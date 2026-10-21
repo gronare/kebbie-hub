@@ -1,0 +1,108 @@
+{
+  "cases": [
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "DvB1srdFROOPdDbnOr776sp1IOVxUM5npllxRR-UInM",
+      "device": "phone",
+      "device_nonce": "H8OmY8AfqoGwWGFWCJgiHmqJmkKP1GFV3voyxZikaQI",
+      "expect": {
+        "sas": "002 787"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "rEcAgTL1kUkOtRe6El3moa1vlN95JnBCPiWBrJ8BI8A",
+      "name": "phone-pairs",
+      "revealed": {
+        "device": "phone",
+        "nonce": "H8OmY8AfqoGwWGFWCJgiHmqJmkKP1GFV3voyxZikaQI"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "JGwSvL-2TIYxopolDwSRuljGGt6KXJPZR-K5rUd8ffg",
+      "device": "tablet",
+      "device_nonce": "LxxRn7K1xtuM73hsF_DVO3NHHn1v5EAp72QZngIs-1c",
+      "expect": {
+        "sas": "355 907"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "TLujF2Pmz_t38owV--eEzibroHvRHt5M0w7R4lM79GY",
+      "name": "tablet-pairs",
+      "revealed": {
+        "device": "tablet",
+        "nonce": "LxxRn7K1xtuM73hsF_DVO3NHHn1v5EAp72QZngIs-1c"
+      }
+    },
+    {
+      "code": "Q2ZR-8HWN",
+      "commitment": "LKRthh6Uqgz-NcCaUXb4D3GKmDZjU30sSvbNbPFXdQE",
+      "device": "phone",
+      "device_nonce": "Ylb3wknDQmD92RM0Pe0mb_B_B5-HTJlZ8sZVjBMX71o",
+      "expect": {
+        "sas": "218 155"
+      },
+      "machine": "other-machine",
+      "machine_code": "Q2ZR-8HWN",
+      "machine_nonce": "YIRsfFMoJBf29zA1DxYeEC60RpdfdSKDYcQqKtrqLIU",
+      "name": "pairs-with-another-machine",
+      "revealed": {
+        "device": "phone",
+        "nonce": "Ylb3wknDQmD92RM0Pe0mb_B_B5-HTJlZ8sZVjBMX71o"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "JWP1BHhAMJmwpVSaVwiJHQCG5-zQ4pBENII-Off1qgA",
+      "device": "phone",
+      "device_nonce": "7KCMtHsv_ljmc8uKUalNsDeEm5pULkK8r7R18pGjnwM",
+      "expect": {
+        "error": "commitment-mismatch"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "ZPdbUm34d8NGDo50tOKTjObiW_rHR7eh25e2pnc2xgo",
+      "name": "reveal-with-another-nonce-is-refused",
+      "revealed": {
+        "device": "phone",
+        "nonce": "uSFlwVYGhLbWSr7Q4SjqQhTcIqJWEPjD1N7GgakX_rY"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "3Pkn21EWpcK1Q3KIKViQpTYv0s8XBW93o0RC0R8naOU",
+      "device": "phone",
+      "device_nonce": "WyO5z6f-5RPwwLYUucyaEtxAaYLoOgwT7Uh_l1zetxo",
+      "expect": {
+        "error": "commitment-mismatch"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "BPn3HwFhiF1_iTafNYL0xaApgL7-KEfLe4ooaMW_EzY",
+      "name": "reveal-of-substituted-keys-is-refused",
+      "revealed": {
+        "device": "intruder",
+        "nonce": "WyO5z6f-5RPwwLYUucyaEtxAaYLoOgwT7Uh_l1zetxo"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "Hr7zBo3KDGC0M7ORfsJdwcrUnM0qi0nr4g93yvBUNss",
+      "device": "phone",
+      "device_nonce": "Q8MUdr5KjnZX807k-vWhle819vPM28v-7ahpviQAmvU",
+      "expect": {
+        "error": "commitment-mismatch"
+      },
+      "machine": "machine",
+      "machine_code": "Q2ZR-8HWN",
+      "machine_nonce": "06sLz-Sf5olokBJpLXEvEgk_O7rh-brH0VNPGPcLS_k",
+      "name": "machine-with-another-code-is-refused",
+      "revealed": {
+        "device": "phone",
+        "nonce": "Q8MUdr5KjnZX807k-vWhle819vPM28v-7ahpviQAmvU"
+      }
+    }
+  ],
+  "commit_domain": "kelpie-pair-commit-v1",
+  "sas_domain": "kelpie-pair-v1"
+}

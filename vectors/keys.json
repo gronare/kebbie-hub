@@ -1,0 +1,49 @@
+{
+  "parties": {
+    "intruder": {
+      "encryption_secret": "Lp_8jOC0OLJxP4hxGKFKDMK90KhRvcf4SuJ6UmJJfSo",
+      "id": "dev_01K83YV380B68N2787R00EZ06Y",
+      "public": {
+        "encryption": "c4s3pwXFZPiEZCBWPJOTHhWt5sYaUUSj5UCH9XYai24",
+        "signing": "5wDSk9eBq4--3uwnD3X-Z-gkDJQEEwozLslaIl2Ido8"
+      },
+      "signing_secret": "O0X8e6xFD919RE0kQWNMma5WgU-s_DOr0jfxxrxhGQ0"
+    },
+    "machine": {
+      "encryption_secret": "Rae7bJlQZOuF9w5H3R-xSFMsR2OnouZA-NTQtjw-ImU",
+      "id": "mch_01K83YV380C22K88V6NF4RVHXX",
+      "public": {
+        "encryption": "31kcjbOLwSGg1u5FZ83qMVALrCccF1ke0WmNvUuu0mg",
+        "signing": "L1xBrv3mfhcDxE_nV1ZQ361Bk00O6WKBEN6MKh7D46A"
+      },
+      "signing_secret": "ype6yHZxwfqQXRHdozAoSYmAMBMjrAos9mf011GqqHA"
+    },
+    "other-machine": {
+      "encryption_secret": "1nlMjJHl14gFS_aw_NIN9qWJZ9bA3vggXTM-FSavDEI",
+      "id": "mch_01K83YV380VW3A2NGRP5ZV0J1V",
+      "public": {
+        "encryption": "Eu8qn70SbRcznhw-iwqc-FfOAwipMVvO8SI6afWc0Es",
+        "signing": "MRhl1thVOFcISeCMeZ0cPe_-H8rC5Oa5SrCiXKqfeLM"
+      },
+      "signing_secret": "D9FxE-myOyhy9MwZ07EOKWMtGKwB23RH7N7gCHjlLUE"
+    },
+    "phone": {
+      "encryption_secret": "ecp771qrH01qUMYCwewbCM1qwqlrUvdwVHwDfTpA0Z4",
+      "id": "dev_01K83YV380E53982K97AMTCKG1",
+      "public": {
+        "encryption": "mpgpQMHst2XLT2MzPY5dVVSTRplCun_uHfRQ1ptVpj4",
+        "signing": "Kj7EWI6Of9w8CbFiltVEd_-a2CgpNK5J2_E4_W83LHY"
+      },
+      "signing_secret": "75NyCZ6hoLASxc7A-1atC340p52u4h9yt8Z9prOiB0Y"
+    },
+    "tablet": {
+      "encryption_secret": "P1HsZfMzPV-hnnrsIlPyc1lQtfJdgZkCRYleKuWWDrk",
+      "id": "dev_01K83YV380FYYJR575Y98C6MPM",
+      "public": {
+        "encryption": "IvaY263TiGok3H0m2foZvMCaLdIHhBUfXp-VsI1BdCk",
+        "signing": "cj0Nvx-ikjpGXjpzw_61yil9x-rAXkEgeBbn-B7ZZ7o"
+      },
+      "signing_secret": "MOHjz4-R6u0MaS4YsxZ-vlS54Zif2HIHWkcrfUuAFYI"
+    }
+  }
+}

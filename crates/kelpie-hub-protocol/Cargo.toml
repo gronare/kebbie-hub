@@ -1,0 +1,25 @@
+[package]
+name = "kelpie-hub-protocol"
+description = "Envelopes, messages and end-to-end encryption between kelpie machines and their devices"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+test-vectors = []
+
+[[bin]]
+name = "vectors"
+required-features = ["test-vectors"]
+
+[dependencies]
+aes-gcm = "=0.11.1"
+base64 = "=0.23.1"
+ed25519-dalek = "=3.0.0"
+getrandom = "=0.4.3"
+hpke = { version = "=0.14.1", default-features = false, features = ["alloc", "x25519", "aes"] }
+rand_core = "=0.10.1"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+sha2 = "=0.11.1"

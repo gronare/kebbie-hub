@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "message": "a2VscGllLWh1YiBzaWduYXR1cmUgdmVjdG9yIGZvciBtYWNoaW5l",
+      "signature": "Lnz6VuQKe-jO3ox_fQK5GaqJuAHCPLAtcoNuiMW5rCHjXi6-IIJa69Vkag3f3Tj_R6PvVE-xFZlbl9j7fxtdDg",
+      "signer": "machine"
+    },
+    {
+      "message": "a2VscGllLWh1YiBzaWduYXR1cmUgdmVjdG9yIGZvciBwaG9uZQ",
+      "signature": "-orKtK2tj9HoGmLQ2ArCCgcNVsdcVYxy7jzFp5EAV3Hlio4qVy1eDKUDVrMqnK5U_jFdKIbPnnz6Tq778i9UDQ",
+      "signer": "phone"
+    }
+  ]
+}
