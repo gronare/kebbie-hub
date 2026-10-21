@@ -1,0 +1,76 @@
+{
+  "away_since": null,
+  "checkouts": [
+    {
+      "busy_worktrees": 4,
+      "free_worktrees": 2,
+      "repo": "greenhouse"
+    }
+  ],
+  "items": [
+    {
+      "address": "refunds@greenhouse",
+      "agent": {
+        "status": "idle"
+      },
+      "card": null,
+      "ci": null,
+      "follows_main": false,
+      "git": {
+        "ahead": 2,
+        "approved": false,
+        "behind": 1,
+        "uncommitted": 0,
+        "upstream": "main"
+      },
+      "group": "NEEDS YOU",
+      "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+      "next_for_you": "answer: Keep the old endpoint for a release?",
+      "prompt": null,
+      "push_permission": null,
+      "push_waits": null,
+      "question": {
+        "at": 1761069540,
+        "id": "1761069540-4411-0-question",
+        "kept_for_user": false,
+        "options": [
+          {
+            "label": "Keep it",
+            "meaning": "deprecate now, remove in the next release"
+          },
+          {
+            "label": "Remove it",
+            "meaning": "drop it in this task"
+          }
+        ],
+        "plan": null,
+        "recommend": 1,
+        "text": "Keep the old endpoint for a release?"
+      },
+      "recover": null,
+      "report": {
+        "at": 1761069540,
+        "next": "answer: Keep the old endpoint for a release?",
+        "state": "needs-you",
+        "summary": "asked the user: Keep the old endpoint for a release?"
+      },
+      "routine": null,
+      "summary": "2 commits · 1 behind main",
+      "urgency": 1,
+      "verdict": null
+    }
+  ],
+  "kelpie": "0.24.0",
+  "rev": 1,
+  "routines": [
+    {
+      "id": "nightly-deps",
+      "last_outcome": "ok",
+      "mode": "fix",
+      "next_run": 1761100200,
+      "repo": "greenhouse",
+      "title": "Nightly deps"
+    }
+  ],
+  "sessions_outside_tasks": 1
+}

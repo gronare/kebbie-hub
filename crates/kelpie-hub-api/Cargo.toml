@@ -1,0 +1,12 @@
+[package]
+name = "kelpie-hub-api"
+description = "Request and response bodies of the kelpie hub's HTTP API"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64 = "=0.23.1"
+kelpie-hub-protocol = { path = "../kelpie-hub-protocol" }
+serde = { version = "=1.0.229", features = ["derive"] }

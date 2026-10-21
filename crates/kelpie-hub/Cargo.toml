@@ -1,0 +1,25 @@
+[package]
+name = "kelpie-hub"
+description = "The kelpie hub: a mailbox that relays end-to-end encrypted boards between machines and devices"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }
+base64 = "=0.23.1"
+clap = { version = "=4.6.7", features = ["derive"] }
+getrandom = "=0.4.3"
+kelpie-hub-api = { path = "../kelpie-hub-api" }
+kelpie-hub-protocol = { path = "../kelpie-hub-protocol" }
+rusqlite = { version = "=0.40.2", features = ["bundled", "fallible_uint"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+sha2 = "=0.11.1"
+tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
+
+[dev-dependencies]
+kelpie-hub-fakes = { path = "../kelpie-hub-fakes" }
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "query"] }
+tempfile = "=3.27.0"
