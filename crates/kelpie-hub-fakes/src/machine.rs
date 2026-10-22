@@ -134,6 +134,14 @@ impl MachineState {
         Ok(device)
     }
 
+    pub async fn remove_device(&mut self, device: &Id) -> Result<(), Error> {
+        self.client()
+            .delete(&format!("/v1/m/devices/{device}"))
+            .await?;
+        self.devices.retain(|known| &known.id != device);
+        Ok(())
+    }
+
     async fn next_state(
         &self,
         client: &HubClient,

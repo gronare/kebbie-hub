@@ -21,9 +21,49 @@ CREATE TABLE IF NOT EXISTS join_codes (
     code_hash BLOB PRIMARY KEY,
     expires_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    handle TEXT NOT NULL UNIQUE,
+    user_handle BLOB NOT NULL UNIQUE,
+    github_id INTEGER UNIQUE,
+    email TEXT UNIQUE,
+    email_verified_at INTEGER,
+    created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS invites (
+    code_hash BLOB PRIMARY KEY,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS passkeys (
+    credential_id BLOB PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name TEXT,
+    passkey TEXT NOT NULL,
+    counter INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    last_used_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash BLOB PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ceremonies (
+    id_hash BLOB PRIMARY KEY,
+    purpose TEXT NOT NULL,
+    account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+    handle TEXT,
+    user_handle BLOB,
+    invite_hash BLOB,
+    state TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS devices (
     id TEXT PRIMARY KEY,
     token_hash BLOB NOT NULL UNIQUE,
+    account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+    name TEXT,
     signing_key BLOB,
     encryption_key BLOB,
     created_at INTEGER NOT NULL,
@@ -77,6 +117,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 ";
 
+const SCHEMA_VERSION: i64 = 1;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
 
@@ -129,7 +170,20 @@ impl Store {
         connection.pragma_update(None, "synchronous", "NORMAL")?;
         connection.pragma_update(None, "foreign_keys", true)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
+        let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        let tables: i64 =
+            connection.query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get(0))?;
+        if version != SCHEMA_VERSION && (version != 0 || tables > 0) {
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISMATCH),
+                Some(format!(
+                    "{} was written by another kelpie-hub version (schema {version}); start with an empty data directory",
+                    path.display()
+                )),
+            ));
+        }
         connection.execute_batch(SCHEMA)?;
+        connection.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         Ok(Store { connection })
     }
 
@@ -316,54 +370,55 @@ impl Store {
     }
 
     pub fn pairing(&self, id: &str) -> Result<Option<Pairing>> {
-        self.pairing_where("id = ?1", rusqlite::types::Value::Text(id.to_string()))
+        Ok(self
+            .pairings_where("id = ?1", rusqlite::types::Value::Text(id.to_string()))?
+            .pop())
     }
 
     pub fn pairing_by_code(&self, code_hash: &[u8]) -> Result<Option<Pairing>> {
-        self.pairing_where(
-            "code_hash = ?1",
-            rusqlite::types::Value::Blob(code_hash.to_vec()),
+        Ok(self
+            .pairings_where(
+                "code_hash = ?1",
+                rusqlite::types::Value::Blob(code_hash.to_vec()),
+            )?
+            .pop())
+    }
+
+    pub fn pairings_of_device(&self, device: &Id) -> Result<Vec<Pairing>> {
+        self.pairings_where(
+            "device_id = ?1",
+            rusqlite::types::Value::Text(device.as_str().to_string()),
         )
     }
 
-    fn pairing_where(
-        &self,
-        filter: &str,
-        value: rusqlite::types::Value,
-    ) -> Result<Option<Pairing>> {
-        self.connection
-            .query_row(
-                &format!(
-                    "SELECT id, machine_id, state, reason, device_id, commitment,
-                            machine_signing, machine_encryption, machine_nonce,
-                            device_signing, device_encryption, device_nonce, expires_at
-                     FROM pairings WHERE {filter}"
-                ),
-                [value],
-                |row| {
-                    Ok(Pairing {
-                        id: row.get(0)?,
-                        machine: id_at(row, 1)?,
-                        state: PairingState::parse(&row.get::<_, String>(2)?)
-                            .ok_or_else(|| corrupt(2))?,
-                        reason: row
-                            .get::<_, Option<String>>(3)?
-                            .map(|name| PairingFailure::parse(&name).ok_or_else(|| corrupt(3)))
-                            .transpose()?,
-                        device: row
-                            .get::<_, Option<String>>(4)?
-                            .map(|text| Id::parse(&text).map_err(|_| corrupt(4)))
-                            .transpose()?,
-                        commitment: bytes32_at(row, 5)?,
-                        machine_keys: optional_keys_at(row, 6)?,
-                        machine_nonce: bytes32_at(row, 8)?,
-                        device_keys: optional_keys_at(row, 9)?,
-                        device_nonce: bytes32_at(row, 11)?,
-                        expires_at: row.get(12)?,
-                    })
-                },
-            )
-            .optional()
+    fn pairings_where(&self, filter: &str, value: rusqlite::types::Value) -> Result<Vec<Pairing>> {
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT id, machine_id, state, reason, device_id, commitment,
+                    machine_signing, machine_encryption, machine_nonce,
+                    device_signing, device_encryption, device_nonce, expires_at
+             FROM pairings WHERE {filter} ORDER BY opened_at, id"
+        ))?;
+        statement
+            .query_map([value], |row| {
+                Ok(Pairing {
+                    id: row.get(0)?,
+                    machine: id_at(row, 1)?,
+                    state: PairingState::parse(&row.get::<_, String>(2)?)
+                        .ok_or_else(|| corrupt(2))?,
+                    reason: row
+                        .get::<_, Option<String>>(3)?
+                        .map(|name| PairingFailure::parse(&name).ok_or_else(|| corrupt(3)))
+                        .transpose()?,
+                    device: optional_id_at(row, 4)?,
+                    commitment: bytes32_at(row, 5)?,
+                    machine_keys: optional_keys_at(row, 6)?,
+                    machine_nonce: bytes32_at(row, 8)?,
+                    device_keys: optional_keys_at(row, 9)?,
+                    device_nonce: bytes32_at(row, 11)?,
+                    expires_at: row.get(12)?,
+                })
+            })?
+            .collect()
     }
 
     pub fn save_pairing(&self, pairing: &Pairing) -> Result<()> {
@@ -389,10 +444,18 @@ impl Store {
         Ok(())
     }
 
-    pub fn create_device(&self, device: &Id, token_hash: &[u8], now: u64) -> Result<()> {
+    pub fn create_device(
+        &self,
+        device: &Id,
+        token_hash: &[u8],
+        account: Option<&str>,
+        name: Option<&str>,
+        now: u64,
+    ) -> Result<()> {
         self.connection.execute(
-            "INSERT INTO devices (id, token_hash, created_at, last_seen) VALUES (?1, ?2, ?3, ?3)",
-            params![device.as_str(), token_hash, now],
+            "INSERT INTO devices (id, token_hash, account_id, name, created_at, last_seen)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+            params![device.as_str(), token_hash, account, name, now],
         )?;
         Ok(())
     }
@@ -473,9 +536,386 @@ impl Store {
             .collect()
     }
 
-    pub fn sweep(&self, now: u64) -> Result<()> {
+    pub fn admitted_devices(&self, machine: &Id) -> Result<Vec<Id>> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT device_id FROM admissions WHERE machine_id = ?1")?;
+        statement
+            .query_map([machine.as_str()], |row| id_at(row, 0))?
+            .collect()
+    }
+
+    pub fn device_exists(&self, device: &Id) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM devices WHERE id = ?1)",
+            [device.as_str()],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn heads_for_device(&self, device: &Id) -> Result<Vec<BoardHead>> {
+        let mut statement = self.connection.prepare(
+            "SELECT admissions.machine_id, boards.envelope_id, boards.rev
+             FROM admissions LEFT JOIN boards ON boards.machine_id = admissions.machine_id
+             WHERE admissions.device_id = ?1 ORDER BY admissions.machine_id",
+        )?;
+        statement
+            .query_map([device.as_str()], |row| {
+                let envelope: Option<String> = row.get(1)?;
+                let rev: Option<u64> = row.get(2)?;
+                Ok(BoardHead {
+                    machine: id_at(row, 0)?,
+                    board: envelope.zip(rev),
+                })
+            })?
+            .collect()
+    }
+
+    pub fn remove_admission(&self, machine: &Id, device: &Id) -> Result<bool> {
+        Ok(self.connection.execute(
+            "DELETE FROM admissions WHERE machine_id = ?1 AND device_id = ?2",
+            params![machine.as_str(), device.as_str()],
+        )? > 0)
+    }
+
+    pub fn remove_machine(&self, machine: &Id) -> Result<bool> {
+        Ok(self
+            .connection
+            .execute("DELETE FROM machines WHERE id = ?1", [machine.as_str()])?
+            > 0)
+    }
+
+    pub fn machines(&self) -> Result<Vec<MachineRow>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, name, joined_at, last_seen FROM machines ORDER BY joined_at, id",
+        )?;
+        statement
+            .query_map([], |row| {
+                Ok(MachineRow {
+                    id: id_at(row, 0)?,
+                    name: row.get(1)?,
+                    joined_at: row.get(2)?,
+                    last_seen: row.get(3)?,
+                })
+            })?
+            .collect()
+    }
+
+    pub fn add_invite(&self, code_hash: &[u8], expires_at: u64) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO invites (code_hash, expires_at) VALUES (?1, ?2)",
+            params![code_hash, expires_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn invite_valid(&self, code_hash: &[u8], now: u64) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM invites WHERE code_hash = ?1 AND expires_at > ?2)",
+            params![code_hash, now],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn handle_taken(&self, handle: &str) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM accounts WHERE handle = ?1)",
+            [handle],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn account_by_handle(&self, handle: &str) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT id FROM accounts WHERE handle = ?1",
+                [handle],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn account(&self, account: &str) -> Result<Option<AccountRow>> {
+        self.connection
+            .query_row(
+                "SELECT id, handle, user_handle, created_at FROM accounts WHERE id = ?1",
+                [account],
+                |row| {
+                    Ok(AccountRow {
+                        id: row.get(0)?,
+                        handle: row.get(1)?,
+                        user_handle: row
+                            .get::<_, Vec<u8>>(2)?
+                            .try_into()
+                            .map_err(|_| corrupt(2))?,
+                        created_at: row.get(3)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn save_ceremony(&self, ceremony: &Ceremony) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO ceremonies (id_hash, purpose, account_id, handle, user_handle, invite_hash, state, expires_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                ceremony.id_hash,
+                ceremony.purpose.name(),
+                ceremony.account,
+                ceremony.handle,
+                ceremony.user_handle.map(|bytes| bytes.to_vec()),
+                ceremony.invite_hash,
+                ceremony.state,
+                ceremony.expires_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn take_ceremony(
+        &self,
+        id_hash: &[u8],
+        purpose: Purpose,
+        now: u64,
+    ) -> Result<Option<Ceremony>> {
+        let ceremony = self
+            .connection
+            .query_row(
+                "DELETE FROM ceremonies WHERE id_hash = ?1
+                 RETURNING id_hash, purpose, account_id, handle, user_handle, invite_hash, state, expires_at",
+                [id_hash],
+                |row| {
+                    Ok(Ceremony {
+                        id_hash: row.get(0)?,
+                        purpose: Purpose::parse(&row.get::<_, String>(1)?)
+                            .ok_or_else(|| corrupt(1))?,
+                        account: row.get(2)?,
+                        handle: row.get(3)?,
+                        user_handle: row
+                            .get::<_, Option<Vec<u8>>>(4)?
+                            .map(|bytes| bytes.try_into().map_err(|_| corrupt(4)))
+                            .transpose()?,
+                        invite_hash: row.get(5)?,
+                        state: row.get(6)?,
+                        expires_at: row.get(7)?,
+                    })
+                },
+            )
+            .optional()?;
+        Ok(ceremony.filter(|ceremony| ceremony.purpose == purpose && ceremony.expires_at > now))
+    }
+
+    pub fn sign_up(&mut self, signup: &SignUp<'_>) -> Result<SignUpOutcome> {
+        let tx = self.connection.transaction()?;
+        let spent = tx.execute(
+            "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2",
+            params![signup.invite_hash, signup.now],
+        )?;
+        if spent == 0 {
+            return Ok(SignUpOutcome::InviteSpent);
+        }
+        let taken: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM accounts WHERE handle = ?1)",
+            [signup.handle],
+            |row| row.get(0),
+        )?;
+        if taken {
+            return Ok(SignUpOutcome::HandleTaken);
+        }
+        let reused: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM passkeys WHERE credential_id = ?1)",
+            [signup.credential_id],
+            |row| row.get(0),
+        )?;
+        if reused {
+            return Ok(SignUpOutcome::CredentialTaken);
+        }
+        tx.execute(
+            "INSERT INTO accounts (id, handle, user_handle, created_at) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                signup.account,
+                signup.handle,
+                signup.user_handle.to_vec(),
+                signup.now
+            ],
+        )?;
+        tx.execute(
+            "INSERT INTO passkeys (credential_id, account_id, name, passkey, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                signup.credential_id,
+                signup.account,
+                signup.name,
+                signup.passkey,
+                signup.now
+            ],
+        )?;
+        tx.execute(
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
+            params![signup.session_hash, signup.account, signup.now, signup.session_expires_at],
+        )?;
+        tx.commit()?;
+        Ok(SignUpOutcome::Created)
+    }
+
+    pub fn passkeys(&self, account: &str) -> Result<Vec<StoredPasskey>> {
+        let mut statement = self.connection.prepare(
+            "SELECT credential_id, name, passkey, created_at, last_used_at, counter
+             FROM passkeys WHERE account_id = ?1 ORDER BY created_at, credential_id",
+        )?;
+        statement
+            .query_map([account], |row| {
+                Ok(StoredPasskey {
+                    credential_id: row.get(0)?,
+                    name: row.get(1)?,
+                    passkey: row.get(2)?,
+                    created_at: row.get(3)?,
+                    last_used_at: row.get(4)?,
+                    counter: row.get(5)?,
+                })
+            })?
+            .collect()
+    }
+
+    pub fn add_passkey(
+        &self,
+        account: &str,
+        credential_id: &[u8],
+        name: Option<&str>,
+        passkey: &str,
+        now: u64,
+    ) -> Result<bool> {
+        Ok(self.connection.execute(
+            "INSERT INTO passkeys (credential_id, account_id, name, passkey, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (credential_id) DO NOTHING",
+            params![credential_id, account, name, passkey, now],
+        )? > 0)
+    }
+
+    pub fn use_passkey(
+        &self,
+        credential_id: &[u8],
+        passkey: Option<&str>,
+        counter: u32,
+        now: u64,
+    ) -> Result<()> {
+        self.connection.execute(
+            "UPDATE passkeys SET last_used_at = ?2, passkey = coalesce(?3, passkey), counter = ?4
+             WHERE credential_id = ?1",
+            params![credential_id, now, passkey, counter],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_passkey(&mut self, account: &str, credential_id: &[u8]) -> Result<Removal> {
+        let tx = self.connection.transaction()?;
+        let count: u64 = tx.query_row(
+            "SELECT count(*) FROM passkeys WHERE account_id = ?1",
+            [account],
+            |row| row.get(0),
+        )?;
+        let owned: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM passkeys WHERE account_id = ?1 AND credential_id = ?2)",
+            params![account, credential_id],
+            |row| row.get(0),
+        )?;
+        if !owned {
+            return Ok(Removal::Missing);
+        }
+        if count <= 1 {
+            return Ok(Removal::Last);
+        }
+        tx.execute(
+            "DELETE FROM passkeys WHERE account_id = ?1 AND credential_id = ?2",
+            params![account, credential_id],
+        )?;
+        tx.commit()?;
+        Ok(Removal::Removed)
+    }
+
+    pub fn create_session(
+        &self,
+        token_hash: &[u8],
+        account: &str,
+        now: u64,
+        expires_at: u64,
+    ) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
+            params![token_hash, account, now, expires_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn session_account(&self, token_hash: &[u8], now: u64) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT account_id FROM sessions WHERE token_hash = ?1 AND expires_at > ?2",
+                params![token_hash, now],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn end_session(&self, token_hash: &[u8]) -> Result<()> {
+        self.connection
+            .execute("DELETE FROM sessions WHERE token_hash = ?1", [token_hash])?;
+        Ok(())
+    }
+
+    pub fn devices_of_account(&self, account: &str) -> Result<Vec<DeviceRow>> {
+        let mut statement = self.connection.prepare(
+            "SELECT devices.id, devices.name, devices.created_at, devices.last_seen,
+                    group_concat(admissions.machine_id, ' ')
+             FROM devices LEFT JOIN admissions ON admissions.device_id = devices.id
+             WHERE devices.account_id = ?1
+             GROUP BY devices.id ORDER BY devices.created_at, devices.id",
+        )?;
+        statement
+            .query_map([account], |row| {
+                let machines = row
+                    .get::<_, Option<String>>(4)?
+                    .unwrap_or_default()
+                    .split_whitespace()
+                    .map(|text| Id::parse(text).map_err(|_| corrupt(4)))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(DeviceRow {
+                    id: id_at(row, 0)?,
+                    name: row.get(1)?,
+                    created_at: row.get(2)?,
+                    last_seen: row.get(3)?,
+                    machines,
+                })
+            })?
+            .collect()
+    }
+
+    pub fn remove_account_device(&self, account: &str, device: &Id) -> Result<bool> {
+        Ok(self.connection.execute(
+            "DELETE FROM devices WHERE id = ?1 AND account_id = ?2",
+            params![device.as_str(), account],
+        )? > 0)
+    }
+
+    pub fn sweep(&self, now: u64) -> Result<Sweep> {
         self.connection
             .execute("DELETE FROM join_codes WHERE expires_at <= ?1", [now])?;
+        self.connection
+            .execute("DELETE FROM invites WHERE expires_at <= ?1", [now])?;
+        self.connection
+            .execute("DELETE FROM ceremonies WHERE expires_at <= ?1", [now])?;
+        let sessions = self
+            .connection
+            .execute("DELETE FROM sessions WHERE expires_at <= ?1", [now])?;
+        let devices = self.connection.execute(
+            "DELETE FROM devices WHERE account_id IS NULL
+                AND NOT EXISTS (SELECT 1 FROM admissions WHERE admissions.device_id = devices.id)
+                AND NOT EXISTS (SELECT 1 FROM pairings WHERE pairings.device_id = devices.id
+                    AND pairings.state IN ('open', 'committed', 'replied', 'revealed')
+                    AND pairings.expires_at > ?1)",
+            [now],
+        )?;
         self.connection.execute(
             "DELETE FROM pairings WHERE expires_at + ?2 <= ?1",
             params![now, PAIRING_KEEP_SECONDS],
@@ -484,8 +924,110 @@ impl Store {
             "DELETE FROM events WHERE at + ?2 <= ?1",
             params![now, EVENT_KEEP_SECONDS],
         )?;
-        Ok(())
+        Ok(Sweep { sessions, devices })
     }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Sweep {
+    pub sessions: usize,
+    pub devices: usize,
+}
+
+pub struct BoardHead {
+    pub machine: Id,
+    pub board: Option<(String, u64)>,
+}
+
+pub struct MachineRow {
+    pub id: Id,
+    pub name: String,
+    pub joined_at: u64,
+    pub last_seen: Option<u64>,
+}
+
+pub struct AccountRow {
+    pub id: String,
+    pub handle: String,
+    pub user_handle: [u8; 16],
+    pub created_at: u64,
+}
+
+pub struct DeviceRow {
+    pub id: Id,
+    pub name: Option<String>,
+    pub created_at: u64,
+    pub last_seen: Option<u64>,
+    pub machines: Vec<Id>,
+}
+
+pub struct StoredPasskey {
+    pub credential_id: Vec<u8>,
+    pub name: Option<String>,
+    pub passkey: String,
+    pub created_at: u64,
+    pub last_used_at: Option<u64>,
+    pub counter: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Purpose {
+    SignUp,
+    AddPasskey,
+    LogIn,
+}
+
+impl Purpose {
+    pub fn name(self) -> &'static str {
+        match self {
+            Purpose::SignUp => "sign-up",
+            Purpose::AddPasskey => "add-passkey",
+            Purpose::LogIn => "log-in",
+        }
+    }
+
+    fn parse(name: &str) -> Option<Purpose> {
+        [Purpose::SignUp, Purpose::AddPasskey, Purpose::LogIn]
+            .into_iter()
+            .find(|purpose| purpose.name() == name)
+    }
+}
+
+pub struct Ceremony {
+    pub id_hash: Vec<u8>,
+    pub purpose: Purpose,
+    pub account: Option<String>,
+    pub handle: Option<String>,
+    pub user_handle: Option<[u8; 16]>,
+    pub invite_hash: Option<Vec<u8>>,
+    pub state: String,
+    pub expires_at: u64,
+}
+
+pub struct SignUp<'a> {
+    pub invite_hash: &'a [u8],
+    pub account: &'a str,
+    pub handle: &'a str,
+    pub user_handle: [u8; 16],
+    pub credential_id: &'a [u8],
+    pub name: Option<&'a str>,
+    pub passkey: &'a str,
+    pub session_hash: &'a [u8],
+    pub session_expires_at: u64,
+    pub now: u64,
+}
+
+pub enum SignUpOutcome {
+    Created,
+    InviteSpent,
+    HandleTaken,
+    CredentialTaken,
+}
+
+pub enum Removal {
+    Removed,
+    Last,
+    Missing,
 }
 
 fn corrupt(column: usize) -> rusqlite::Error {
@@ -498,6 +1040,12 @@ fn corrupt(column: usize) -> rusqlite::Error {
 
 fn id_at(row: &Row<'_>, column: usize) -> Result<Id> {
     Id::parse(&row.get::<_, String>(column)?).map_err(|_| corrupt(column))
+}
+
+fn optional_id_at(row: &Row<'_>, column: usize) -> Result<Option<Id>> {
+    row.get::<_, Option<String>>(column)?
+        .map(|text| Id::parse(&text).map_err(|_| corrupt(column)))
+        .transpose()
 }
 
 fn bytes32_at(row: &Row<'_>, column: usize) -> Result<Option<[u8; 32]>> {

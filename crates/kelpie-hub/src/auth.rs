@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use axum::extract::{ConnectInfo, FromRequestParts};
 use axum::http::HeaderMap;
-use axum::http::header::AUTHORIZATION;
+use axum::http::header::{AUTHORIZATION, COOKIE, ORIGIN};
 use axum::http::request::Parts;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -16,6 +16,8 @@ use crate::{Hub, TrustedProxy};
 
 pub const MACHINE_TOKEN_PREFIX: &str = "khm_";
 pub const DEVICE_TOKEN_PREFIX: &str = "khd_";
+pub const SESSION_TOKEN_PREFIX: &str = "khs_";
+pub const SESSION_COOKIE: &str = "__Host-kelpie_session";
 
 pub fn random<const N: usize>() -> [u8; N] {
     let mut bytes = [0u8; N];
@@ -39,6 +41,18 @@ pub fn bearer(headers: &HeaderMap) -> Option<&str> {
         .strip_prefix("Bearer ")
         .map(str::trim)
         .filter(|token| !token.is_empty())
+}
+
+pub fn session_cookie(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(name, _)| *name == SESSION_COOKIE)
+        .map(|(_, value)| value.trim())
+        .filter(|token| token.starts_with(SESSION_TOKEN_PREFIX))
 }
 
 const CLOUDFLARE_CLIENT_HEADER: &str = "cf-connecting-ip";
@@ -66,6 +80,10 @@ pub fn client_address(parts: &Parts, hub: &Hub) -> String {
 pub struct MachineAuth(pub Id);
 
 pub struct DeviceAuth(pub Id);
+
+pub struct AccountAuth(pub String);
+
+pub struct SameOrigin;
 
 pub struct Anonymous {
     pub address: String,
@@ -114,6 +132,43 @@ pub fn device_for(hub: &Hub, token: Option<&str>) -> Result<Option<Id>, ApiError
     match token.filter(|token| token.starts_with(DEVICE_TOKEN_PREFIX)) {
         Some(token) => Ok(hub.store().device_by_token(&digest(token))?),
         None => Ok(None),
+    }
+}
+
+impl FromRequestParts<Arc<Hub>> for AccountAuth {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        hub: &Arc<Hub>,
+    ) -> Result<AccountAuth, ApiError> {
+        let address = client_address(parts, hub);
+        hub.check_anonymous(&address)?;
+        let account = match session_cookie(&parts.headers) {
+            Some(token) => hub.store().session_account(&digest(token), crate::now())?,
+            None => None,
+        };
+        let Some(account) = account else {
+            return Err(hub.refuse_anonymous(&address));
+        };
+        hub.limit(&format!("account:{account}"))?;
+        Ok(AccountAuth(account))
+    }
+}
+
+impl FromRequestParts<Arc<Hub>> for SameOrigin {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<SameOrigin, ApiError> {
+        let origin = parts
+            .headers
+            .get(ORIGIN)
+            .and_then(|value| value.to_str().ok());
+        if origin == Some(hub.origin()) {
+            Ok(SameOrigin)
+        } else {
+            Err(ApiError::forbidden("cross-origin"))
+        }
     }
 }
 

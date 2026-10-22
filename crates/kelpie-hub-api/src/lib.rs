@@ -4,6 +4,10 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_protocol::{Envelope, Id, PublicKeys};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
+pub use webauthn_rs_proto::{
+    CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
+    RequestChallengeResponse,
+};
 
 pub const MAX_WAIT_SECONDS: u64 = 25;
 const CODE_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -250,6 +254,113 @@ pub struct BoardEntry {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Boards {
     pub boards: Vec<BoardEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RegisterBegin {
+    pub invite: String,
+    pub handle: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LoginBegin {
+    pub handle: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreationCeremony {
+    pub ceremony: String,
+    pub options: CreationChallengeResponse,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RequestCeremony {
+    pub ceremony: String,
+    pub options: RequestChallengeResponse,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RegisterFinish {
+    pub ceremony: String,
+    pub credential: RegisterPublicKeyCredential,
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LoginFinish {
+    pub ceremony: String,
+    pub credential: PublicKeyCredential,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountView {
+    pub account: String,
+    pub handle: String,
+    pub created_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PasskeyView {
+    pub passkey: String,
+    pub name: Option<String>,
+    pub created_at: u64,
+    pub last_used_at: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Passkeys {
+    pub passkeys: Vec<PasskeyView>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct DeviceRequest {
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceRegistered {
+    pub device: Id,
+    pub token: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceView {
+    pub device: Id,
+    pub name: Option<String>,
+    pub created_at: u64,
+    pub last_seen: Option<u64>,
+    pub machines: Vec<Id>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Devices {
+    pub devices: Vec<DeviceView>,
+}
+
+pub const EVENT_BOARD: &str = "board";
+pub const EVENT_PAIRING: &str = "pairing";
+pub const EVENT_MACHINE_REMOVED: &str = "machine-removed";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BoardChanged {
+    pub machine: Id,
+    pub rev: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PairingChanged {
+    pub pairing: String,
+    pub state: PairingState,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MachineRemoved {
+    pub machine: Id,
 }
 
 #[cfg(test)]

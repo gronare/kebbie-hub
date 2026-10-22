@@ -85,6 +85,14 @@ impl PhoneState {
         }
     }
 
+    pub fn registered(hub: &str, device: Id, token: &str) -> PhoneState {
+        PhoneState {
+            device: Some(device),
+            token: Some(token.to_string()),
+            ..PhoneState::new(hub)
+        }
+    }
+
     pub fn secret(&self) -> SecretKeys {
         self.secret.keys()
     }

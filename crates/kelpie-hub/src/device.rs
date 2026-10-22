@@ -12,6 +12,7 @@ use crate::auth::{Anonymous, DEVICE_TOKEN_PREFIX, DeviceAuth, device_for, digest
 use crate::error::ApiError;
 use crate::pairing::{Side, Watch, view};
 use crate::store::{Pairing, Store};
+use crate::wake::pairing_key;
 use crate::{Hub, now};
 
 pub async fn commit(
@@ -26,10 +27,11 @@ pub async fn commit(
             hub.limit(&format!("token:{device}"))?;
             Some(device)
         }
-        None => {
+        None if hub.config().anonymous_devices => {
             hub.limit_anonymous(&client.address)?;
             None
         }
+        None => return Err(hub.refuse_anonymous(&client.address)),
     };
     let code = normalize_code(&request.code).ok_or_else(ApiError::unauthorized)?;
     let at = now();
@@ -61,7 +63,7 @@ pub async fn commit(
             Some(PairingFailure::SecondCommitment.name()),
         )?;
         drop(store);
-        hub.changed();
+        hub.wake_pairing(&pairing);
         return Err(ApiError::conflict("second-commitment"));
     }
     let (device, token) = match known {
@@ -69,7 +71,7 @@ pub async fn commit(
         None => {
             let device = Id::new(Prefix::Device).expect("a fresh device id is valid");
             let token = new_token(DEVICE_TOKEN_PREFIX);
-            store.create_device(&device, &digest(&token), at)?;
+            store.create_device(&device, &digest(&token), None, None, at)?;
             (device, Some(token))
         }
     };
@@ -85,7 +87,7 @@ pub async fn commit(
         None,
     )?;
     drop(store);
-    hub.changed();
+    hub.wake_pairing(&pairing);
     Ok(Json(Committed {
         pairing: pairing.id,
         device,
@@ -108,7 +110,7 @@ pub async fn pairing(
     Query(watch): Query<Watch>,
 ) -> Result<Json<PairingView>, ApiError> {
     let pairing = hub
-        .wait_until(watch.wait, || {
+        .wait_until(&pairing_key(&id), watch.wait, || {
             let pairing = own_pairing(&hub.store(), &device, &id)?;
             let changed = watch.changed(pairing.state_at(now()));
             Ok((pairing, changed))
@@ -147,7 +149,7 @@ pub async fn reveal(
         None,
     )?;
     drop(store);
-    hub.changed();
+    hub.wake_pairing(&pairing);
     Ok(Json(view(&pairing, Side::Device, at)))
 }
 

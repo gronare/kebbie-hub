@@ -4,7 +4,11 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use kelpie_hub::store::Store;
-use kelpie_hub::{Config, Hub, TrustedProxy, database_path, mint_join_code, serve};
+use kelpie_hub::{
+    Config, DEV_ORIGIN, DEV_RP_ID, Hub, TrustedProxy, database_path, mint_invite, mint_join_code,
+    serve,
+};
+use kelpie_hub_protocol::Id;
 
 const DEV_LISTEN: &str = "127.0.0.1:8470";
 
@@ -31,6 +35,16 @@ struct Cli {
         help = "Take the client address from this proxy's header instead of the TCP peer"
     )]
     trusted_proxy: Option<Proxy>,
+    #[arg(
+        long,
+        help = "Passkey relying party id: the hub's domain, like hub.example.com"
+    )]
+    rp_id: Option<String>,
+    #[arg(
+        long,
+        help = "The origin people open the hub at, like https://hub.example.com"
+    )]
+    origin: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -50,6 +64,12 @@ enum Command {
 enum Admin {
     #[command(about = "Mint a one-time code a machine joins with")]
     JoinCode,
+    #[command(about = "Mint a one-time code a person signs up with")]
+    Invite,
+    #[command(about = "List the machines that joined")]
+    Machines,
+    #[command(about = "Remove a machine, its board, queue and admissions")]
+    RemoveMachine { machine: String },
 }
 
 fn data_dir(cli: &Cli) -> Result<PathBuf, String> {
@@ -62,10 +82,25 @@ fn data_dir(cli: &Cli) -> Result<PathBuf, String> {
 
 fn listen_address(cli: &Cli) -> Result<SocketAddr, String> {
     match (cli.listen, cli.dev) {
+        (Some(address), true) if !address.ip().is_loopback() => Err(format!(
+            "--dev lets devices in without an account; listen on a loopback address, not {address}"
+        )),
         (Some(address), _) => Ok(address),
         (None, true) => Ok(DEV_LISTEN.parse().expect("the dev address parses")),
         (None, false) => Err("pass --listen <address>, or --dev for a local hub".to_string()),
     }
+}
+
+fn relying_party_config(cli: &Cli) -> Result<(String, String), String> {
+    match (&cli.rp_id, &cli.origin, cli.dev) {
+        (Some(rp_id), Some(origin), _) => Ok((rp_id.clone(), origin.clone())),
+        (None, None, true) => Ok((DEV_RP_ID.to_string(), DEV_ORIGIN.to_string())),
+        _ => Err("pass --rp-id <domain> and --origin <url>, or --dev for a local hub".to_string()),
+    }
+}
+
+fn open_store(data: &std::path::Path) -> Result<Store, String> {
+    Store::open(&database_path(data)).map_err(|error| error.to_string())
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
@@ -74,19 +109,65 @@ async fn run(cli: Cli) -> Result<(), String> {
     #[cfg(unix)]
     std::fs::set_permissions(&data, std::os::unix::fs::PermissionsExt::from_mode(0o700))
         .map_err(|error| format!("{}: {error}", data.display()))?;
-    match cli.command {
+    let defaults = Config::new(&data);
+    match &cli.command {
         Some(Command::Admin(Admin::JoinCode)) => {
-            let config = Config::new(&data);
-            let store = Store::open(&database_path(&data)).map_err(|error| error.to_string())?;
-            let code =
-                mint_join_code(&store, config.join_code_ttl).map_err(|error| error.to_string())?;
+            let code = mint_join_code(&open_store(&data)?, defaults.join_code_ttl)
+                .map_err(|error| error.to_string())?;
             println!("{code}");
-            eprintln!("valid for {} minutes, once", config.join_code_ttl / 60);
+            eprintln!("valid for {} minutes, once", defaults.join_code_ttl / 60);
+            Ok(())
+        }
+        Some(Command::Admin(Admin::Invite)) => {
+            let code = mint_invite(&open_store(&data)?, defaults.invite_ttl)
+                .map_err(|error| error.to_string())?;
+            println!("{code}");
+            eprintln!("valid for {} days, once", defaults.invite_ttl / 86_400);
+            Ok(())
+        }
+        Some(Command::Admin(Admin::Machines)) => {
+            let machines = open_store(&data)?
+                .machines()
+                .map_err(|error| error.to_string())?;
+            for machine in machines {
+                let seen = machine
+                    .last_seen
+                    .map_or("-".to_string(), |at| at.to_string());
+                println!(
+                    "{} {} joined {} seen {seen}",
+                    machine.id, machine.name, machine.joined_at
+                );
+            }
+            Ok(())
+        }
+        Some(Command::Admin(Admin::RemoveMachine { machine })) => {
+            let machine = Id::parse(machine).map_err(|error| error.to_string())?;
+            let store = open_store(&data)?;
+            if !store
+                .remove_machine(&machine)
+                .map_err(|error| error.to_string())?
+            {
+                return Err(format!("no machine {machine}"));
+            }
+            store
+                .log(
+                    kelpie_hub::now(),
+                    "machine.removed",
+                    Some(&machine),
+                    None,
+                    None,
+                )
+                .map_err(|error| error.to_string())?;
+            println!("removed {machine}");
             Ok(())
         }
         None => {
             let address = listen_address(&cli)?;
-            let mut config = Config::new(&data);
+            let (rp_id, origin) = relying_party_config(&cli)?;
+            let mut config = defaults;
+            config.rp_id = rp_id;
+            config.origin = origin;
+            config.anonymous_devices = cli.dev;
             config.trusted_proxy = cli
                 .trusted_proxy
                 .map(|Proxy::Cloudflare| TrustedProxy::Cloudflare);

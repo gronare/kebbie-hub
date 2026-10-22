@@ -45,7 +45,19 @@ cargo build --workspace
 target/debug/kelpie-hub --dev
 ```
 
-`--dev` listens on `127.0.0.1:8470` and keeps its sqlite file in `kelpie-hub-dev` under the system temp directory. `--data <dir>` and `--listen <address>` override either; without `--dev` both are required. Behind Cloudflare, `--trusted-proxy cloudflare` takes the client address from `CF-Connecting-IP`; without it the hub uses the TCP peer and ignores that header.
+The hub links OpenSSL (through `webauthn-rs`) built from source and statically, so the binary needs no system OpenSSL; building it needs a C compiler, `make` and `perl`.
+
+`--dev` listens on `127.0.0.1:8470`, keeps its sqlite file in `kelpie-hub-dev` under the system temp directory, uses `localhost` as the passkey relying party with `http://localhost:8470` as the origin, and lets a pairing code create a device without an account so the fake phone can pair. `--data <dir>`, `--listen <address>`, `--rp-id <domain>` and `--origin <url>` override these; without `--dev` all four are required, and with `--dev` the hub refuses to listen on anything but a loopback address. Behind Cloudflare, `--trusted-proxy cloudflare` takes the client address from `CF-Connecting-IP`; without it the hub uses the TCP peer and ignores that header.
+
+A public hub:
+
+```sh
+kelpie-hub --data /var/lib/kelpie-hub --listen 0.0.0.0:8470 \
+  --rp-id hub.example.com --origin https://hub.example.com --trusted-proxy cloudflare
+kelpie-hub --data /var/lib/kelpie-hub admin invite
+```
+
+`admin invite` mints a one-time sign-up code, valid 7 days. `admin machines` lists the machines that joined, and `admin remove-machine <id>` removes one with its board, queue and admissions; its token stops working at once.
 
 In a second terminal, mint a join code and join a machine:
 
@@ -69,11 +81,24 @@ target/debug/fake-machine --state machine.json post-board examples/board.json
 target/debug/fake-phone --state phone.json boards
 ```
 
-`fake-machine poll` long-polls the machine's queue once, and `fake-phone attempts` lists every pairing attempt, failed ones included. Both CLIs keep their keys and tokens in the `--state` file, written with mode 0600.
+`fake-machine poll` long-polls the machine's queue once, and `fake-phone attempts` lists every pairing attempt, failed ones included. Both CLIs keep their keys and tokens in the `--state` file, written with mode 0600. Against a hub without `--dev`, give the phone a device an account registered: `fake-phone init <hub> --device <id> --token <token>`.
+
+## Accounts and who holds what
+
+People sign in to the hub with its own accounts. An account holds passkeys (WebAuthn, user verification required) and the devices it registered; it never sees a board, because boards are sealed to device keys the account does not have.
+
+- **Sign-up** takes a one-time invite from `kelpie-hub admin invite` and a handle (lowercase letters, digits and `-`, starting with a letter), then registers the first passkey. The invite is spent when the passkey is accepted, so two ceremonies started with one invite make one account. The account table has room for a GitHub id and a verified email, for sign-up through GitHub or an email link later. Safari refuses `Secure` and `__Host-` cookies on `http://localhost`, so a `--dev` hub signs in from Chrome or Firefox, or from Safari behind a local TLS name.
+- **Logging in** takes the handle and a passkey the account holds. Handles are not secret: logging in tells whether one exists. The hub keeps each passkey's signature counter and refuses a login whose counter does not move past it (unless both are zero), as a sign the passkey was cloned.
+- **The session** is an opaque `khs_` token in the cookie `__Host-kelpie_session` with `HttpOnly`, `Secure`, `SameSite=Strict` and `Path=/`, valid 14 days. The hub stores its SHA-256 hash. Logging out deletes it.
+- **Cross-site requests.** Every state-changing `/v1/a/` call needs an `Origin` header equal to `--origin`, or gets `403 cross-origin`. The cookie is accepted on `/v1/a/` only.
+- **Devices.** A logged-in account registers a device and gets its `khd_` token once. Every `/v1/d/` call, the event feed included (read with `fetch`, since `EventSource` cannot send a bearer token), takes that token as a bearer token and never the cookie, so no device call rides on an ambient credential and none needs a CSRF check. The web app keeps the token next to its non-extractable device keys in IndexedDB, and uses its session only to register a device or manage the account. Logging out leaves the device working; removing the device ends it.
+- **Removal.** A machine removes a device it admitted, and the hub stops handing that device the machine's board. An account removes its own devices, which deletes their tokens and ends their event feeds. An admin removes a machine.
+
+Ceremony state (the challenge a passkey must sign) is kept on the hub for 5 minutes and used once; it never reaches the browser.
 
 ## The hub's API
 
-Every endpoint is under `/v1` and takes a bearer token, except joining and committing to a pairing, where the one-time code is the credential. Machine tokens start with `khm_`, device tokens with `khd_`.
+Every endpoint is under `/v1`. Machine endpoints (`/v1/m/`) take a `khm_` bearer token, except joining, where the join code is the credential. Device endpoints (`/v1/d/`) take a `khd_` bearer token. Account endpoints (`/v1/a/`) take the session cookie, except signing up and logging in.
 
 | Call | Who | What |
 |---|---|---|
@@ -85,27 +110,47 @@ Every endpoint is under `/v1` and takes a bearer token, except joining and commi
 | `POST /v1/m/pairings/<id>/reply` | machine | `M` and `n_m`, once, after the commitment |
 | `POST /v1/m/pairings/<id>/admit` | machine | after the user confirmed the digits; the hub records which machine admitted the device |
 | `POST /v1/m/pairings/<id>/refuse` | machine | `mismatch`, `declined` or `timeout` |
-| `POST /v1/d/pairings` | device, pairing code | the commitment; a device without a token gets an id and token here. The same token sending the same commitment again gets the same answer; any other second commitment fails the pairing. An unknown code and a code whose pairing has ended both get `401` |
+| `DELETE /v1/m/devices/<id>` | machine | stops handing the machine's board to a device it admitted; `404` for a device it did not admit |
+| `POST /v1/d/pairings` | device, pairing code | the commitment. The same token sending the same commitment again gets the same answer; any other second commitment fails the pairing. An unknown code and a code whose pairing has ended both get `401`. Only a `--dev` hub accepts a commitment without a token, and hands out a device id and token with it |
 | `GET /v1/d/pairings/<id>?seen=<state>&wait=<s>` | device | waits like the machine's; shows `M` and `n_m`, then the outcome |
 | `POST /v1/d/pairings/<id>/reveal` | device | `D` and `n_d`, once, after the reply |
 | `GET /v1/d/boards` | device | the latest board of every machine that admitted the device, with only this device's key row |
+| `GET /v1/d/events` | device | a server-sent event stream: `board` (`{machine, rev}`) when an admitting machine stores a board, `pairing` (`{pairing, state}`) when one of the device's pairings changes or expires, `machine-removed` (`{machine}`) when a machine removes the device. It starts with the current state, carries no content, keeps alive every 15 s and ends when the device is removed |
+| `POST /v1/a/register/begin` | anyone, invite | `{invite, handle}`; returns a ceremony id and the passkey creation options |
+| `POST /v1/a/register/finish` | anyone | `{ceremony, credential, name?}`; creates the account, spends the invite and sets the session cookie |
+| `POST /v1/a/login/begin` | anyone | `{handle}`; returns a ceremony id and the passkey request options |
+| `POST /v1/a/login/finish` | anyone | `{ceremony, credential}`; sets the session cookie |
+| `POST /v1/a/logout` | account | deletes the session and clears the cookie |
+| `GET /v1/a/account` | account | the account id, handle and creation time |
+| `GET /v1/a/passkeys` | account | the account's passkeys: id, name, created, last used |
+| `POST /v1/a/passkeys/begin`, `/finish` | account | adds a passkey, excluding the ones the account holds |
+| `DELETE /v1/a/passkeys/<id>` | account | removes a passkey; the last one stays (`409 last-passkey`) |
+| `POST /v1/a/devices` | account | `{name?}`; registers a device and returns its id and token, once |
+| `GET /v1/a/devices` | account | the account's devices with the machines that admitted each |
+| `DELETE /v1/a/devices/<id>` | account | removes the device, its token and its admissions |
 
 A pairing moves `open → committed → replied → revealed → admitted`, or ends `refused`, `failed` (a second commitment to the same code) or `expired`. Each step is accepted once; anything out of order is `409`. A device's public keys are fixed by its first admission, not by a reveal, so a relay that swaps keys in a refused pairing cannot lock the device out.
 
-Requests are rate limited per token, and per client address (IPv6 per /64) for unauthenticated calls and bad tokens; an address that has used up its bucket is refused before any token lookup. The limiter keeps at most 100 000 buckets. Numbers above `i64::MAX` (`rev`, `after`) get `400`. Bodies are capped at 16 KiB, boards at 1 MiB. The hub sends no CORS headers.
+Requests are rate limited per token or account, and per client address (IPv6 per /64) for unauthenticated calls and bad credentials; an address that has used up its bucket is refused before any lookup. The limiter keeps at most 100 000 buckets. Numbers above `i64::MAX` (`rev`, `after`) get `400`. Bodies are capped at 16 KiB, boards at 1 MiB. A connection that has not sent its request headers within 10 seconds is closed, and a request body that sends nothing for 30 seconds is cut. The hub serves at most 4096 connections at once; further ones wait to be accepted. A device holds at most 8 event feeds at once, and a ninth gets `429 too-many-feeds`. Long-polls and feeds end when the hub shuts down. The hub sends no CORS headers, so the web app is served from the hub's own origin.
+
+Long-polls and event feeds wake only for their own machine, pairing or device.
 
 ## What the hub stores
 
-One sqlite file: machine ids, names and public keys; SHA-256 hashes of machine and device tokens, never the tokens; SHA-256 hashes of join and pairing codes, so they cannot be read off the file, though a code's 40 bits do not resist offline guessing during its 10-minute life; device ids and public keys, and which machine admitted each device; the latest board envelope per machine, as ciphertext with its key rows, its id and signed time; queued envelopes until acknowledged; pairing sessions, deleted an hour after they expire; and an event log of what happened when (joins, stored revisions and sizes, pairing steps and refusal reasons), kept 30 days.
+One sqlite file: machine ids, names and public keys; accounts (id, handle, a random WebAuthn user handle, creation time, and room for a GitHub id and a verified email); each passkey's public key, signature counter, name and use times; SHA-256 hashes of machine, device and session tokens, never the tokens; SHA-256 hashes of join codes, invites and pairing codes, so they cannot be read off the file, though a code's 40 bits do not resist offline guessing during its life; pending passkey ceremonies for 5 minutes; device ids, names, public keys and owning account, and which machine admitted each device; the latest board envelope per machine, as ciphertext with its key rows, its id and signed time; queued envelopes until acknowledged; pairing sessions, deleted an hour after they expire; and an event log of what happened when (joins, stored revisions and sizes, pairing steps and refusal reasons, sign-ups, logins, device registrations and removals), kept 30 days.
+
+Every minute the hub sweeps expired sessions, ceremonies, invites and codes, and devices that no account holds and no machine admits once none of their pairings is still open. A database written by an earlier schema is refused at start-up.
 
 It never stores or sees a board's content, a private key, or a token. It cannot decrypt an envelope, and it does not decide which devices a machine trusts: it records the machine's decision.
 
 ## Not yet
 
-- Removing or revoking a device or a machine.
-- Sweeping devices that no machine admitted.
-- Waking only the waiters of one machine or pairing: every change wakes every long-poll, which then rechecks.
-- A header-read timeout for running the hub exposed without a proxy in front.
+- The web app.
+- Signing up through GitHub or an email link, and OIDC sign-in for self-hosted hubs.
+- Logging in without typing a handle (discoverable passkeys).
+- Removing an account.
+- Logging out everywhere, and ending an account's sessions when one of its passkeys is removed.
+- An event to an open feed when `admin remove-machine` runs: the CLI is another process, so a connected device learns of it on its next request.
 
 ## Tests
 
@@ -114,7 +159,7 @@ cargo test
 node --test
 ```
 
-`cargo test` checks the crates and replays `vectors/*.json`. The hub's integration tests start it in-process on a random port and drive it with the fake machine and phone: pairing with matching digits, a relay that swaps the machine's key (the digits differ and the machine refuses) or the device's key (the commitment fails), boards reaching the paired phone and no other, stale revisions, bad tokens, rate limits, and a scan of the sqlite files for the board's text. `node --test` (Node 25 or newer) checks the same vectors with WebCrypto as browsers expose it, plus [`@hpke/core`](https://github.com/dajiaji/hpke-js) for HPKE: it opens what Rust sealed with non-extractable keys, reseals it byte for byte, refuses every tampered, expired, misaddressed or malformed case with the same error as Rust, and runs the pairing flows. Run `npm install` once first.
+`cargo test` checks the crates and replays `vectors/*.json`. The hub's integration tests start it in-process on a random port and drive it with the fake machine and phone, and with `webauthn-authenticator-rs`'s software passkey for accounts: pairing with matching digits, a relay that swaps the machine's key (the digits differ and the machine refuses) or the device's key (the commitment fails), boards reaching the paired phone and no other, stale revisions, bad tokens, rate limits, a scan of the sqlite files for the board's text and the tokens, sign-up and login with the cookie's flags, invites and ceremonies used once, session expiry, the origin check, device registration behind a session, removal by machine, account and admin CLI ending boards and the event feed, the sweeps, feed events without content, and the header-read timeout. `node --test` (Node 25 or newer) checks the same vectors with WebCrypto as browsers expose it, plus [`@hpke/core`](https://github.com/dajiaji/hpke-js) for HPKE: it opens what Rust sealed with non-extractable keys, reseals it byte for byte, refuses every tampered, expired, misaddressed or malformed case with the same error as Rust, and runs the pairing flows. Run `npm install` once first.
 
 The vectors are generated from fixed keys and randomness:
 

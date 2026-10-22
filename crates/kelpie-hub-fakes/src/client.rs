@@ -130,6 +130,27 @@ impl HubClient {
         HubClient::send(self.request(Method::PUT, path).json(body)).await
     }
 
+    pub async fn delete(&self, path: &str) -> Result<(), HubError> {
+        let response = self
+            .request(Method::DELETE, path)
+            .send()
+            .await
+            .map_err(|error| HubError::Transport(error.to_string()))?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
+        }
+        let code = response
+            .json::<ErrorBody>()
+            .await
+            .map(|body| body.error)
+            .unwrap_or_else(|_| status.canonical_reason().unwrap_or("error").to_string());
+        Err(HubError::Status {
+            status: status.as_u16(),
+            code,
+        })
+    }
+
     pub async fn await_pairing(
         &self,
         path: &str,

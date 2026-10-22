@@ -5,6 +5,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use kelpie_hub_fakes::phone::PhoneState;
 use kelpie_hub_fakes::{load, save};
+use kelpie_hub_protocol::Id;
 
 #[derive(Parser)]
 #[command(
@@ -25,7 +26,17 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     #[command(about = "Generate the device's keys for a hub")]
-    Init { hub: String },
+    Init {
+        hub: String,
+        #[arg(
+            long,
+            requires = "token",
+            help = "Device id an account registered; without it only a --dev hub lets the phone pair"
+        )]
+        device: Option<String>,
+        #[arg(long, requires = "device", help = "That device's token")]
+        token: Option<String>,
+    },
     #[command(about = "Pair with the machine showing this code")]
     Pair {
         code: String,
@@ -41,11 +52,18 @@ enum Command {
 async fn run(cli: Cli) -> Result<(), String> {
     let text = |error: &dyn std::fmt::Display| error.to_string();
     match cli.command {
-        Command::Init { hub } => {
+        Command::Init { hub, device, token } => {
             if cli.state.exists() {
                 return Err(format!("{} exists already", cli.state.display()));
             }
-            save(&cli.state, &PhoneState::new(&hub)).map_err(|e| text(&e))?;
+            let state = match (device, token) {
+                (Some(device), Some(token)) => {
+                    let device = Id::parse(&device).map_err(|e| text(&e))?;
+                    PhoneState::registered(&hub, device, &token)
+                }
+                _ => PhoneState::new(&hub),
+            };
+            save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("device keys written to {}", cli.state.display());
         }
         Command::Pair { code, timeout } => {

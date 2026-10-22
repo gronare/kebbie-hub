@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
@@ -16,9 +17,8 @@ use crate::auth::{Anonymous, MACHINE_TOKEN_PREFIX, MachineAuth, digest, new_toke
 use crate::error::ApiError;
 use crate::pairing::{Side, Watch, view};
 use crate::store::{BoardWrite, Pairing, Store};
-use crate::{Hub, MAX_STORED_INTEGER, now};
-
-const MAX_NAME_CHARS: usize = 64;
+use crate::wake::{machine_key, pairing_key};
+use crate::{Hub, MAX_STORED_INTEGER, clean_name, now};
 
 pub async fn join(
     State(hub): State<Arc<Hub>>,
@@ -26,13 +26,7 @@ pub async fn join(
     Json(request): Json<JoinRequest>,
 ) -> Result<Json<Joined>, ApiError> {
     hub.limit_anonymous(&client.address)?;
-    let name = request.name.trim();
-    if name.is_empty()
-        || name.chars().count() > MAX_NAME_CHARS
-        || name.chars().any(char::is_control)
-    {
-        return Err(ApiError::bad_request("bad-name"));
-    }
+    let name = clean_name(&request.name).ok_or(ApiError::bad_request("bad-name"))?;
     let code = normalize_code(&request.code).ok_or_else(ApiError::unauthorized)?;
     let machine = Id::new(Prefix::Machine).expect("a fresh machine id is valid");
     let token = new_token(MACHINE_TOKEN_PREFIX);
@@ -86,8 +80,9 @@ pub async fn put_board(
         None,
         Some(&format!("rev={} bytes={}", upload.rev, text.len())),
     )?;
+    let readers = store.admitted_devices(&machine)?;
     drop(store);
-    hub.changed();
+    hub.wake_devices(&readers);
     Ok(Json(BoardStored { rev: upload.rev }))
 }
 
@@ -109,7 +104,7 @@ pub async fn inbox(
     }
     hub.store().acknowledge(&machine, query.after)?;
     let queued = hub
-        .wait_until(query.wait, || {
+        .wait_until(&machine_key(&machine), query.wait, || {
             let queued = hub.store().queued_after(&machine, query.after)?;
             let ready = !queued.is_empty();
             Ok((queued, ready))
@@ -164,7 +159,7 @@ pub async fn pairing(
     Query(watch): Query<Watch>,
 ) -> Result<Json<PairingView>, ApiError> {
     let pairing = hub
-        .wait_until(watch.wait, || {
+        .wait_until(&pairing_key(&id), watch.wait, || {
             let pairing = own_pairing(&hub.store(), &machine, &id)?;
             let changed = watch.changed(pairing.state_at(now()));
             Ok((pairing, changed))
@@ -189,7 +184,7 @@ fn advance(
     step(&store, &mut pairing)?;
     store.save_pairing(&pairing)?;
     drop(store);
-    hub.changed();
+    hub.wake_pairing(&pairing);
     Ok(Json(view(&pairing, Side::Machine, at)))
 }
 
@@ -271,6 +266,24 @@ pub async fn refuse(
         Some(refusal.reason.name()),
     )?;
     drop(store);
-    hub.changed();
+    hub.wake_pairing(&pairing);
     Ok(Json(view(&pairing, Side::Machine, at)))
+}
+
+pub async fn remove_device(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let device = Id::parse(&id).map_err(|_| ApiError::not_found())?;
+    let at = now();
+    {
+        let store = hub.store();
+        if !store.remove_admission(&machine, &device)? {
+            return Err(ApiError::not_found());
+        }
+        store.log(at, "admission.removed", Some(&machine), Some(&device), None)?;
+    }
+    hub.wake_device(&device);
+    Ok(StatusCode::NO_CONTENT)
 }

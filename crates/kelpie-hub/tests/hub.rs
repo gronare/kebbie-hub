@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+mod common;
+
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -5,94 +8,20 @@ use axum::body::{Body, to_bytes};
 use axum::extract::{Request, State};
 use axum::http::{Method, StatusCode};
 use axum::response::Response;
-use kelpie_hub::{Config, Hub, RateLimit, serve};
+use common::*;
+use kelpie_hub::RateLimit;
 use kelpie_hub_api::{
     Bytes32, CommitRequest, Committed, PairingFailure, PairingOpened, PairingState, PairingView,
 };
-use kelpie_hub_fakes::machine::{MachineState, join};
+use kelpie_hub_fakes::machine::join;
 use kelpie_hub_fakes::phone::PhoneState;
 use kelpie_hub_fakes::{HubClient, HubError, PairError};
 use kelpie_hub_protocol::{
-    Board, Header, Id, Kind, Payload, Prefix, PublicKeys, RunRoutine, SecretKeys, seal,
+    Header, Id, Kind, Payload, Prefix, PublicKeys, RunRoutine, SecretKeys, seal,
 };
 use serde_json::Value;
-use tempfile::TempDir;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
-
-const EXAMPLE_BOARD: &str = include_str!("../../../examples/board.json");
-const MARKER: &str = "zebra-umbrella-7f3a";
-const PAIRING_TIMEOUT: Duration = Duration::from_secs(10);
-
-struct TestHub {
-    url: String,
-    hub: Arc<Hub>,
-    data: TempDir,
-    _stop: oneshot::Sender<()>,
-}
-
-async fn start_hub(configure: impl FnOnce(&mut Config)) -> TestHub {
-    let data = tempfile::tempdir().unwrap();
-    let mut config = Config::new(data.path());
-    configure(&mut config);
-    let hub = Hub::open(config).unwrap();
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let url = format!("http://{}", listener.local_addr().unwrap());
-    let (stop, stopped) = oneshot::channel::<()>();
-    tokio::spawn(serve(listener, Arc::clone(&hub), async {
-        let _ = stopped.await;
-    }));
-    TestHub {
-        url,
-        hub,
-        data,
-        _stop: stop,
-    }
-}
-
-async fn joined_machine(test: &TestHub) -> MachineState {
-    let code = test.hub.mint_join_code().unwrap();
-    join(&test.url, &code, "mac").await.unwrap()
-}
-
-fn board(marker: &str) -> Board {
-    let mut board: Board = serde_json::from_str(EXAMPLE_BOARD).unwrap();
-    board.items[0].summary = format!("{marker} summary");
-    if let Some(question) = &mut board.items[0].question {
-        question.text = format!("{marker} question");
-    }
-    board
-}
-
-async fn pair_both(
-    machine: &mut MachineState,
-    phone: &mut PhoneState,
-    accept_if_same: bool,
-) -> (Result<Id, PairError>, Result<Id, PairError>) {
-    let (code_out, code_in) = oneshot::channel::<String>();
-    let (digits_out, digits_in) = oneshot::channel::<String>();
-    let machine_side = machine.pair(
-        PAIRING_TIMEOUT,
-        move |code| {
-            let _ = code_out.send(code.to_string());
-        },
-        async move |machine_digits: String| {
-            accept_if_same
-                && digits_in
-                    .await
-                    .is_ok_and(|phone_digits| phone_digits == machine_digits)
-        },
-    );
-    let phone_side = async {
-        let code = code_in.await.unwrap();
-        phone
-            .pair(&code, PAIRING_TIMEOUT, move |digits| {
-                let _ = digits_out.send(digits.to_string());
-            })
-            .await
-    };
-    tokio::join!(machine_side, phone_side)
-}
 
 #[derive(Clone)]
 enum Swap {
@@ -168,15 +97,11 @@ async fn start_relay(target: &str, swap: Swap) -> String {
     url
 }
 
-fn status_of<T: std::fmt::Debug>(result: Result<T, HubError>) -> u16 {
-    result.expect_err("the hub should refuse").status().unwrap()
-}
-
 #[tokio::test]
 async fn a_paired_phone_opens_the_board_its_machine_posted() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     let (admitted, paired) = pair_both(&mut machine, &mut phone, true).await;
     let device = admitted.unwrap();
     assert_eq!(paired.unwrap(), machine.machine);
@@ -205,7 +130,7 @@ async fn a_relay_that_swaps_the_machine_key_shows_different_digits_and_the_machi
     let mut machine = joined_machine(&test).await;
     let substitute = SecretKeys::generate().public();
     let relay = start_relay(&test.url, Swap::MachineKeysToPhone(substitute)).await;
-    let mut phone = PhoneState::new(&relay);
+    let mut phone = phone_at(&test, &relay).await;
     let (admitted, paired) = pair_both(&mut machine, &mut phone, true).await;
     assert!(matches!(admitted, Err(PairError::Declined)), "{admitted:?}");
     assert!(
@@ -231,7 +156,7 @@ async fn a_relay_that_swaps_the_device_key_breaks_the_commitment_and_the_machine
     let mut machine = joined_machine(&test).await;
     let substitute = SecretKeys::generate().public();
     let relay = start_relay(&test.url, Swap::DeviceKeysToMachine(substitute)).await;
-    let mut phone = PhoneState::new(&relay);
+    let mut phone = phone_at(&test, &relay).await;
     let (admitted, paired) = pair_both(&mut machine, &mut phone, true).await;
     assert!(matches!(admitted, Err(PairError::Mismatch)), "{admitted:?}");
     assert!(
@@ -252,7 +177,7 @@ async fn a_relay_that_swaps_the_device_key_breaks_the_commitment_and_the_machine
 async fn the_hub_refuses_a_board_older_than_the_one_it_holds() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     let (admitted, _) = pair_both(&mut machine, &mut phone, true).await;
     admitted.unwrap();
 
@@ -292,7 +217,7 @@ fn hub_refusal<T: std::fmt::Debug>(result: Result<T, kelpie_hub_fakes::Error>) -
 async fn a_replayed_board_with_a_huge_rev_is_refused_and_the_machine_carries_on() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     pair_both(&mut machine, &mut phone, true).await.0.unwrap();
     let at = kelpie_hub::now();
     let older = machine.seal_board(board("older"), 1, at - 60).unwrap();
@@ -320,7 +245,7 @@ async fn a_replayed_board_with_a_huge_rev_is_refused_and_the_machine_carries_on(
 async fn an_envelope_posted_ahead_of_the_machine_with_a_huge_rev_does_not_freeze_it() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     pair_both(&mut machine, &mut phone, true).await.0.unwrap();
     let at = kelpie_hub::now();
     let caught = machine.seal_board(board("caught"), 1, at - 5).unwrap();
@@ -365,7 +290,7 @@ async fn a_refused_reveal_leaves_the_device_free_to_pair_with_its_real_keys() {
     let mut machine = joined_machine(&test).await;
     let substitute = SecretKeys::generate().public();
     let relay = start_relay(&test.url, Swap::DeviceKeysToMachine(substitute)).await;
-    let mut phone = PhoneState::new(&relay);
+    let mut phone = phone_at(&test, &relay).await;
     let (refused, _) = pair_both(&mut machine, &mut phone, true).await;
     assert!(matches!(refused, Err(PairError::Mismatch)), "{refused:?}");
     let device = phone.device.clone().unwrap();
@@ -382,27 +307,11 @@ async fn a_refused_reveal_leaves_the_device_free_to_pair_with_its_real_keys() {
 async fn retrying_the_same_commitment_with_the_same_token_is_idempotent() {
     let test = start_hub(|_| {}).await;
     let machine = joined_machine(&test).await;
-    let anonymous = HubClient::new(&test.url, None);
-    let open = || async {
-        let opened: PairingOpened = machine.client().post("/v1/m/pairings", &()).await.unwrap();
-        opened
-    };
-    let first = open().await;
-    let registered: Committed = anonymous
-        .post(
-            "/v1/d/pairings",
-            &CommitRequest {
-                code: first.code,
-                commitment: Bytes32([1; 32]),
-            },
-        )
-        .await
-        .unwrap();
-    let device = anonymous.with_token(registered.token.as_deref().unwrap());
-
-    let second = open().await;
+    let registered = signed_up(&test).await.register_device().await;
+    let device = device_client(&test, &registered);
+    let opened: PairingOpened = machine.client().post("/v1/m/pairings", &()).await.unwrap();
     let commit = |seed: u8| CommitRequest {
-        code: second.code.clone(),
+        code: opened.code.clone(),
         commitment: Bytes32([seed; 32]),
     };
     let once: Committed = device.post("/v1/d/pairings", &commit(2)).await.unwrap();
@@ -411,7 +320,9 @@ async fn retrying_the_same_commitment_with_the_same_token_is_idempotent() {
         (once.pairing.as_str(), once.device.as_str()),
         (again.pairing.as_str(), again.device.as_str())
     );
-    let path = format!("/v1/m/pairings/{}", second.pairing);
+    assert_eq!(once.device, registered.device);
+    assert_eq!(once.token, None);
+    let path = format!("/v1/m/pairings/{}", opened.pairing);
     let view: PairingView = machine.client().get(&path, &[]).await.unwrap();
     assert_eq!(view.state, PairingState::Committed);
 
@@ -483,12 +394,12 @@ async fn without_a_trusted_proxy_the_cloudflare_header_is_ignored() {
 async fn a_phone_the_machine_did_not_admit_sees_no_board() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut admitted_phone = PhoneState::new(&test.url);
+    let mut admitted_phone = phone(&test).await;
     pair_both(&mut machine, &mut admitted_phone, true)
         .await
         .0
         .unwrap();
-    let mut other_phone = PhoneState::new(&test.url);
+    let mut other_phone = phone(&test).await;
     let (refused, _) = pair_both(&mut machine, &mut other_phone, false).await;
     assert!(matches!(refused, Err(PairError::Declined)));
     assert!(other_phone.device.is_some());
@@ -505,7 +416,7 @@ async fn a_board_sealed_before_a_phone_paired_is_listed_but_not_readable_by_it()
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
     machine.post_board(board(MARKER)).await.unwrap();
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     pair_both(&mut machine, &mut phone, true).await.0.unwrap();
     let boards = phone.boards().await.unwrap();
     assert!(matches!(
@@ -518,7 +429,7 @@ async fn a_board_sealed_before_a_phone_paired_is_listed_but_not_readable_by_it()
 async fn requests_without_a_valid_token_get_401_and_no_cors_grant() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     pair_both(&mut machine, &mut phone, true).await.0.unwrap();
 
     let anonymous = HubClient::new(&test.url, None);
@@ -640,7 +551,9 @@ async fn a_board_not_signed_by_the_machine_is_refused() {
 async fn the_database_never_holds_board_text() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
+    let person = signed_up(&test).await;
+    let registered = person.register_device().await;
+    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
     pair_both(&mut machine, &mut phone, true).await.0.unwrap();
     machine.post_board(board(MARKER)).await.unwrap();
     let boards = phone.boards().await.unwrap();
@@ -650,22 +563,24 @@ async fn the_database_never_holds_board_text() {
             .contains(MARKER)
     );
 
-    let mut stored = Vec::new();
-    for entry in std::fs::read_dir(test.data.path()).unwrap() {
-        stored.extend(std::fs::read(entry.unwrap().path()).unwrap());
-    }
-    let holds = |needle: &[u8]| stored.windows(needle.len()).any(|window| window == needle);
+    let stored = database_bytes(&test);
     assert!(
-        holds(machine.machine.as_str().as_bytes()),
+        holds(&stored, machine.machine.as_str().as_bytes()),
         "the scan did not read the database"
     );
+    let session = person.cookie.as_deref().unwrap().split_once('=').unwrap().1;
     for leak in [
         MARKER,
         "refunds@greenhouse",
         "Keep the old endpoint",
         "Nightly deps",
+        &registered.token,
+        session,
     ] {
-        assert!(!holds(leak.as_bytes()), "the database holds {leak:?}");
+        assert!(
+            !holds(&stored, leak.as_bytes()),
+            "the database holds {leak:?}"
+        );
     }
 }
 
@@ -678,9 +593,13 @@ async fn a_second_commitment_ends_the_pairing_for_everyone() {
         code: opened.code.clone(),
         commitment: Bytes32([seed; 32]),
     };
-    let anonymous = HubClient::new(&test.url, None);
-    let first: Committed = anonymous.post("/v1/d/pairings", &commit(1)).await.unwrap();
-    let second = anonymous
+    let first_device = device_client(&test, &signed_up(&test).await.register_device().await);
+    let second_device = device_client(&test, &signed_up(&test).await.register_device().await);
+    let first: Committed = first_device
+        .post("/v1/d/pairings", &commit(1))
+        .await
+        .unwrap();
+    let second = second_device
         .post::<_, Committed>("/v1/d/pairings", &commit(2))
         .await;
     assert_eq!(
@@ -700,8 +619,7 @@ async fn a_second_commitment_ends_the_pairing_for_everyone() {
         seen_by_machine.reason,
         Some(PairingFailure::SecondCommitment)
     );
-    let seen_by_device: PairingView = anonymous
-        .with_token(first.token.as_deref().unwrap())
+    let seen_by_device: PairingView = first_device
         .get(&format!("/v1/d/pairings/{}", first.pairing), &[])
         .await
         .unwrap();
@@ -725,8 +643,9 @@ async fn unknown_expired_and_finished_codes_all_get_the_same_401() {
     let test = start_hub(|config| config.pairing_ttl = 1).await;
     let machine = joined_machine(&test).await;
     let opened: PairingOpened = machine.client().post("/v1/m/pairings", &()).await.unwrap();
+    let device = device_client(&test, &signed_up(&test).await.register_device().await);
     tokio::time::sleep(Duration::from_millis(2100)).await;
-    let late = HubClient::new(&test.url, None)
+    let late = device
         .post::<_, Committed>(
             "/v1/d/pairings",
             &CommitRequest {
@@ -736,7 +655,7 @@ async fn unknown_expired_and_finished_codes_all_get_the_same_401() {
         )
         .await;
     assert_eq!(status_of(late), 401);
-    let unknown = HubClient::new(&test.url, None)
+    let unknown = device
         .post::<_, Committed>(
             "/v1/d/pairings",
             &CommitRequest {
@@ -754,7 +673,7 @@ async fn unknown_expired_and_finished_codes_all_get_the_same_401() {
     );
 
     let mut machine = machine;
-    let mut phone = PhoneState::new(&test.url);
+    let mut phone = phone(&test).await;
     let (code_out, code_in) = oneshot::channel::<String>();
     let used = std::sync::Mutex::new(None);
     let (admitted, _) = tokio::join!(
@@ -773,7 +692,7 @@ async fn unknown_expired_and_finished_codes_all_get_the_same_401() {
     );
     admitted.unwrap();
     let used_code = used.lock().unwrap().clone().unwrap();
-    let finished = HubClient::new(&test.url, None)
+    let finished = device
         .post::<_, Committed>(
             "/v1/d/pairings",
             &CommitRequest {

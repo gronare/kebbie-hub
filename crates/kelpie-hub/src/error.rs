@@ -18,6 +18,10 @@ impl ApiError {
         ApiError::new(StatusCode::UNAUTHORIZED, "unauthorized")
     }
 
+    pub fn forbidden(code: &'static str) -> ApiError {
+        ApiError::new(StatusCode::FORBIDDEN, code)
+    }
+
     pub fn rate_limited() -> ApiError {
         ApiError::new(StatusCode::TOO_MANY_REQUESTS, "rate-limited")
     }
