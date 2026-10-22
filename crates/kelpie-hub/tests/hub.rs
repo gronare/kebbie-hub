@@ -133,16 +133,7 @@ async fn a_relay_that_swaps_the_machine_key_shows_different_digits_and_the_machi
     let mut phone = phone_at(&test, &relay).await;
     let (admitted, paired) = pair_both(&mut machine, &mut phone, true).await;
     assert!(matches!(admitted, Err(PairError::Declined)), "{admitted:?}");
-    assert!(
-        matches!(
-            paired,
-            Err(PairError::Ended {
-                state: PairingState::Refused,
-                reason: Some(PairingFailure::Declined)
-            })
-        ),
-        "{paired:?}"
-    );
+    assert!(matches!(paired, Err(PairError::Declined)), "{paired:?}");
     assert!(machine.devices.is_empty());
     assert!(phone.machines.is_empty());
     assert_eq!(phone.attempts.len(), 1);
@@ -687,7 +678,7 @@ async fn unknown_expired_and_finished_codes_all_get_the_same_401() {
         ),
         async {
             let code = code_in.await.unwrap();
-            phone.pair(&code, PAIRING_TIMEOUT, |_| {}).await
+            phone.pair(&code, PAIRING_TIMEOUT, async |_| true).await
         }
     );
     admitted.unwrap();

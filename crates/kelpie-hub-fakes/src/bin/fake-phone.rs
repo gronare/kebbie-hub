@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
@@ -6,6 +7,7 @@ use clap::{Parser, Subcommand};
 use kelpie_hub_fakes::phone::PhoneState;
 use kelpie_hub_fakes::{load, save};
 use kelpie_hub_protocol::{Answer, Id, Outcome, Payload, PushApproval, RunRoutine, StartTask};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Parser)]
 #[command(
@@ -176,9 +178,18 @@ async fn run(cli: Cli) -> Result<(), String> {
         Command::Pair { code, timeout } => {
             let mut state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
             let outcome = state
-                .pair(&code, Duration::from_secs(timeout), |digits| {
-                    println!("The machine should show: {digits}");
-                })
+                .pair(
+                    &code,
+                    Duration::from_secs(timeout),
+                    async |digits: String| {
+                        print!("Same six digits on the machine? {digits} [y/N] ");
+                        let _ = std::io::stdout().flush();
+                        let mut line = String::new();
+                        let mut input = BufReader::new(tokio::io::stdin());
+                        input.read_line(&mut line).await.is_ok()
+                            && line.trim().eq_ignore_ascii_case("y")
+                    },
+                )
                 .await;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             let machine = outcome.map_err(|e| text(&e))?;

@@ -118,13 +118,16 @@ impl PhoneState {
         HubClient::new(&self.hub, self.token.as_deref())
     }
 
-    pub async fn pair(
+    pub async fn pair<C>(
         &mut self,
         code: &str,
         timeout: Duration,
-        show_code: impl FnOnce(&str),
-    ) -> Result<Id, PairError> {
-        let outcome = self.try_pair(code, timeout, show_code).await;
+        confirm: C,
+    ) -> Result<Id, PairError>
+    where
+        C: AsyncFnOnce(String) -> bool,
+    {
+        let outcome = self.try_pair(code, timeout, confirm).await;
         self.attempts.push(Attempt {
             at: now(),
             machine: outcome.as_ref().ok().cloned(),
@@ -136,12 +139,15 @@ impl PhoneState {
         outcome
     }
 
-    async fn try_pair(
+    async fn try_pair<C>(
         &mut self,
         code: &str,
         timeout: Duration,
-        show_code: impl FnOnce(&str),
-    ) -> Result<Id, PairError> {
+        confirm: C,
+    ) -> Result<Id, PairError>
+    where
+        C: AsyncFnOnce(String) -> bool,
+    {
         let code = normalize_code(code).ok_or(PairError::BadCode)?;
         let deadline = Instant::now() + timeout;
         let pairing = DevicePairing::start(self.public(), &code);
@@ -181,7 +187,9 @@ impl PhoneState {
                 },
             )
             .await?;
-        show_code(&pairing.comparison_code(&machine_keys, &machine_nonce.0));
+        if !confirm(pairing.comparison_code(&machine_keys, &machine_nonce.0)).await {
+            return Err(PairError::Declined);
+        }
         let settled = next_state(&client, &path, PairingState::Revealed, deadline).await?;
         if settled.state != PairingState::Admitted {
             return Err(ended(&settled));

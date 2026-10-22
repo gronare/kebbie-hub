@@ -194,6 +194,8 @@ impl Pairing {
 
 pub struct StoredBoard {
     pub machine: Id,
+    pub name: String,
+    pub last_seen: Option<u64>,
     pub rev: u64,
     pub stored_at: u64,
     pub envelope: String,
@@ -356,6 +358,16 @@ impl Store {
                 "SELECT id FROM devices WHERE token_hash = ?1",
                 [token_hash],
                 |row| id_at(row, 0),
+            )
+            .optional()
+    }
+
+    pub fn machine_name(&self, machine: &Id) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT name FROM machines WHERE id = ?1",
+                [machine.as_str()],
+                |row| row.get(0),
             )
             .optional()
     }
@@ -803,14 +815,17 @@ impl Store {
 
     pub fn boards_for_device(&self, device: &Id) -> Result<Vec<StoredBoard>> {
         let mut statement = self.connection.prepare(
-            "SELECT boards.machine_id, boards.rev, boards.stored_at, boards.envelope
+            "SELECT boards.machine_id, boards.rev, boards.stored_at, boards.envelope, machines.name, machines.last_seen
              FROM admissions JOIN boards ON boards.machine_id = admissions.machine_id
+             JOIN machines ON machines.id = admissions.machine_id
              WHERE admissions.device_id = ?1 ORDER BY boards.machine_id",
         )?;
         statement
             .query_map([device.as_str()], |row| {
                 Ok(StoredBoard {
                     machine: id_at(row, 0)?,
+                    name: row.get(4)?,
+                    last_seen: row.get(5)?,
                     rev: row.get(1)?,
                     stored_at: row.get(2)?,
                     envelope: row.get(3)?,

@@ -39,5 +39,6 @@ pub fn view(pairing: &Pairing, side: Side, now: u64) -> PairingView {
         machine_nonce: pairing.machine_nonce.filter(|_| shows_reply).map(Bytes32),
         device_keys: pairing.device_keys.filter(|_| shows_reveal),
         device_nonce: pairing.device_nonce.filter(|_| shows_reveal).map(Bytes32),
+        machine_name: None,
     }
 }

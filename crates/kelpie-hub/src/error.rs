@@ -18,6 +18,10 @@ impl ApiError {
         ApiError::new(StatusCode::UNAUTHORIZED, "unauthorized")
     }
 
+    pub fn unknown_device() -> ApiError {
+        ApiError::new(StatusCode::UNAUTHORIZED, "unknown-device")
+    }
+
     pub fn forbidden(code: &'static str) -> ApiError {
         ApiError::new(StatusCode::FORBIDDEN, code)
     }

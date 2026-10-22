@@ -210,6 +210,8 @@ pub struct PairingView {
     pub machine_nonce: Option<Bytes32>,
     pub device_keys: Option<PublicKeys>,
     pub device_nonce: Option<Bytes32>,
+    #[serde(default)]
+    pub machine_name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -246,6 +248,10 @@ pub struct RevealRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoardEntry {
     pub machine: Id,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub last_seen: Option<u64>,
     pub rev: u64,
     pub stored_at: u64,
     pub envelope: Option<Envelope>,

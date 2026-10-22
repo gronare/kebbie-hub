@@ -116,7 +116,9 @@ pub async fn pairing(
             Ok((pairing, changed))
         })
         .await?;
-    Ok(Json(view(&pairing, Side::Device, now())))
+    let mut shown = view(&pairing, Side::Device, now());
+    shown.machine_name = hub.store().machine_name(&pairing.machine)?;
+    Ok(Json(shown))
 }
 
 pub async fn reveal(
@@ -165,6 +167,8 @@ pub async fn boards(
                 Envelope::from_json(&board.envelope).map_err(|_| ApiError::internal())?;
             Ok(BoardEntry {
                 machine: board.machine,
+                name: board.name,
+                last_seen: board.last_seen,
                 rev: board.rev,
                 stored_at: board.stored_at,
                 envelope: envelope.for_recipient(&device),

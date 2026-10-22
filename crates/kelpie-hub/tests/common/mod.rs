@@ -73,12 +73,14 @@ pub async fn pair_both(
 ) -> (Result<Id, PairError>, Result<Id, PairError>) {
     let (code_out, code_in) = oneshot::channel::<String>();
     let (digits_out, digits_in) = oneshot::channel::<String>();
+    let (machine_digits_out, machine_digits_in) = oneshot::channel::<String>();
     let machine_side = machine.pair(
         PAIRING_TIMEOUT,
         move |code| {
             let _ = code_out.send(code.to_string());
         },
         async move |machine_digits: String| {
+            let _ = machine_digits_out.send(machine_digits.clone());
             accept_if_same
                 && digits_in
                     .await
@@ -88,8 +90,11 @@ pub async fn pair_both(
     let phone_side = async {
         let code = code_in.await.unwrap();
         phone
-            .pair(&code, PAIRING_TIMEOUT, move |digits| {
-                let _ = digits_out.send(digits.to_string());
+            .pair(&code, PAIRING_TIMEOUT, async move |digits: String| {
+                let _ = digits_out.send(digits.clone());
+                machine_digits_in
+                    .await
+                    .map_or(true, |machine_digits| machine_digits == digits)
             })
             .await
     };

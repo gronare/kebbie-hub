@@ -11,6 +11,7 @@ mod push;
 mod server;
 pub mod store;
 mod wake;
+pub mod web;
 pub mod webpush;
 
 use std::collections::HashMap;
@@ -398,6 +399,13 @@ impl Hub {
         }
     }
 
+    fn refuse_device(&self, address: &str) -> ApiError {
+        match self.limit_anonymous(address) {
+            Ok(()) => ApiError::unknown_device(),
+            Err(limited) => limited,
+        }
+    }
+
     fn refuse_anonymous(&self, address: &str) -> ApiError {
         match self.limit_anonymous(address) {
             Ok(()) => ApiError::unauthorized(),
@@ -487,6 +495,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
             get(account::devices).post(account::register_device),
         )
         .route("/v1/a/devices/{id}", delete(account::remove_device))
+        .fallback(web::asset)
         .layer(DefaultBodyLimit::max(REQUEST_BODY_LIMIT))
         .with_state(hub)
 }

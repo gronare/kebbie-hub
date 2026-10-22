@@ -1,4 +1,4 @@
-import { Aes128Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from "@hpke/core";
+import * as hpke from "./hpke.js";
 
 const subtle = globalThis.crypto.subtle;
 const text = new TextEncoder();
@@ -9,7 +9,6 @@ const PAIR_COMMIT_DOMAIN = text.encode("kelpie-pair-commit-v1");
 const SAS_DOMAIN = text.encode("kelpie-pair-v1");
 const PKCS8_ED25519 = Uint8Array.fromHex("302e020100300506032b657004220420");
 const PKCS8_X25519 = Uint8Array.fromHex("302e020100300506032b656e04220420");
-const ENC_LEN = 32;
 const NONCE_LEN = 12;
 const DAY = 86_400;
 export const PROTOCOL_VERSION = 1;
@@ -29,8 +28,6 @@ export const KINDS = {
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64})$/;
 const BASE64URL = /^[A-Za-z0-9_-]*$/;
-
-const suite = new CipherSuite({ kem: new DhkemX25519HkdfSha256(), kdf: new HkdfSha256(), aead: new Aes128Gcm() });
 
 export class ProtocolError extends Error {
   constructor(code) {
@@ -240,11 +237,10 @@ export async function decryptEnvelope(envelope, recipient) {
   const aad = headerBytes(envelope);
   if (!Object.hasOwn(envelope.keys, recipient.id)) throw new ProtocolError("not-a-recipient");
   const row = fromB64(envelope.keys[recipient.id]);
-  if (row.length <= ENC_LEN) throw new ProtocolError("malformed");
+  if (row.length <= hpke.ENC_LEN) throw new ProtocolError("malformed");
   let contentKey;
   try {
-    const context = await suite.createRecipientContext({ recipientKey: recipient.encryption, enc: row.slice(0, ENC_LEN), info: HPKE_INFO });
-    contentKey = new Uint8Array(await context.open(row.slice(ENC_LEN), aad));
+    contentKey = await hpke.open(recipient.encryption, HPKE_INFO, aad, row);
   } catch {
     throw new ProtocolError("undecryptable");
   }
@@ -285,10 +281,8 @@ export async function sealEnvelope(header, plaintext, sender, recipients, random
   if (recipients.length === 0) throw new ProtocolError("no-recipients");
   if (new Set(recipients.map((recipient) => recipient.id)).size !== recipients.length) throw new ProtocolError("duplicate-recipient");
   for (const recipient of [...recipients].sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    const recipientPublicKey = await suite.kem.deserializePublicKey(fromB64(recipient.encryption));
     const ekm = randomness?.ephemeral[recipient.id] ?? random(32);
-    const context = await suite.createSenderContext({ recipientPublicKey, info: HPKE_INFO, ekm });
-    keys[recipient.id] = toB64(concat(new Uint8Array(context.enc), new Uint8Array(await context.seal(contentKey, aad))));
+    keys[recipient.id] = toB64(await hpke.seal(fromB64(recipient.encryption), HPKE_INFO, aad, contentKey, ekm));
   }
   const key = await subtle.importKey("raw", contentKey, "AES-GCM", false, ["encrypt"]);
   const sealed = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad }, key, plaintext));
