@@ -1,0 +1,65 @@
+name: image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ${{ vars.CI_RUNNER || 'kelpie-hub-ci' }}
+    timeout-minutes: 60
+    env:
+      IMAGE: registry.gronare.com/kelpie-hub
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Log in to the registry
+        uses: docker/login-action@v4
+        with:
+          registry: registry.gronare.com
+          username: ${{ secrets.STAGING_REGISTRY_USER }}
+          password: ${{ secrets.STAGING_REGISTRY_PASSWORD }}
+
+      - name: Ask the registry whether this sha is built
+        id: built
+        run: |
+          if docker manifest inspect "${IMAGE}:${SHA}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: cargo test --workspace
+        if: steps.built.outputs.exists == 'false'
+        run: docker build --progress=plain --platform linux/amd64 --build-arg JOBS=2 --target test .
+
+      - name: Build and push the sha
+        if: steps.built.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          docker build --progress=plain --platform linux/amd64 --build-arg JOBS=2 -t "${IMAGE}:${SHA}" .
+          docker push "${IMAGE}:${SHA}"
+
+      - name: Move the main and version tags to this sha
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "${IMAGE}:${SHA}"
+          tags=()
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then tags+=(main); fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then tags+=("${GITHUB_REF_NAME#v}"); fi
+          for tag in "${tags[@]}"; do
+            docker tag "${IMAGE}:${SHA}" "${IMAGE}:${tag}"
+            docker push "${IMAGE}:${tag}"
+          done
+          echo "kelpie-hub \`${SHA}\` ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"

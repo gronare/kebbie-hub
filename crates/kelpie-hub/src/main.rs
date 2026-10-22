@@ -215,14 +215,26 @@ async fn run(cli: Cli) -> Result<(), String> {
                 "kelpie-hub listening on http://{address} with data in {}",
                 data.display()
             );
-            let shutdown = async {
-                let _ = tokio::signal::ctrl_c().await;
-            };
+            let shutdown = shutdown_signal();
             serve(listener, hub, shutdown)
                 .await
                 .map_err(|error| error.to_string())
         }
     }
+}
+
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut terminate = signal(SignalKind::terminate()).expect("SIGTERM can be watched");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = terminate.recv() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = tokio::signal::ctrl_c().await;
 }
 
 #[tokio::main]

@@ -205,3 +205,11 @@ async fn the_phone_sees_the_machine_name_while_pairing() {
         .unwrap();
     assert_eq!(view.machine_name.as_deref(), Some("mac"));
 }
+
+#[tokio::test]
+async fn the_health_check_answers_without_credentials_and_says_nothing() {
+    let test = start_hub(|_| {}).await;
+    let response = reqwest::get(format!("{}/healthz", test.url)).await.unwrap();
+    assert_eq!(response.status(), 204);
+    assert!(response.bytes().await.unwrap().is_empty());
+}

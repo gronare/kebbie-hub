@@ -21,6 +21,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
+use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
 use kelpie_hub_api::{MAX_WAIT_SECONDS, code_from_random};
 use kelpie_hub_protocol::{Envelope, Id, Kind};
@@ -452,8 +453,13 @@ impl Hub {
     }
 }
 
+async fn health() -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
 pub fn router(hub: Arc<Hub>) -> Router {
     Router::new()
+        .route("/healthz", get(health))
         .route("/v1/m/join", post(machine::join))
         .route(
             "/v1/m/board",

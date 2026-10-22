@@ -60,6 +60,8 @@ kelpie-hub --data /var/lib/kelpie-hub --listen 0.0.0.0:8470 \
 kelpie-hub --data /var/lib/kelpie-hub admin invite
 ```
 
+`GET /healthz` answers `204` without credentials, for a load balancer's or Kubernetes' probes. `SIGTERM` and `Ctrl-C` both stop the hub, giving open requests 5 seconds to finish.
+
 `admin invite` mints a one-time sign-up code, valid 7 days. `admin machines` lists the machines that joined, and `admin remove-machine <id>` removes one with its board, queue and admissions; its token stops working at once.
 
 In a second terminal, mint a join code and join a machine:
