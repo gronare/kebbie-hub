@@ -376,6 +376,34 @@ pub struct Results {
     pub results: Vec<ResultEntry>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PushKeys {
+    pub p256dh: String,
+    pub auth: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PushSubscription {
+    pub endpoint: String,
+    pub keys: PushKeys,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VapidKey {
+    pub key: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoticeUpload {
+    pub envelope: Envelope,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoticePosted {
+    pub notice: Id,
+    pub pushes: usize,
+}
+
 pub const EVENT_BOARD: &str = "board";
 pub const EVENT_PAIRING: &str = "pairing";
 pub const EVENT_MACHINE_REMOVED: &str = "machine-removed";

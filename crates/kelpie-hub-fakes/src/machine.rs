@@ -1,16 +1,20 @@
 use std::path::Path;
 use std::time::Duration;
 
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
-    BoardStored, BoardUpload, Bytes32, Inbox, JoinRequest, Joined, PairingFailure, PairingOpened,
-    PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
+    BoardStored, BoardUpload, Bytes32, Inbox, JoinRequest, Joined, NoticePosted, NoticeUpload,
+    PairingFailure, PairingOpened, PairingRefusal, PairingReply, PairingState, PairingView,
+    ResultStored, ResultUpload,
 };
 use kelpie_hub_protocol::{
-    AppliedCommands, Board, CommandResult, Dropped, Envelope, Header, Id, Kind, Machine,
-    MachinePairing, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal, Role, SecretKeys,
-    TrustedDevice, authorize, seal,
+    AppliedCommands, Board, CommandResult, Dropped, Envelope, Event, Header, Id, Kind, Machine,
+    MachinePairing, Notice, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal, Role,
+    SecretKeys, TrustedDevice, Urgency, authorize, seal,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::time::Instant;
 
 use crate::{Error, HubClient, HubError, KeyFile, PairError, now, save};
@@ -479,6 +483,64 @@ impl MachineState {
             .await?;
         self.last_rev = self.last_rev.max(stored.rev);
         Ok(stored.rev)
+    }
+
+    pub fn collapse_tag(&self, event: Event, address: &str) -> String {
+        let event = serde_json::to_value(event).expect("an event serializes");
+        let (_, encryption) = self.secret().to_bytes();
+        let digest = Sha256::new()
+            .chain_update(b"kelpie-hub fake collapse\0")
+            .chain_update(encryption)
+            .chain_update(format!("{}:{address}", event.as_str().unwrap_or_default()))
+            .finalize();
+        URL_SAFE_NO_PAD.encode(digest)
+    }
+
+    pub fn seal_notice(
+        &self,
+        notice: &Notice,
+        urgency: Urgency,
+        collapse: Option<String>,
+        at: u64,
+    ) -> Result<Envelope, Error> {
+        let mut header = Header::new(
+            Id::new(Prefix::Notice).expect("a fresh notice id is valid"),
+            Kind::Notice,
+            self.machine.clone(),
+            self.machine.clone(),
+            at,
+        );
+        header.urgency = Some(urgency);
+        header.collapse = collapse;
+        let recipients: Vec<(Id, PublicKeys)> = self
+            .devices
+            .iter()
+            .map(|device| (device.id.clone(), device.keys))
+            .collect();
+        seal(
+            header,
+            &Payload::Notice(notice.clone()),
+            &self.secret(),
+            &recipients,
+        )
+        .map_err(|error| Error::Protocol(error.to_string()))
+    }
+
+    pub async fn post_notice(&self, envelope: Envelope) -> Result<NoticePosted, Error> {
+        Ok(self
+            .client()
+            .post("/v1/m/notices", &NoticeUpload { envelope })
+            .await?)
+    }
+
+    pub async fn notice(
+        &self,
+        notice: &Notice,
+        urgency: Urgency,
+        collapse: Option<String>,
+    ) -> Result<NoticePosted, Error> {
+        let envelope = self.seal_notice(notice, urgency, collapse, now())?;
+        self.post_notice(envelope).await
     }
 
     pub async fn poll_once(&mut self, wait: u64) -> Result<Inbox, Error> {

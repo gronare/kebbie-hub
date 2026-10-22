@@ -6,7 +6,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand, ValueEnum};
 use kelpie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, join};
 use kelpie_hub_fakes::{load, save};
-use kelpie_hub_protocol::{Board, Id, Outcome, Role};
+use kelpie_hub_protocol::{Board, Event, Id, Notice, Outcome, Role, Urgency};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Parser)]
@@ -59,8 +59,67 @@ enum Command {
         #[arg(long, help = "Poll once and stop")]
         once: bool,
     },
+    #[command(
+        about = "Seal a notice to every paired device and post it; the hub pushes it to the subscribed ones"
+    )]
+    Notice {
+        body: String,
+        #[arg(long, default_value = "kelpie")]
+        title: String,
+        #[arg(long, value_enum, default_value_t = EventName::NeedsYou)]
+        event: EventName,
+        #[arg(long, value_enum, default_value_t = UrgencyName::Normal)]
+        urgency: UrgencyName,
+        #[arg(
+            long,
+            value_name = "TASK@REPO",
+            help = "The task the notice is about; its next notice replaces this one"
+        )]
+        collapse: Option<String>,
+        #[arg(
+            long,
+            requires = "collapse",
+            help = "Take back the earlier notice for this task instead"
+        )]
+        retract: bool,
+    },
     #[command(about = "Set what a paired device may do")]
     Role { device: String, role: RoleName },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum UrgencyName {
+    High,
+    Normal,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum EventName {
+    NeedsYou,
+    Ready,
+    Question,
+    Summary,
+    CiFailed,
+    CiGreen,
+    ApiError,
+    RoutineFindings,
+    RoutineFailed,
+}
+
+impl EventName {
+    fn event(self) -> Event {
+        match self {
+            EventName::NeedsYou => Event::NeedsYou,
+            EventName::Ready => Event::Ready,
+            EventName::Question => Event::Question,
+            EventName::Summary => Event::Summary,
+            EventName::CiFailed => Event::CiFailed,
+            EventName::CiGreen => Event::CiGreen,
+            EventName::ApiError => Event::ApiError,
+            EventName::RoutineFindings => Event::RoutineFindings,
+            EventName::RoutineFailed => Event::RoutineFailed,
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -178,6 +237,45 @@ async fn run(cli: Cli) -> Result<(), String> {
                     break;
                 }
             }
+        }
+        Command::Notice {
+            body,
+            title,
+            event,
+            urgency,
+            collapse,
+            retract,
+        } => {
+            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let event = event.event();
+            let tag = collapse
+                .as_deref()
+                .map(|address| state.collapse_tag(event, address));
+            let notice = Notice {
+                event,
+                address: collapse,
+                title,
+                body,
+                question: None,
+                options: Vec::new(),
+                recommend: None,
+                board_rev: state.last_rev,
+                retract: tag.clone().filter(|_| retract),
+            };
+            let urgency = match urgency {
+                UrgencyName::High => Urgency::High,
+                UrgencyName::Normal => Urgency::Normal,
+            };
+            let posted = state
+                .notice(&notice, urgency, tag)
+                .await
+                .map_err(|e| text(&e))?;
+            println!(
+                "posted notice {} sealed to {} device(s); the hub pushes it to {}",
+                posted.notice,
+                state.devices.len(),
+                posted.pushes
+            );
         }
         Command::Role { device, role } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

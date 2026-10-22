@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand, ValueEnum};
 use kelpie_hub::store::Store;
 use kelpie_hub::{
-    Config, DEV_ORIGIN, DEV_RP_ID, Hub, TrustedProxy, database_path, mint_invite, mint_join_code,
-    serve,
+    Config, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy, database_path,
+    mint_invite, mint_join_code, serve,
 };
 use kelpie_hub_protocol::Id;
 
@@ -45,6 +45,22 @@ struct Cli {
         help = "The origin people open the hub at, like https://hub.example.com"
     )]
     origin: Option<String>,
+    #[arg(
+        long,
+        help = "Contact the push services see in every VAPID token: mailto:you@example.com or the hub's https: URL"
+    )]
+    vapid_subject: Option<String>,
+    #[arg(
+        long,
+        help = "File holding the hub's VAPID private key, created on first start [default: <data>/vapid.key]"
+    )]
+    vapid_key: Option<PathBuf>,
+    #[arg(
+        long = "push-allow-host",
+        value_name = "HOST",
+        help = "Accept push endpoints on this host besides the known push services; *.example.com matches subdomains, and a loopback host may use http"
+    )]
+    push_allow_hosts: Vec<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -96,6 +112,17 @@ fn relying_party_config(cli: &Cli) -> Result<(String, String), String> {
         (Some(rp_id), Some(origin), _) => Ok((rp_id.clone(), origin.clone())),
         (None, None, true) => Ok((DEV_RP_ID.to_string(), DEV_ORIGIN.to_string())),
         _ => Err("pass --rp-id <domain> and --origin <url>, or --dev for a local hub".to_string()),
+    }
+}
+
+fn vapid_subject(cli: &Cli) -> Result<String, String> {
+    match (&cli.vapid_subject, cli.dev) {
+        (Some(subject), _) => Ok(subject.clone()),
+        (None, true) => Ok(DEV_VAPID_SUBJECT.to_string()),
+        (None, false) => Err(
+            "pass --vapid-subject mailto:<you@your-domain> (or the hub's https: URL), or --dev for a local hub"
+                .to_string(),
+        ),
     }
 }
 
@@ -167,6 +194,15 @@ async fn run(cli: Cli) -> Result<(), String> {
             let mut config = defaults;
             config.rp_id = rp_id;
             config.origin = origin;
+            config.vapid_subject = vapid_subject(&cli)?;
+            if let Some(key) = &cli.vapid_key {
+                config.vapid_key = key.clone();
+            }
+            config.push_allow_hosts = cli
+                .push_allow_hosts
+                .iter()
+                .map(|host| host.trim().to_ascii_lowercase())
+                .collect();
             config.anonymous_devices = cli.dev;
             config.trusted_proxy = cli
                 .trusted_proxy

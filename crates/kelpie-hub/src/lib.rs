@@ -7,9 +7,11 @@ mod events;
 mod limit;
 mod machine;
 mod pairing;
+mod push;
 mod server;
 pub mod store;
 mod wake;
+pub mod webpush;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -28,9 +30,11 @@ pub use auth::SESSION_COOKIE;
 pub use error::ApiError;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
+use push::Pusher;
 pub use server::serve;
 use store::{Pairing, Store};
 use wake::{Wakeups, device_key, machine_key, pairing_key};
+use webpush::{Vapid, check_subject};
 
 pub const DATABASE_FILE: &str = "hub.sqlite3";
 const REQUEST_BODY_LIMIT: usize = 16 * 1024;
@@ -41,6 +45,8 @@ const MAX_NAME_CHARS: usize = 64;
 pub const MAX_STORED_INTEGER: u64 = i64::MAX as u64;
 pub const DEV_ORIGIN: &str = "http://localhost:8470";
 pub const DEV_RP_ID: &str = "localhost";
+pub const DEV_VAPID_SUBJECT: &str = "https://github.com/gronare/kelpie-hub";
+pub const VAPID_KEY_FILE: &str = "vapid.key";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrustedProxy {
@@ -71,12 +77,24 @@ pub struct Config {
     pub start_push_rate: RateLimit,
     pub max_queued: u64,
     pub max_undelivered_per_device: u64,
+    pub vapid_subject: String,
+    pub vapid_key: PathBuf,
+    pub push_allow_hosts: Vec<String>,
+    pub notice_rate: RateLimit,
+    pub device_push_rate: RateLimit,
+    pub push_in_flight: usize,
+    pub push_pending: usize,
+    pub push_retries: u32,
+    pub push_backoff: Duration,
+    pub push_timeout: Duration,
 }
 
 impl Config {
     pub fn new(data_dir: impl Into<PathBuf>) -> Config {
+        let data_dir = data_dir.into();
         Config {
-            data_dir: data_dir.into(),
+            vapid_key: data_dir.join(VAPID_KEY_FILE),
+            data_dir,
             rate: RateLimit::default(),
             join_code_ttl: 600,
             pairing_ttl: 600,
@@ -104,6 +122,21 @@ impl Config {
             },
             max_queued: 1_000,
             max_undelivered_per_device: 100,
+            vapid_subject: DEV_VAPID_SUBJECT.to_string(),
+            push_allow_hosts: Vec::new(),
+            notice_rate: RateLimit {
+                burst: 30,
+                per_minute: 30,
+            },
+            device_push_rate: RateLimit {
+                burst: 30,
+                per_minute: 30,
+            },
+            push_in_flight: 256,
+            push_pending: 4096,
+            push_retries: 3,
+            push_backoff: Duration::from_secs(1),
+            push_timeout: Duration::from_secs(30),
         }
     }
 
@@ -147,13 +180,16 @@ pub fn mint_invite(store: &Store, ttl: u64) -> store::Result<String> {
 pub enum OpenError {
     Store(rusqlite::Error),
     RelyingParty(String),
+    Push(String),
 }
 
 impl std::fmt::Display for OpenError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OpenError::Store(error) => error.fmt(formatter),
-            OpenError::RelyingParty(message) => formatter.write_str(message),
+            OpenError::RelyingParty(message) | OpenError::Push(message) => {
+                formatter.write_str(message)
+            }
         }
     }
 }
@@ -189,6 +225,9 @@ pub struct Hub {
     limiter: Limiter,
     command_limiter: Limiter,
     start_push_limiter: Limiter,
+    notice_limiter: Limiter,
+    device_push_limiter: Limiter,
+    pusher: Pusher,
     wakeups: Wakeups,
     closing: watch::Sender<bool>,
     webauthn: Webauthn,
@@ -221,12 +260,24 @@ impl Drop for FeedPermit {
 impl Hub {
     pub fn open(config: Config) -> Result<Arc<Hub>, OpenError> {
         let (webauthn, origin) = relying_party(&config.rp_id, &config.origin)?;
+        check_subject(&config.vapid_subject).map_err(OpenError::Push)?;
+        let vapid = Vapid::load_or_create(&config.vapid_key).map_err(OpenError::Push)?;
+        let pusher = Pusher::new(
+            vapid,
+            config.push_timeout,
+            config.push_in_flight,
+            config.push_pending,
+        )
+        .map_err(OpenError::Push)?;
         let store = Store::open(&config.database())?;
         Ok(Arc::new(Hub {
             store: Mutex::new(store),
             limiter: Limiter::new(config.rate, config.max_buckets),
             command_limiter: Limiter::new(config.command_rate, config.max_buckets),
             start_push_limiter: Limiter::new(config.start_push_rate, config.max_buckets),
+            notice_limiter: Limiter::new(config.notice_rate, config.max_buckets),
+            device_push_limiter: Limiter::new(config.device_push_rate, config.max_buckets),
+            pusher,
             wakeups: Wakeups::new(),
             closing: watch::Sender::new(false),
             webauthn,
@@ -272,6 +323,14 @@ impl Hub {
 
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    pub fn vapid_public_key(&self) -> &str {
+        self.pusher.vapid.public_key()
+    }
+
+    pub fn pushes_in_flight(&self) -> usize {
+        self.pusher.pending()
     }
 
     pub fn mint_join_code(&self) -> store::Result<String> {
@@ -378,6 +437,8 @@ impl Hub {
         self.limiter.forget_idle();
         self.command_limiter.forget_idle();
         self.start_push_limiter.forget_idle();
+        self.notice_limiter.forget_idle();
+        self.device_push_limiter.forget_idle();
         self.wakeups.forget_idle();
         swept
     }
@@ -392,6 +453,9 @@ pub fn router(hub: Arc<Hub>) -> Router {
         )
         .route("/v1/m/inbox", get(machine::inbox))
         .route("/v1/m/results", post(command::post_result))
+        .route("/v1/m/notices", post(push::post_notice))
+        .route("/v1/d/push", put(push::subscribe).delete(push::unsubscribe))
+        .route("/v1/push/vapid", get(push::vapid))
         .route(
             "/v1/d/commands",
             post(command::post_command).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),

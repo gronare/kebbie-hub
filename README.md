@@ -7,7 +7,7 @@ The hub is a mailbox, never a party. Everything it carries is end-to-end encrypt
 This repository holds:
 
 - `kelpie-hub-protocol`: envelopes, messages and pairing, plus the test vectors other implementations are checked against.
-- `kelpie-hub`: the hub server. It relays sealed boards from machines to the devices they paired with, signed commands from devices to machines and sealed results back, and carries pairing between them.
+- `kelpie-hub`: the hub server. It relays sealed boards from machines to the devices they paired with, signed commands from devices to machines and sealed results back, pushes sealed notices to devices through Web Push, and carries pairing between them.
 - `kelpie-hub-api`: the request and response bodies of the hub's HTTP API.
 - `kelpie-hub-fakes`: `fake-machine` and `fake-phone`, two CLIs that stand in for kelpie and the web app. The fake machine never runs anything: it prints what kelpie would do.
 
@@ -47,13 +47,16 @@ target/debug/kelpie-hub --dev
 
 The hub links OpenSSL (through `webauthn-rs`) built from source and statically, so the binary needs no system OpenSSL; building it needs a C compiler, `make` and `perl`.
 
-`--dev` listens on `127.0.0.1:8470`, keeps its sqlite file in `kelpie-hub-dev` under the system temp directory, uses `localhost` as the passkey relying party with `http://localhost:8470` as the origin, and lets a pairing code create a device without an account so the fake phone can pair. `--data <dir>`, `--listen <address>`, `--rp-id <domain>` and `--origin <url>` override these; without `--dev` all four are required, and with `--dev` the hub refuses to listen on anything but a loopback address. Behind Cloudflare, `--trusted-proxy cloudflare` takes the client address from `CF-Connecting-IP`; without it the hub uses the TCP peer and ignores that header.
+`--dev` listens on `127.0.0.1:8470`, keeps its sqlite file in `kelpie-hub-dev` under the system temp directory, uses `localhost` as the passkey relying party with `http://localhost:8470` as the origin, signs push requests with this repository's URL as the VAPID subject, and lets a pairing code create a device without an account so the fake phone can pair. `--data <dir>`, `--listen <address>`, `--rp-id <domain>`, `--origin <url>` and `--vapid-subject <contact>` override these; without `--dev` all five are required, and with `--dev` the hub refuses to listen on anything but a loopback address.
+
+The VAPID subject is the contact every push service sees in the hub's push requests: `mailto:you@your-domain` or the hub's `https:` URL. The hub refuses to start with anything else, including a `localhost`, `.local`, `.test`, `.internal` or IP address, because Apple answers such tokens with `403 BadJwtToken`. The hub's VAPID key pair is made on first start and kept in `vapid.key` in the data directory (mode 0600, the P-256 private scalar as base64url); `--vapid-key <file>` keeps it elsewhere. The hub refuses to start when the key file is readable by group or others. The push services are reached over TLS with the platform's root certificates, so a container image needs its CA bundle (`ca-certificates` on Debian or Alpine) for real pushes. Keep the file across restarts and moves: a new key invalidates every device's push subscription, and the web app has to subscribe again. `--push-allow-host <host>` (repeatable, `*.example.com` for subdomains) accepts push endpoints on a host beyond the known push services, for a self-hosted push service or tests; on a loopback host it may be plain `http:`. Behind Cloudflare, `--trusted-proxy cloudflare` takes the client address from `CF-Connecting-IP`; without it the hub uses the TCP peer and ignores that header.
 
 A public hub:
 
 ```sh
 kelpie-hub --data /var/lib/kelpie-hub --listen 0.0.0.0:8470 \
-  --rp-id hub.example.com --origin https://hub.example.com --trusted-proxy cloudflare
+  --rp-id hub.example.com --origin https://hub.example.com --trusted-proxy cloudflare \
+  --vapid-subject mailto:you@example.com
 kelpie-hub --data /var/lib/kelpie-hub admin invite
 ```
 
@@ -91,6 +94,17 @@ target/debug/fake-phone --state phone.json start greenhouse invoice-rounding "Fi
 target/debug/fake-phone --state phone.json routine nightly-deps
 ```
 
+Post a notice. The machine seals it to every device it paired with; the hub pushes each subscribed device its own cut of the envelope:
+
+```sh
+target/debug/fake-phone --state phone.json push-subscribe --endpoint <push endpoint> --keys
+target/debug/fake-machine --state machine.json notice "Keep the old endpoint for a release?" \
+  --event question --urgency high --collapse refunds@greenhouse
+target/debug/fake-machine --state machine.json notice "answered" --collapse refunds@greenhouse --retract
+```
+
+`push-subscribe` makes fresh subscription keys, keeps the private half in the state file and registers the endpoint; `--keys` prints the subscription it sent. A command-line phone has no push service of its own, so the endpoint is one the hub accepts (a known push service, or a host given with `--push-allow-host`). `--collapse` takes the task's `task@repo`: the fake machine turns it into an opaque tag (a SHA-256 over its own key and `event:address`; kelpie will use an HMAC key shared at pairing), so the next notice for that task replaces this one. `--retract` sends a notice whose `retract` names that tag, for the app to close the earlier one.
+
 `fake-machine apply` runs until stopped (`--once` polls once); it keeps the ids it applied, with their results, in its state file. `fake-machine role <device> read` makes a device read-only, so its commands are refused with `not-allowed`. `fake-machine poll` long-polls the machine's queue once, and `fake-phone attempts` lists every pairing attempt, failed ones included. Both CLIs keep their keys and tokens in the `--state` file, written with mode 0600. Against a hub without `--dev`, give the phone a device an account registered: `fake-phone init <hub> --device <id> --token <token>`.
 
 ## Accounts and who holds what
@@ -121,12 +135,16 @@ Every endpoint is under `/v1`. Machine endpoints (`/v1/m/`) take a `khm_` bearer
 | `POST /v1/m/pairings/<id>/reply` | machine | `M` and `n_m`, once, after the commitment |
 | `POST /v1/m/pairings/<id>/admit` | machine | after the user confirmed the digits; the hub records which machine admitted the device |
 | `POST /v1/m/pairings/<id>/refuse` | machine | `mismatch`, `declined` or `timeout` |
+| `POST /v1/m/notices` | machine | `{envelope}`: a notice sealed to the machine's devices; `202` with `{notice, pushes}`, the number of pushes queued. See [Notices and Web Push](#notices-and-web-push) |
 | `DELETE /v1/m/devices/<id>` | machine | stops handing the machine's board to a device it admitted; `404` for a device it did not admit |
 | `POST /v1/d/pairings` | device, pairing code | the commitment. The same token sending the same commitment again gets the same answer; any other second commitment fails the pairing. An unknown code and a code whose pairing has ended both get `401`. Only a `--dev` hub accepts a commitment without a token, and hands out a device id and token with it |
 | `GET /v1/d/pairings/<id>?seen=<state>&wait=<s>` | device | waits like the machine's; shows `M` and `n_m`, then the outcome |
 | `POST /v1/d/pairings/<id>/reveal` | device | `D` and `n_d`, once, after the reply |
 | `POST /v1/d/commands` | device | `{envelope}`: a signed, sealed command; `202` with `{command, seq}`, its place in the machine's queue. Sending the same envelope again returns the same `seq` and queues nothing; another envelope under an id already used is `409 command-id-taken` |
 | `GET /v1/d/results?after=<seq>&wait=<s>` | device | waits up to 25 s for results to this device with `seq > after`, each with only this device's key row. `seq` counts this device's results only. `after` is a cursor, not an acknowledgement: results stay until they expire |
+| `PUT /v1/d/push` | device | the browser's push subscription, as `PushSubscription.toJSON()` gives it: `{endpoint, keys: {p256dh, auth}}`. `204`; it replaces the device's earlier one. An endpoint another device of the same account held moves to this one (logged `push.moved`); one held by another account's device is `409 endpoint-taken`. `400 bad-endpoint`, `endpoint-not-https`, `endpoint-not-allowed` (a host that is not a known push service) or `bad-push-keys` |
+| `DELETE /v1/d/push` | device | removes the device's push subscription; `204` whether or not it had one |
+| `GET /v1/push/vapid` | anyone | `{key}`: the hub's VAPID public key, base64url of the uncompressed P-256 point, for `pushManager.subscribe({applicationServerKey})` |
 | `GET /v1/d/boards` | device | the latest board of every machine that admitted the device, with only this device's key row |
 | `GET /v1/d/events` | device | a server-sent event stream: `board` (`{machine, rev}`) when an admitting machine stores a board, `pairing` (`{pairing, state}`) when one of the device's pairings changes or expires, `machine-removed` (`{machine}`) when a machine removes the device, `result` (`{machine, command}`, with the result's `seq` as the event id) when a result to the device is stored. It starts with the current state: a new feed without `Last-Event-ID` announces every result the hub still holds for the device (at most 7 days back), and with it only those after that `seq` (a `Last-Event-ID` that is not a number up to `i64::MAX` gets `400 bad-last-event-id`). It carries no content, keeps alive every 15 s and ends when the device is removed |
 | `POST /v1/a/register/begin` | anyone, invite | `{invite, handle}`; returns a ceremony id and the passkey creation options |
@@ -168,18 +186,45 @@ Requests are rate limited per token or account (commands also per device and kin
 
 Long-polls and event feeds wake only for their own machine, pairing or device.
 
+## Notices and Web Push
+
+A machine tells its devices that something needs them with a notice: an envelope of kind `notice`, sealed to the devices it paired with and signed by the machine. Its header carries `urgency` (`high` for a question, needs-you or a failed CI, otherwise `normal`) and `collapse`, an opaque tag per task, both covered by the signature. The content (`title`, `body`, the question and its options, `retract`) is end to end encrypted like a board.
+
+`POST /v1/m/notices` checks, before anything is pushed:
+
+- that the envelope is a notice (`400 not-a-notice`) for this machine (`400 wrong-machine`), signed by it (`400 bad-signature`), unexpired (`400 expired`) and well formed;
+- that its key rows are devices, and at least one (`400 bad-recipients`);
+- that each device's cut of the envelope fits one push (`413 too-large`): at most 3993 bytes of envelope JSON, so the encrypted push body stays within the 4096 bytes every push service takes;
+- a rate of 30 at once and 30 a minute per machine (`429 rate-limited`), and that the notice id is new (`409 replayed-envelope`).
+
+The hub then pushes to every recipient device that the machine still admits and that has a subscription, at most 30 at once and 30 a minute per device across all machines (a push over that is dropped and logged `push.capped`). The response does not wait for the push services: deliveries run in the background, at most 4096 waiting or retrying and at most 256 requests open at once. A request slot is held only while a request is out, never through a retry's wait, so a failing push service does not hold up the others. A delivery that finds the 4096 taken is dropped and logged. Each delivery checks its endpoint against the known push services and `--push-allow-host` again before sending, so a host dropped from the allowlist gets nothing (`push.refused`). Redirects are not followed.
+
+Each push is the envelope cut to that device's key row, as JSON, encrypted to the subscription's keys with `aes128gcm` (RFC 8291) and sent with:
+
+- `Authorization: vapid t=<JWT>, k=<public key>` (RFC 8292): an ES256 token with `aud` the endpoint's origin, `sub` the `--vapid-subject`, `exp` 12 hours out;
+- `TTL`: the seconds left until the envelope's `exp`;
+- `Urgency`: the header's urgency;
+- `Topic`: the collapse tag when it is 32 characters or fewer, otherwise the first 32 characters of the base64url SHA-256 of it, so a newer notice for the same task replaces an undelivered one at the push service.
+
+How the hub reads the push service's answer: `201` or any other 2xx is delivered; `404` and `410` mean the subscription is gone, and the hub deletes it (iOS hands out a new endpoint whenever the service worker registers again); `413` is logged; `429`, a 5xx or no answer is retried 3 times, waiting 1, 2 and 4 seconds or the `Retry-After` it names (at most a minute), and then dropped; any other status, a redirect included, is logged as `push.refused`, and a `401` or `403` is also printed, since it usually means the VAPID subject or key is wrong. The hub keeps no notice content, so a notice that found no subscription, or whose push was dropped, is gone; the device sees what it was about on the board.
+
+**What a push service sees.** Apple, Google, Mozilla or Microsoft see the hub's address, its VAPID public key and subject, the endpoint, when each push is sent and how large it is, its TTL, urgency and topic. The body is encrypted to the browser's subscription key; inside it is the sealed envelope, which only the device can open. The topic is a hash of an opaque tag, so it groups one task's notices without naming the task. The hub itself sees the same as for a board: which machine notified which devices, when, how urgently and how large, never the text.
+
+iOS does not replace a shown notification that has the same `tag`, so a notice is never quietly withdrawn: when a question is settled elsewhere, the machine sends a new notice whose sealed `retract` names the collapse tag, and the service worker closes the old notification.
+
 ## What the hub stores
 
-One sqlite file: machine ids, names and public keys; accounts (id, handle, a random WebAuthn user handle, creation time, and room for a GitHub id and a verified email); each passkey's public key, signature counter, name and use times; SHA-256 hashes of machine, device and session tokens, never the tokens; SHA-256 hashes of join codes, invites and pairing codes, so they cannot be read off the file, though a code's 40 bits do not resist offline guessing during its life; pending passkey ceremonies for 5 minutes; device ids, names, public keys and owning account, and which machine admitted each device; the latest board envelope per machine, as ciphertext with its key rows, its id and signed time; queued envelopes until acknowledged or expired; for each command, the sending device, the machine, the id, the kind, a SHA-256 of the envelope (to recognise a resend), its queue position and when it was queued and delivered, kept 7 days; results, as ciphertext with their key rows, until they expire (at most 7 days); pairing sessions, deleted an hour after they expire; and an event log of what happened when (joins, stored revisions and sizes, pairing steps and refusal reasons, sign-ups, logins, device registrations and removals, queued commands with their kind and size, stored results), kept 30 days.
+One sqlite file: machine ids, names and public keys; accounts (id, handle, a random WebAuthn user handle, creation time, and room for a GitHub id and a verified email); each passkey's public key, signature counter, name and use times; SHA-256 hashes of machine, device and session tokens, never the tokens; SHA-256 hashes of join codes, invites and pairing codes, so they cannot be read off the file, though a code's 40 bits do not resist offline guessing during its life; pending passkey ceremonies for 5 minutes; device ids, names, public keys and owning account, and which machine admitted each device; the latest board envelope per machine, as ciphertext with its key rows, its id and signed time; queued envelopes until acknowledged or expired; for each command, the sending device, the machine, the id, the kind, a SHA-256 of the envelope (to recognise a resend), its queue position and when it was queued and delivered, kept 7 days; results, as ciphertext with their key rows, until they expire (at most 7 days); pairing sessions, deleted an hour after they expire; each device's push subscription (the endpoint and the browser's public `p256dh` key and `auth` secret, which let the hub encrypt to the browser but not decrypt); the ids of posted notices until they expire, to refuse a replay; and an event log of what happened when (joins, stored revisions and sizes, pairing steps and refusal reasons, sign-ups, logins, device registrations and removals, queued commands with their kind and size, stored results, push subscriptions with the push service's host, posted notices with their size and number of pushes, and each push's outcome with the push service's status), kept 30 days.
 
 Every minute the hub sweeps expired sessions, ceremonies, invites and codes, and devices that no account holds and no machine admits once none of their pairings is still open. A database written by an earlier schema is refused at start-up.
 
-It never stores or sees a board's, command's or result's content, a private key, or a token. It cannot decrypt an envelope, and it does not decide which devices a machine trusts: it records the machine's decision.
+It never stores or sees a board's, command's, result's or notice's content, a machine's or device's private key, or a token. Its own VAPID private key is in its key file, outside the database. It cannot decrypt an envelope, and it does not decide which devices a machine trusts: it records the machine's decision.
 
 ## Not yet
 
 - The web app.
-- The bridge in kelpie that applies commands for real, and notices.
+- The bridge in kelpie that applies commands and posts notices for real, and the collapse key a machine shares with its devices at pairing.
+- The web app's service worker that opens a pushed envelope and shows it, and APNs for an iOS app.
 - Signing up through GitHub or an email link, and OIDC sign-in for self-hosted hubs.
 - Logging in without typing a handle (discoverable passkeys).
 - Removing an account.
@@ -193,7 +238,7 @@ cargo test
 node --test
 ```
 
-`cargo test` checks the crates and replays `vectors/*.json`. The hub's integration tests start it in-process on a random port and drive it with the fake machine and phone, and with `webauthn-authenticator-rs`'s software passkey for accounts: pairing with matching digits, a relay that swaps the machine's key (the digits differ and the machine refuses) or the device's key (the commitment fails), boards reaching the paired phone and no other, stale revisions, bad tokens, rate limits, a scan of the sqlite files for the board's text and the tokens, sign-up and login with the cookie's flags, invites and ceremonies used once, session expiry, the origin check, device registration behind a session, removal by machine, account and admin CLI ending boards and the event feed, the sweeps, feed events without content, and the header-read timeout. For commands: an answer applied and its result read back; a read-only device refused with `not-allowed`; a resend that queues nothing and a redelivery that replays the stored result; commands to a machine that did not admit the device, forged, misattributed or expired ones refused and never queued; a command that expires in the queue; a push whose head moved; the start rate limit; a result that reaches only the device that sent the command; a scan of the sqlite files for the commands' text; and `result` events without content. `node --test` (Node 25 or newer) checks the same vectors with WebCrypto as browsers expose it, plus [`@hpke/core`](https://github.com/dajiaji/hpke-js) for HPKE: it opens what Rust sealed with non-extractable keys, reseals it byte for byte, refuses every tampered, expired, misaddressed or malformed case with the same error as Rust, and runs the pairing flows. Run `npm install` once first.
+`cargo test` checks the crates and replays `vectors/*.json`. The hub's integration tests start it in-process on a random port and drive it with the fake machine and phone, and with `webauthn-authenticator-rs`'s software passkey for accounts: pairing with matching digits, a relay that swaps the machine's key (the digits differ and the machine refuses) or the device's key (the commitment fails), boards reaching the paired phone and no other, stale revisions, bad tokens, rate limits, a scan of the sqlite files for the board's text and the tokens, sign-up and login with the cookie's flags, invites and ceremonies used once, session expiry, the origin check, device registration behind a session, removal by machine, account and admin CLI ending boards and the event feed, the sweeps, feed events without content, and the header-read timeout. For commands: an answer applied and its result read back; a read-only device refused with `not-allowed`; a resend that queues nothing and a redelivery that replays the stored result; commands to a machine that did not admit the device, forged, misattributed or expired ones refused and never queued; a command that expires in the queue; a push whose head moved; the start rate limit; a result that reaches only the device that sent the command; a scan of the sqlite files for the commands' text; and `result` events without content. For notices, a local fake push service in the test decrypts every push with the subscription's private key (RFC 8291) and checks that it is the machine's envelope cut to that device's row and opens only on that device, verifies the VAPID token's ES256 signature against `GET /v1/push/vapid`, its `aud`, `sub` and `exp`, and the `Urgency`, `TTL`, `Topic` and `Content-Encoding` headers; further tests cover a failing push service not holding up deliveries to another, an endpoint moving within an account and refused across accounts, a stored endpoint off the allowlist refused at delivery, a `302` not followed, a key file others can read refused at start, misaddressed and misfiled notices, the sweep of notice ids, a device without a subscription, one that unsubscribed and one the machine removed getting nothing, `404` and `410` pruning the subscription, `429` and `503` retried until accepted, a service that keeps failing dropped after its retries, a notice too large for one push refused at the post, forged, replayed and misfiled notices, the machine rate and the device cap, endpoints off the known push services refused, a VAPID subject push services reject refused at start, the key file kept across restarts with mode 0600, and a scan of the data directory and the event log for the notice's text, ciphertext and collapse tag. The encryption is also checked against the example in RFC 8291 section 5, byte for byte, on both the hub's and the fake phone's side. `node --test` (Node 25 or newer) checks the same vectors with WebCrypto as browsers expose it, plus [`@hpke/core`](https://github.com/dajiaji/hpke-js) for HPKE: it opens what Rust sealed with non-extractable keys, reseals it byte for byte, refuses every tampered, expired, misaddressed or malformed case with the same error as Rust, and runs the pairing flows. Run `npm install` once first.
 
 The vectors are generated from fixed keys and randomness:
 

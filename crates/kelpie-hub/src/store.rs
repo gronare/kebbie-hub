@@ -134,6 +134,20 @@ CREATE TABLE IF NOT EXISTS pairings (
     opened_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    device_id TEXT PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh BLOB NOT NULL,
+    auth BLOB NOT NULL,
+    subscribed_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notices (
+    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    notice_id TEXT NOT NULL,
+    posted_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    PRIMARY KEY (machine_id, notice_id)
+);
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY,
     at INTEGER NOT NULL,
@@ -144,7 +158,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
@@ -235,6 +249,19 @@ pub struct ResultHead {
     pub seq: u64,
     pub machine: Id,
     pub command: Id,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Subscribed {
+    New,
+    Moved(Id),
+    Taken,
+}
+
+pub struct StoredSubscription {
+    pub endpoint: String,
+    pub p256dh: Vec<u8>,
+    pub auth: Vec<u8>,
 }
 
 pub struct StoredResult {
@@ -1197,6 +1224,91 @@ impl Store {
         Ok(true)
     }
 
+    pub fn subscribe_push(
+        &self,
+        device: &Id,
+        endpoint: &str,
+        p256dh: &[u8],
+        auth: &[u8],
+        now: u64,
+    ) -> Result<Subscribed> {
+        let tx = self.connection.unchecked_transaction()?;
+        let holder: Option<(Id, bool)> = tx
+            .query_row(
+                "SELECT holder.id, holder.account_id IS NOT NULL
+                     AND holder.account_id = (SELECT account_id FROM devices WHERE id = ?2)
+                 FROM push_subscriptions JOIN devices AS holder ON holder.id = push_subscriptions.device_id
+                 WHERE push_subscriptions.endpoint = ?1 AND push_subscriptions.device_id != ?2",
+                params![endpoint, device.as_str()],
+                |row| Ok((id_at(row, 0)?, row.get::<_, Option<bool>>(1)?.unwrap_or(false))),
+            )
+            .optional()?;
+        let outcome = match holder {
+            Some((_, false)) => return Ok(Subscribed::Taken),
+            Some((from, true)) => {
+                tx.execute(
+                    "DELETE FROM push_subscriptions WHERE device_id = ?1",
+                    [from.as_str()],
+                )?;
+                Subscribed::Moved(from)
+            }
+            None => Subscribed::New,
+        };
+        tx.execute(
+            "INSERT INTO push_subscriptions (device_id, endpoint, p256dh, auth, subscribed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (device_id) DO UPDATE SET
+                 endpoint = ?2, p256dh = ?3, auth = ?4, subscribed_at = ?5",
+            params![device.as_str(), endpoint, p256dh, auth, now],
+        )?;
+        tx.commit()?;
+        Ok(outcome)
+    }
+
+    pub fn unsubscribe_push(&self, device: &Id) -> Result<bool> {
+        Ok(self.connection.execute(
+            "DELETE FROM push_subscriptions WHERE device_id = ?1",
+            [device.as_str()],
+        )? > 0)
+    }
+
+    pub fn drop_push_endpoint(&self, device: &Id, endpoint: &str) -> Result<bool> {
+        Ok(self.connection.execute(
+            "DELETE FROM push_subscriptions WHERE device_id = ?1 AND endpoint = ?2",
+            params![device.as_str(), endpoint],
+        )? > 0)
+    }
+
+    pub fn push_subscription(&self, device: &Id) -> Result<Option<StoredSubscription>> {
+        self.connection
+            .query_row(
+                "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE device_id = ?1",
+                [device.as_str()],
+                |row| {
+                    Ok(StoredSubscription {
+                        endpoint: row.get(0)?,
+                        p256dh: row.get(1)?,
+                        auth: row.get(2)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn record_notice(
+        &self,
+        machine: &Id,
+        notice: &Id,
+        now: u64,
+        expires_at: u64,
+    ) -> Result<bool> {
+        Ok(self.connection.execute(
+            "INSERT INTO notices (machine_id, notice_id, posted_at, expires_at)
+             VALUES (?1, ?2, ?3, ?4) ON CONFLICT DO NOTHING",
+            params![machine.as_str(), notice.as_str(), now, expires_at],
+        )? > 0)
+    }
+
     pub fn sweep(&self, now: u64) -> Result<Sweep> {
         self.connection
             .execute("DELETE FROM join_codes WHERE expires_at <= ?1", [now])?;
@@ -1227,6 +1339,8 @@ impl Store {
         )?;
         self.connection
             .execute("DELETE FROM results WHERE expires_at <= ?1", [now])?;
+        self.connection
+            .execute("DELETE FROM notices WHERE expires_at <= ?1", [now])?;
         self.connection.execute(
             "DELETE FROM events WHERE at + ?2 <= ?1",
             params![now, EVENT_KEEP_SECONDS],

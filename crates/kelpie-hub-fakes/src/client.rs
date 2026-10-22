@@ -131,8 +131,15 @@ impl HubClient {
     }
 
     pub async fn delete(&self, path: &str) -> Result<(), HubError> {
-        let response = self
-            .request(Method::DELETE, path)
+        HubClient::send_empty(self.request(Method::DELETE, path)).await
+    }
+
+    pub async fn put_empty<B: Serialize>(&self, path: &str, body: &B) -> Result<(), HubError> {
+        HubClient::send_empty(self.request(Method::PUT, path).json(body)).await
+    }
+
+    async fn send_empty(request: RequestBuilder) -> Result<(), HubError> {
+        let response = request
             .send()
             .await
             .map_err(|error| HubError::Transport(error.to_string()))?;

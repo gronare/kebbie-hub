@@ -74,6 +74,17 @@ enum Command {
         #[command(flatten)]
         target: Target,
     },
+    #[command(
+        about = "Subscribe this device to Web Push at an endpoint, with fresh subscription keys kept in the state file"
+    )]
+    PushSubscribe {
+        #[arg(long)]
+        endpoint: String,
+        #[arg(long, help = "Print the subscription JSON sent, keys included")]
+        keys: bool,
+    },
+    #[command(about = "Remove this device's Web Push subscription")]
+    PushUnsubscribe,
     #[command(about = "Run one of the machine's routines now")]
     Routine {
         id: String,
@@ -172,6 +183,28 @@ async fn run(cli: Cli) -> Result<(), String> {
             save(&cli.state, &state).map_err(|e| text(&e))?;
             let machine = outcome.map_err(|e| text(&e))?;
             println!("paired with {machine}");
+        }
+        Command::PushSubscribe { endpoint, keys } => {
+            let mut state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            let secret = state
+                .subscribe_push(&endpoint)
+                .await
+                .map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            if keys {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&secret.subscription())
+                        .expect("a subscription serializes")
+                );
+            }
+            println!("subscribed to push at {endpoint}");
+        }
+        Command::PushUnsubscribe => {
+            let mut state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            state.unsubscribe_push().await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("unsubscribed from push");
         }
         Command::Boards => {
             let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;

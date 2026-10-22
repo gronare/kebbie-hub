@@ -1,6 +1,7 @@
 pub mod client;
 pub mod machine;
 pub mod phone;
+pub mod push;
 
 use std::fmt;
 use std::fs;

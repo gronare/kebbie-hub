@@ -6,12 +6,13 @@ use kelpie_hub_api::{
     PairingView, ResultEntry, Results, RevealRequest, normalize_code,
 };
 use kelpie_hub_protocol::{
-    Board, CommandResult, DevicePairing, Envelope, Header, Id, OpenError, Payload, Prefix,
+    Board, CommandResult, DevicePairing, Envelope, Header, Id, Notice, OpenError, Payload, Prefix,
     PublicKeys, SecretKeys, open, seal,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
+use crate::push::PushSecret;
 use crate::{Error, HubClient, KeyFile, PairError, now};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +36,8 @@ pub struct PhoneState {
     secret: KeyFile,
     pub machines: Vec<PairedMachine>,
     pub attempts: Vec<Attempt>,
+    #[serde(default)]
+    pub push: Option<PushSecret>,
 }
 
 #[derive(Debug)]
@@ -91,6 +94,7 @@ impl PhoneState {
             secret: KeyFile::generate(),
             machines: Vec::new(),
             attempts: Vec::new(),
+            push: None,
         }
     }
 
@@ -344,6 +348,44 @@ impl PhoneState {
             Payload::Result(result) if result.command == entry.command => Ok(result),
             Payload::Result(_) => Err("the result names another command".into()),
             _ => Err("is not a result".into()),
+        }
+    }
+
+    pub async fn subscribe_push(&mut self, endpoint: &str) -> Result<PushSecret, Error> {
+        let secret = PushSecret::generate(endpoint);
+        self.client()
+            .put_empty("/v1/d/push", &secret.subscription())
+            .await?;
+        self.push = Some(secret.clone());
+        Ok(secret)
+    }
+
+    pub async fn unsubscribe_push(&mut self) -> Result<(), Error> {
+        self.client().delete("/v1/d/push").await?;
+        self.push = None;
+        Ok(())
+    }
+
+    pub fn open_push(&self, body: &[u8]) -> Result<(Envelope, Notice), String> {
+        let device = self.device.as_ref().ok_or("this phone has no device id")?;
+        let secret = self
+            .push
+            .as_ref()
+            .ok_or("this phone has no push subscription")?;
+        let plaintext = secret.decrypt(body)?;
+        let envelope = Envelope::from_json(
+            std::str::from_utf8(&plaintext).map_err(|_| "the push is not text")?,
+        )
+        .map_err(|error| format!("the push is not an envelope: {error}"))?;
+        let machine = envelope.header.machine.clone();
+        let keys = self
+            .machine_keys(&machine)
+            .map_err(|error| error.to_string())?;
+        let payload = open(&envelope, device, &self.secret(), &machine, &keys, now())
+            .map_err(|error| format!("does not open: {error}"))?;
+        match payload {
+            Payload::Notice(notice) => Ok((envelope, notice)),
+            _ => Err("is not a notice".into()),
         }
     }
 
