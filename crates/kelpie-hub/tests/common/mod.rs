@@ -360,12 +360,21 @@ pub struct EventStream {
 
 impl EventStream {
     pub async fn open(url: &str, token: &str) -> EventStream {
-        let response = reqwest::Client::new()
+        EventStream::connect(url, token, None).await
+    }
+
+    pub async fn open_after(url: &str, token: &str, last_event: u64) -> EventStream {
+        EventStream::connect(url, token, Some(last_event)).await
+    }
+
+    async fn connect(url: &str, token: &str, last_event: Option<u64>) -> EventStream {
+        let mut request = reqwest::Client::new()
             .get(format!("{url}/v1/d/events"))
-            .bearer_auth(token)
-            .send()
-            .await
-            .unwrap();
+            .bearer_auth(token);
+        if let Some(last_event) = last_event {
+            request = request.header("last-event-id", last_event.to_string());
+        }
+        let response = request.send().await.unwrap();
         assert_eq!(response.status(), 200);
         assert_eq!(
             response.headers()["content-type"].to_str().unwrap(),

@@ -4,12 +4,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use futures_util::Stream;
 use kelpie_hub_api::{
-    BoardChanged, EVENT_BOARD, EVENT_MACHINE_REMOVED, EVENT_PAIRING, MachineRemoved,
-    PairingChanged, PairingState,
+    BoardChanged, EVENT_BOARD, EVENT_MACHINE_REMOVED, EVENT_PAIRING, EVENT_RESULT, MachineRemoved,
+    PairingChanged, PairingState, ResultReady,
 };
 use kelpie_hub_protocol::Id;
 use serde::Serialize;
@@ -18,7 +18,7 @@ use tokio::sync::watch;
 use crate::auth::DeviceAuth;
 use crate::error::ApiError;
 use crate::wake::{Subscription, device_key};
-use crate::{FeedPermit, Hub, now};
+use crate::{FeedPermit, Hub, MAX_STORED_INTEGER, now};
 
 #[derive(Default)]
 struct Snapshot {
@@ -36,6 +36,7 @@ struct Feed {
     seen: Snapshot,
     pending: VecDeque<Event>,
     started: bool,
+    results_after: u64,
 }
 
 fn event<T: Serialize>(name: &str, body: &T) -> Event {
@@ -145,6 +146,26 @@ impl Feed {
             };
             self.pending.extend(changes(&self.seen, &current));
             self.seen = current;
+            let Ok(results) =
+                self.hub
+                    .store()
+                    .result_heads_after(&self.device, self.results_after, now())
+            else {
+                return None;
+            };
+            for result in results {
+                self.results_after = result.seq;
+                self.pending.push_back(
+                    event(
+                        EVENT_RESULT,
+                        &ResultReady {
+                            machine: result.machine,
+                            command: result.command,
+                        },
+                    )
+                    .id(result.seq.to_string()),
+                );
+            }
         }
     }
 }
@@ -152,7 +173,17 @@ impl Feed {
 pub async fn events(
     State(hub): State<Arc<Hub>>,
     DeviceAuth(device): DeviceAuth,
+    headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ApiError> {
+    let results_after = match headers.get("last-event-id") {
+        None => 0,
+        Some(value) => value
+            .to_str()
+            .ok()
+            .and_then(|text| text.trim().parse::<u64>().ok())
+            .filter(|seq| *seq <= MAX_STORED_INTEGER)
+            .ok_or(ApiError::bad_request("bad-last-event-id"))?,
+    };
     let permit = hub
         .open_feed(&device)
         .ok_or_else(|| ApiError::new(StatusCode::TOO_MANY_REQUESTS, "too-many-feeds"))?;
@@ -166,6 +197,7 @@ pub async fn events(
         seen: Snapshot::default(),
         pending: VecDeque::new(),
         started: false,
+        results_after,
     };
     let stream = futures_util::stream::unfold(feed, Feed::next);
     Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(keep_alive)))

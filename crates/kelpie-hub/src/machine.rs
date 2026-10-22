@@ -119,7 +119,10 @@ pub async fn inbox(
         })
         .collect::<Result<Vec<_>, _>>()?;
     let seq = messages.last().map_or(query.after, |message| message.seq);
-    let board_rev = hub.store().board_rev(&machine)?;
+    let store = hub.store();
+    store.mark_delivered(&machine, query.after, seq, now())?;
+    let board_rev = store.board_rev(&machine)?;
+    drop(store);
     Ok(Json(Inbox {
         seq,
         messages,

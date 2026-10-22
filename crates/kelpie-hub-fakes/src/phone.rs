@@ -2,11 +2,12 @@ use std::fmt;
 use std::time::Duration;
 
 use kelpie_hub_api::{
-    Boards, Bytes32, CommitRequest, Committed, PairingState, PairingView, RevealRequest,
-    normalize_code,
+    Boards, Bytes32, CommandQueued, CommandUpload, CommitRequest, Committed, PairingState,
+    PairingView, ResultEntry, Results, RevealRequest, normalize_code,
 };
 use kelpie_hub_protocol::{
-    Board, DevicePairing, Id, OpenError, Payload, PublicKeys, SecretKeys, open,
+    Board, CommandResult, DevicePairing, Envelope, Header, Id, OpenError, Payload, Prefix,
+    PublicKeys, SecretKeys, open, seal,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
@@ -64,6 +65,14 @@ impl fmt::Display for BoardProblem {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct ReceivedResult {
+    pub seq: u64,
+    pub machine: Id,
+    pub command: Id,
+    pub result: Result<CommandResult, String>,
 }
 
 #[derive(Debug)]
@@ -195,6 +204,147 @@ impl PhoneState {
                 rev: entry.rev,
             })
             .collect())
+    }
+
+    pub fn machine_keys(&self, machine: &Id) -> Result<PublicKeys, Error> {
+        self.machines
+            .iter()
+            .find(|paired| &paired.id == machine)
+            .map(|paired| paired.keys)
+            .ok_or_else(|| Error::Protocol(format!("{machine} is not a paired machine")))
+    }
+
+    pub fn only_machine(&self) -> Result<Id, Error> {
+        match self.machines.as_slice() {
+            [paired] => Ok(paired.id.clone()),
+            [] => Err(Error::Protocol("this phone has no paired machine".into())),
+            _ => Err(Error::Protocol(
+                "this phone paired with several machines; pass --machine".into(),
+            )),
+        }
+    }
+
+    pub fn seal_command(
+        &self,
+        machine: &Id,
+        payload: &Payload,
+        at: u64,
+        ttl: Option<u64>,
+    ) -> Result<Envelope, Error> {
+        let device = self
+            .device
+            .clone()
+            .ok_or_else(|| Error::Protocol("this phone has no device id yet".into()))?;
+        let mut header = Header::new(
+            Id::new(Prefix::Command).expect("a fresh command id is valid"),
+            payload.kind(),
+            device.clone(),
+            machine.clone(),
+            at,
+        );
+        if let Some(ttl) = ttl {
+            header.exp = at + ttl;
+        }
+        seal(
+            header,
+            payload,
+            &self.secret(),
+            &[
+                (machine.clone(), self.machine_keys(machine)?),
+                (device, self.public()),
+            ],
+        )
+        .map_err(|error| Error::Protocol(error.to_string()))
+    }
+
+    pub async fn send_command(&self, envelope: &Envelope) -> Result<CommandQueued, Error> {
+        Ok(self
+            .client()
+            .post(
+                "/v1/d/commands",
+                &CommandUpload {
+                    envelope: envelope.clone(),
+                },
+            )
+            .await?)
+    }
+
+    pub async fn command(&self, machine: &Id, payload: &Payload) -> Result<Envelope, Error> {
+        let envelope = self.seal_command(machine, payload, now(), None)?;
+        self.send_command(&envelope).await?;
+        Ok(envelope)
+    }
+
+    pub async fn results(
+        &self,
+        after: u64,
+        wait: u64,
+    ) -> Result<(u64, Vec<ReceivedResult>), Error> {
+        let listing: Results = self
+            .client()
+            .get(
+                "/v1/d/results",
+                &[("after", after.to_string()), ("wait", wait.to_string())],
+            )
+            .await?;
+        let received = listing
+            .results
+            .into_iter()
+            .map(|entry| ReceivedResult {
+                result: self.open_result(&entry),
+                seq: entry.seq,
+                machine: entry.machine,
+                command: entry.command,
+            })
+            .collect();
+        Ok((listing.cursor, received))
+    }
+
+    pub async fn await_result(
+        &self,
+        command: &Id,
+        timeout: Duration,
+    ) -> Result<Option<CommandResult>, Error> {
+        let deadline = Instant::now() + timeout;
+        let mut after = 0;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Ok(None);
+            }
+            let (cursor, received) = self
+                .results(after, remaining.as_secs().clamp(1, 25))
+                .await?;
+            after = cursor;
+            if let Some(found) = received.into_iter().find(|entry| &entry.command == command) {
+                return found.result.map(Some).map_err(Error::Protocol);
+            }
+        }
+    }
+
+    fn open_result(&self, entry: &ResultEntry) -> Result<CommandResult, String> {
+        let device = self.device.as_ref().ok_or("this phone has no device id")?;
+        let keys = self
+            .machine_keys(&entry.machine)
+            .map_err(|error| error.to_string())?;
+        let envelope = &entry.envelope;
+        if envelope.header.machine != entry.machine || envelope.header.id != entry.command {
+            return Err("the hub filed this result under another command".into());
+        }
+        let payload = open(
+            envelope,
+            device,
+            &self.secret(),
+            &entry.machine,
+            &keys,
+            now(),
+        )
+        .map_err(|error| format!("does not open: {error}"))?;
+        match payload {
+            Payload::Result(result) if result.command == entry.command => Ok(result),
+            Payload::Result(_) => Err("the result names another command".into()),
+            _ => Err("is not a result".into()),
+        }
     }
 
     fn open_board(

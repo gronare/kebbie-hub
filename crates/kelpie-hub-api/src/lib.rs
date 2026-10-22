@@ -339,9 +339,54 @@ pub struct Devices {
     pub devices: Vec<DeviceView>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CommandUpload {
+    pub envelope: Envelope,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandQueued {
+    pub command: Id,
+    pub seq: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ResultUpload {
+    pub envelope: Envelope,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResultStored {
+    pub command: Id,
+    pub seq: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ResultEntry {
+    pub seq: u64,
+    pub machine: Id,
+    pub command: Id,
+    pub stored_at: u64,
+    pub envelope: Envelope,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Results {
+    pub cursor: u64,
+    pub results: Vec<ResultEntry>,
+}
+
 pub const EVENT_BOARD: &str = "board";
 pub const EVENT_PAIRING: &str = "pairing";
 pub const EVENT_MACHINE_REMOVED: &str = "machine-removed";
+pub const EVENT_RESULT: &str = "result";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResultReady {
+    pub machine: Id,
+    pub command: Id,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -1,5 +1,6 @@
 mod account;
 mod auth;
+mod command;
 mod device;
 mod error;
 mod events;
@@ -19,7 +20,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, post, put};
 use kelpie_hub_api::{MAX_WAIT_SECONDS, code_from_random};
-use kelpie_hub_protocol::{Envelope, Id};
+use kelpie_hub_protocol::{Envelope, Id, Kind};
 use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
 
@@ -34,6 +35,7 @@ use wake::{Wakeups, device_key, machine_key, pairing_key};
 pub const DATABASE_FILE: &str = "hub.sqlite3";
 const REQUEST_BODY_LIMIT: usize = 16 * 1024;
 const BOARD_BODY_LIMIT: usize = 1024 * 1024;
+const COMMAND_BODY_LIMIT: usize = 64 * 1024;
 pub(crate) const SWEEP_EVERY: Duration = Duration::from_secs(60);
 const MAX_NAME_CHARS: usize = 64;
 pub const MAX_STORED_INTEGER: u64 = i64::MAX as u64;
@@ -65,6 +67,10 @@ pub struct Config {
     pub max_feeds_per_device: usize,
     pub feed_keep_alive: Duration,
     pub anonymous_devices: bool,
+    pub command_rate: RateLimit,
+    pub start_push_rate: RateLimit,
+    pub max_queued: u64,
+    pub max_undelivered_per_device: u64,
 }
 
 impl Config {
@@ -88,6 +94,16 @@ impl Config {
             max_feeds_per_device: 8,
             feed_keep_alive: Duration::from_secs(15),
             anonymous_devices: false,
+            command_rate: RateLimit {
+                burst: 30,
+                per_minute: 30,
+            },
+            start_push_rate: RateLimit {
+                burst: 5,
+                per_minute: 5,
+            },
+            max_queued: 1_000,
+            max_undelivered_per_device: 100,
         }
     }
 
@@ -171,6 +187,8 @@ pub fn relying_party(rp_id: &str, origin: &str) -> Result<(Webauthn, String), Op
 pub struct Hub {
     store: Mutex<Store>,
     limiter: Limiter,
+    command_limiter: Limiter,
+    start_push_limiter: Limiter,
     wakeups: Wakeups,
     closing: watch::Sender<bool>,
     webauthn: Webauthn,
@@ -207,6 +225,8 @@ impl Hub {
         Ok(Arc::new(Hub {
             store: Mutex::new(store),
             limiter: Limiter::new(config.rate, config.max_buckets),
+            command_limiter: Limiter::new(config.command_rate, config.max_buckets),
+            start_push_limiter: Limiter::new(config.start_push_rate, config.max_buckets),
             wakeups: Wakeups::new(),
             closing: watch::Sender::new(false),
             webauthn,
@@ -263,7 +283,9 @@ impl Hub {
     }
 
     pub fn enqueue(&self, machine: &Id, envelope: &Envelope) -> store::Result<u64> {
-        let seq = self.store().enqueue(machine, &envelope.to_json(), now())?;
+        let seq = self
+            .store()
+            .enqueue(machine, &envelope.to_json(), now(), envelope.header.exp)?;
         self.wakeups.wake(&machine_key(machine));
         Ok(seq)
     }
@@ -287,6 +309,18 @@ impl Hub {
 
     fn limit(&self, key: &str) -> Result<(), ApiError> {
         if self.limiter.allow(key) {
+            Ok(())
+        } else {
+            Err(ApiError::rate_limited())
+        }
+    }
+
+    fn limit_command(&self, device: &Id, kind: Kind) -> Result<(), ApiError> {
+        let limiter = match kind {
+            Kind::Start | Kind::Push => &self.start_push_limiter,
+            _ => &self.command_limiter,
+        };
+        if limiter.allow(&format!("{device}:{}", kind.name())) {
             Ok(())
         } else {
             Err(ApiError::rate_limited())
@@ -342,6 +376,8 @@ impl Hub {
     pub fn sweep(&self) -> store::Result<store::Sweep> {
         let swept = self.store().sweep(now());
         self.limiter.forget_idle();
+        self.command_limiter.forget_idle();
+        self.start_push_limiter.forget_idle();
         self.wakeups.forget_idle();
         swept
     }
@@ -355,6 +391,12 @@ pub fn router(hub: Arc<Hub>) -> Router {
             put(machine::put_board).layer(DefaultBodyLimit::max(BOARD_BODY_LIMIT)),
         )
         .route("/v1/m/inbox", get(machine::inbox))
+        .route("/v1/m/results", post(command::post_result))
+        .route(
+            "/v1/d/commands",
+            post(command::post_command).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
+        )
+        .route("/v1/d/results", get(command::results))
         .route("/v1/m/pairings", post(machine::open_pairing))
         .route("/v1/m/pairings/{id}", get(machine::pairing))
         .route("/v1/m/pairings/{id}/reply", post(machine::reply))

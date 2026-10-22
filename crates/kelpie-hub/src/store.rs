@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS devices (
     signing_key BLOB,
     encryption_key BLOB,
     created_at INTEGER NOT NULL,
-    last_seen INTEGER
+    last_seen INTEGER,
+    last_result_seq INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS admissions (
     machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
@@ -88,7 +89,33 @@ CREATE TABLE IF NOT EXISTS queue (
     seq INTEGER NOT NULL,
     envelope TEXT NOT NULL,
     queued_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
     PRIMARY KEY (machine_id, seq)
+);
+CREATE TABLE IF NOT EXISTS commands (
+    device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    command_id TEXT NOT NULL,
+    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    digest BLOB NOT NULL,
+    seq INTEGER NOT NULL,
+    queued_at INTEGER NOT NULL,
+    delivered_at INTEGER,
+    PRIMARY KEY (device_id, command_id),
+    UNIQUE (machine_id, command_id)
+);
+CREATE INDEX IF NOT EXISTS commands_by_seq ON commands (machine_id, seq);
+CREATE TABLE IF NOT EXISTS results (
+    device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL,
+    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    command_id TEXT NOT NULL,
+    digest BLOB NOT NULL,
+    envelope TEXT NOT NULL,
+    stored_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    PRIMARY KEY (device_id, seq),
+    UNIQUE (device_id, command_id)
 );
 CREATE TABLE IF NOT EXISTS pairings (
     id TEXT PRIMARY KEY,
@@ -117,7 +144,8 @@ CREATE TABLE IF NOT EXISTS events (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 3;
+pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
 
@@ -161,6 +189,60 @@ pub enum BoardWrite {
     Stored,
     Stale,
     Replayed,
+}
+
+pub struct NewCommand<'a> {
+    pub device: &'a Id,
+    pub command: &'a Id,
+    pub machine: &'a Id,
+    pub kind: &'a str,
+    pub digest: &'a [u8],
+    pub envelope: &'a str,
+    pub now: u64,
+    pub expires_at: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum CommandWrite {
+    Queued(u64),
+    Resent(u64),
+    IdTaken,
+}
+
+pub struct NewResult<'a> {
+    pub device: &'a Id,
+    pub machine: &'a Id,
+    pub command: &'a Id,
+    pub digest: &'a [u8],
+    pub envelope: &'a str,
+    pub now: u64,
+    pub expires_at: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ResultWrite {
+    Stored(u64),
+    Resent(u64),
+    Differs,
+}
+
+pub struct DeliveredCommand {
+    pub device: Id,
+    pub delivered: bool,
+}
+
+pub struct ResultHead {
+    pub seq: u64,
+    pub machine: Id,
+    pub command: Id,
+}
+
+pub struct StoredResult {
+    pub seq: u64,
+    pub machine: Id,
+    pub command: Id,
+    pub stored_at: u64,
+    pub envelope: String,
 }
 
 impl Store {
@@ -319,7 +401,13 @@ impl Store {
         Ok(BoardWrite::Stored)
     }
 
-    pub fn enqueue(&mut self, machine: &Id, envelope: &str, now: u64) -> Result<u64> {
+    pub fn enqueue(
+        &mut self,
+        machine: &Id,
+        envelope: &str,
+        now: u64,
+        expires_at: u64,
+    ) -> Result<u64> {
         let tx = self.connection.transaction()?;
         let seq: u64 = tx.query_row(
             "UPDATE machines SET last_seq = last_seq + 1 WHERE id = ?1 RETURNING last_seq",
@@ -327,11 +415,209 @@ impl Store {
             |row| row.get(0),
         )?;
         tx.execute(
-            "INSERT INTO queue (machine_id, seq, envelope, queued_at) VALUES (?1, ?2, ?3, ?4)",
-            params![machine.as_str(), seq, envelope, now],
+            "INSERT INTO queue (machine_id, seq, envelope, queued_at, expires_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![machine.as_str(), seq, envelope, now, expires_at],
         )?;
         tx.commit()?;
         Ok(seq)
+    }
+
+    pub fn is_admitted(&self, machine: &Id, device: &Id) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM admissions WHERE machine_id = ?1 AND device_id = ?2)",
+            params![machine.as_str(), device.as_str()],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn queued_count(&self, machine: &Id) -> Result<u64> {
+        self.connection.query_row(
+            "SELECT count(*) FROM queue WHERE machine_id = ?1",
+            [machine.as_str()],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn undelivered_count(&self, machine: &Id, device: &Id) -> Result<u64> {
+        self.connection.query_row(
+            "SELECT count(*) FROM commands JOIN queue
+                 ON queue.machine_id = commands.machine_id AND queue.seq = commands.seq
+             WHERE commands.machine_id = ?1 AND commands.device_id = ?2
+                 AND commands.delivered_at IS NULL",
+            params![machine.as_str(), device.as_str()],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn resent_command(&self, device: &Id, command: &Id) -> Result<Option<(Vec<u8>, u64)>> {
+        self.connection
+            .query_row(
+                "SELECT digest, seq FROM commands WHERE device_id = ?1 AND command_id = ?2",
+                params![device.as_str(), command.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+    }
+
+    pub fn queue_command(&mut self, new: &NewCommand<'_>) -> Result<CommandWrite> {
+        let tx = self.connection.transaction()?;
+        let held: Option<(String, Vec<u8>, u64)> = tx
+            .query_row(
+                "SELECT device_id, digest, seq FROM commands WHERE machine_id = ?1 AND command_id = ?2",
+                params![new.machine.as_str(), new.command.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+        if let Some((device, digest, seq)) = held {
+            return Ok(if device == new.device.as_str() && digest == new.digest {
+                CommandWrite::Resent(seq)
+            } else {
+                CommandWrite::IdTaken
+            });
+        }
+        let taken: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM commands WHERE device_id = ?1 AND command_id = ?2)",
+            params![new.device.as_str(), new.command.as_str()],
+            |row| row.get(0),
+        )?;
+        if taken {
+            return Ok(CommandWrite::IdTaken);
+        }
+        let seq: u64 = tx.query_row(
+            "UPDATE machines SET last_seq = last_seq + 1 WHERE id = ?1 RETURNING last_seq",
+            [new.machine.as_str()],
+            |row| row.get(0),
+        )?;
+        tx.execute(
+            "INSERT INTO queue (machine_id, seq, envelope, queued_at, expires_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                new.machine.as_str(),
+                seq,
+                new.envelope,
+                new.now,
+                new.expires_at
+            ],
+        )?;
+        tx.execute(
+            "INSERT INTO commands (device_id, command_id, machine_id, kind, digest, seq, queued_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                new.device.as_str(),
+                new.command.as_str(),
+                new.machine.as_str(),
+                new.kind,
+                new.digest,
+                seq,
+                new.now
+            ],
+        )?;
+        tx.commit()?;
+        Ok(CommandWrite::Queued(seq))
+    }
+
+    pub fn mark_delivered(&self, machine: &Id, after: u64, through: u64, now: u64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE commands SET delivered_at = ?4
+             WHERE machine_id = ?1 AND seq > ?2 AND seq <= ?3 AND delivered_at IS NULL",
+            params![machine.as_str(), after, through, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn delivered_command(
+        &self,
+        machine: &Id,
+        command: &Id,
+    ) -> Result<Option<DeliveredCommand>> {
+        self.connection
+            .query_row(
+                "SELECT device_id, delivered_at IS NOT NULL FROM commands
+                 WHERE machine_id = ?1 AND command_id = ?2",
+                params![machine.as_str(), command.as_str()],
+                |row| {
+                    Ok(DeliveredCommand {
+                        device: id_at(row, 0)?,
+                        delivered: row.get(1)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn store_result(&mut self, new: &NewResult<'_>) -> Result<ResultWrite> {
+        let tx = self.connection.transaction()?;
+        let held: Option<(Vec<u8>, u64)> = tx
+            .query_row(
+                "SELECT digest, seq FROM results WHERE device_id = ?1 AND command_id = ?2",
+                params![new.device.as_str(), new.command.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if let Some((digest, seq)) = held {
+            return Ok(if digest == new.digest {
+                ResultWrite::Resent(seq)
+            } else {
+                ResultWrite::Differs
+            });
+        }
+        let seq: u64 = tx.query_row(
+            "UPDATE devices SET last_result_seq = last_result_seq + 1 WHERE id = ?1
+             RETURNING last_result_seq",
+            [new.device.as_str()],
+            |row| row.get(0),
+        )?;
+        tx.execute(
+            "INSERT INTO results (device_id, seq, machine_id, command_id, digest, envelope, stored_at, expires_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                new.device.as_str(),
+                seq,
+                new.machine.as_str(),
+                new.command.as_str(),
+                new.digest,
+                new.envelope,
+                new.now,
+                new.expires_at
+            ],
+        )?;
+        tx.commit()?;
+        Ok(ResultWrite::Stored(seq))
+    }
+
+    pub fn results_after(&self, device: &Id, after: u64, now: u64) -> Result<Vec<StoredResult>> {
+        let mut statement = self.connection.prepare(
+            "SELECT seq, machine_id, command_id, stored_at, envelope FROM results
+             WHERE device_id = ?1 AND seq > ?2 AND expires_at > ?3 ORDER BY seq",
+        )?;
+        statement
+            .query_map(params![device.as_str(), after, now], |row| {
+                Ok(StoredResult {
+                    seq: row.get(0)?,
+                    machine: id_at(row, 1)?,
+                    command: id_at(row, 2)?,
+                    stored_at: row.get(3)?,
+                    envelope: row.get(4)?,
+                })
+            })?
+            .collect()
+    }
+
+    pub fn result_heads_after(&self, device: &Id, after: u64, now: u64) -> Result<Vec<ResultHead>> {
+        let mut statement = self.connection.prepare(
+            "SELECT seq, machine_id, command_id FROM results
+             WHERE device_id = ?1 AND seq > ?2 AND expires_at > ?3 ORDER BY seq",
+        )?;
+        statement
+            .query_map(params![device.as_str(), after, now], |row| {
+                Ok(ResultHead {
+                    seq: row.get(0)?,
+                    machine: id_at(row, 1)?,
+                    command: id_at(row, 2)?,
+                })
+            })?
+            .collect()
     }
 
     pub fn acknowledge(&self, machine: &Id, through: u64) -> Result<()> {
@@ -572,10 +858,14 @@ impl Store {
     }
 
     pub fn remove_admission(&self, machine: &Id, device: &Id) -> Result<bool> {
-        Ok(self.connection.execute(
+        let tx = self.connection.unchecked_transaction()?;
+        let removed = tx.execute(
             "DELETE FROM admissions WHERE machine_id = ?1 AND device_id = ?2",
             params![machine.as_str(), device.as_str()],
-        )? > 0)
+        )? > 0;
+        drop_undelivered(&tx, device, Some(machine))?;
+        tx.commit()?;
+        Ok(removed)
     }
 
     pub fn remove_machine(&self, machine: &Id) -> Result<bool> {
@@ -892,10 +1182,19 @@ impl Store {
     }
 
     pub fn remove_account_device(&self, account: &str, device: &Id) -> Result<bool> {
-        Ok(self.connection.execute(
-            "DELETE FROM devices WHERE id = ?1 AND account_id = ?2",
+        let tx = self.connection.unchecked_transaction()?;
+        let owned: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM devices WHERE id = ?1 AND account_id = ?2)",
             params![device.as_str(), account],
-        )? > 0)
+            |row| row.get(0),
+        )?;
+        if !owned {
+            return Ok(false);
+        }
+        drop_undelivered(&tx, device, None)?;
+        tx.execute("DELETE FROM devices WHERE id = ?1", [device.as_str()])?;
+        tx.commit()?;
+        Ok(true)
     }
 
     pub fn sweep(&self, now: u64) -> Result<Sweep> {
@@ -920,6 +1219,14 @@ impl Store {
             "DELETE FROM pairings WHERE expires_at + ?2 <= ?1",
             params![now, PAIRING_KEEP_SECONDS],
         )?;
+        self.connection
+            .execute("DELETE FROM queue WHERE expires_at <= ?1", [now])?;
+        self.connection.execute(
+            "DELETE FROM commands WHERE queued_at + ?2 <= ?1",
+            params![now, COMMAND_KEEP_SECONDS],
+        )?;
+        self.connection
+            .execute("DELETE FROM results WHERE expires_at <= ?1", [now])?;
         self.connection.execute(
             "DELETE FROM events WHERE at + ?2 <= ?1",
             params![now, EVENT_KEEP_SECONDS],
@@ -1028,6 +1335,22 @@ pub enum Removal {
     Removed,
     Last,
     Missing,
+}
+
+fn drop_undelivered(connection: &Connection, device: &Id, machine: Option<&Id>) -> Result<()> {
+    let machine = machine.map(Id::as_str);
+    connection.execute(
+        "DELETE FROM queue WHERE (machine_id, seq) IN (
+             SELECT machine_id, seq FROM commands
+             WHERE device_id = ?1 AND delivered_at IS NULL AND (?2 IS NULL OR machine_id = ?2))",
+        params![device.as_str(), machine],
+    )?;
+    connection.execute(
+        "DELETE FROM commands
+         WHERE device_id = ?1 AND delivered_at IS NULL AND (?2 IS NULL OR machine_id = ?2)",
+        params![device.as_str(), machine],
+    )?;
+    Ok(())
 }
 
 fn corrupt(column: usize) -> rusqlite::Error {

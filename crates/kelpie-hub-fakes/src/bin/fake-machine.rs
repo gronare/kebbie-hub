@@ -3,16 +3,16 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use clap::{Parser, Subcommand};
-use kelpie_hub_fakes::machine::{MachineState, join};
+use clap::{Parser, Subcommand, ValueEnum};
+use kelpie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, join};
 use kelpie_hub_fakes::{load, save};
-use kelpie_hub_protocol::Board;
+use kelpie_hub_protocol::{Board, Id, Outcome, Role};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Parser)]
 #[command(
     name = "fake-machine",
-    about = "Stands in for kelpie on a machine: joins a hub, pairs devices, posts boards"
+    about = "Stands in for kelpie on a machine: joins a hub, pairs devices, posts boards, applies commands"
 )]
 struct Cli {
     #[arg(
@@ -50,6 +50,54 @@ enum Command {
         #[arg(long, default_value_t = 25)]
         wait: u64,
     },
+    #[command(
+        about = "Apply queued commands: authorize each, print what kelpie would do, post the result; nothing real runs"
+    )]
+    Apply {
+        #[arg(long, default_value_t = 25)]
+        wait: u64,
+        #[arg(long, help = "Poll once and stop")]
+        once: bool,
+    },
+    #[command(about = "Set what a paired device may do")]
+    Role { device: String, role: RoleName },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum RoleName {
+    Read,
+    Control,
+}
+
+fn describe(handled: &Handled) -> String {
+    let what = match &handled.handling {
+        Handling::Applied { did, .. } => format!("applied: {did}"),
+        Handling::Refused(result) => format!("refused: {}", outcome(result.outcome)),
+        Handling::Replayed(result) => {
+            format!("replayed the stored result: {}", outcome(result.outcome))
+        }
+        Handling::Dropped(dropped) => format!("dropped without a reply: {}", dropped.key()),
+    };
+    let posted = match handled.posted {
+        Some(Posted::Stored(_)) | None => "",
+        Some(Posted::AlreadyHeld) => " (the hub already holds its result)",
+        Some(Posted::CommandGone) => " (the hub no longer holds the command; result dropped)",
+    };
+    format!(
+        "{} {} {} from {}: {what}{posted}",
+        handled.seq,
+        handled.kind.name(),
+        handled.command,
+        handled.from
+    )
+}
+
+fn outcome(outcome: Outcome) -> String {
+    match outcome {
+        Outcome::Done => "done".to_string(),
+        Outcome::Failed => "failed".to_string(),
+        Outcome::Refused { reason } => format!("refused {}", reason.key()),
+    }
 }
 
 async fn ask(prompt: &str) -> bool {
@@ -114,6 +162,40 @@ async fn run(cli: Cli) -> Result<(), String> {
                 "{} message(s), seq {}, hub holds board rev {board}",
                 inbox.messages.len(),
                 inbox.seq
+            );
+        }
+        Command::Apply { wait, once } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            loop {
+                let handled = state
+                    .apply_once(wait, Some(&cli.state))
+                    .await
+                    .map_err(|e| text(&e))?;
+                for entry in &handled {
+                    println!("{}", describe(entry));
+                }
+                if once {
+                    break;
+                }
+            }
+        }
+        Command::Role { device, role } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let device = Id::parse(&device).map_err(|e| text(&e))?;
+            let role = match role {
+                RoleName::Read => Role::Read,
+                RoleName::Control => Role::Control,
+            };
+            if !state.set_role(&device, role) {
+                return Err(format!("{device} is not a paired device"));
+            }
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!(
+                "{device} may now {}",
+                match role {
+                    Role::Read => "only read",
+                    Role::Control => "send commands",
+                }
             );
         }
     }

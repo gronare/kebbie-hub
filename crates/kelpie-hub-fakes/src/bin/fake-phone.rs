@@ -5,12 +5,12 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use kelpie_hub_fakes::phone::PhoneState;
 use kelpie_hub_fakes::{load, save};
-use kelpie_hub_protocol::Id;
+use kelpie_hub_protocol::{Answer, Id, Outcome, Payload, PushApproval, RunRoutine, StartTask};
 
 #[derive(Parser)]
 #[command(
     name = "fake-phone",
-    about = "Stands in for the web app: pairs with machines, reads their boards"
+    about = "Stands in for the web app: pairs with machines, reads their boards, sends signed commands"
 )]
 struct Cli {
     #[arg(
@@ -47,6 +47,102 @@ enum Command {
     Boards,
     #[command(about = "List every pairing attempt, failed ones included")]
     Attempts,
+    #[command(about = "Answer a task's question, then wait for the machine's result")]
+    Answer {
+        address: String,
+        question: String,
+        #[arg(long, help = "0-based option; leave out for a free answer")]
+        choice: Option<u8>,
+        #[arg(long, default_value = "")]
+        comment: String,
+        #[command(flatten)]
+        target: Target,
+    },
+    #[command(about = "Approve a push of exactly the head this phone saw on the board")]
+    Push {
+        address: String,
+        #[arg(long, help = "Head to approve instead of the one on the board")]
+        head: Option<String>,
+        #[command(flatten)]
+        target: Target,
+    },
+    #[command(about = "Start a task in one of the machine's checkouts")]
+    Start {
+        repo: String,
+        name: String,
+        prompt: String,
+        #[command(flatten)]
+        target: Target,
+    },
+    #[command(about = "Run one of the machine's routines now")]
+    Routine {
+        id: String,
+        #[command(flatten)]
+        target: Target,
+    },
+}
+
+#[derive(clap::Args)]
+struct Target {
+    #[arg(
+        long,
+        help = "Machine to send to; needed only when the phone paired with several"
+    )]
+    machine: Option<String>,
+    #[arg(long, default_value_t = 60, help = "Seconds to wait for the result")]
+    timeout: u64,
+}
+
+impl Target {
+    fn machine(&self, state: &PhoneState) -> Result<Id, String> {
+        match &self.machine {
+            Some(machine) => Id::parse(machine).map_err(|e| e.to_string()),
+            None => state.only_machine().map_err(|e| e.to_string()),
+        }
+    }
+}
+
+async fn send(
+    state: &PhoneState,
+    target: &Target,
+    machine: &Id,
+    payload: Payload,
+) -> Result<(), String> {
+    let text = |error: &dyn std::fmt::Display| error.to_string();
+    let envelope = state
+        .command(machine, &payload)
+        .await
+        .map_err(|e| text(&e))?;
+    let command = envelope.header.id;
+    println!("sent {} {command}", payload.kind().name());
+    let result = state
+        .await_result(&command, Duration::from_secs(target.timeout))
+        .await
+        .map_err(|e| text(&e))?
+        .ok_or_else(|| format!("no result for {command} within {} s", target.timeout))?;
+    let outcome = match result.outcome {
+        Outcome::Done => "done".to_string(),
+        Outcome::Failed => "failed".to_string(),
+        Outcome::Refused { reason } => format!("refused {}", reason.key()),
+    };
+    println!("{outcome}: {}", result.text);
+    Ok(())
+}
+
+async fn board_head(state: &PhoneState, machine: &Id, address: &str) -> Result<String, String> {
+    let boards = state.boards().await.map_err(|e| e.to_string())?;
+    let board = boards
+        .into_iter()
+        .find(|entry| &entry.machine == machine)
+        .ok_or_else(|| format!("{machine} has posted no board"))?
+        .board
+        .map_err(|problem| problem.to_string())?;
+    board
+        .items
+        .into_iter()
+        .find(|item| item.address == address)
+        .and_then(|item| item.head)
+        .ok_or_else(|| format!("{address} shows no head on the board"))
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
@@ -104,6 +200,63 @@ async fn run(cli: Cli) -> Result<(), String> {
                     .map_or("-".to_string(), ToString::to_string);
                 println!("{} {machine} {}", attempt.at, attempt.outcome);
             }
+        }
+        Command::Answer {
+            address,
+            question,
+            choice,
+            comment,
+            target,
+        } => {
+            let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            let machine = target.machine(&state)?;
+            let payload = Payload::Answer(Answer {
+                address,
+                question,
+                choice,
+                comment,
+            });
+            send(&state, &target, &machine, payload).await?;
+        }
+        Command::Push {
+            address,
+            head,
+            target,
+        } => {
+            let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            let machine = target.machine(&state)?;
+            let head = match head {
+                Some(head) => head,
+                None => board_head(&state, &machine, &address).await?,
+            };
+            let payload = Payload::Push(PushApproval {
+                address,
+                head,
+                card_sha: None,
+            });
+            send(&state, &target, &machine, payload).await?;
+        }
+        Command::Start {
+            repo,
+            name,
+            prompt,
+            target,
+        } => {
+            let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            let machine = target.machine(&state)?;
+            let payload = Payload::Start(StartTask { repo, name, prompt });
+            send(&state, &target, &machine, payload).await?;
+        }
+        Command::Routine { id, target } => {
+            let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            let machine = target.machine(&state)?;
+            send(
+                &state,
+                &target,
+                &machine,
+                Payload::Routine(RunRoutine { id }),
+            )
+            .await?;
         }
     }
     Ok(())
