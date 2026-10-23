@@ -2,11 +2,13 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kelpie_hub::store::Store;
+use kelpie_hub::store::{KeyStatus, Store, StoredReport};
 use kelpie_hub::{
-    Config, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy, database_path,
-    mint_invite, mint_join_code, serve,
+    Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy,
+    database_path, mint_admin_token, mint_invite, mint_join_code, serve,
 };
 use kelpie_hub_protocol::Id;
 
@@ -61,6 +63,13 @@ struct Cli {
         help = "Accept push endpoints on this host besides the known push services; *.example.com matches subdomains, and a loopback host may use http"
     )]
     push_allow_hosts: Vec<String>,
+    #[arg(
+        long,
+        value_name = "BITS",
+        default_value_t = DEFAULT_REPORT_DIFFICULTY,
+        help = "Leading zero bits a report's proof of work must reach; each bit doubles a sender's work"
+    )]
+    report_difficulty: u8,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -86,6 +95,181 @@ enum Admin {
     Machines,
     #[command(about = "Remove a machine, its board, queue and admissions")]
     RemoveMachine { machine: String },
+    #[command(
+        about = "Mint a named token that reads and acknowledges allowed reports over the API, or list or revoke them"
+    )]
+    Token {
+        #[arg(long, help = "The token's name, such as the machine it goes to")]
+        name: Option<String>,
+        #[command(subcommand)]
+        action: Option<TokenAction>,
+    },
+    #[command(about = "List error reports from kelpie installs, or decide on a sender's key")]
+    Reports {
+        #[arg(long, help = "List the reports from keys not yet allowed")]
+        quarantine: bool,
+        #[arg(long, help = "Print JSON")]
+        json: bool,
+        #[command(subcommand)]
+        action: Option<ReportAction>,
+    },
+}
+
+#[derive(Subcommand)]
+enum TokenAction {
+    #[command(about = "List the tokens by name, with when each was made and last used")]
+    List,
+    #[command(about = "Revoke a token by its name; it stops working at once")]
+    Revoke { name: String },
+}
+
+fn token(
+    data: &std::path::Path,
+    name: Option<&str>,
+    action: Option<&TokenAction>,
+) -> Result<(), String> {
+    let store = open_store(data)?;
+    let failed = |error: rusqlite::Error| error.to_string();
+    match action {
+        Some(TokenAction::List) => {
+            for (name, created, used) in store.admin_tokens().map_err(failed)? {
+                let used = used.map_or("never used".to_string(), |at| format!("used {at}"));
+                println!("{name}  made {created}  {used}");
+            }
+        }
+        Some(TokenAction::Revoke { name }) => {
+            if !store.revoke_admin_token(name).map_err(failed)? {
+                return Err(format!(
+                    "no token named {name}; kelpie-hub admin token list names them"
+                ));
+            }
+            println!("revoked {name}");
+        }
+        None => {
+            let name = name.and_then(kelpie_hub::clean_name).ok_or(
+                "kelpie-hub admin token needs --name <name>, such as the machine it goes to",
+            )?;
+            let token = mint_admin_token(&store, name)
+                .map_err(failed)?
+                .ok_or_else(|| {
+                    format!("a token named {name} exists; revoke it first or pick another name")
+                })?;
+            println!("{token}");
+            eprintln!(
+                "{name}: shown once; it reads and acknowledges allowed reports at /v1/admin/reports"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[derive(Subcommand)]
+enum ReportAction {
+    #[command(about = "Let a sender's reports through, the waiting ones included")]
+    Allow { key: String },
+    #[command(about = "Drop a sender's reports, the waiting ones and every later one")]
+    Block { key: String },
+    #[command(about = "Mark a report handled, so the API no longer hands it out")]
+    Ack { id: u64 },
+}
+
+fn report_key(text: &str) -> Result<[u8; 32], String> {
+    URL_SAFE_NO_PAD
+        .decode(text.trim())
+        .ok()
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| format!("{text} is not a report key; kelpie-hub admin reports lists them"))
+}
+
+fn report_line(stored: &StoredReport) -> String {
+    let acked = stored
+        .acked_at
+        .map_or(String::new(), |at| format!(" acked {at}"));
+    format!(
+        "{}  {}  {}  {}  {}{acked}\n    {} · {}",
+        stored.id,
+        stored.received_at,
+        stored.status.name(),
+        URL_SAFE_NO_PAD.encode(stored.key),
+        stored.report.title,
+        stored.report.version,
+        stored.report.os
+    )
+}
+
+fn report_json(stored: &StoredReport) -> serde_json::Value {
+    serde_json::json!({
+        "id": stored.id,
+        "key": URL_SAFE_NO_PAD.encode(stored.key),
+        "status": stored.status.name(),
+        "received_at": stored.received_at,
+        "acked_at": stored.acked_at,
+        "title": stored.report.title,
+        "text": stored.report.text,
+        "version": stored.report.version,
+        "os": stored.report.os,
+    })
+}
+
+fn reports(
+    data: &std::path::Path,
+    quarantine: bool,
+    json: bool,
+    action: Option<&ReportAction>,
+) -> Result<(), String> {
+    let store = open_store(data)?;
+    let at = kelpie_hub::now();
+    let failed = |error: rusqlite::Error| error.to_string();
+    match action {
+        Some(ReportAction::Allow { key }) => {
+            store
+                .set_key_status(&report_key(key)?, KeyStatus::Allowed, at)
+                .map_err(failed)?;
+            println!("allowed {key}; its reports reach the API");
+        }
+        Some(ReportAction::Block { key }) => {
+            store
+                .set_key_status(&report_key(key)?, KeyStatus::Blocked, at)
+                .map_err(failed)?;
+            println!("blocked {key}; its reports are dropped");
+        }
+        Some(ReportAction::Ack { id }) => {
+            if !store.ack_report(*id, at).map_err(failed)? {
+                return Err(format!("no allowed report {id}"));
+            }
+            println!("acknowledged {id}");
+        }
+        None => {
+            let status = if quarantine {
+                KeyStatus::Quarantine
+            } else {
+                KeyStatus::Allowed
+            };
+            let listed = store
+                .reports(status, 0, !quarantine, u64::MAX >> 1)
+                .map_err(failed)?;
+            if json {
+                let rows: Vec<serde_json::Value> = listed.iter().map(report_json).collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&rows).map_err(|error| error.to_string())?
+                );
+            } else {
+                for stored in &listed {
+                    println!("{}", report_line(stored));
+                }
+                if !quarantine {
+                    let waiting = store.quarantined_count().map_err(failed)?;
+                    if waiting > 0 {
+                        eprintln!(
+                            "{waiting} more wait in quarantine: kelpie-hub admin reports --quarantine"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn data_dir(cli: &Cli) -> Result<PathBuf, String> {
@@ -167,6 +351,14 @@ async fn run(cli: Cli) -> Result<(), String> {
             }
             Ok(())
         }
+        Some(Command::Admin(Admin::Token { name, action })) => {
+            token(&data, name.as_deref(), action.as_ref())
+        }
+        Some(Command::Admin(Admin::Reports {
+            quarantine,
+            json,
+            action,
+        })) => reports(&data, *quarantine, *json, action.as_ref()),
         Some(Command::Admin(Admin::RemoveMachine { machine })) => {
             let machine = Id::parse(machine).map_err(|error| error.to_string())?;
             let store = open_store(&data)?;
@@ -204,6 +396,7 @@ async fn run(cli: Cli) -> Result<(), String> {
                 .map(|host| host.trim().to_ascii_lowercase())
                 .collect();
             config.anonymous_devices = cli.dev;
+            config.report_difficulty = cli.report_difficulty;
             config.trusted_proxy = cli
                 .trusted_proxy
                 .map(|Proxy::Cloudflare| TrustedProxy::Cloudflare);

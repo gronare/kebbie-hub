@@ -11,6 +11,7 @@ use crate::board::{
     Agent, AgentStatus, Board, Checkout, Git, Group, Item, Question, QuestionOption, Report,
     RoutineSummary,
 };
+use crate::bug_report::{BugReport, InstallKey, leading_zero_bits, meets, pow_hash, solve};
 use crate::crypto::{
     OpenError, PublicKeys, Randomness, SecretKeys, decrypt, key_commitment, open, seal_unchecked,
     seal_with, wrap_key,
@@ -1323,6 +1324,45 @@ fn pairing_json(parties: &Parties) -> Value {
     json!({ "commit_domain": "kelpie-pair-commit-v1", "sas_domain": "kelpie-pair-v1", "cases": cases })
 }
 
+fn reports_json() -> Value {
+    let key = InstallKey::from_bytes(seed("install/sign"));
+    let report = BugReport {
+        title: "kelpie push hid git's error".to_string(),
+        text:
+            "Ran kelpie push in ~/work/app.\nGot: nothing, and no error.\nExpected: git's refusal."
+                .to_string(),
+        version: "0.26.0 (e58e84a)".to_string(),
+        os: "macos aarch64".to_string(),
+    };
+    let nonce = seed("report/nonce");
+    let digest = report.digest();
+    let difficulty = 12;
+    let counter = solve(&nonce, &digest, difficulty);
+    let hash = pow_hash(&nonce, &digest, counter);
+    let short = (0..counter)
+        .rev()
+        .find(|earlier| !meets(&nonce, &digest, *earlier, difficulty))
+        .expect("an earlier counter falls short");
+    json!({
+        "pow_domain": "kelpie-report-pow-v1",
+        "sign_domain": "kelpie-report-sign-v1",
+        "report_domain": "kelpie-report-v1",
+        "install_secret": b64(&key.to_bytes()),
+        "install_public": b64(&key.public()),
+        "report": report,
+        "report_bytes": b64(&report.bytes()),
+        "digest": b64(&digest),
+        "nonce": b64(&nonce),
+        "difficulty": difficulty,
+        "counter": counter,
+        "hash": b64(&hash),
+        "hash_zero_bits": leading_zero_bits(&hash),
+        "short_counter": short,
+        "short_zero_bits": leading_zero_bits(&pow_hash(&nonce, &digest, short)),
+        "signature": b64(&key.sign(&nonce, &report)),
+    })
+}
+
 fn keys_json(parties: &Parties) -> Value {
     let all: BTreeMap<&str, Value> = parties
         .all()
@@ -1340,6 +1380,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("authorize.json", authorize_json(&parties)),
         ("signatures.json", signatures_json(&parties)),
         ("pairing.json", pairing_json(&parties)),
+        ("reports.json", reports_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

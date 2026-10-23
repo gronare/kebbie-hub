@@ -2,7 +2,7 @@ use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kelpie_hub_protocol::{Envelope, Id, PublicKeys};
+use kelpie_hub_protocol::{BugReport, Envelope, Id, PublicKeys};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 pub use webauthn_rs_proto::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
@@ -36,6 +36,32 @@ impl<'de> Deserialize<'de> for Bytes32 {
             .try_into()
             .map(Bytes32)
             .map_err(|_| D::Error::custom("expected 32 bytes"))
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Bytes64(pub [u8; 64]);
+
+impl fmt::Debug for Bytes64 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&URL_SAFE_NO_PAD.encode(self.0))
+    }
+}
+
+impl Serialize for Bytes64 {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&URL_SAFE_NO_PAD.encode(self.0))
+    }
+}
+
+impl<'de> Deserialize<'de> for Bytes64 {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Bytes64, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        let bytes = URL_SAFE_NO_PAD.decode(&text).map_err(D::Error::custom)?;
+        bytes
+            .try_into()
+            .map(Bytes64)
+            .map_err(|_| D::Error::custom("expected 64 bytes"))
     }
 }
 
@@ -408,6 +434,44 @@ pub struct NoticeUpload {
 pub struct NoticePosted {
     pub notice: Id,
     pub pushes: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReportChallenge {
+    pub nonce: Bytes32,
+    pub difficulty: u8,
+    pub expires: u64,
+    pub tag: Bytes32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReportUpload {
+    pub report: BugReport,
+    pub key: Bytes32,
+    pub signature: Bytes64,
+    pub challenge: ReportChallenge,
+    pub counter: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportAccepted {
+    pub report: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceivedReport {
+    pub id: u64,
+    pub key: Bytes32,
+    pub received_at: u64,
+    pub report: BugReport,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportInbox {
+    pub reports: Vec<ReceivedReport>,
+    pub quarantined: u64,
 }
 
 pub const EVENT_BOARD: &str = "board";

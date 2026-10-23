@@ -184,3 +184,52 @@ fn pairing_flows_end_as_the_vectors_say() {
         }
     }
 }
+
+#[test]
+fn reports_sign_and_solve_as_the_vectors_say() {
+    use kelpie_hub_protocol::{
+        BugReport, InstallKey, leading_zero_bits, meets, pow_hash, solve, verify_report,
+    };
+    let vectors = load("reports.json");
+    let key = InstallKey::from_bytes(bytes32(&vectors["install_secret"]));
+    assert_eq!(key.public(), bytes32(&vectors["install_public"]));
+    let report: BugReport = serde_json::from_value(vectors["report"].clone()).unwrap();
+    assert_eq!(
+        URL_SAFE_NO_PAD.encode(report.bytes()),
+        vectors["report_bytes"].as_str().unwrap()
+    );
+    let digest = report.digest();
+    assert_eq!(digest, bytes32(&vectors["digest"]));
+    let nonce = bytes32(&vectors["nonce"]);
+    let difficulty = vectors["difficulty"].as_u64().unwrap() as u8;
+    let counter = vectors["counter"].as_u64().unwrap();
+    assert_eq!(
+        solve(&nonce, &digest, difficulty),
+        counter,
+        "the first counter that meets the difficulty"
+    );
+    let hash = pow_hash(&nonce, &digest, counter);
+    assert_eq!(hash, bytes32(&vectors["hash"]));
+    assert_eq!(
+        u64::from(leading_zero_bits(&hash)),
+        vectors["hash_zero_bits"].as_u64().unwrap()
+    );
+    let short = vectors["short_counter"].as_u64().unwrap();
+    assert!(!meets(&nonce, &digest, short, difficulty));
+    assert_eq!(
+        u64::from(leading_zero_bits(&pow_hash(&nonce, &digest, short))),
+        vectors["short_zero_bits"].as_u64().unwrap()
+    );
+    let signature: [u8; 64] = URL_SAFE_NO_PAD
+        .decode(vectors["signature"].as_str().unwrap())
+        .unwrap()
+        .try_into()
+        .unwrap();
+    assert_eq!(
+        key.sign(&nonce, &report),
+        signature,
+        "Ed25519 signatures are deterministic"
+    );
+    assert!(verify_report(&key.public(), &nonce, &report, &signature));
+    assert!(!verify_report(&key.public(), &digest, &report, &signature));
+}

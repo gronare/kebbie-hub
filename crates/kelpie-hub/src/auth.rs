@@ -17,6 +17,7 @@ use crate::{Hub, TrustedProxy};
 pub const MACHINE_TOKEN_PREFIX: &str = "khm_";
 pub const DEVICE_TOKEN_PREFIX: &str = "khd_";
 pub const SESSION_TOKEN_PREFIX: &str = "khs_";
+pub const ADMIN_TOKEN_PREFIX: &str = "kha_";
 pub const SESSION_COOKIE: &str = "__Host-kelpie_session";
 
 pub fn random<const N: usize>() -> [u8; N] {
@@ -84,6 +85,8 @@ pub struct DeviceAuth(pub Id);
 pub struct AccountAuth(pub String);
 
 pub struct SameOrigin;
+
+pub struct AdminAuth;
 
 pub struct Anonymous {
     pub address: String,
@@ -159,6 +162,26 @@ impl FromRequestParts<Arc<Hub>> for AccountAuth {
         };
         hub.limit(&format!("account:{account}"))?;
         Ok(AccountAuth(account))
+    }
+}
+
+impl FromRequestParts<Arc<Hub>> for AdminAuth {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<AdminAuth, ApiError> {
+        let address = client_address(parts, hub);
+        hub.check_anonymous(&address)?;
+        let token = bearer(&parts.headers).filter(|token| token.starts_with(ADMIN_TOKEN_PREFIX));
+        let valid = match token {
+            Some(token) => hub
+                .store()
+                .admin_token_valid(&digest(token), crate::now())?,
+            None => false,
+        };
+        if !valid {
+            return Err(hub.refuse_anonymous(&address));
+        }
+        Ok(AdminAuth)
     }
 }
 

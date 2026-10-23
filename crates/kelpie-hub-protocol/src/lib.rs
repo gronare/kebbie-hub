@@ -1,6 +1,7 @@
 mod alert;
 mod authorize;
 mod board;
+mod bug_report;
 mod crypto;
 mod envelope;
 mod ids;
@@ -17,6 +18,11 @@ pub use board::{
     Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Git, Group, Item, Prompt,
     PromptOption, PushPermission, Question, QuestionOption, Recover, Report, RoutineSummary,
     Verdict, VerdictOutcome,
+};
+pub use bug_report::{
+    BugReport, BugReportError, InstallKey, MAX_DIFFICULTY, MAX_FIELD_CHARS, MAX_TEXT_BYTES,
+    MAX_TITLE_CHARS, REPORT_DOMAIN, REPORT_POW_DOMAIN, REPORT_SIGN_DOMAIN, leading_zero_bits,
+    meets, pow_hash, solve, verify_report,
 };
 pub use crypto::{
     CLOCK_SKEW, HPKE_INFO, OpenError, PublicKeys, Randomness, SealError, SecretKeys,

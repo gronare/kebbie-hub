@@ -1,0 +1,23 @@
+{
+  "counter": 3847,
+  "difficulty": 12,
+  "digest": "KzqPTY2sncgveQGccc4FRHKIKOpymmVHfLe43JVpjuQ",
+  "hash": "AAvIucSQRIG7D8jOx03M289PRSiFeHDsr0bgF2CDuso",
+  "hash_zero_bits": 12,
+  "install_public": "8h0DgqBLgp1kwGgccu-MwD5f7LOMJbGBQfYzLVjRLio",
+  "install_secret": "k_8j6QGOfoVtMU1X7OPnRrHNfX50cqbHnd0KZcWxAEs",
+  "nonce": "CSx6ci2b1hrShGL0_v0B61_I2_Tkovg6KQCfeBbjPrE",
+  "pow_domain": "kelpie-report-pow-v1",
+  "report": {
+    "os": "macos aarch64",
+    "text": "Ran kelpie push in ~/work/app.\nGot: nothing, and no error.\nExpected: git's refusal.",
+    "title": "kelpie push hid git's error",
+    "version": "0.26.0 (e58e84a)"
+  },
+  "report_bytes": "a2VscGllLXJlcG9ydC12MQAAABtrZWxwaWUgcHVzaCBoaWQgZ2l0J3MgZXJyb3IAAABTUmFuIGtlbHBpZSBwdXNoIGluIH4vd29yay9hcHAuCkdvdDogbm90aGluZywgYW5kIG5vIGVycm9yLgpFeHBlY3RlZDogZ2l0J3MgcmVmdXNhbC4AAAAQMC4yNi4wIChlNThlODRhKQAAAA1tYWNvcyBhYXJjaDY0",
+  "report_domain": "kelpie-report-v1",
+  "short_counter": 3846,
+  "short_zero_bits": 0,
+  "sign_domain": "kelpie-report-sign-v1",
+  "signature": "8Kj_232lzQY4-nWqDAzjpnDEyEEBuCSNJgXQNeg-b57eCipD7in62W7vv2koz_nb_N242Ka6vzGRJeF1xOj_Aw"
+}

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use kelpie_hub_api::{PairingFailure, PairingState};
-use kelpie_hub_protocol::{Header, Id, PublicKeys};
+use kelpie_hub_protocol::{BugReport, Header, Id, PublicKeys};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 pub type Result<T> = rusqlite::Result<T>;
@@ -158,7 +158,39 @@ CREATE TABLE IF NOT EXISTS events (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 4;
+const REPORTS_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS report_keys (
+    key BLOB PRIMARY KEY,
+    status TEXT NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key BLOB NOT NULL REFERENCES report_keys(key) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    text TEXT NOT NULL,
+    version TEXT NOT NULL,
+    os TEXT NOT NULL,
+    received_at INTEGER NOT NULL,
+    acked_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS reports_by_key ON reports (key);
+CREATE TABLE IF NOT EXISTS report_challenges (
+    nonce BLOB PRIMARY KEY,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_tokens (
+    token_hash BLOB PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    last_used INTEGER
+);
+";
+
+const SCHEMA_VERSION: i64 = 5;
+const UPGRADES: &[(i64, &str)] = &[(5, REPORTS_SCHEMA)];
+pub const REPORT_KEEP_SECONDS: u64 = 30 * 86_400;
 pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
@@ -284,7 +316,14 @@ impl Store {
         let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
         let tables: i64 =
             connection.query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get(0))?;
-        if version != SCHEMA_VERSION && (version != 0 || tables > 0) {
+        let fresh = version == 0 && tables == 0;
+        let upgradable = UPGRADES
+            .iter()
+            .skip_while(|(to, _)| *to != version + 1)
+            .map(|(to, _)| *to)
+            .last()
+            == Some(SCHEMA_VERSION);
+        if version != SCHEMA_VERSION && !fresh && !upgradable {
             return Err(rusqlite::Error::SqliteFailure(
                 rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISMATCH),
                 Some(format!(
@@ -293,8 +332,18 @@ impl Store {
                 )),
             ));
         }
-        connection.execute_batch(SCHEMA)?;
-        connection.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        let mut connection = connection;
+        let tx = connection.transaction()?;
+        if fresh || version == SCHEMA_VERSION {
+            tx.execute_batch(SCHEMA)?;
+            tx.execute_batch(REPORTS_SCHEMA)?;
+        } else {
+            for (_, upgrade) in UPGRADES.iter().filter(|(to, _)| *to > version) {
+                tx.execute_batch(upgrade)?;
+            }
+        }
+        tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        tx.commit()?;
         Ok(Store { connection })
     }
 
@@ -1324,6 +1373,156 @@ impl Store {
         )? > 0)
     }
 
+    pub fn spend_challenge(&self, nonce: &[u8; 32], expires_at: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "INSERT INTO report_challenges (nonce, expires_at) VALUES (?1, ?2) ON CONFLICT DO NOTHING",
+            params![nonce.as_slice(), expires_at],
+        )? > 0)
+    }
+
+    pub fn store_report(&mut self, new: &NewReport<'_>) -> Result<ReportWrite> {
+        let tx = self.connection.transaction()?;
+        tx.execute(
+            "INSERT INTO report_keys (key, status, first_seen, last_seen) VALUES (?1, 'quarantine', ?2, ?2)
+             ON CONFLICT (key) DO UPDATE SET last_seen = ?2",
+            params![new.key.as_slice(), new.now],
+        )?;
+        let status: String = tx.query_row(
+            "SELECT status FROM report_keys WHERE key = ?1",
+            [new.key.as_slice()],
+            |row| row.get(0),
+        )?;
+        let status = KeyStatus::parse(&status).ok_or_else(|| corrupt(0))?;
+        let waiting: u64 = tx.query_row(
+            "SELECT count(*) FROM reports JOIN report_keys ON report_keys.key = reports.key
+             WHERE report_keys.status = 'quarantine'",
+            [],
+            |row| row.get(0),
+        )?;
+        let from_key: u64 = tx.query_row(
+            "SELECT count(*) FROM reports WHERE key = ?1",
+            [new.key.as_slice()],
+            |row| row.get(0),
+        )?;
+        let full = status == KeyStatus::Quarantine
+            && (waiting >= new.max_quarantined || from_key >= new.max_quarantined_per_key);
+        let report = new.report;
+        let id: u64 = tx.query_row(
+            "INSERT INTO reports (key, title, text, version, os, received_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             RETURNING id",
+            params![new.key.as_slice(), report.title, report.text, report.version, report.os, new.now],
+            |row| row.get(0),
+        )?;
+        let dropped = status == KeyStatus::Blocked || full;
+        if dropped {
+            tx.execute("DELETE FROM reports WHERE id = ?1", [id])?;
+        }
+        tx.commit()?;
+        Ok(if dropped {
+            ReportWrite::Dropped(id, status)
+        } else {
+            ReportWrite::Stored(id, status)
+        })
+    }
+
+    pub fn reports(
+        &self,
+        status: KeyStatus,
+        after: u64,
+        unacked: bool,
+        limit: u64,
+    ) -> Result<Vec<StoredReport>> {
+        let mut statement = self.connection.prepare(
+            "SELECT reports.id, reports.key, report_keys.status, reports.received_at, reports.acked_at,
+                    reports.title, reports.text, reports.version, reports.os
+             FROM reports JOIN report_keys ON report_keys.key = reports.key
+             WHERE report_keys.status = ?1 AND reports.id > ?2 AND (?3 = 0 OR reports.acked_at IS NULL)
+             ORDER BY reports.id LIMIT ?4",
+        )?;
+        statement
+            .query_map(params![status.name(), after, unacked, limit], |row| {
+                Ok(StoredReport {
+                    id: row.get(0)?,
+                    key: row
+                        .get::<_, Vec<u8>>(1)?
+                        .try_into()
+                        .map_err(|_| corrupt(1))?,
+                    status: KeyStatus::parse(&row.get::<_, String>(2)?)
+                        .ok_or_else(|| corrupt(2))?,
+                    received_at: row.get(3)?,
+                    acked_at: row.get(4)?,
+                    report: BugReport {
+                        title: row.get(5)?,
+                        text: row.get(6)?,
+                        version: row.get(7)?,
+                        os: row.get(8)?,
+                    },
+                })
+            })?
+            .collect()
+    }
+
+    pub fn quarantined_count(&self) -> Result<u64> {
+        self.connection.query_row(
+            "SELECT count(*) FROM reports JOIN report_keys ON report_keys.key = reports.key
+             WHERE report_keys.status = 'quarantine'",
+            [],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn ack_report(&self, id: u64, now: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE reports SET acked_at = coalesce(acked_at, ?2)
+             WHERE id = ?1 AND key IN (SELECT key FROM report_keys WHERE status = 'allowed')",
+            params![id, now],
+        )? > 0)
+    }
+
+    pub fn set_key_status(&self, key: &[u8; 32], status: KeyStatus, now: u64) -> Result<()> {
+        let tx = self.connection.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO report_keys (key, status, first_seen, last_seen) VALUES (?1, ?2, ?3, ?3)
+             ON CONFLICT (key) DO UPDATE SET status = ?2",
+            params![key.as_slice(), status.name(), now],
+        )?;
+        if status == KeyStatus::Blocked {
+            tx.execute("DELETE FROM reports WHERE key = ?1", [key.as_slice()])?;
+        }
+        tx.commit()
+    }
+
+    pub fn add_admin_token(&self, token_hash: &[u8], name: &str, now: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "INSERT INTO admin_tokens (token_hash, name, created_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (name) DO NOTHING",
+            params![token_hash, name, now],
+        )? > 0)
+    }
+
+    pub fn admin_token_valid(&self, token_hash: &[u8], now: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE admin_tokens SET last_used = ?2 WHERE token_hash = ?1",
+            params![token_hash, now],
+        )? > 0)
+    }
+
+    pub fn admin_tokens(&self) -> Result<Vec<(String, u64, Option<u64>)>> {
+        let mut statement = self.connection.prepare(
+            "SELECT name, created_at, last_used FROM admin_tokens ORDER BY created_at, name",
+        )?;
+        statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .collect()
+    }
+
+    pub fn revoke_admin_token(&self, name: &str) -> Result<bool> {
+        Ok(self
+            .connection
+            .execute("DELETE FROM admin_tokens WHERE name = ?1", [name])?
+            > 0)
+    }
+
     pub fn sweep(&self, now: u64) -> Result<Sweep> {
         self.connection
             .execute("DELETE FROM join_codes WHERE expires_at <= ?1", [now])?;
@@ -1360,8 +1559,73 @@ impl Store {
             "DELETE FROM events WHERE at + ?2 <= ?1",
             params![now, EVENT_KEEP_SECONDS],
         )?;
+        self.connection.execute(
+            "DELETE FROM report_challenges WHERE expires_at <= ?1",
+            [now],
+        )?;
+        self.connection.execute(
+            "DELETE FROM reports WHERE received_at + ?2 <= ?1
+                AND (acked_at IS NOT NULL OR key IN (SELECT key FROM report_keys WHERE status = 'quarantine'))",
+            params![now, REPORT_KEEP_SECONDS],
+        )?;
+        self.connection.execute(
+            "DELETE FROM report_keys WHERE status = 'quarantine'
+                AND NOT EXISTS (SELECT 1 FROM reports WHERE reports.key = report_keys.key)",
+            [],
+        )?;
         Ok(Sweep { sessions, devices })
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyStatus {
+    Quarantine,
+    Allowed,
+    Blocked,
+}
+
+impl KeyStatus {
+    pub fn name(self) -> &'static str {
+        match self {
+            KeyStatus::Quarantine => "quarantine",
+            KeyStatus::Allowed => "allowed",
+            KeyStatus::Blocked => "blocked",
+        }
+    }
+
+    fn parse(name: &str) -> Option<KeyStatus> {
+        [
+            KeyStatus::Quarantine,
+            KeyStatus::Allowed,
+            KeyStatus::Blocked,
+        ]
+        .into_iter()
+        .find(|status| status.name() == name)
+    }
+}
+
+pub struct NewReport<'a> {
+    pub key: &'a [u8; 32],
+    pub report: &'a BugReport,
+    pub now: u64,
+    pub max_quarantined: u64,
+    pub max_quarantined_per_key: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ReportWrite {
+    Stored(u64, KeyStatus),
+    Dropped(u64, KeyStatus),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StoredReport {
+    pub id: u64,
+    pub key: [u8; 32],
+    pub status: KeyStatus,
+    pub received_at: u64,
+    pub acked_at: Option<u64>,
+    pub report: BugReport,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

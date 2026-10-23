@@ -8,6 +8,7 @@ mod limit;
 mod machine;
 mod pairing;
 mod push;
+mod report;
 mod server;
 pub mod store;
 mod wake;
@@ -49,6 +50,7 @@ pub const DEV_ORIGIN: &str = "http://localhost:8470";
 pub const DEV_RP_ID: &str = "localhost";
 pub const DEV_VAPID_SUBJECT: &str = "https://github.com/gronare/kelpie-hub";
 pub const VAPID_KEY_FILE: &str = "vapid.key";
+pub const DEFAULT_REPORT_DIFFICULTY: u8 = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrustedProxy {
@@ -89,6 +91,12 @@ pub struct Config {
     pub push_retries: u32,
     pub push_backoff: Duration,
     pub push_timeout: Duration,
+    pub report_difficulty: u8,
+    pub report_challenge_ttl: u64,
+    pub report_key_rate: RateLimit,
+    pub report_address_rate: RateLimit,
+    pub max_quarantined: u64,
+    pub max_quarantined_per_key: u64,
 }
 
 impl Config {
@@ -139,6 +147,18 @@ impl Config {
             push_retries: 3,
             push_backoff: Duration::from_secs(1),
             push_timeout: Duration::from_secs(30),
+            report_difficulty: DEFAULT_REPORT_DIFFICULTY,
+            report_challenge_ttl: 600,
+            report_key_rate: RateLimit {
+                burst: 5,
+                per_minute: 1,
+            },
+            report_address_rate: RateLimit {
+                burst: 20,
+                per_minute: 4,
+            },
+            max_quarantined: 10_000,
+            max_quarantined_per_key: 20,
         }
     }
 
@@ -172,6 +192,13 @@ pub fn mint_join_code(store: &Store, ttl: u64) -> store::Result<String> {
     Ok(code)
 }
 
+pub fn mint_admin_token(store: &Store, name: &str) -> store::Result<Option<String>> {
+    let token = auth::new_token(auth::ADMIN_TOKEN_PREFIX);
+    Ok(store
+        .add_admin_token(&auth::digest(&token), name, now())?
+        .then_some(token))
+}
+
 pub fn mint_invite(store: &Store, ttl: u64) -> store::Result<String> {
     let code = code_from_random(auth::random());
     store.add_invite(&auth::digest(&code), now() + ttl)?;
@@ -183,15 +210,16 @@ pub enum OpenError {
     Store(rusqlite::Error),
     RelyingParty(String),
     Push(String),
+    Report(String),
 }
 
 impl std::fmt::Display for OpenError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OpenError::Store(error) => error.fmt(formatter),
-            OpenError::RelyingParty(message) | OpenError::Push(message) => {
-                formatter.write_str(message)
-            }
+            OpenError::RelyingParty(message)
+            | OpenError::Push(message)
+            | OpenError::Report(message) => formatter.write_str(message),
         }
     }
 }
@@ -229,6 +257,9 @@ pub struct Hub {
     start_push_limiter: Limiter,
     notice_limiter: Limiter,
     device_push_limiter: Limiter,
+    report_key_limiter: Limiter,
+    report_address_limiter: Limiter,
+    challenge_secret: [u8; 32],
     pusher: Pusher,
     wakeups: Wakeups,
     closing: watch::Sender<bool>,
@@ -263,6 +294,13 @@ impl Hub {
     pub fn open(config: Config) -> Result<Arc<Hub>, OpenError> {
         let (webauthn, origin) = relying_party(&config.rp_id, &config.origin)?;
         check_subject(&config.vapid_subject).map_err(OpenError::Push)?;
+        if config.report_difficulty > kelpie_hub_protocol::MAX_DIFFICULTY {
+            return Err(OpenError::Report(format!(
+                "a report difficulty of {} bits is more work than any client does; at most {}",
+                config.report_difficulty,
+                kelpie_hub_protocol::MAX_DIFFICULTY
+            )));
+        }
         let vapid = Vapid::load_or_create(&config.vapid_key).map_err(OpenError::Push)?;
         let pusher = Pusher::new(
             vapid,
@@ -279,6 +317,9 @@ impl Hub {
             start_push_limiter: Limiter::new(config.start_push_rate, config.max_buckets),
             notice_limiter: Limiter::new(config.notice_rate, config.max_buckets),
             device_push_limiter: Limiter::new(config.device_push_rate, config.max_buckets),
+            report_key_limiter: Limiter::new(config.report_key_rate, config.max_buckets),
+            report_address_limiter: Limiter::new(config.report_address_rate, config.max_buckets),
+            challenge_secret: auth::random(),
             pusher,
             wakeups: Wakeups::new(),
             closing: watch::Sender::new(false),
@@ -337,6 +378,10 @@ impl Hub {
 
     pub fn mint_join_code(&self) -> store::Result<String> {
         mint_join_code(&self.store(), self.config.join_code_ttl)
+    }
+
+    pub fn mint_admin_token(&self, name: &str) -> store::Result<Option<String>> {
+        mint_admin_token(&self.store(), name)
     }
 
     pub fn mint_invite(&self) -> store::Result<String> {
@@ -448,6 +493,8 @@ impl Hub {
         self.start_push_limiter.forget_idle();
         self.notice_limiter.forget_idle();
         self.device_push_limiter.forget_idle();
+        self.report_key_limiter.forget_idle();
+        self.report_address_limiter.forget_idle();
         self.wakeups.forget_idle();
         swept
     }
@@ -501,6 +548,10 @@ pub fn router(hub: Arc<Hub>) -> Router {
             get(account::devices).post(account::register_device),
         )
         .route("/v1/a/devices/{id}", delete(account::remove_device))
+        .route("/v1/reports/challenge", get(report::challenge))
+        .route("/v1/reports", post(report::post_report))
+        .route("/v1/admin/reports", get(report::inbox))
+        .route("/v1/admin/reports/{id}/ack", post(report::ack))
         .fallback(web::asset)
         .layer(DefaultBodyLimit::max(REQUEST_BODY_LIMIT))
         .with_state(hub)
