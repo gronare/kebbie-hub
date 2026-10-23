@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use kelpie_hub_api::{PairingFailure, PairingState};
-use kelpie_hub_protocol::{BugReport, Header, Id, PublicKeys};
+use kelpie_hub_protocol::{BugReport, ErrorSignals, Header, Id, PublicKeys};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 pub type Result<T> = rusqlite::Result<T>;
@@ -188,9 +188,31 @@ CREATE TABLE IF NOT EXISTS admin_tokens (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 5;
-const UPGRADES: &[(i64, &str)] = &[(5, REPORTS_SCHEMA)];
+const SIGNALS_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS signal_counts (
+    day INTEGER NOT NULL,
+    version TEXT NOT NULL,
+    commit_id TEXT NOT NULL,
+    os TEXT NOT NULL,
+    arch TEXT NOT NULL,
+    component TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    vetted INTEGER NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (day, version, commit_id, os, arch, component, kind, vetted)
+);
+CREATE TABLE IF NOT EXISTS signal_senders (
+    key BLOB NOT NULL,
+    day INTEGER NOT NULL,
+    batches INTEGER NOT NULL,
+    PRIMARY KEY (key, day)
+);
+";
+
+const SCHEMA_VERSION: i64 = 6;
+const UPGRADES: &[(i64, &str)] = &[(5, REPORTS_SCHEMA), (6, SIGNALS_SCHEMA)];
 pub const REPORT_KEEP_SECONDS: u64 = 30 * 86_400;
+pub const SIGNAL_KEEP_DAYS: u64 = 180;
 pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
@@ -337,6 +359,7 @@ impl Store {
         if fresh || version == SCHEMA_VERSION {
             tx.execute_batch(SCHEMA)?;
             tx.execute_batch(REPORTS_SCHEMA)?;
+            tx.execute_batch(SIGNALS_SCHEMA)?;
         } else {
             for (_, upgrade) in UPGRADES.iter().filter(|(to, _)| *to > version) {
                 tx.execute_batch(upgrade)?;
@@ -1499,6 +1522,84 @@ impl Store {
         tx.commit()
     }
 
+    pub fn store_signals(&mut self, new: &NewSignals<'_>) -> Result<SignalWrite> {
+        let tx = self.connection.transaction()?;
+        let status = tx
+            .query_row(
+                "SELECT status FROM report_keys WHERE key = ?1",
+                [new.key.as_slice()],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .map(|status| KeyStatus::parse(&status).ok_or_else(|| corrupt(0)))
+            .transpose()?
+            .unwrap_or(KeyStatus::Quarantine);
+        if status == KeyStatus::Blocked {
+            return Ok(SignalWrite::Dropped("dropped-blocked"));
+        }
+        let batches: u64 = tx
+            .query_row(
+                "SELECT batches FROM signal_senders WHERE key = ?1 AND day = ?2",
+                params![new.key.as_slice(), new.day],
+                |row| row.get(0),
+            )
+            .optional()?
+            .unwrap_or(0);
+        if batches >= new.max_batches_per_key {
+            return Ok(SignalWrite::Dropped("dropped-repeat"));
+        }
+        let vetted = status == KeyStatus::Allowed;
+        if !vetted {
+            let unvetted: u64 = tx.query_row(
+                "SELECT count(*) FROM signal_counts WHERE day = ?1 AND vetted = 0",
+                [new.day],
+                |row| row.get(0),
+            )?;
+            if unvetted + new.signals.counts.len() as u64 > new.max_unvetted_rows {
+                return Ok(SignalWrite::Dropped("dropped-unvetted-full"));
+            }
+        }
+        tx.execute(
+            "INSERT INTO signal_senders (key, day, batches) VALUES (?1, ?2, 1)
+             ON CONFLICT (key, day) DO UPDATE SET batches = batches + 1",
+            params![new.key.as_slice(), new.day],
+        )?;
+        let signals = new.signals;
+        let commit = signals.commit.as_ref().map_or("", |commit| commit.as_str());
+        for row in &signals.counts {
+            tx.execute(
+                "INSERT INTO signal_counts (day, version, commit_id, os, arch, component, kind, vetted, count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                 ON CONFLICT (day, version, commit_id, os, arch, component, kind, vetted) DO UPDATE SET count = count + ?9",
+                params![new.day, signals.version.as_str(), commit, signals.os.as_str(), signals.arch.as_str(), row.component.as_str(), row.kind.key(), vetted, row.count],
+            )?;
+        }
+        tx.commit()?;
+        Ok(SignalWrite::Counted { vetted })
+    }
+
+    pub fn signal_rows(&self, since_day: u64) -> Result<Vec<SignalRow>> {
+        let mut statement = self.connection.prepare(
+            "SELECT day, version, commit_id, os, arch, component, kind, vetted, count FROM signal_counts
+             WHERE day >= ?1 ORDER BY day DESC, vetted DESC, count DESC, component, kind",
+        )?;
+        statement
+            .query_map([since_day], |row| {
+                Ok(SignalRow {
+                    day: row.get(0)?,
+                    version: row.get(1)?,
+                    commit: row.get(2)?,
+                    os: row.get(3)?,
+                    arch: row.get(4)?,
+                    component: row.get(5)?,
+                    kind: row.get(6)?,
+                    vetted: row.get(7)?,
+                    count: row.get(8)?,
+                })
+            })?
+            .collect()
+    }
+
     pub fn add_admin_token(&self, token_hash: &[u8], name: &str, now: u64) -> Result<bool> {
         Ok(self.connection.execute(
             "INSERT INTO admin_tokens (token_hash, name, created_at) VALUES (?1, ?2, ?3)
@@ -1580,6 +1681,13 @@ impl Store {
                 AND NOT EXISTS (SELECT 1 FROM reports WHERE reports.key = report_keys.key)",
             [],
         )?;
+        let today = now / 86_400;
+        self.connection
+            .execute("DELETE FROM signal_senders WHERE day < ?1", [today])?;
+        self.connection.execute(
+            "DELETE FROM signal_counts WHERE day + ?2 <= ?1",
+            params![today, SIGNAL_KEEP_DAYS],
+        )?;
         Ok(Sweep { sessions, devices })
     }
 }
@@ -1633,6 +1741,33 @@ pub struct StoredReport {
     pub received_at: u64,
     pub acked_at: Option<u64>,
     pub report: BugReport,
+}
+
+pub struct NewSignals<'a> {
+    pub key: &'a [u8; 32],
+    pub signals: &'a ErrorSignals,
+    pub day: u64,
+    pub max_batches_per_key: u64,
+    pub max_unvetted_rows: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SignalWrite {
+    Counted { vetted: bool },
+    Dropped(&'static str),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SignalRow {
+    pub day: u64,
+    pub version: String,
+    pub commit: String,
+    pub os: String,
+    pub arch: String,
+    pub component: String,
+    pub kind: String,
+    pub vetted: bool,
+    pub count: u64,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

@@ -97,6 +97,9 @@ pub struct Config {
     pub report_address_rate: RateLimit,
     pub max_quarantined: u64,
     pub max_quarantined_per_key: u64,
+    pub max_signal_batches_per_key: u64,
+    pub max_signal_batches_per_address: u32,
+    pub max_unvetted_signal_rows: u64,
 }
 
 impl Config {
@@ -159,6 +162,9 @@ impl Config {
             },
             max_quarantined: 10_000,
             max_quarantined_per_key: 20,
+            max_signal_batches_per_key: 4,
+            max_signal_batches_per_address: 200,
+            max_unvetted_signal_rows: 1_000_000,
         }
     }
 
@@ -259,6 +265,7 @@ pub struct Hub {
     device_push_limiter: Limiter,
     report_key_limiter: Limiter,
     report_address_limiter: Limiter,
+    signal_addresses: Mutex<(u64, HashMap<String, u32>)>,
     challenge_secret: [u8; 32],
     pusher: Pusher,
     wakeups: Wakeups,
@@ -319,6 +326,7 @@ impl Hub {
             device_push_limiter: Limiter::new(config.device_push_rate, config.max_buckets),
             report_key_limiter: Limiter::new(config.report_key_rate, config.max_buckets),
             report_address_limiter: Limiter::new(config.report_address_rate, config.max_buckets),
+            signal_addresses: Mutex::new((0, HashMap::new())),
             challenge_secret: auth::random(),
             pusher,
             wakeups: Wakeups::new(),
@@ -486,6 +494,30 @@ impl Hub {
         }
     }
 
+    // Counted in memory and forgotten when the day turns, so no address is ever written down; a full table keeps only the addresses at their cap, so a flood of addresses never locks a newcomer out.
+    pub fn signal_batch_allowed(&self, address: &str, day: u64) -> bool {
+        let cap = self.config.max_signal_batches_per_address;
+        let mut seen = self
+            .signal_addresses
+            .lock()
+            .expect("the signal address lock is never poisoned");
+        if seen.0 != day {
+            *seen = (day, HashMap::new());
+        }
+        if let Some(batches) = seen.1.get_mut(address) {
+            if *batches >= cap {
+                return false;
+            }
+            *batches += 1;
+            return true;
+        }
+        if seen.1.len() >= self.config.max_buckets {
+            seen.1.retain(|_, batches| *batches >= cap);
+        }
+        seen.1.insert(address.to_string(), 1);
+        true
+    }
+
     pub fn sweep(&self) -> store::Result<store::Sweep> {
         let swept = self.store().sweep(now());
         self.limiter.forget_idle();
@@ -551,6 +583,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/a/devices/{id}", delete(account::remove_device))
         .route("/v1/reports/challenge", get(report::challenge))
         .route("/v1/reports", post(report::post_report))
+        .route("/v1/signals", post(report::post_signals))
         .route("/v1/admin/reports", get(report::inbox))
         .route("/v1/admin/reports/{id}/ack", post(report::ack))
         .fallback(web::asset)

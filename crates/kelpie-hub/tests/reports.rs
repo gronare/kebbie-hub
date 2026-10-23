@@ -567,7 +567,7 @@ fn a_schema_4_database_is_upgraded_in_place_and_an_older_one_refused() {
     let kept: i64 = connection
         .query_row("SELECT count(*) FROM join_codes", [], |row| row.get(0))
         .unwrap();
-    assert_eq!((version, kept), (5, 1), "the upgrade keeps what was there");
+    assert_eq!((version, kept), (6, 1), "the upgrade keeps what was there");
     connection
         .execute_batch("PRAGMA user_version = 3;")
         .unwrap();

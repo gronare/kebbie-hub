@@ -4,6 +4,7 @@ mod board;
 mod bug_report;
 mod crypto;
 mod envelope;
+mod error_signal;
 mod ids;
 mod message;
 mod pairing;
@@ -22,13 +23,17 @@ pub use board::{
 pub use bug_report::{
     BugReport, BugReportError, InstallKey, MAX_DIFFICULTY, MAX_FIELD_CHARS, MAX_TEXT_BYTES,
     MAX_TITLE_CHARS, REPORT_DOMAIN, REPORT_POW_DOMAIN, REPORT_SIGN_DOMAIN, leading_zero_bits,
-    meets, pow_hash, solve, verify_report,
+    meets, pow_hash, solve, verify_report, verify_signals,
 };
 pub use crypto::{
     CLOCK_SKEW, HPKE_INFO, OpenError, PublicKeys, Randomness, SealError, SecretKeys,
     key_commitment, open, seal, verify,
 };
 pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
+pub use error_signal::{
+    ErrorSignals, MAX_COMMIT_CHARS, MAX_NAME_CHARS, MAX_SIGNAL_COUNT, MAX_SIGNAL_ROWS, Name,
+    SIGNAL_DOMAIN, SIGNAL_SIGN_DOMAIN, SignalCount, SignalKind, SignalsError,
+};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
     Answer, CommandResult, Event, MAX_OPTIONS, MAX_PROMPT_CHARS, Notice, Outcome, Payload,

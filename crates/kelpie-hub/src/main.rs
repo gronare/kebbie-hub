@@ -5,7 +5,7 @@ use std::process::ExitCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kelpie_hub::store::{KeyStatus, Store, StoredReport};
+use kelpie_hub::store::{KeyStatus, SignalRow, Store, StoredReport};
 use kelpie_hub::{
     Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy,
     database_path, mint_admin_token, mint_invite, mint_join_code, serve,
@@ -112,6 +112,15 @@ enum Admin {
         json: bool,
         #[command(subcommand)]
         action: Option<ReportAction>,
+    },
+    #[command(
+        about = "List the error signals kelpie installs sent: counts per day, version, OS, component and kind"
+    )]
+    Signals {
+        #[arg(long, default_value_t = 7, help = "How many days back, today included")]
+        days: u64,
+        #[arg(long, help = "Print JSON")]
+        json: bool,
     },
 }
 
@@ -272,6 +281,77 @@ fn reports(
     Ok(())
 }
 
+fn day_date(day: u64) -> String {
+    let shifted = day as i64 + 719_468;
+    let era = shifted.div_euclid(146_097);
+    let day_of_era = shifted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let date = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!("{year:04}-{month:02}-{date:02}")
+}
+
+fn signal_line(row: &SignalRow) -> String {
+    let built = if row.commit.is_empty() {
+        row.version.clone()
+    } else {
+        format!("{} ({})", row.version, row.commit)
+    };
+    let sender = if row.vetted { "" } else { "  unvetted" };
+    format!(
+        "{}  {:>6}  {} {}  kelpie {built}  {} {}{sender}",
+        day_date(row.day),
+        row.count,
+        row.component,
+        row.kind,
+        row.os,
+        row.arch
+    )
+}
+
+fn signals(data: &std::path::Path, days: u64, json: bool) -> Result<(), String> {
+    let store = open_store(data)?;
+    let today = kelpie_hub::now() / 86_400;
+    let rows = store
+        .signal_rows(today.saturating_sub(days.saturating_sub(1)))
+        .map_err(|error| error.to_string())?;
+    if json {
+        let listed: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "day": day_date(row.day),
+                    "version": row.version,
+                    "commit": row.commit,
+                    "os": row.os,
+                    "arch": row.arch,
+                    "component": row.component,
+                    "kind": row.kind,
+                    "vetted": row.vetted,
+                    "count": row.count,
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&listed).map_err(|error| error.to_string())?
+        );
+    } else {
+        for row in &rows {
+            println!("{}", signal_line(row));
+        }
+    }
+    Ok(())
+}
+
 fn data_dir(cli: &Cli) -> Result<PathBuf, String> {
     match (&cli.data, cli.dev) {
         (Some(dir), _) => Ok(dir.clone()),
@@ -359,6 +439,7 @@ async fn run(cli: Cli) -> Result<(), String> {
             json,
             action,
         })) => reports(&data, *quarantine, *json, action.as_ref()),
+        Some(Command::Admin(Admin::Signals { days, json })) => signals(&data, *days, *json),
         Some(Command::Admin(Admin::RemoveMachine { machine })) => {
             let machine = Id::parse(machine).map_err(|error| error.to_string())?;
             let store = open_store(&data)?;
@@ -440,5 +521,19 @@ async fn main() -> ExitCode {
             eprintln!("kelpie-hub: {message}");
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::day_date;
+
+    #[test]
+    fn a_day_number_reads_as_its_calendar_date() {
+        assert_eq!(day_date(0), "1970-01-01");
+        assert_eq!(day_date(59), "1970-03-01");
+        assert_eq!(day_date(11_016), "2000-02-29");
+        assert_eq!(day_date(20_749), "2026-10-23");
+        assert_eq!(day_date(20_819), "2027-01-01");
     }
 }

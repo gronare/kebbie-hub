@@ -2,7 +2,7 @@ use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kelpie_hub_protocol::{BugReport, Envelope, Id, PublicKeys};
+use kelpie_hub_protocol::{BugReport, Envelope, ErrorSignals, Id, PublicKeys};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 pub use webauthn_rs_proto::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
@@ -477,6 +477,21 @@ pub struct ReceivedReport {
 pub struct ReportInbox {
     pub reports: Vec<ReceivedReport>,
     pub quarantined: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalUpload {
+    pub signals: ErrorSignals,
+    pub key: Bytes32,
+    pub signature: Bytes64,
+    pub challenge: ReportChallenge,
+    pub counter: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalsAccepted {
+    pub rows: usize,
 }
 
 pub const EVENT_BOARD: &str = "board";

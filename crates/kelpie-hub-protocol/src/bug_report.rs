@@ -4,6 +4,8 @@ use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::error_signal::{ErrorSignals, SIGNAL_SIGN_DOMAIN};
+
 pub const REPORT_DOMAIN: &[u8] = b"kelpie-report-v1";
 pub const REPORT_SIGN_DOMAIN: &[u8] = b"kelpie-report-sign-v1";
 pub const REPORT_POW_DOMAIN: &[u8] = b"kelpie-report-pow-v1";
@@ -109,10 +111,10 @@ pub fn solve(nonce: &[u8; 32], digest: &[u8; 32], difficulty: u8) -> u64 {
         .expect("some counter meets any difficulty up to 64 bits")
 }
 
-fn signed_bytes(nonce: &[u8; 32], report: &BugReport) -> Vec<u8> {
-    let mut bytes = REPORT_SIGN_DOMAIN.to_vec();
+fn signed_bytes(domain: &[u8], nonce: &[u8; 32], digest: &[u8; 32]) -> Vec<u8> {
+    let mut bytes = domain.to_vec();
     bytes.extend(nonce);
-    bytes.extend(report.digest());
+    bytes.extend(digest);
     bytes
 }
 
@@ -133,7 +135,15 @@ impl InstallKey {
     }
 
     pub fn sign(&self, nonce: &[u8; 32], report: &BugReport) -> [u8; 64] {
-        self.0.sign(&signed_bytes(nonce, report)).to_bytes()
+        self.0
+            .sign(&signed_bytes(REPORT_SIGN_DOMAIN, nonce, &report.digest()))
+            .to_bytes()
+    }
+
+    pub fn sign_signals(&self, nonce: &[u8; 32], signals: &ErrorSignals) -> [u8; 64] {
+        self.0
+            .sign(&signed_bytes(SIGNAL_SIGN_DOMAIN, nonce, &signals.digest()))
+            .to_bytes()
     }
 }
 
@@ -146,19 +156,50 @@ impl fmt::Debug for InstallKey {
     }
 }
 
+fn verify(
+    public: &[u8; 32],
+    domain: &[u8],
+    nonce: &[u8; 32],
+    digest: &[u8; 32],
+    signature: &[u8; 64],
+) -> bool {
+    VerifyingKey::from_bytes(public).is_ok_and(|key| {
+        key.verify_strict(
+            &signed_bytes(domain, nonce, digest),
+            &Signature::from_bytes(signature),
+        )
+        .is_ok()
+    })
+}
+
 pub fn verify_report(
     public: &[u8; 32],
     nonce: &[u8; 32],
     report: &BugReport,
     signature: &[u8; 64],
 ) -> bool {
-    VerifyingKey::from_bytes(public).is_ok_and(|key| {
-        key.verify_strict(
-            &signed_bytes(nonce, report),
-            &Signature::from_bytes(signature),
-        )
-        .is_ok()
-    })
+    verify(
+        public,
+        REPORT_SIGN_DOMAIN,
+        nonce,
+        &report.digest(),
+        signature,
+    )
+}
+
+pub fn verify_signals(
+    public: &[u8; 32],
+    nonce: &[u8; 32],
+    signals: &ErrorSignals,
+    signature: &[u8; 64],
+) -> bool {
+    verify(
+        public,
+        SIGNAL_SIGN_DOMAIN,
+        nonce,
+        &signals.digest(),
+        signature,
+    )
 }
 
 #[cfg(test)]

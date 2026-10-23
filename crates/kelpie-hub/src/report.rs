@@ -8,14 +8,15 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use hmac::{Hmac, KeyInit, Mac};
 use kelpie_hub_api::{
     Bytes32, ReceivedReport, ReportAccepted, ReportChallenge, ReportInbox, ReportUpload,
+    SignalUpload, SignalsAccepted,
 };
-use kelpie_hub_protocol::{meets, verify_report};
+use kelpie_hub_protocol::{meets, verify_report, verify_signals};
 use serde::Deserialize;
 use sha2::Sha256;
 
 use crate::auth::{AdminAuth, Anonymous, random};
 use crate::error::ApiError;
-use crate::store::{KeyStatus, NewReport, ReportWrite};
+use crate::store::{KeyStatus, NewReport, NewSignals, ReportWrite, SignalWrite};
 use crate::{Hub, MAX_STORED_INTEGER, now};
 
 pub const INBOX_PAGE: u64 = 100;
@@ -144,6 +145,84 @@ pub async fn post_report(
         )),
     )?;
     Ok((StatusCode::ACCEPTED, Json(ReportAccepted { report: id })))
+}
+
+// The same order as a report's checks, and a blocked, repeating or flooding sender gets the same answer as a counted one.
+pub async fn post_signals(
+    State(hub): State<Arc<Hub>>,
+    client: Anonymous,
+    Json(upload): Json<SignalUpload>,
+) -> Result<(StatusCode, Json<SignalsAccepted>), ApiError> {
+    if !hub
+        .report_address_limiter
+        .allow(&format!("address:{}", client.address))
+    {
+        return Err(ApiError::rate_limited());
+    }
+    let at = now();
+    let challenge = &upload.challenge;
+    if !genuine(&hub.challenge_secret, challenge) {
+        return Err(ApiError::bad_request("bad-challenge"));
+    }
+    if at >= challenge.expires {
+        return Err(ApiError::bad_request("expired-challenge"));
+    }
+    upload
+        .signals
+        .check()
+        .map_err(|error| ApiError::bad_request(error.key()))?;
+    if !meets(
+        &challenge.nonce.0,
+        &upload.signals.digest(),
+        upload.counter,
+        challenge.difficulty,
+    ) {
+        return Err(ApiError::bad_request("insufficient-work"));
+    }
+    if !verify_signals(
+        &upload.key.0,
+        &challenge.nonce.0,
+        &upload.signals,
+        &upload.signature.0,
+    ) {
+        return Err(ApiError::bad_request("bad-signature"));
+    }
+    if !hub
+        .report_key_limiter
+        .allow(&URL_SAFE_NO_PAD.encode(upload.key.0))
+    {
+        return Err(ApiError::rate_limited());
+    }
+    let mut store = hub.store();
+    if !store.spend_challenge(&challenge.nonce.0, challenge.expires)? {
+        return Err(ApiError::conflict("challenge-used"));
+    }
+    let day = at / 86_400;
+    let written = if hub.signal_batch_allowed(&client.address, day) {
+        store.store_signals(&NewSignals {
+            key: &upload.key.0,
+            signals: &upload.signals,
+            day,
+            max_batches_per_key: hub.config.max_signal_batches_per_key,
+            max_unvetted_rows: hub.config.max_unvetted_signal_rows,
+        })?
+    } else {
+        SignalWrite::Dropped("dropped-address")
+    };
+    let outcome = match written {
+        SignalWrite::Counted { vetted: true } => "counted",
+        SignalWrite::Counted { vetted: false } => "counted-unvetted",
+        SignalWrite::Dropped(why) => why,
+    };
+    let rows = upload.signals.counts.len();
+    store.log(
+        at,
+        "signals.received",
+        None,
+        None,
+        Some(&format!("{outcome} rows={rows}")),
+    )?;
+    Ok((StatusCode::ACCEPTED, Json(SignalsAccepted { rows })))
 }
 
 #[derive(Deserialize)]
