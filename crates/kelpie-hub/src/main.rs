@@ -404,11 +404,11 @@ async fn run(cli: Cli) -> Result<(), String> {
             let listener = tokio::net::TcpListener::bind(address)
                 .await
                 .map_err(|error| format!("{address}: {error}"))?;
+            let shutdown = shutdown_signal();
             eprintln!(
                 "kelpie-hub listening on http://{address} with data in {}",
                 data.display()
             );
-            let shutdown = shutdown_signal();
             serve(listener, hub, shutdown)
                 .await
                 .map_err(|error| error.to_string())
@@ -416,18 +416,20 @@ async fn run(cli: Cli) -> Result<(), String> {
     }
 }
 
-async fn shutdown_signal() {
+// The SIGTERM handler is registered before the hub says it listens, so a stop sent right after that line is caught.
+fn shutdown_signal() -> impl std::future::Future<Output = ()> {
     #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-        let mut terminate = signal(SignalKind::terminate()).expect("SIGTERM can be watched");
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("SIGTERM can be watched");
+    async move {
+        #[cfg(unix)]
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {}
             _ = terminate.recv() => {}
         }
+        #[cfg(not(unix))]
+        let _ = tokio::signal::ctrl_c().await;
     }
-    #[cfg(not(unix))]
-    let _ = tokio::signal::ctrl_c().await;
 }
 
 #[tokio::main]
