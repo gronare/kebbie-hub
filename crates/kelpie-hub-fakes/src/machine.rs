@@ -4,9 +4,9 @@ use std::time::Duration;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
-    BoardStored, BoardUpload, Bytes32, Inbox, JoinRequest, Joined, NoticePosted, NoticeUpload,
-    PairingFailure, PairingOpened, PairingRefusal, PairingReply, PairingState, PairingView,
-    ResultStored, ResultUpload,
+    BoardStored, BoardUpload, Bytes32, Inbox, JoinRequest, Joined, MachineName, NoticePosted,
+    NoticeUpload, PairingFailure, PairingOpened, PairingRefusal, PairingReply, PairingState,
+    PairingView, ResultStored, ResultUpload,
 };
 use kelpie_hub_protocol::{
     AppliedCommands, Board, CommandResult, Dropped, Envelope, Event, Header, Id, Kind, Machine,
@@ -237,6 +237,19 @@ impl MachineState {
             });
         }
         Ok(view)
+    }
+
+    pub async fn rename(&self, name: &str) -> Result<String, Error> {
+        let renamed: MachineName = self
+            .client()
+            .put(
+                "/v1/m/name",
+                &MachineName {
+                    name: name.to_string(),
+                },
+            )
+            .await?;
+        Ok(renamed.name)
     }
 
     pub async fn post_board(&mut self, board: Board) -> Result<u64, Error> {

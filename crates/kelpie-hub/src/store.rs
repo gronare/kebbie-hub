@@ -421,6 +421,13 @@ impl Store {
             .optional()
     }
 
+    pub fn rename_machine(&self, machine: &Id, name: &str) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE machines SET name = ?2 WHERE id = ?1",
+            params![machine.as_str(), name],
+        )? == 1)
+    }
+
     pub fn touch_machine(&self, machine: &Id, now: u64) -> Result<()> {
         self.connection.execute(
             "UPDATE machines SET last_seen = ?2 WHERE id = ?1",

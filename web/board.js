@@ -16,6 +16,18 @@ export function splitAddress(address) {
   return at > 0 ? { task: address.slice(0, at), repo: address.slice(at + 1) } : { task: address, repo: "" };
 }
 
+// A name the phone stored that is the hub's own is no name of the phone's, so it is dropped and the hub's later renames show.
+export function followHubNames(machines, entries) {
+  let changed = false;
+  const followed = machines.map((machine) => {
+    const entry = entries.find((candidate) => candidate.machine === machine.id);
+    if (!machine.name || !entry || machine.name !== entry.name) return machine;
+    changed = true;
+    return { ...machine, name: null };
+  });
+  return changed ? followed : null;
+}
+
 export async function openBoards(entries, identity, machines, now, highest = {}) {
   const opened = [];
   for (const entry of entries) {

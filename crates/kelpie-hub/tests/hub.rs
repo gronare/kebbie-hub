@@ -787,3 +787,68 @@ async fn the_inbox_hands_over_queued_envelopes_until_they_are_acknowledged() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn a_machine_renames_itself_and_only_itself() {
+    let test = start_hub(|_| {}).await;
+    let mut machine = joined_machine(&test).await;
+    let other = joined_machine(&test).await;
+    let mut phone = phone(&test).await;
+    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
+    machine.post_board(board(MARKER)).await.unwrap();
+    assert_eq!(phone.boards().await.unwrap()[0].name, "mac");
+
+    assert_eq!(machine.rename("  studio ").await.unwrap(), "studio");
+    assert_eq!(phone.boards().await.unwrap()[0].name, "studio");
+    let (renamed_to, other_name, renamed) = {
+        let store = test.hub.store();
+        (
+            store.machine_name(&machine.machine).unwrap(),
+            store.machine_name(&other.machine).unwrap(),
+            store
+                .events()
+                .unwrap()
+                .iter()
+                .filter(|(kind, _)| kind == "machine.renamed")
+                .count(),
+        )
+    };
+    assert_eq!(renamed_to.as_deref(), Some("studio"));
+    assert_eq!(other_name.as_deref(), Some("mac"));
+    assert_eq!(renamed, 1);
+    machine.rename("studio").await.unwrap();
+    let again = test
+        .hub
+        .store()
+        .events()
+        .unwrap()
+        .iter()
+        .filter(|(kind, _)| kind == "machine.renamed")
+        .count();
+    assert_eq!(again, 1, "the same name logs nothing");
+
+    for bad in [" ".to_string(), "x".repeat(65), "a\u{7}b".to_string()] {
+        assert_eq!(
+            hub_refusal(machine.rename(&bad).await),
+            (400, "bad-name".to_string()),
+            "{bad:?}"
+        );
+    }
+    let anonymous = kelpie_hub_fakes::HubClient::new(&test.url, None);
+    let refused = anonymous
+        .put::<_, Value>("/v1/m/name", &serde_json::json!({ "name": "evil" }))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(refused, HubError::Status { status: 401, .. }),
+        "{refused:?}"
+    );
+    assert_eq!(
+        test.hub
+            .store()
+            .machine_name(&machine.machine)
+            .unwrap()
+            .as_deref(),
+        Some("studio")
+    );
+}

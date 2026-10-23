@@ -6,9 +6,9 @@ use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
-    BoardStored, BoardUpload, Inbox, JoinRequest, Joined, PairingFailure, PairingOpened,
-    PairingRefusal, PairingReply, PairingState, PairingView, QueuedMessage, code_from_random,
-    normalize_code,
+    BoardStored, BoardUpload, Inbox, JoinRequest, Joined, MachineName, PairingFailure,
+    PairingOpened, PairingRefusal, PairingReply, PairingState, PairingView, QueuedMessage,
+    code_from_random, normalize_code,
 };
 use kelpie_hub_protocol::{Envelope, Id, Kind, Prefix, verify};
 use serde::Deserialize;
@@ -44,6 +44,26 @@ pub async fn join(
     }
     store.log(at, "machine.joined", Some(&machine), None, None)?;
     Ok(Json(Joined { machine, token }))
+}
+
+pub async fn rename(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+    Json(request): Json<MachineName>,
+) -> Result<Json<MachineName>, ApiError> {
+    let name = clean_name(&request.name).ok_or(ApiError::bad_request("bad-name"))?;
+    let at = now();
+    let store = hub.store();
+    let before = store
+        .machine_name(&machine)?
+        .ok_or_else(ApiError::unauthorized)?;
+    if before != name {
+        store.rename_machine(&machine, name)?;
+        store.log(at, "machine.renamed", Some(&machine), None, None)?;
+    }
+    Ok(Json(MachineName {
+        name: name.to_string(),
+    }))
 }
 
 pub async fn put_board(

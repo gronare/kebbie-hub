@@ -56,7 +56,8 @@ export async function pair({ hub, publicKeys, typed, confirm, timeoutMs = 10 * 6
   const answer = await Promise.race([confirm(digits, machine), settled.then(() => new Promise(() => {}))]);
   if (!answer?.matches) throw new PairingFailed("phone-mismatch", machine.id);
   await settled;
-  return { id: machine.id, keys: machine.keys, name: answer.name?.trim() || machine.hubName || machine.id.slice(-6) };
+  const own = answer.name?.trim();
+  return { id: machine.id, keys: machine.keys, name: own && own !== machine.hubName ? own : null, hubName: machine.hubName };
 }
 
 export const FAILURE_TEXT = {

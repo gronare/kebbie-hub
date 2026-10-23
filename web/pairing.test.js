@@ -73,7 +73,7 @@ test("the phone commits, then shows the same six digits as the machine and ends 
   const hub = fakeHub();
   const { promise, shown } = run(hub);
   const machine = await promise;
-  assert.deepEqual(machine, { id: MACHINE, keys: parties.machine.public, name: "Kontoret" });
+  assert.deepEqual(machine, { id: MACHINE, keys: parties.machine.public, name: "Kontoret", hubName: "devbox" });
   assert.deepEqual(shown, [vector.expect.sas]);
   assert.equal(hub.machineSas, vector.expect.sas);
   assert.deepEqual(hub.log.map(([step]) => step), ["commit", "watch", "reveal", "watch"]);
@@ -134,9 +134,12 @@ test("the keys kept are the ones the digits were computed over, never ones the h
   assert.notDeepEqual(machine.keys, parties.intruder.public);
 });
 
-test("a machine left unnamed on the phone takes the hub's name for it", async () => {
-  const machine = await run(fakeHub(), {}, { matches: true, name: " " }).promise;
-  assert.equal(machine.name, "devbox");
+test("a machine left unnamed or with the hub's name follows the hub's name, so a rename shows", async () => {
+  for (const name of [" ", "devbox"]) {
+    const machine = await run(fakeHub(), {}, { matches: true, name }).promise;
+    assert.equal(machine.name, null);
+    assert.equal(machine.hubName, "devbox");
+  }
 });
 
 test("a machine that refuses while the phone is still asking ends the pairing", async () => {

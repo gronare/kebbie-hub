@@ -1,4 +1,4 @@
-import { arrange, findTask, highestRevs, isAsleep, openBoards } from "./board.js";
+import { arrange, findTask, followHubNames, highestRevs, isAsleep, openBoards } from "./board.js";
 import { account, deviceClient, follow, HubError } from "./hub.js";
 import { get, identity, loadAttempts, loadDevice, loadMachines, newDeviceKeys, put, recordAttempt, remove, saveDevice, saveMachines } from "./keystore.js";
 import { failureText, pair, PairingFailed } from "./pairing.js";
@@ -260,6 +260,13 @@ function render() {
 
 let retrying = null;
 
+async function followNames(entries) {
+  const followed = followHubNames(state.machines, entries ?? []);
+  if (!followed) return;
+  state.machines = followed;
+  await saveMachines(followed);
+}
+
 async function refresh() {
   if (!state.device) return;
   let boards;
@@ -278,6 +285,7 @@ async function refresh() {
     boards = cached;
     state.fetchedAt = cached.at;
   }
+  await followNames(boards.boards);
   const highest = (await get("revs")) ?? {};
   state.opened = await openBoards(boards.boards, identity(state.device), state.machines, nowSeconds(), highest);
   await put("revs", highestRevs(state.opened, highest));
@@ -383,8 +391,8 @@ async function startPairing(form) {
           render();
         }),
     });
-    const name = machine.name;
-    state.machines = [...state.machines.filter((known) => known.id !== machine.id), { id: machine.id, keys: machine.keys, name, pairedAt: nowSeconds() }];
+    const name = machine.name ?? machine.hubName ?? machine.id.slice(-6);
+    state.machines = [...state.machines.filter((known) => known.id !== machine.id), { id: machine.id, keys: machine.keys, name: machine.name, pairedAt: nowSeconds() }];
     await saveMachines(state.machines);
     await put("revs", { ...((await get("revs")) ?? {}), [machine.id]: 0 });
     state.attempts = await recordAttempt({ at: nowSeconds(), machine: machine.id, name, outcome: "admitted" });
@@ -497,6 +505,8 @@ async function start() {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { type: "module", scope: "/" }).catch(() => {});
   state.device = (await loadDevice()) ?? null;
   state.machines = await loadMachines();
+  // The boards cached by the last read hold the names the phone saw then, before any rename since.
+  await followNames((await get("boards"))?.boards);
   state.attempts = await loadAttempts();
   render();
   if (!state.device) return;

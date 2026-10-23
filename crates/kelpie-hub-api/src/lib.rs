@@ -108,6 +108,11 @@ pub struct Joined {
     pub token: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MachineName {
+    pub name: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoardUpload {
     pub rev: u64,

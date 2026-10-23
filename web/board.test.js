@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { importIdentity } from "../js/protocol.js";
-import { arrange, findTask, highestRevs, isAsleep, openBoards, SLEEP_AFTER, splitAddress } from "./board.js";
+import { arrange, findTask, followHubNames, highestRevs, isAsleep, openBoards, SLEEP_AFTER, splitAddress } from "./board.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -91,8 +91,10 @@ test("a task is found by machine and address", () => {
 test("the phone's own name for a machine wins over the hub's", async () => {
   const [named] = await openBoards([entry()], await phone(), [machine], now);
   assert.equal(named.name, "Kontoret");
-  const [unnamed] = await openBoards([entry()], await phone(), [{ ...machine, name: "" }], now);
+  const [unnamed] = await openBoards([entry()], await phone(), [{ ...machine, name: null }], now);
   assert.equal(unnamed.name, "devbox");
+  const [renamed] = await openBoards([entry({ name: "studio" })], await phone(), [{ ...machine, name: null }], now);
+  assert.equal(renamed.name, "studio");
 });
 
 test("a board older than the newest one read from that machine is refused as a rollback", async () => {
@@ -104,4 +106,13 @@ test("a board older than the newest one read from that machine is refused as a r
   assert.equal(same.problem, null);
   assert.deepEqual(highestRevs([same, older], { other: 3, [machine.id]: rev - 1 }), { other: 3, [machine.id]: rev });
   assert.deepEqual(highestRevs([older], { [machine.id]: rev + 1 }), { [machine.id]: rev + 1 });
+});
+
+test("a phone paired before names followed the hub drops a stored name that is the hub's, and then follows its renames", async () => {
+  const stored = [{ ...machine, name: "devbox" }, { ...machine, id: "mch_other", name: "Kontoret" }];
+  const followed = followHubNames(stored, [entry(), entry({ machine: "mch_other", name: "devbox" })]);
+  assert.deepEqual(followed.map((known) => known.name), [null, "Kontoret"]);
+  assert.equal(followHubNames(followed, [entry()]), null, "nothing left to drop changes nothing");
+  const [renamed] = await openBoards([entry({ name: "studio" })], await phone(), followed, now);
+  assert.equal(renamed.name, "studio");
 });

@@ -81,6 +81,7 @@ pub struct ReceivedResult {
 #[derive(Debug)]
 pub struct MachineBoard {
     pub machine: Id,
+    pub name: String,
     pub rev: u64,
     pub board: Result<Board, BoardProblem>,
 }
@@ -213,6 +214,7 @@ impl PhoneState {
             .map(|entry| MachineBoard {
                 board: self.open_board(device, &entry.machine, entry.rev, entry.envelope.as_ref()),
                 machine: entry.machine,
+                name: entry.name,
                 rev: entry.rev,
             })
             .collect())
