@@ -252,7 +252,8 @@ async fn a_notice_reaches_each_subscribed_device_as_its_own_cut_of_the_sealed_en
         assert_eq!(header(push, "urgency"), Some("high"));
         let ttl: u64 = header(push, "ttl").unwrap().parse().unwrap();
         let left = envelope.header.exp - now;
-        assert!(ttl <= left && ttl + 5 >= left, "ttl {ttl}, {left} left");
+        // The hub read the clock before this test did, so its ttl is the same or a little more.
+        assert!(ttl >= left && ttl <= left + 5, "ttl {ttl}, {left} left");
         let topic_header = header(push, "topic").unwrap();
         assert_eq!(collapse.len(), 43);
         assert_eq!(topic_header, topic(&collapse));
