@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::Json;
+use axum::extract::Query;
 use axum::extract::{Path, State};
 use axum::http::header::SET_COOKIE;
 use axum::http::{HeaderMap, StatusCode};
@@ -9,8 +10,8 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
     AccountView, CreationCeremony, DeviceRegistered, DeviceRequest, DeviceView, Devices,
-    LoginBegin, LoginFinish, PasskeyView, Passkeys, RegisterBegin, RegisterFinish, RequestCeremony,
-    normalize_code,
+    EmailSignup, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys, RegisterBegin,
+    RegisterFinish, RequestCeremony, SignupMode, VerifiedEmail, normalize_code,
 };
 use kelpie_hub_protocol::{Id, Prefix};
 use serde::Serialize;
@@ -20,11 +21,12 @@ use webauthn_rs::prelude::{
 };
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, SESSION_COOKIE, SESSION_TOKEN_PREFIX, SameOrigin,
-    digest, new_token, random, session_cookie,
+    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, SESSION_COOKIE, SESSION_TOKEN_PREFIX,
+    SETUP_TOKEN_PREFIX, SameOrigin, VERIFY_TOKEN_PREFIX, digest, new_token, random, session_cookie,
 };
 use crate::error::ApiError;
-use crate::store::{Ceremony, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey};
+use crate::mail::{Mail, plausible_address};
+use crate::store::{Ceremony, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey, Ticket};
 use crate::{Hub, clean_name, now};
 
 const MAX_HANDLE_CHARS: usize = 32;
@@ -102,16 +104,38 @@ fn passkey_view(stored: &StoredPasskey) -> PasskeyView {
     }
 }
 
-fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
+pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
     let row = hub
         .store()
         .account(account)?
         .ok_or_else(ApiError::unauthorized)?;
+    let plan = hub.plan_view(&row, now());
     Ok(AccountView {
         account: row.id,
         handle: row.handle,
         created_at: row.created_at,
+        owner: row.owner,
+        email: row.email,
+        billing_url: hub.config().billing_url.clone().filter(|_| !plan.entitled),
+        plan,
     })
+}
+
+fn ticket_of(request: &RegisterBegin) -> Option<(Ticket, Vec<u8>)> {
+    match (&request.setup, &request.verification) {
+        (Some(setup), None) => setup
+            .trim()
+            .starts_with(SETUP_TOKEN_PREFIX)
+            .then(|| (Ticket::Owner, digest(setup.trim()))),
+        (None, Some(verification)) => verification
+            .trim()
+            .starts_with(VERIFY_TOKEN_PREFIX)
+            .then(|| (Ticket::Email, digest(verification.trim()))),
+        (None, None) => {
+            normalize_code(&request.invite).map(|invite| (Ticket::Invite, digest(&invite)))
+        }
+        (Some(_), Some(_)) => None,
+    }
 }
 
 fn save_ceremony(
@@ -153,12 +177,25 @@ pub async fn register_begin(
 ) -> Result<Json<CreationCeremony>, ApiError> {
     hub.limit_anonymous(&client.address)?;
     let handle = normalize_handle(&request.handle).ok_or(ApiError::bad_request("bad-handle"))?;
-    let invite = normalize_code(&request.invite).ok_or_else(ApiError::unauthorized)?;
-    let invite_hash = digest(&invite);
+    let (kind, invite_hash) = ticket_of(&request).ok_or_else(ApiError::unauthorized)?;
     {
         let store = hub.store();
-        if !store.invite_valid(&invite_hash, now())? {
+        let (held, email) = store
+            .ticket(&invite_hash, now())?
+            .ok_or_else(ApiError::unauthorized)?;
+        if held != kind {
             return Err(ApiError::unauthorized());
+        }
+        if kind == Ticket::Owner && store.account_count()? > 0 {
+            return Err(ApiError::unauthorized());
+        }
+        if kind == Ticket::Email && hub.config().signup != SignupMode::Open {
+            return Err(ApiError::forbidden("signup-closed"));
+        }
+        if let Some(email) = email
+            && store.email_taken(&email)?
+        {
+            return Err(ApiError::conflict("email-taken"));
         }
         if store.handle_taken(&handle)? {
             return Err(ApiError::conflict("handle-taken"));
@@ -214,19 +251,25 @@ pub async fn register_finish(
         session_expires_at: at + hub.config().session_ttl,
         now: at,
     })?;
-    match outcome {
-        SignUpOutcome::Created => {}
+    let kind = match outcome {
+        SignUpOutcome::Created(kind) => kind,
+        SignUpOutcome::EmailTaken => return Err(ApiError::conflict("email-taken")),
         SignUpOutcome::InviteSpent => return Err(ApiError::unauthorized()),
         SignUpOutcome::HandleTaken => return Err(ApiError::conflict("handle-taken")),
         SignUpOutcome::CredentialTaken => return Err(ApiError::conflict("passkey-taken")),
-    }
-    store.log(at, "account.created", None, None, Some(&account))?;
-    drop(store);
-    let view = AccountView {
-        account,
-        handle,
-        created_at: at,
     };
+    store.log(
+        at,
+        "account.created",
+        None,
+        None,
+        Some(&format!("{account} by={}", kind.name())),
+    )?;
+    drop(store);
+    if kind == Ticket::Owner {
+        hub.forget_setup();
+    }
+    let view = account_view(&hub, &account)?;
     Ok(with_session(&hub, &session, view))
 }
 
@@ -243,6 +286,12 @@ pub async fn login_begin(
         let account = store
             .account_by_handle(&handle)?
             .ok_or_else(ApiError::unauthorized)?;
+        if store
+            .account(&account)?
+            .is_none_or(|row| row.deactivated_at.is_some())
+        {
+            return Err(ApiError::unauthorized());
+        }
         let stored = store.passkeys(&account)?;
         (account, stored)
     };
@@ -330,6 +379,96 @@ pub async fn logout(
         AppendHeaders([(SET_COOKIE, session_set_cookie("", 0))]),
         StatusCode::NO_CONTENT,
     ))
+}
+
+pub async fn hub_info(
+    State(hub): State<Arc<Hub>>,
+    client: Anonymous,
+) -> Result<Json<HubInfo>, ApiError> {
+    hub.limit_anonymous(&client.address)?;
+    Ok(Json(HubInfo {
+        signup: hub.config().signup,
+        plans: hub.config().plans,
+        needs_setup: hub.store().account_count()? == 0,
+    }))
+}
+
+pub async fn email_signup(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    client: Anonymous,
+    Json(request): Json<EmailSignup>,
+) -> Result<StatusCode, ApiError> {
+    hub.limit_anonymous(&client.address)?;
+    if hub.config().signup != SignupMode::Open {
+        return Err(ApiError::forbidden("signup-closed"));
+    }
+    let email = request.email.trim().to_ascii_lowercase();
+    if !plausible_address(&email) {
+        return Err(ApiError::bad_request("bad-email"));
+    }
+    if !hub
+        .email_limiter
+        .allow(&format!("address:{}", client.address))
+        || !hub.email_limiter.allow(&format!("email:{email}"))
+    {
+        return Err(ApiError::rate_limited());
+    }
+    let at = now();
+    let token = new_token(VERIFY_TOKEN_PREFIX);
+    {
+        let store = hub.store();
+        if store.email_taken(&email)? {
+            store.log(at, "signup.email-held", None, None, None)?;
+            return Ok(StatusCode::ACCEPTED);
+        }
+        store.add_ticket(
+            &digest(&token),
+            Ticket::Email,
+            Some(&email),
+            at + hub.config().verify_ttl,
+        )?;
+    }
+    let mail = Mail {
+        to: email,
+        subject: "Finish signing up to kelpie hub".to_string(),
+        text: format!(
+            "Open this link to pick a handle and add a passkey:\n\n{}/signup?verify={token}\n\nThe link works once, for {} hours. If you did not ask for it, ignore this mail.",
+            hub.origin(),
+            hub.config().verify_ttl / 3600
+        ),
+    };
+    if let Err(error) = hub.mailer.send(&mail).await {
+        eprintln!("kelpie-hub: sign-up mail failed: {error}");
+        hub.store()
+            .log(at, "signup.mail-failed", None, None, None)?;
+        return Err(ApiError::new(StatusCode::BAD_GATEWAY, "mail-failed"));
+    }
+    hub.store().log(at, "signup.mail-sent", None, None, None)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+#[derive(serde::Deserialize)]
+pub struct VerificationQuery {
+    token: String,
+}
+
+pub async fn verification(
+    State(hub): State<Arc<Hub>>,
+    client: Anonymous,
+    Query(query): Query<VerificationQuery>,
+) -> Result<Json<VerifiedEmail>, ApiError> {
+    hub.limit_anonymous(&client.address)?;
+    let ticket = query
+        .token
+        .starts_with(VERIFY_TOKEN_PREFIX)
+        .then(|| hub.store().ticket(&digest(&query.token), now()))
+        .transpose()?
+        .flatten();
+    match ticket {
+        Some((Ticket::Email, Some(email))) => Ok(Json(VerifiedEmail { email })),
+        _ => Err(ApiError::unauthorized()),
+    }
 }
 
 pub async fn account(

@@ -1,8 +1,8 @@
 {
   "name": "kelpie",
   "short_name": "kelpie",
-  "description": "Boardet från alla kelpie-maskiner, krypterat hela vägen.",
-  "lang": "sv",
+  "description": "The board from every kelpie machine, encrypted end to end.",
+  "lang": "en",
   "id": "/",
   "start_url": "/#/board",
   "scope": "/",

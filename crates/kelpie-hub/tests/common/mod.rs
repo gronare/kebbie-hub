@@ -7,7 +7,8 @@ use kelpie_hub_api::{
     CreationCeremony, DeviceRegistered, DeviceRequest, LoginBegin, LoginFinish, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony,
 };
-use kelpie_hub_fakes::machine::{MachineState, join};
+use kelpie_hub_fakes::browser::Browser;
+use kelpie_hub_fakes::machine::{MachineState, connect, join};
 use kelpie_hub_fakes::phone::PhoneState;
 use kelpie_hub_fakes::{HubClient, HubError, PairError};
 use kelpie_hub_protocol::{Board, Id};
@@ -25,6 +26,7 @@ use webauthn_rs::prelude::Url;
 pub const EXAMPLE_BOARD: &str = include_str!("../../../../examples/board.json");
 pub const MARKER: &str = "zebra-umbrella-7f3a";
 pub const PAIRING_TIMEOUT: Duration = Duration::from_secs(10);
+pub const WAIT: Duration = Duration::from_secs(10);
 
 pub struct TestHub {
     pub url: String,
@@ -202,6 +204,7 @@ impl Person {
             &RegisterBegin {
                 invite: invite.to_string(),
                 handle: self.handle.clone(),
+                ..RegisterBegin::default()
             },
         )
         .await
@@ -433,4 +436,40 @@ impl EventStream {
             }
         }
     }
+}
+
+pub fn browser(test: &TestHub) -> Browser {
+    Browser::new(&test.url, DEV_ORIGIN, &fresh_handle())
+}
+
+pub async fn member(test: &TestHub) -> Browser {
+    let mut person = browser(test);
+    person
+        .sign_up_with_invite(&test.hub.mint_invite().unwrap())
+        .await
+        .unwrap();
+    person
+}
+
+pub async fn owner(test: &TestHub) -> Browser {
+    let mut person = browser(test);
+    let setup = test.hub.setup_url().expect("a fresh hub has a setup link");
+    person.sign_up_as_owner(&setup).await.unwrap();
+    person
+}
+
+pub async fn connected(test: &TestHub, person: &mut Browser) -> MachineState {
+    let pending = connect(&test.url, "mac").await.unwrap();
+    person
+        .approve_connect(&pending.link(), false)
+        .await
+        .unwrap();
+    pending.wait(WAIT).await.unwrap().0
+}
+
+pub fn hub_code(error: HubError) -> (u16, String) {
+    (
+        error.status().unwrap_or_default(),
+        error.code().unwrap_or_default().to_string(),
+    )
 }

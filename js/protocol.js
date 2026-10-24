@@ -7,6 +7,7 @@ const HPKE_INFO = text.encode("kelpie-hub content key v1");
 const KEY_COMMIT_DOMAIN = text.encode("kelpie-hub key commit v1");
 const PAIR_COMMIT_DOMAIN = text.encode("kelpie-pair-commit-v1");
 const SAS_DOMAIN = text.encode("kelpie-pair-v1");
+const CONNECT_DOMAIN = text.encode("kelpie-connect-machine-v1");
 const PKCS8_ED25519 = Uint8Array.fromHex("302e020100300506032b657004220420");
 const PKCS8_X25519 = Uint8Array.fromHex("302e020100300506032b656e04220420");
 const NONCE_LEN = 12;
@@ -309,4 +310,17 @@ export async function machineComparisonCode(commitment, machine, machineNonce, d
   const revealed = await pairingCommitment(device, deviceNonce, code);
   if (toB64(revealed) !== toB64(commitment)) throw new ProtocolError("commitment-mismatch");
   return comparisonCode(machine, device, machineNonce, deviceNonce, code);
+}
+
+export const machineFingerprint = async (machine) => toB64(await sha256(CONNECT_DOMAIN, publicBytes(machine)));
+
+export function parseConnectFragment(fragment) {
+  const values = new URLSearchParams(String(fragment ?? "").replace(/^#/, ""));
+  const [code, fingerprint] = [values.get("k"), values.get("m")];
+  try {
+    if (fromB64(code ?? "").length !== 32 || fromB64(fingerprint ?? "").length !== 32) return null;
+  } catch {
+    return null;
+  }
+  return { code, fingerprint };
 }

@@ -1,0 +1,427 @@
+#[allow(dead_code)]
+mod common;
+
+use std::time::Duration;
+
+use common::*;
+use kelpie_hub::store::{KeyStatus, NewReport, Store};
+use kelpie_hub_api::{
+    AdminAccounts, AdminMachines, AdminOverview, AdminReports, AdminSignals, DeviceAdd, InviteLink,
+};
+use kelpie_hub_fakes::PairError;
+use kelpie_hub_protocol::BugReport;
+use tokio::sync::oneshot;
+
+const OWNER_READS: [&str; 5] = [
+    "/v1/a/admin/overview",
+    "/v1/a/admin/accounts",
+    "/v1/a/admin/machines",
+    "/v1/a/admin/reports",
+    "/v1/a/admin/signals",
+];
+
+#[tokio::test]
+async fn the_admin_endpoints_answer_only_the_owner() {
+    let test = start_hub(|_| {}).await;
+    let mut owner = owner(&test).await;
+    let mut member = member(&test).await;
+    let mut anonymous = browser(&test);
+    for path in OWNER_READS {
+        let refused = member.get::<serde_json::Value>(path).await;
+        assert_eq!(
+            hub_code(refused.unwrap_err()),
+            (403, "not-owner".to_string()),
+            "{path}"
+        );
+        let refused = anonymous.get::<serde_json::Value>(path).await;
+        assert_eq!(hub_code(refused.unwrap_err()).0, 401, "{path}");
+        owner.get::<serde_json::Value>(path).await.unwrap();
+    }
+    for path in [
+        "/v1/a/admin/invites",
+        "/v1/a/admin/accounts/acc_x/deactivate",
+        "/v1/a/admin/reports/1/ack",
+    ] {
+        let refused = member.post::<_, serde_json::Value>(path, &()).await;
+        assert_eq!(hub_code(refused.unwrap_err()).0, 403, "{path}");
+    }
+    assert_eq!(
+        hub_code(
+            member
+                .delete("/v1/a/admin/machines/mch_x")
+                .await
+                .unwrap_err()
+        )
+        .0,
+        403
+    );
+    owner.origin = "https://evil.example".to_string();
+    let cross = owner
+        .post::<_, serde_json::Value>("/v1/a/admin/invites", &())
+        .await;
+    assert_eq!(
+        hub_code(cross.unwrap_err()),
+        (403, "cross-origin".to_string())
+    );
+}
+
+#[tokio::test]
+async fn the_owner_sees_accounts_with_their_machines_devices_and_plans() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut owner = owner(&test).await;
+    let mut person = member(&test).await;
+    let mut machine = connected(&test, &mut person).await;
+    person.ensure_device().await.unwrap();
+    machine.post_board(board(MARKER)).await.unwrap();
+    let overview: AdminOverview = owner.get("/v1/a/admin/overview").await.unwrap();
+    assert_eq!(
+        (overview.accounts, overview.machines, overview.devices),
+        (2, 1, 1)
+    );
+    let listed: AdminAccounts = owner.get("/v1/a/admin/accounts").await.unwrap();
+    let row = listed
+        .accounts
+        .iter()
+        .find(|row| row.handle == person.handle)
+        .unwrap();
+    assert_eq!((row.machines, row.devices, row.owner), (1, 1, false));
+    assert!(row.last_seen.is_some());
+    assert!(row.plan.entitled);
+    assert!(listed.accounts.iter().any(|row| row.owner));
+    let machines: AdminMachines = owner.get("/v1/a/admin/machines").await.unwrap();
+    assert_eq!(
+        machines.machines[0].owner.as_deref(),
+        Some(person.handle.as_str())
+    );
+}
+
+#[tokio::test]
+async fn a_deactivated_account_loses_its_session_login_devices_and_machines() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut owner = owner(&test).await;
+    let mut person = member(&test).await;
+    let mut machine = connected(&test, &mut person).await;
+    let phone = person.ensure_device().await.unwrap().clone();
+    let account = person.account().await.unwrap().account;
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
+        .await
+        .unwrap();
+    assert_eq!(hub_code(person.account().await.unwrap_err()).0, 401);
+    assert_eq!(hub_code(person.log_in().await.unwrap_err()).0, 401);
+    assert!(phone.boards().await.is_err());
+    assert!(machine.post_board(board(MARKER)).await.is_err());
+    let own = owner.account().await.unwrap().account;
+    let refused = owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{own}/deactivate"), &())
+        .await;
+    assert_eq!(
+        hub_code(refused.unwrap_err()),
+        (409, "owner-stays".to_string())
+    );
+
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/activate"), &())
+        .await
+        .unwrap();
+    person.log_in().await.unwrap();
+    machine.post_board(board(MARKER)).await.unwrap();
+}
+
+#[tokio::test]
+async fn the_owner_removes_a_machine_and_its_token_stops() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut owner = owner(&test).await;
+    let mut person = member(&test).await;
+    let mut machine = connected(&test, &mut person).await;
+    owner
+        .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
+        .await
+        .unwrap();
+    assert_eq!(
+        machine
+            .post_board(board(MARKER))
+            .await
+            .err()
+            .map(|e| e.to_string().contains("401")),
+        Some(true)
+    );
+    let gone = owner
+        .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
+        .await;
+    assert_eq!(hub_code(gone.unwrap_err()).0, 404);
+}
+
+fn report(title: &str) -> BugReport {
+    BugReport {
+        title: title.to_string(),
+        text: "the text".to_string(),
+        version: "0.27.0".to_string(),
+        os: "macos aarch64".to_string(),
+    }
+}
+
+#[tokio::test]
+async fn the_owner_decides_on_reports_from_the_web() {
+    let test = start_hub(|_| {}).await;
+    let mut owner = owner(&test).await;
+    {
+        let mut store = Store::open(&test.hub.config().database()).unwrap();
+        store
+            .store_report(&NewReport {
+                key: &[3; 32],
+                report: &report("waiting"),
+                now: kelpie_hub::now(),
+                max_quarantined: 10,
+                max_quarantined_per_key: 10,
+            })
+            .unwrap();
+    }
+    let waiting: AdminReports = owner
+        .get("/v1/a/admin/reports?quarantine=true")
+        .await
+        .unwrap();
+    assert_eq!(waiting.reports.len(), 1);
+    let key = serde_json::to_value(waiting.reports[0].key).unwrap();
+    let key = key.as_str().unwrap();
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/allow"), &())
+        .await
+        .unwrap();
+    let allowed: AdminReports = owner.get("/v1/a/admin/reports").await.unwrap();
+    assert_eq!(allowed.reports[0].status, "allowed");
+    let overview: AdminOverview = owner.get("/v1/a/admin/overview").await.unwrap();
+    assert_eq!((overview.reports, overview.quarantined), (1, 0));
+    owner
+        .post::<_, Option<()>>(
+            &format!("/v1/a/admin/reports/{}/ack", allowed.reports[0].id),
+            &(),
+        )
+        .await
+        .unwrap();
+    let handled: AdminReports = owner.get("/v1/a/admin/reports").await.unwrap();
+    assert!(handled.reports.is_empty());
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/block"), &())
+        .await
+        .unwrap();
+    assert_eq!(
+        test.hub
+            .store()
+            .reports(KeyStatus::Blocked, 0, false, 10)
+            .unwrap()
+            .len(),
+        0
+    );
+    let signals: AdminSignals = owner.get("/v1/a/admin/signals?days=30").await.unwrap();
+    assert!(signals.signals.is_empty());
+}
+
+#[tokio::test]
+async fn a_phone_added_from_the_machine_pairs_after_both_show_the_same_digits() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut person = member(&test).await;
+    let mut machine = connected(&test, &mut person).await;
+    let mut phone = browser(&test);
+    phone.handle = person.handle.clone();
+    phone.passkey = std::mem::replace(&mut person.passkey, soft_passkey());
+    phone.log_in().await.unwrap();
+    let (link_out, link_in) = oneshot::channel::<DeviceAdd>();
+    let (digits_out, digits_in) = oneshot::channel::<String>();
+    let machine_side = machine.add_device(
+        WAIT,
+        move |added| {
+            let _ = link_out.send(added.clone());
+        },
+        async move |digits: String| digits_in.await.is_ok_and(|phone| phone == digits),
+    );
+    let phone_side = async {
+        let added = link_in.await.unwrap();
+        assert_eq!(
+            added.url,
+            format!("http://localhost:8470/add?code={}", added.code)
+        );
+        let shown = phone.add_view(&added.url).await.unwrap();
+        assert_eq!(shown.name, "mac");
+        phone
+            .add_this_phone(&added.url, WAIT, async move |digits: String| {
+                let _ = digits_out.send(digits);
+                true
+            })
+            .await
+    };
+    let (admitted, paired) = tokio::join!(machine_side, phone_side);
+    let device = admitted.unwrap();
+    assert_eq!(paired.unwrap(), machine.machine);
+    assert_eq!(
+        phone.device.as_ref().unwrap().device.as_ref(),
+        Some(&device)
+    );
+    machine.post_board(board(MARKER)).await.unwrap();
+    assert!(
+        phone.device.as_ref().unwrap().boards().await.unwrap()[0]
+            .board
+            .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn another_account_cannot_add_a_phone_to_my_machine() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut person = member(&test).await;
+    let mut machine = connected(&test, &mut person).await;
+    let mut stranger = member(&test).await;
+    let (link_out, link_in) = oneshot::channel::<DeviceAdd>();
+    let machine_side = machine.add_device(
+        Duration::from_secs(2),
+        move |added| {
+            let _ = link_out.send(added.clone());
+        },
+        async |_: String| true,
+    );
+    let stranger_side = async {
+        let added = link_in.await.unwrap();
+        let viewed = stranger.add_view(&added.url).await;
+        assert_eq!(
+            hub_code(viewed.unwrap_err()),
+            (403, "not-your-machine".to_string())
+        );
+        let code = added.code.clone();
+        let device = stranger.ensure_device().await.unwrap();
+        device
+            .pair(&code, Duration::from_secs(2), async |_: String| true)
+            .await
+    };
+    let (admitted, paired) = tokio::join!(machine_side, stranger_side);
+    assert!(admitted.is_err());
+    match paired {
+        Err(PairError::Hub(error)) => {
+            assert_eq!(hub_code(error), (403, "not-your-machine".to_string()))
+        }
+        other => panic!("a stranger paired: {other:?}"),
+    }
+}
+
+#[test]
+fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute_batch(include_str!("fixtures/schema-6.sql"))
+        .unwrap();
+    connection
+        .execute_batch(
+            "INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'carl', x'00112233445566778899aabbccddeeff', 1);
+             INSERT INTO machines (id, name, signing_key, encryption_key, token_hash, joined_at)
+                 VALUES ('mch_00000000000000000000000000', 'mac', zeroblob(32), zeroblob(32), x'01', 1);
+             INSERT INTO invites (code_hash, expires_at) VALUES (x'02', 9999999999);
+             INSERT INTO admin_tokens (token_hash, name, created_at) VALUES (x'03', 'laptop', 1);",
+        )
+        .unwrap();
+    drop(connection);
+    let store = Store::open(&path).unwrap();
+    let account = store.account("acc_kept").unwrap().unwrap();
+    assert_eq!((account.handle.as_str(), account.owner), ("carl", false));
+    assert_eq!(
+        account.plan,
+        kelpie_hub_api::PlanStatus::Active,
+        "an account from before plans keeps working"
+    );
+    assert!(store.ticket(b"\x02", 1).unwrap().is_some());
+    let mut store = store;
+    let outcome = store
+        .sign_up(&kelpie_hub::store::SignUp {
+            invite_hash: b"\x02",
+            account: "acc_new",
+            handle: "newcomer",
+            user_handle: [9; 16],
+            credential_id: b"cred",
+            name: None,
+            passkey: "{}",
+            session_hash: b"session",
+            session_expires_at: u64::MAX >> 2,
+            now: 2,
+        })
+        .unwrap();
+    assert!(matches!(
+        outcome,
+        kelpie_hub::store::SignUpOutcome::Created(_)
+    ));
+    assert_eq!(
+        store.account("acc_new").unwrap().unwrap().plan,
+        kelpie_hub_api::PlanStatus::Inactive
+    );
+    assert_eq!(store.machines().unwrap()[0].name, "mac");
+    let tokens = store.admin_tokens().unwrap();
+    assert_eq!(tokens[0].scope, kelpie_hub::store::AdminScope::Reports);
+    drop(store);
+    let version: i64 = rusqlite::Connection::open(&path)
+        .unwrap()
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 7);
+    let reopened = Store::open(&path).unwrap();
+    assert_eq!(
+        reopened.account("acc_new").unwrap().unwrap().plan,
+        kelpie_hub_api::PlanStatus::Inactive,
+        "a later start does not activate new accounts"
+    );
+}
+
+#[tokio::test]
+async fn destructive_owner_actions_need_a_fresh_passkey_session() {
+    let test = start_hub(|config| {
+        config.fresh_session_ttl = 1;
+        config.connect_interval = 0;
+    })
+    .await;
+    let mut owner = owner(&test).await;
+    let mut person = member(&test).await;
+    let machine = connected(&test, &mut person).await;
+    let account = person.account().await.unwrap().account;
+    tokio::time::sleep(Duration::from_millis(2100)).await;
+    let key = "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM";
+    let stale = [
+        owner
+            .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
+            .await,
+        owner
+            .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
+            .await
+            .map(|()| None),
+        owner
+            .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/block"), &())
+            .await,
+    ];
+    for refused in stale {
+        assert_eq!(
+            hub_code(refused.unwrap_err()),
+            (401, "reauth-required".to_string())
+        );
+    }
+    for path in OWNER_READS {
+        owner.get::<serde_json::Value>(path).await.unwrap();
+    }
+    owner
+        .post::<_, InviteLink>("/v1/a/admin/invites", &())
+        .await
+        .unwrap();
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/allow"), &())
+        .await
+        .unwrap();
+    owner.log_in().await.unwrap();
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/block"), &())
+        .await
+        .unwrap();
+    owner
+        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
+        .await
+        .unwrap();
+    owner
+        .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
+        .await
+        .unwrap();
+}

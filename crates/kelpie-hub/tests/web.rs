@@ -79,12 +79,15 @@ async fn every_shipped_file_is_served_byte_for_byte_and_nothing_else() {
     let mut served: Vec<String> = ASSETS
         .iter()
         .map(|(path, _, _)| match *path {
-            "/" => "web/index.html".to_string(),
+            "/" | "/setup" | "/signup" | "/connect" | "/add" | "/admin" => {
+                "web/index.html".to_string()
+            }
             path if path.starts_with("/js/") => path.trim_start_matches('/').to_string(),
             path => format!("web{path}"),
         })
         .collect();
     served.sort();
+    served.dedup();
     assert_eq!(served, shipped_files());
     for (path, _, bytes) in ASSETS {
         let body = client

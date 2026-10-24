@@ -16,7 +16,7 @@ use sha2::Sha256;
 
 use crate::auth::{AdminAuth, Anonymous, random};
 use crate::error::ApiError;
-use crate::store::{KeyStatus, NewReport, NewSignals, ReportWrite, SignalWrite};
+use crate::store::{AdminScope, KeyStatus, NewReport, NewSignals, ReportWrite, SignalWrite};
 use crate::{Hub, MAX_STORED_INTEGER, now};
 
 pub const INBOX_PAGE: u64 = 100;
@@ -233,9 +233,10 @@ pub struct InboxQuery {
 
 pub async fn inbox(
     State(hub): State<Arc<Hub>>,
-    _admin: AdminAuth,
+    admin: AdminAuth,
     Query(query): Query<InboxQuery>,
 ) -> Result<Json<ReportInbox>, ApiError> {
+    admin.require(AdminScope::Reports)?;
     if query.after > MAX_STORED_INTEGER {
         return Err(ApiError::bad_request("after-out-of-range"));
     }
@@ -258,9 +259,10 @@ pub async fn inbox(
 
 pub async fn ack(
     State(hub): State<Arc<Hub>>,
-    _admin: AdminAuth,
+    admin: AdminAuth,
     Path(id): Path<u64>,
 ) -> Result<StatusCode, ApiError> {
+    admin.require(AdminScope::Reports)?;
     if id > MAX_STORED_INTEGER {
         return Err(ApiError::not_found());
     }

@@ -4,7 +4,7 @@ mod common;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub::RateLimit;
-use kelpie_hub::store::{KeyStatus, Store};
+use kelpie_hub::store::{AdminScope, KeyStatus, Store};
 use kelpie_hub_api::{
     Bytes32, Bytes64, ReportAccepted, ReportChallenge, ReportInbox, ReportUpload,
 };
@@ -103,7 +103,11 @@ fn allow(test: &TestHub, key: &InstallKey) {
 async fn a_valid_report_waits_in_quarantine_until_its_key_is_allowed_then_reaches_the_admin_api_once_acked()
  {
     let test = hub().await;
-    let token = test.hub.mint_admin_token("laptop").unwrap().unwrap();
+    let token = test
+        .hub
+        .mint_admin_token("laptop", AdminScope::Reports)
+        .unwrap()
+        .unwrap();
     let key = install_key(1);
     let first = accepted(
         &test,
@@ -180,7 +184,11 @@ async fn a_valid_report_waits_in_quarantine_until_its_key_is_allowed_then_reache
 #[tokio::test]
 async fn the_admin_api_takes_only_an_admin_token() {
     let test = hub().await;
-    let token = test.hub.mint_admin_token("laptop").unwrap().unwrap();
+    let token = test
+        .hub
+        .mint_admin_token("laptop", AdminScope::Reports)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         refusal(admin_get(&test, None, 0).await).await,
         (401, "unauthorized".to_string())
@@ -423,7 +431,11 @@ async fn behind_cloudflare_the_address_limit_follows_the_client_not_the_proxy() 
 #[tokio::test]
 async fn a_blocked_keys_reports_are_accepted_as_any_other_and_dropped() {
     let test = hub().await;
-    let token = test.hub.mint_admin_token("laptop").unwrap().unwrap();
+    let token = test
+        .hub
+        .mint_admin_token("laptop", AdminScope::Reports)
+        .unwrap()
+        .unwrap();
     let blocked = install_key(1);
     let waiting = accepted(&test, &upload(&test, &blocked, report("spam one")).await).await;
     test.hub
@@ -468,17 +480,24 @@ async fn a_blocked_keys_reports_are_accepted_as_any_other_and_dropped() {
 #[tokio::test]
 async fn a_revoked_token_stops_working_at_once() {
     let test = hub().await;
-    let token = test.hub.mint_admin_token("laptop").unwrap().unwrap();
+    let token = test
+        .hub
+        .mint_admin_token("laptop", AdminScope::Reports)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         admin_get(&test, Some(&token), 0).await.status().as_u16(),
         200
     );
     assert!(
-        test.hub.mint_admin_token("laptop").unwrap().is_none(),
+        test.hub
+            .mint_admin_token("laptop", AdminScope::Reports)
+            .unwrap()
+            .is_none(),
         "names are unique"
     );
     let used = test.hub.store().admin_tokens().unwrap();
-    assert!(used[0].0 == "laptop" && used[0].2.is_some(), "{used:?}");
+    assert!(used[0].name == "laptop" && used[0].last_used.is_some());
     assert!(test.hub.store().revoke_admin_token("laptop").unwrap());
     assert_eq!(
         admin_get(&test, Some(&token), 0).await.status().as_u16(),
@@ -567,7 +586,7 @@ fn a_schema_4_database_is_upgraded_in_place_and_an_older_one_refused() {
     let kept: i64 = connection
         .query_row("SELECT count(*) FROM join_codes", [], |row| row.get(0))
         .unwrap();
-    assert_eq!((version, kept), (6, 1), "the upgrade keeps what was there");
+    assert_eq!((version, kept), (7, 1), "the upgrade keeps what was there");
     connection
         .execute_batch("PRAGMA user_version = 3;")
         .unwrap();
@@ -628,7 +647,7 @@ fn the_admin_cli_mints_a_token_lists_reports_and_decides_on_keys() {
     );
     let (listed, _) = run(&["token", "list"]);
     assert!(
-        listed.starts_with("laptop  made ")
+        listed.starts_with("laptop  reports  made ")
             && listed.contains("never used")
             && !listed.contains("kha_"),
         "{listed}"

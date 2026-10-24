@@ -1,11 +1,14 @@
 mod account;
+mod admin;
 mod auth;
 mod command;
+mod connect;
 mod device;
 mod error;
 mod events;
 mod limit;
 mod machine;
+pub mod mail;
 mod pairing;
 mod push;
 mod report;
@@ -24,7 +27,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
-use kelpie_hub_api::{MAX_WAIT_SECONDS, code_from_random};
+use kelpie_hub_api::{MAX_WAIT_SECONDS, PlanStatus, PlanView, SignupMode, code_from_random};
 use kelpie_hub_protocol::{Envelope, Id, Kind};
 use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
@@ -33,9 +36,10 @@ pub use auth::SESSION_COOKIE;
 pub use error::ApiError;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
+use mail::{LogMailer, MailSettings, Mailer, SmtpMailer};
 use push::Pusher;
 pub use server::serve;
-use store::{Pairing, Store};
+use store::{AccountRow, AdminScope, Pairing, Store};
 use wake::{Wakeups, device_key, machine_key, pairing_key};
 use webpush::{Vapid, check_subject};
 
@@ -51,6 +55,7 @@ pub const DEV_RP_ID: &str = "localhost";
 pub const DEV_VAPID_SUBJECT: &str = "https://github.com/gronare/kelpie-hub";
 pub const VAPID_KEY_FILE: &str = "vapid.key";
 pub const DEFAULT_REPORT_DIFFICULTY: u8 = 20;
+const SETUP_TTL: u64 = 30 * 86_400;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrustedProxy {
@@ -100,6 +105,17 @@ pub struct Config {
     pub max_signal_batches_per_key: u64,
     pub max_signal_batches_per_address: u32,
     pub max_unvetted_signal_rows: u64,
+    pub signup: SignupMode,
+    pub plans: bool,
+    pub billing_url: Option<String>,
+    pub mail: MailSettings,
+    pub fresh_session_ttl: u64,
+    pub connect_ttl: u64,
+    pub connect_interval: u64,
+    pub verify_ttl: u64,
+    pub connect_rate: RateLimit,
+    pub code_rate: RateLimit,
+    pub email_rate: RateLimit,
 }
 
 impl Config {
@@ -165,6 +181,26 @@ impl Config {
             max_signal_batches_per_key: 4,
             max_signal_batches_per_address: 200,
             max_unvetted_signal_rows: 1_000_000,
+            signup: SignupMode::Invite,
+            plans: false,
+            billing_url: None,
+            mail: MailSettings::Log,
+            fresh_session_ttl: 300,
+            connect_ttl: 600,
+            connect_interval: 5,
+            verify_ttl: 86_400,
+            connect_rate: RateLimit {
+                burst: 10,
+                per_minute: 10,
+            },
+            code_rate: RateLimit {
+                burst: 10,
+                per_minute: 10,
+            },
+            email_rate: RateLimit {
+                burst: 3,
+                per_minute: 1,
+            },
         }
     }
 
@@ -198,10 +234,14 @@ pub fn mint_join_code(store: &Store, ttl: u64) -> store::Result<String> {
     Ok(code)
 }
 
-pub fn mint_admin_token(store: &Store, name: &str) -> store::Result<Option<String>> {
+pub fn mint_admin_token(
+    store: &Store,
+    name: &str,
+    scope: AdminScope,
+) -> store::Result<Option<String>> {
     let token = auth::new_token(auth::ADMIN_TOKEN_PREFIX);
     Ok(store
-        .add_admin_token(&auth::digest(&token), name, now())?
+        .add_admin_token(&auth::digest(&token), name, scope, now())?
         .then_some(token))
 }
 
@@ -217,6 +257,7 @@ pub enum OpenError {
     RelyingParty(String),
     Push(String),
     Report(String),
+    Mail(String),
 }
 
 impl std::fmt::Display for OpenError {
@@ -225,7 +266,8 @@ impl std::fmt::Display for OpenError {
             OpenError::Store(error) => error.fmt(formatter),
             OpenError::RelyingParty(message)
             | OpenError::Push(message)
-            | OpenError::Report(message) => formatter.write_str(message),
+            | OpenError::Report(message)
+            | OpenError::Mail(message) => formatter.write_str(message),
         }
     }
 }
@@ -265,6 +307,12 @@ pub struct Hub {
     device_push_limiter: Limiter,
     report_key_limiter: Limiter,
     report_address_limiter: Limiter,
+    connect_limiter: Limiter,
+    code_limiter: Limiter,
+    email_limiter: Limiter,
+    mailer: Arc<dyn Mailer>,
+    mail_log: Option<Arc<LogMailer>>,
+    setup_url: Mutex<Option<String>>,
     signal_addresses: Mutex<(u64, HashMap<String, u32>)>,
     challenge_secret: [u8; 32],
     pusher: Pusher,
@@ -317,7 +365,34 @@ impl Hub {
         )
         .map_err(OpenError::Push)?;
         let store = Store::open(&config.database())?;
+        let (mailer, mail_log): (Arc<dyn Mailer>, _) = match &config.mail {
+            MailSettings::Log => {
+                let log = Arc::new(LogMailer::default());
+                (log.clone(), Some(log))
+            }
+            MailSettings::Smtp(settings) => {
+                let helo = Url::parse(&origin)
+                    .ok()
+                    .and_then(|url| url.host_str().map(str::to_string))
+                    .unwrap_or_else(|| "localhost".to_string());
+                let smtp = SmtpMailer::new(settings.clone(), &helo).map_err(OpenError::Mail)?;
+                (Arc::new(smtp), None)
+            }
+        };
+        let setup_url = if store.account_count()? == 0 {
+            let token = auth::new_token(auth::SETUP_TOKEN_PREFIX);
+            store.replace_setup_ticket(&auth::digest(&token), now() + SETUP_TTL)?;
+            Some(format!("{origin}/setup?token={token}"))
+        } else {
+            None
+        };
         Ok(Arc::new(Hub {
+            connect_limiter: Limiter::new(config.connect_rate, config.max_buckets),
+            code_limiter: Limiter::new(config.code_rate, config.max_buckets),
+            email_limiter: Limiter::new(config.email_rate, config.max_buckets),
+            mailer,
+            mail_log,
+            setup_url: Mutex::new(setup_url),
             store: Mutex::new(store),
             limiter: Limiter::new(config.rate, config.max_buckets),
             command_limiter: Limiter::new(config.command_rate, config.max_buckets),
@@ -388,8 +463,68 @@ impl Hub {
         mint_join_code(&self.store(), self.config.join_code_ttl)
     }
 
-    pub fn mint_admin_token(&self, name: &str) -> store::Result<Option<String>> {
-        mint_admin_token(&self.store(), name)
+    pub fn mint_admin_token(&self, name: &str, scope: AdminScope) -> store::Result<Option<String>> {
+        mint_admin_token(&self.store(), name, scope)
+    }
+
+    pub fn setup_url(&self) -> Option<String> {
+        self.setup_url
+            .lock()
+            .expect("the setup lock is never poisoned")
+            .clone()
+    }
+
+    fn forget_setup(&self) {
+        *self
+            .setup_url
+            .lock()
+            .expect("the setup lock is never poisoned") = None;
+    }
+
+    pub fn mail_log(&self) -> Vec<mail::Mail> {
+        self.mail_log
+            .as_ref()
+            .map(|log| log.sent())
+            .unwrap_or_default()
+    }
+
+    pub fn plan_view(&self, row: &AccountRow, at: u64) -> PlanView {
+        if !self.config.plans {
+            return PlanView::default();
+        }
+        let current =
+            row.plan == PlanStatus::Active && row.plan_until.is_none_or(|until| until > at);
+        PlanView {
+            status: row.plan,
+            until: row.plan_until,
+            entitled: row.owner || current,
+        }
+    }
+
+    fn require_account_plan(&self, account: &str) -> Result<(), ApiError> {
+        if !self.config.plans {
+            return Ok(());
+        }
+        let row = self
+            .store()
+            .account(account)?
+            .ok_or_else(ApiError::unauthorized)?;
+        if self.plan_view(&row, now()).entitled {
+            Ok(())
+        } else {
+            Err(ApiError::plan_inactive(self.config.billing_url.clone()))
+        }
+    }
+
+    fn require_machine_plan(&self, machine: &Id) -> Result<(), ApiError> {
+        if !self.config.plans {
+            return Ok(());
+        }
+        let owner = self.store().machine_owner(machine)?;
+        match owner {
+            Some(account) => self.require_account_plan(&account),
+            None => Ok(()),
+        }
     }
 
     pub fn mint_invite(&self) -> store::Result<String> {
@@ -527,6 +662,9 @@ impl Hub {
         self.device_push_limiter.forget_idle();
         self.report_key_limiter.forget_idle();
         self.report_address_limiter.forget_idle();
+        self.connect_limiter.forget_idle();
+        self.code_limiter.forget_idle();
+        self.email_limiter.forget_idle();
         self.wakeups.forget_idle();
         swept
     }
@@ -539,7 +677,36 @@ async fn health() -> StatusCode {
 pub fn router(hub: Arc<Hub>) -> Router {
     Router::new()
         .route("/healthz", get(health))
+        .route("/v1/hub", get(account::hub_info))
         .route("/v1/m/join", post(machine::join))
+        .route("/v1/m/connect", post(connect::start))
+        .route("/v1/m/connect/token", post(connect::token))
+        .route("/v1/m/devices/add", post(connect::add_device))
+        .route("/v1/a/connect", get(connect::view))
+        .route("/v1/a/connect/approve", post(connect::approve))
+        .route("/v1/a/connect/deny", post(connect::deny))
+        .route("/v1/a/add", get(connect::add_view))
+        .route("/v1/a/signup/email", post(account::email_signup))
+        .route("/v1/a/signup/verify", get(account::verification))
+        .route("/v1/a/admin/overview", get(admin::overview))
+        .route("/v1/a/admin/accounts", get(admin::accounts))
+        .route(
+            "/v1/a/admin/accounts/{id}/deactivate",
+            post(admin::deactivate),
+        )
+        .route("/v1/a/admin/accounts/{id}/activate", post(admin::activate))
+        .route("/v1/a/admin/invites", post(admin::invite))
+        .route("/v1/a/admin/machines", get(admin::machines))
+        .route("/v1/a/admin/machines/{id}", delete(admin::remove_machine))
+        .route("/v1/a/admin/reports", get(admin::reports))
+        .route("/v1/a/admin/reports/{id}/ack", post(admin::ack_report))
+        .route(
+            "/v1/a/admin/reports/keys/{key}/{decision}",
+            post(admin::decide_key),
+        )
+        .route("/v1/a/admin/signals", get(admin::signals))
+        .route("/v1/admin/accounts", get(admin::billing_lookup))
+        .route("/v1/admin/accounts/{id}/plan", put(admin::set_plan))
         .route(
             "/v1/m/board",
             put(machine::put_board).layer(DefaultBodyLimit::max(BOARD_BODY_LIMIT)),

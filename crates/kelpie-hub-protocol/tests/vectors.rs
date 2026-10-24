@@ -186,6 +186,42 @@ fn pairing_flows_end_as_the_vectors_say() {
 }
 
 #[test]
+fn a_connect_link_names_its_machine_and_binds_the_browser_commitment() {
+    use kelpie_hub_protocol::{ConnectSecret, machine_fingerprint};
+    let parties = parties();
+    let vector = &load("pairing.json")["connect"];
+    let text = |key: &str| vector[key].as_str().unwrap().to_string();
+    let machine = &parties[&text("machine")];
+    let device = &parties[&text("device")];
+    assert_eq!(
+        URL_SAFE_NO_PAD.encode(machine_fingerprint(&machine.public)),
+        text("fingerprint")
+    );
+    let link = text("link");
+    let secret = ConnectSecret::parse(link.split_once('#').unwrap().1).unwrap();
+    assert!(secret.names(&machine.public));
+    assert!(!secret.names(&parties["intruder"].public));
+    assert_eq!(secret.pairing_code(), text("code"));
+    let browser = DevicePairing::with_nonce(
+        device.public,
+        bytes32(&vector["device_nonce"]),
+        &text("code"),
+    );
+    assert_eq!(browser.commitment(), bytes32(&vector["commitment"]));
+    let answering = MachinePairing::with_nonce(
+        machine.public,
+        browser.commitment(),
+        bytes32(&vector["machine_nonce"]),
+        &text("code"),
+    );
+    assert!(
+        answering
+            .comparison_code(&device.public, &bytes32(&vector["device_nonce"]))
+            .is_ok()
+    );
+}
+
+#[test]
 fn reports_sign_and_solve_as_the_vectors_say() {
     use kelpie_hub_protocol::{
         BugReport, InstallKey, leading_zero_bits, meets, pow_hash, solve, verify_report,

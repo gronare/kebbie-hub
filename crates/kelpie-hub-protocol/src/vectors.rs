@@ -12,6 +12,7 @@ use crate::board::{
     RoutineSummary,
 };
 use crate::bug_report::{BugReport, InstallKey, leading_zero_bits, meets, pow_hash, solve};
+use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 use crate::crypto::{
     OpenError, PublicKeys, Randomness, SecretKeys, decrypt, key_commitment, open, seal_unchecked,
     seal_with, wrap_key,
@@ -1321,7 +1322,35 @@ fn pairing_json(parties: &Parties) -> Value {
             })
         })
         .collect();
-    json!({ "commit_domain": "kelpie-pair-commit-v1", "sas_domain": "kelpie-pair-v1", "cases": cases })
+    let connect = ConnectSecret::with_secret(&machine.public(), seed("connect/secret"));
+    let code = connect.pairing_code();
+    let device_nonce = seed("connect/device-nonce");
+    let browser = DevicePairing::with_nonce(phone.public(), device_nonce, &code);
+    let answering = MachinePairing::with_nonce(
+        machine.public(),
+        browser.commitment(),
+        seed("connect/machine-nonce"),
+        &code,
+    );
+    let (_, machine_nonce) = answering.reply();
+    assert!(
+        answering
+            .comparison_code(&phone.public(), &device_nonce)
+            .is_ok()
+    );
+    let connect = json!({
+        "domain": String::from_utf8_lossy(CONNECT_FINGERPRINT_DOMAIN),
+        "machine": machine.name,
+        "device": phone.name,
+        "fingerprint": b64(&machine_fingerprint(&machine.public())),
+        "other_fingerprint": b64(&machine_fingerprint(&intruder.public())),
+        "link": connect.link("https://hub.example.com/connect?code=K7QF-M2XD"),
+        "code": code,
+        "device_nonce": b64(&device_nonce),
+        "commitment": b64(&browser.commitment()),
+        "machine_nonce": b64(&machine_nonce),
+    });
+    json!({ "commit_domain": "kelpie-pair-commit-v1", "sas_domain": "kelpie-pair-v1", "cases": cases, "connect": connect })
 }
 
 fn reports_json() -> Value {

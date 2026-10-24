@@ -18,13 +18,13 @@ export function normalizeCode(typed) {
   return `${symbols.slice(0, 4).join("")}-${symbols.slice(4).join("")}`;
 }
 
-function ended(view) {
+export function ended(view) {
   if (view.state === "refused") return new PairingFailed(`refused-${view.reason ?? "declined"}`, view.machine);
   if (view.state === "failed") return new PairingFailed(view.reason ?? "failed", view.machine);
   return new PairingFailed(view.state, view.machine);
 }
 
-async function next(hub, pairing, seen, deadline, clock) {
+export async function next(hub, pairing, seen, deadline, clock) {
   while (clock() < deadline) {
     const view = await hub.watch(pairing, seen, Math.max(1, Math.min(WAIT_SECONDS, Math.ceil((deadline - clock()) / 1000))));
     if (view.state !== seen) return view;
@@ -61,17 +61,17 @@ export async function pair({ hub, publicKeys, typed, confirm, timeoutMs = 10 * 6
 }
 
 export const FAILURE_TEXT = {
-  "bad-code": "Koden ska vara åtta tecken, som den kelpie hub pair visar.",
-  "unknown-code": "Koden finns inte eller har gått ut. Kör kelpie hub pair igen.",
-  "refused-mismatch": "Maskinen avbröt: nycklarna stämde inte. Något kan stå mellan dig och maskinen.",
-  "refused-declined": "Du svarade n i terminalen. Telefonen kopplades inte.",
-  "refused-timeout": "Maskinen slutade vänta. Kör kelpie hub pair igen.",
-  "second-commitment": "Koden användes av en annan enhet samtidigt. Kör kelpie hub pair igen.",
-  expired: "Koden gick ut. Kör kelpie hub pair igen.",
-  timeout: "Ingen svarade i tid. Kör kelpie hub pair igen.",
-  "machine-changed": "Hubben bytte maskin mitt i kopplingen. Telefonen litar inte på den.",
-  incomplete: "Hubben skickade inte maskinens nycklar.",
-  "phone-mismatch": "Du såg andra siffror än terminalen. Telefonen litar inte på maskinen; svara n i terminalen och försök igen.",
+  "bad-code": "The code is eight characters, like the one kelpie hub pair shows.",
+  "unknown-code": "That code does not exist or has expired. Run kelpie hub pair again.",
+  "refused-mismatch": "The machine stopped: the keys did not match. Something may be between you and the machine.",
+  "refused-declined": "You answered n in the terminal. This device was not paired.",
+  "refused-timeout": "The machine stopped waiting. Run kelpie hub pair again.",
+  "second-commitment": "Another device used the code at the same time. Run kelpie hub pair again.",
+  expired: "The code expired. Run kelpie hub pair again.",
+  timeout: "Nobody answered in time. Run kelpie hub pair again.",
+  "machine-changed": "The hub switched machines halfway. This device does not trust it.",
+  incomplete: "The hub left out the machine's keys.",
+  "phone-mismatch": "You saw different digits than the terminal. This device does not trust the machine; answer n in the terminal and try again.",
 };
 
-export const failureText = (reason) => FAILURE_TEXT[reason] ?? `Kopplingen misslyckades (${reason}).`;
+export const failureText = (reason) => FAILURE_TEXT[reason] ?? `Pairing failed (${reason}).`;

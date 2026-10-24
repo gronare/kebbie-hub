@@ -1,7 +1,7 @@
 use std::fmt;
 use std::time::Duration;
 
-use kelpie_hub_api::{ErrorBody, PairingState, PairingView};
+use kelpie_hub_api::{ErrorBody, PLAN_INACTIVE, PairingState, PairingView};
 use reqwest::{Method, RequestBuilder};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -13,6 +13,7 @@ const LONGEST_WAIT: u64 = 25;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HubError {
     Status { status: u16, code: String },
+    PlanInactive { url: Option<String> },
     Transport(String),
 }
 
@@ -20,7 +21,34 @@ impl HubError {
     pub fn status(&self) -> Option<u16> {
         match self {
             HubError::Status { status, .. } => Some(*status),
+            HubError::PlanInactive { .. } => Some(402),
             HubError::Transport(_) => None,
+        }
+    }
+
+    pub fn code(&self) -> Option<&str> {
+        match self {
+            HubError::Status { code, .. } => Some(code),
+            HubError::PlanInactive { .. } => Some(PLAN_INACTIVE),
+            HubError::Transport(_) => None,
+        }
+    }
+
+    pub(crate) async fn from_response(response: reqwest::Response) -> HubError {
+        let status = response.status();
+        let body = response.json::<ErrorBody>().await.ok();
+        match body {
+            Some(body) if status.as_u16() == 402 && body.error == PLAN_INACTIVE => {
+                HubError::PlanInactive { url: body.url }
+            }
+            Some(body) => HubError::Status {
+                status: status.as_u16(),
+                code: body.error,
+            },
+            None => HubError::Status {
+                status: status.as_u16(),
+                code: status.canonical_reason().unwrap_or("error").to_string(),
+            },
         }
     }
 }
@@ -30,6 +58,13 @@ impl fmt::Display for HubError {
         match self {
             HubError::Status { status, code } => {
                 write!(formatter, "the hub answered {status} {code}")
+            }
+            HubError::PlanInactive { url: Some(url) } => write!(
+                formatter,
+                "this machine's account has no active plan; start a subscription at {url}"
+            ),
+            HubError::PlanInactive { url: None } => {
+                formatter.write_str("this machine's account has no active plan")
             }
             HubError::Transport(message) => write!(formatter, "could not reach the hub: {message}"),
         }
@@ -88,17 +123,8 @@ impl HubClient {
             .send()
             .await
             .map_err(|error| HubError::Transport(error.to_string()))?;
-        let status = response.status();
-        if !status.is_success() {
-            let code = response
-                .json::<ErrorBody>()
-                .await
-                .map(|body| body.error)
-                .unwrap_or_else(|_| status.canonical_reason().unwrap_or("error").to_string());
-            return Err(HubError::Status {
-                status: status.as_u16(),
-                code,
-            });
+        if !response.status().is_success() {
+            return Err(HubError::from_response(response).await);
         }
         response
             .json()
@@ -130,6 +156,10 @@ impl HubClient {
         HubClient::send(self.request(Method::PUT, path).json(body)).await
     }
 
+    pub async fn post_empty<B: Serialize>(&self, path: &str, body: &B) -> Result<(), HubError> {
+        HubClient::send_empty(self.request(Method::POST, path).json(body)).await
+    }
+
     pub async fn delete(&self, path: &str) -> Result<(), HubError> {
         HubClient::send_empty(self.request(Method::DELETE, path)).await
     }
@@ -143,19 +173,10 @@ impl HubClient {
             .send()
             .await
             .map_err(|error| HubError::Transport(error.to_string()))?;
-        let status = response.status();
-        if status.is_success() {
+        if response.status().is_success() {
             return Ok(());
         }
-        let code = response
-            .json::<ErrorBody>()
-            .await
-            .map(|body| body.error)
-            .unwrap_or_else(|_| status.canonical_reason().unwrap_or("error").to_string());
-        Err(HubError::Status {
-            status: status.as_u16(),
-            code,
-        })
+        Err(HubError::from_response(response).await)
     }
 
     pub async fn await_pairing(

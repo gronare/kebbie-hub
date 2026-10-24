@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use kelpie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, join};
+use kelpie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, connect, join};
 use kelpie_hub_fakes::{load, save};
 use kelpie_hub_protocol::{Board, Event, Id, Notice, Outcome, Role, Urgency};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -33,6 +33,23 @@ enum Command {
         code: String,
         #[arg(long, default_value = "fake-machine")]
         name: String,
+    },
+    #[command(
+        about = "Connect to a hub without a join code: print a link, wait while someone signs in and approves it"
+    )]
+    Connect {
+        hub: String,
+        #[arg(long, default_value = "fake-machine")]
+        name: String,
+        #[arg(long, default_value_t = 600)]
+        timeout: u64,
+    },
+    #[command(
+        about = "Add a phone: print a link to open on it, then confirm the six digits both show"
+    )]
+    AddDevice {
+        #[arg(long, default_value_t = 600)]
+        timeout: u64,
     },
     #[command(about = "Pair one device: show a code, then confirm the six digits")]
     Pair {
@@ -180,6 +197,52 @@ async fn run(cli: Cli) -> Result<(), String> {
             let state = join(&hub, &code, &name).await.map_err(|e| text(&e))?;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("joined {hub} as {} ({})", state.machine, state.name);
+        }
+        Command::Connect { hub, name, timeout } => {
+            if cli.state.exists() {
+                return Err(format!(
+                    "{} exists; this machine has joined already",
+                    cli.state.display()
+                ));
+            }
+            let pending = connect(&hub, &name).await.map_err(|e| text(&e))?;
+            println!(
+                "Open this link, sign in and press Connect:\n\n    {}\n\nCheck that the page shows {}.",
+                pending.link(),
+                pending.started.user_code
+            );
+            let timeout = Duration::from_secs(timeout);
+            let (mut state, pairing, secret) = pending.wait(timeout).await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("connected to {hub} as {} ({})", state.machine, state.name);
+            if let Some(pairing) = pairing {
+                let device = state
+                    .finish_connect(&pairing, &secret, timeout)
+                    .await
+                    .map_err(|e| text(&e))?;
+                save(&cli.state, &state).map_err(|e| text(&e))?;
+                println!("paired the browser {device}; it receives the next board");
+            }
+        }
+        Command::AddDevice { timeout } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let outcome = state
+                .add_device(
+                    Duration::from_secs(timeout),
+                    |added| {
+                        println!(
+                            "Open this on the phone (or scan it as a QR code):\n\n    {}\n",
+                            added.url
+                        )
+                    },
+                    async |digits: String| {
+                        ask(&format!("Does the phone show {digits}? [y/N] ")).await
+                    },
+                )
+                .await;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            let device = outcome.map_err(|e| text(&e))?;
+            println!("added {device}; it receives the next board");
         }
         Command::Pair { timeout } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

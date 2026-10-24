@@ -119,6 +119,7 @@ pub async fn post_result(
     MachineAuth(machine): MachineAuth,
     Json(upload): Json<ResultUpload>,
 ) -> Result<Json<ResultStored>, ApiError> {
+    hub.require_machine_plan(&machine)?;
     let envelope = &upload.envelope;
     let header = &envelope.header;
     if header.kind != Kind::Result {

@@ -1325,11 +1325,13 @@ dependencies = [
  "p256",
  "reqwest",
  "rusqlite",
+ "rustls-platform-verifier",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "tokio",
+ "tokio-rustls",
  "tower-service",
  "webauthn-authenticator-rs",
  "webauthn-rs",
@@ -1363,6 +1365,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "webauthn-authenticator-rs",
 ]
 
 [[package]]

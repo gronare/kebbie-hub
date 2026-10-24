@@ -1,17 +1,19 @@
+use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
-    BoardStored, BoardUpload, Bytes32, Inbox, JoinRequest, Joined, MachineName, NoticePosted,
-    NoticeUpload, PairingFailure, PairingOpened, PairingRefusal, PairingReply, PairingState,
-    PairingView, ResultStored, ResultUpload,
+    BoardStored, BoardUpload, Bytes32, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING,
+    CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, DeviceAdd, Inbox,
+    JoinRequest, Joined, MachineName, NoticePosted, NoticeUpload, PairingFailure, PairingOpened,
+    PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
 };
 use kelpie_hub_protocol::{
-    AppliedCommands, Board, CommandResult, Dropped, Envelope, Event, Header, Id, Kind, Machine,
-    MachinePairing, Notice, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal, Role,
-    SecretKeys, TrustedDevice, Urgency, authorize, seal,
+    AppliedCommands, Board, CommandResult, ConnectSecret, Dropped, Envelope, Event, Header, Id,
+    Kind, Machine, MachinePairing, Notice, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal,
+    Role, SecretKeys, TrustedDevice, Urgency, authorize, seal,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -112,22 +114,152 @@ pub async fn join(hub: &str, code: &str, name: &str) -> Result<MachineState, Err
             },
         )
         .await?;
-    Ok(MachineState {
-        hub: hub.to_string(),
-        machine: joined.machine,
-        name: name.to_string(),
-        token: joined.token,
+    Ok(MachineState::joined(
+        hub,
+        name,
+        joined.machine,
+        joined.token,
         secret,
-        devices: Vec::new(),
-        last_rev: 0,
-        inbox_seq: 0,
-        board: None,
-        accepts: every_command(),
-        applied: AppliedCommands::default(),
+    ))
+}
+
+pub struct PendingConnect {
+    pub hub: String,
+    pub name: String,
+    secret: KeyFile,
+    pub connect: ConnectSecret,
+    pub started: ConnectStarted,
+    pub interval: u64,
+}
+
+#[derive(Debug)]
+pub enum ConnectError {
+    Hub(HubError),
+    Denied,
+    Expired,
+    TimedOut,
+}
+
+impl fmt::Display for ConnectError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConnectError::Hub(error) => error.fmt(formatter),
+            ConnectError::Denied => {
+                formatter.write_str("the connection was cancelled in the browser")
+            }
+            ConnectError::Expired => formatter.write_str("the code expired; connect again"),
+            ConnectError::TimedOut => formatter.write_str("nobody connected the machine in time"),
+        }
+    }
+}
+
+impl std::error::Error for ConnectError {}
+
+pub enum ConnectPolled {
+    Pending,
+    SlowDown,
+    Connected {
+        machine: Box<MachineState>,
+        pairing: Option<String>,
+    },
+}
+
+pub async fn connect(hub: &str, name: &str) -> Result<PendingConnect, Error> {
+    let secret = KeyFile::generate();
+    let keys = secret.keys().public();
+    let started: ConnectStarted = HubClient::new(hub, None)
+        .post(
+            "/v1/m/connect",
+            &ConnectStart {
+                name: name.to_string(),
+                keys,
+            },
+        )
+        .await?;
+    Ok(PendingConnect {
+        hub: hub.to_string(),
+        name: name.to_string(),
+        connect: ConnectSecret::new(&keys),
+        interval: started.interval,
+        started,
+        secret,
     })
 }
 
+impl PendingConnect {
+    pub fn link(&self) -> String {
+        self.connect.link(&self.started.verification_uri_complete)
+    }
+
+    pub async fn poll(&mut self) -> Result<ConnectPolled, ConnectError> {
+        let answer = HubClient::new(&self.hub, None)
+            .post::<_, Connected>(
+                "/v1/m/connect/token",
+                &ConnectPoll {
+                    device_code: self.started.device_code.clone(),
+                },
+            )
+            .await;
+        match answer {
+            Ok(connected) => Ok(ConnectPolled::Connected {
+                machine: Box::new(MachineState::joined(
+                    &self.hub,
+                    &self.name,
+                    connected.machine,
+                    connected.token,
+                    self.secret.clone(),
+                )),
+                pairing: connected.pairing,
+            }),
+            Err(HubError::Status { status: 400, code }) => match code.as_str() {
+                CONNECT_PENDING => Ok(ConnectPolled::Pending),
+                CONNECT_SLOW_DOWN => {
+                    self.interval += 5;
+                    Ok(ConnectPolled::SlowDown)
+                }
+                CONNECT_DENIED => Err(ConnectError::Denied),
+                CONNECT_EXPIRED => Err(ConnectError::Expired),
+                _ => Err(ConnectError::Hub(HubError::Status { status: 400, code })),
+            },
+            Err(error) => Err(ConnectError::Hub(error)),
+        }
+    }
+
+    pub async fn wait(
+        mut self,
+        timeout: Duration,
+    ) -> Result<(MachineState, Option<String>, ConnectSecret), ConnectError> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let ConnectPolled::Connected { machine, pairing } = self.poll().await? {
+                return Ok((*machine, pairing, self.connect));
+            }
+            let next = Instant::now() + Duration::from_secs(self.interval);
+            if next > deadline {
+                return Err(ConnectError::TimedOut);
+            }
+            tokio::time::sleep_until(next).await;
+        }
+    }
+}
+
 impl MachineState {
+    fn joined(hub: &str, name: &str, machine: Id, token: String, secret: KeyFile) -> MachineState {
+        MachineState {
+            hub: hub.to_string(),
+            machine,
+            name: name.to_string(),
+            token,
+            secret,
+            devices: Vec::new(),
+            last_rev: 0,
+            inbox_seq: 0,
+            board: None,
+            accepts: every_command(),
+            applied: AppliedCommands::default(),
+        }
+    }
+
     pub fn secret(&self) -> SecretKeys {
         self.secret.keys()
     }
@@ -149,10 +281,54 @@ impl MachineState {
     where
         C: AsyncFnOnce(String) -> bool,
     {
-        let client = self.client();
-        let opened: PairingOpened = client.post("/v1/m/pairings", &()).await?;
+        let opened: PairingOpened = self.client().post("/v1/m/pairings", &()).await?;
         show_code(&opened.code);
-        let path = format!("/v1/m/pairings/{}", opened.pairing);
+        self.run_pairing(&opened.pairing, &opened.code, timeout, confirm)
+            .await
+    }
+
+    pub async fn add_device<C>(
+        &mut self,
+        timeout: Duration,
+        show_link: impl FnOnce(&DeviceAdd),
+        confirm: C,
+    ) -> Result<Id, PairError>
+    where
+        C: AsyncFnOnce(String) -> bool,
+    {
+        let added: DeviceAdd = self.client().post("/v1/m/devices/add", &()).await?;
+        show_link(&added);
+        self.run_pairing(&added.pairing, &added.code, timeout, confirm)
+            .await
+    }
+
+    pub async fn finish_connect(
+        &mut self,
+        pairing: &str,
+        connect: &ConnectSecret,
+        timeout: Duration,
+    ) -> Result<Id, PairError> {
+        self.run_pairing(
+            pairing,
+            &connect.pairing_code(),
+            timeout,
+            async |_: String| true,
+        )
+        .await
+    }
+
+    async fn run_pairing<C>(
+        &mut self,
+        pairing_id: &str,
+        code: &str,
+        timeout: Duration,
+        confirm: C,
+    ) -> Result<Id, PairError>
+    where
+        C: AsyncFnOnce(String) -> bool,
+    {
+        let client = self.client();
+        let path = format!("/v1/m/pairings/{pairing_id}");
         let deadline = Instant::now() + timeout;
         let committed = self
             .next_state(&client, &path, PairingState::Open, deadline)
@@ -160,7 +336,7 @@ impl MachineState {
         let commitment = committed
             .commitment
             .ok_or(PairError::Incomplete("the commitment"))?;
-        let pairing = MachinePairing::answer(self.public(), commitment.0, &opened.code);
+        let pairing = MachinePairing::answer(self.public(), commitment.0, code);
         let (keys, nonce) = pairing.reply();
         let _: PairingView = client
             .post(

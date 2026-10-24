@@ -7,11 +7,27 @@ use kelpie_hub_api::ErrorBody;
 pub struct ApiError {
     status: StatusCode,
     code: &'static str,
+    url: Option<String>,
 }
 
 impl ApiError {
     pub fn new(status: StatusCode, code: &'static str) -> ApiError {
-        ApiError { status, code }
+        ApiError {
+            status,
+            code,
+            url: None,
+        }
+    }
+
+    pub fn plan_inactive(billing_url: Option<String>) -> ApiError {
+        ApiError {
+            url: billing_url,
+            ..ApiError::new(StatusCode::PAYMENT_REQUIRED, kelpie_hub_api::PLAN_INACTIVE)
+        }
+    }
+
+    pub fn code(&self) -> &'static str {
+        self.code
     }
 
     pub fn unauthorized() -> ApiError {
@@ -60,6 +76,7 @@ impl IntoResponse for ApiError {
             self.status,
             Json(ErrorBody {
                 error: self.code.to_string(),
+                url: self.url,
             }),
         )
             .into_response()

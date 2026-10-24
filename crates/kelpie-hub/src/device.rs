@@ -40,6 +40,13 @@ pub async fn commit(
         .pairing_by_code(&digest(&code))?
         .filter(|pairing| !pairing.state_at(at).is_final())
         .ok_or_else(ApiError::unauthorized)?;
+    if let (Some(device), Some(owner)) = (&known, store.machine_owner(&pairing.machine)?)
+        && store
+            .device_account(device)?
+            .is_some_and(|account| account != owner)
+    {
+        return Err(ApiError::forbidden("not-your-machine"));
+    }
     if pairing.state_at(at) != PairingState::Open {
         let retried = known.is_some()
             && pairing.device == known

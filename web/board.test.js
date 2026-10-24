@@ -10,14 +10,14 @@ const { parties } = load("keys.json");
 const envelopes = load("envelopes.json");
 const vector = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-a-device");
 const now = envelopes.now;
-const machine = { id: parties.machine.id, keys: parties.machine.public, name: "Kontoret" };
+const machine = { id: parties.machine.id, keys: parties.machine.public, name: "Office" };
 const entry = (changes = {}) => ({ machine: machine.id, name: "devbox", last_seen: now - 5, rev: vector.expect.payload.rev, stored_at: now - 60, envelope: vector.envelope, ...changes });
 const phone = () => importIdentity(parties.phone);
 
 test("a board sealed to this phone opens to the machine's payload", async () => {
   const [opened] = await openBoards([entry()], await phone(), [machine], now);
   assert.equal(opened.problem, null);
-  assert.equal(opened.name, "Kontoret");
+  assert.equal(opened.name, "Office");
   assert.deepEqual(opened.board, vector.expect.payload);
 });
 
@@ -90,7 +90,7 @@ test("a task is found by machine and address", () => {
 
 test("the phone's own name for a machine wins over the hub's", async () => {
   const [named] = await openBoards([entry()], await phone(), [machine], now);
-  assert.equal(named.name, "Kontoret");
+  assert.equal(named.name, "Office");
   const [unnamed] = await openBoards([entry()], await phone(), [{ ...machine, name: null }], now);
   assert.equal(unnamed.name, "devbox");
   const [renamed] = await openBoards([entry({ name: "studio" })], await phone(), [{ ...machine, name: null }], now);
@@ -109,9 +109,9 @@ test("a board older than the newest one read from that machine is refused as a r
 });
 
 test("a phone paired before names followed the hub drops a stored name that is the hub's, and then follows its renames", async () => {
-  const stored = [{ ...machine, name: "devbox" }, { ...machine, id: "mch_other", name: "Kontoret" }];
+  const stored = [{ ...machine, name: "devbox" }, { ...machine, id: "mch_other", name: "Office" }];
   const followed = followHubNames(stored, [entry(), entry({ machine: "mch_other", name: "devbox" })]);
-  assert.deepEqual(followed.map((known) => known.name), [null, "Kontoret"]);
+  assert.deepEqual(followed.map((known) => known.name), [null, "Office"]);
   assert.equal(followHubNames(followed, [entry()]), null, "nothing left to drop changes nothing");
   const [renamed] = await openBoards([entry({ name: "studio" })], await phone(), followed, now);
   assert.equal(renamed.name, "studio");

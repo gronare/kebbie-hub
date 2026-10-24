@@ -5,11 +5,13 @@ use std::process::ExitCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kelpie_hub::store::{KeyStatus, SignalRow, Store, StoredReport};
+use kelpie_hub::mail::{MailSettings, SmtpSecurity, SmtpSettings};
+use kelpie_hub::store::{AdminScope, KeyStatus, SignalRow, Store, StoredReport};
 use kelpie_hub::{
     Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy,
     database_path, mint_admin_token, mint_invite, mint_join_code, serve,
 };
+use kelpie_hub_api::SignupMode;
 use kelpie_hub_protocol::Id;
 
 const DEV_LISTEN: &str = "127.0.0.1:8470";
@@ -70,9 +72,81 @@ struct Cli {
         help = "Leading zero bits a report's proof of work must reach; each bit doubles a sender's work"
     )]
     report_difficulty: u8,
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = Signup::Invite,
+        help = "Who signs up: people with an invite, or anyone who verifies an email address"
+    )]
+    signup: Signup,
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = Plans::Off,
+        help = "With on, a machine works only while its account's plan is active"
+    )]
+    plans: Plans,
+    #[arg(
+        long,
+        value_name = "URL",
+        help = "Where people start a subscription, shown when their plan is inactive"
+    )]
+    billing_url: Option<String>,
+    #[arg(
+        long,
+        help = "SMTP server for sign-up mail; without it the hub logs the links it would send"
+    )]
+    smtp_host: Option<String>,
+    #[arg(long, default_value_t = 587, help = "SMTP port")]
+    smtp_port: u16,
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = Security::Starttls,
+        help = "How to reach the SMTP server; none only for a loopback host"
+    )]
+    smtp_security: Security,
+    #[arg(
+        long,
+        help = "SMTP user; the password comes from KELPIE_HUB_SMTP_PASSWORD"
+    )]
+    smtp_user: Option<String>,
+    #[arg(
+        long,
+        value_name = "ADDRESS",
+        help = "The address sign-up mail comes from"
+    )]
+    mail_from: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Signup {
+    Invite,
+    Open,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Plans {
+    Off,
+    On,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Security {
+    Tls,
+    Starttls,
+    None,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Scope {
+    Reports,
+    Billing,
+}
+
+const SMTP_PASSWORD_ENV: &str = "KELPIE_HUB_SMTP_PASSWORD";
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Proxy {
@@ -96,11 +170,18 @@ enum Admin {
     #[command(about = "Remove a machine, its board, queue and admissions")]
     RemoveMachine { machine: String },
     #[command(
-        about = "Mint a named token that reads and acknowledges allowed reports over the API, or list or revoke them"
+        about = "Mint a named token for the admin API (reports for kelpie's maintainers, billing for a billing service), or list or revoke them"
     )]
     Token {
         #[arg(long, help = "The token's name, such as the machine it goes to")]
         name: Option<String>,
+        #[arg(
+            long,
+            value_enum,
+            default_value_t = Scope::Reports,
+            help = "What the token may do: read and acknowledge reports, or look up accounts and set their plans"
+        )]
+        scope: Scope,
         #[command(subcommand)]
         action: Option<TokenAction>,
     },
@@ -135,15 +216,23 @@ enum TokenAction {
 fn token(
     data: &std::path::Path,
     name: Option<&str>,
+    scope: AdminScope,
     action: Option<&TokenAction>,
 ) -> Result<(), String> {
     let store = open_store(data)?;
     let failed = |error: rusqlite::Error| error.to_string();
     match action {
         Some(TokenAction::List) => {
-            for (name, created, used) in store.admin_tokens().map_err(failed)? {
-                let used = used.map_or("never used".to_string(), |at| format!("used {at}"));
-                println!("{name}  made {created}  {used}");
+            for listed in store.admin_tokens().map_err(failed)? {
+                let used = listed
+                    .last_used
+                    .map_or("never used".to_string(), |at| format!("used {at}"));
+                println!(
+                    "{}  {}  made {}  {used}",
+                    listed.name,
+                    listed.scope.name(),
+                    listed.created_at
+                );
             }
         }
         Some(TokenAction::Revoke { name }) => {
@@ -158,15 +247,20 @@ fn token(
             let name = name.and_then(kelpie_hub::clean_name).ok_or(
                 "kelpie-hub admin token needs --name <name>, such as the machine it goes to",
             )?;
-            let token = mint_admin_token(&store, name)
+            let token = mint_admin_token(&store, name, scope)
                 .map_err(failed)?
                 .ok_or_else(|| {
                     format!("a token named {name} exists; revoke it first or pick another name")
                 })?;
             println!("{token}");
-            eprintln!(
-                "{name}: shown once; it reads and acknowledges allowed reports at /v1/admin/reports"
-            );
+            match scope {
+                AdminScope::Reports => eprintln!(
+                    "{name}: shown once; it reads and acknowledges allowed reports at /v1/admin/reports"
+                ),
+                AdminScope::Billing => eprintln!(
+                    "{name}: shown once; it looks up accounts and sets their plans at /v1/admin/accounts"
+                ),
+            }
         }
     }
     Ok(())
@@ -390,6 +484,36 @@ fn vapid_subject(cli: &Cli) -> Result<String, String> {
     }
 }
 
+fn mail_settings(cli: &Cli) -> Result<MailSettings, String> {
+    let Some(host) = &cli.smtp_host else {
+        return match (cli.signup, cli.dev) {
+            (Signup::Open, false) => Err(
+                "--signup open sends verification mail: pass --smtp-host and --mail-from, or --dev to log the links"
+                    .to_string(),
+            ),
+            _ => Ok(MailSettings::Log),
+        };
+    };
+    let from = cli
+        .mail_from
+        .clone()
+        .ok_or("--smtp-host needs --mail-from <address>")?;
+    Ok(MailSettings::Smtp(SmtpSettings {
+        host: host.clone(),
+        port: cli.smtp_port,
+        security: match cli.smtp_security {
+            Security::Tls => SmtpSecurity::Tls,
+            Security::Starttls => SmtpSecurity::StartTls,
+            Security::None => SmtpSecurity::Plain,
+        },
+        user: cli.smtp_user.clone(),
+        password: std::env::var(SMTP_PASSWORD_ENV)
+            .ok()
+            .filter(|value| !value.is_empty()),
+        from,
+    }))
+}
+
 fn open_store(data: &std::path::Path) -> Result<Store, String> {
     Store::open(&database_path(data)).map_err(|error| error.to_string())
 }
@@ -431,8 +555,16 @@ async fn run(cli: Cli) -> Result<(), String> {
             }
             Ok(())
         }
-        Some(Command::Admin(Admin::Token { name, action })) => {
-            token(&data, name.as_deref(), action.as_ref())
+        Some(Command::Admin(Admin::Token {
+            name,
+            scope,
+            action,
+        })) => {
+            let scope = match scope {
+                Scope::Reports => AdminScope::Reports,
+                Scope::Billing => AdminScope::Billing,
+            };
+            token(&data, name.as_deref(), scope, action.as_ref())
         }
         Some(Command::Admin(Admin::Reports {
             quarantine,
@@ -481,6 +613,13 @@ async fn run(cli: Cli) -> Result<(), String> {
             config.trusted_proxy = cli
                 .trusted_proxy
                 .map(|Proxy::Cloudflare| TrustedProxy::Cloudflare);
+            config.signup = match cli.signup {
+                Signup::Invite => SignupMode::Invite,
+                Signup::Open => SignupMode::Open,
+            };
+            config.plans = matches!(cli.plans, Plans::On);
+            config.billing_url = cli.billing_url.clone();
+            config.mail = mail_settings(&cli)?;
             let hub = Hub::open(config).map_err(|error| error.to_string())?;
             let listener = tokio::net::TcpListener::bind(address)
                 .await
@@ -490,6 +629,11 @@ async fn run(cli: Cli) -> Result<(), String> {
                 "kelpie-hub listening on http://{address} with data in {}",
                 data.display()
             );
+            if let Some(url) = hub.setup_url() {
+                eprintln!(
+                    "kelpie-hub: no account yet. Create the owner account, once, at:\n\n    {url}\n"
+                );
+            }
             serve(listener, hub, shutdown)
                 .await
                 .map_err(|error| error.to_string())

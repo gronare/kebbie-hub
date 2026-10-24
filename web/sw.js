@@ -1,8 +1,8 @@
 import { identity, loadDevice, loadMachines } from "./keystore.js";
 import { FALLBACK, openNotice } from "./notice.js";
 
-const SHELL = "kelpie-shell-v1";
-const FILES = ["/", "/app.css", "/app.js", "/board.js", "/hub.js", "/keystore.js", "/pairing.js", "/passkey.js", "/notice.js", "/js/protocol.js", "/js/hpke.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
+const SHELL = "kelpie-shell-v2";
+const FILES = ["/", "/app.css", "/app.js", "/board.js", "/connect.js", "/pages.js", "/hub.js", "/keystore.js", "/pairing.js", "/passkey.js", "/notice.js", "/js/protocol.js", "/js/hpke.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));

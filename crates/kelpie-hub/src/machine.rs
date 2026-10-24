@@ -71,6 +71,7 @@ pub async fn put_board(
     MachineAuth(machine): MachineAuth,
     Json(upload): Json<BoardUpload>,
 ) -> Result<Json<BoardStored>, ApiError> {
+    hub.require_machine_plan(&machine)?;
     if upload.rev > MAX_STORED_INTEGER {
         return Err(ApiError::bad_request("rev-out-of-range"));
     }
@@ -119,6 +120,7 @@ pub async fn inbox(
     MachineAuth(machine): MachineAuth,
     Query(query): Query<InboxQuery>,
 ) -> Result<Json<Inbox>, ApiError> {
+    hub.require_machine_plan(&machine)?;
     if query.after > MAX_STORED_INTEGER {
         return Err(ApiError::bad_request("after-out-of-range"));
     }
@@ -150,22 +152,29 @@ pub async fn inbox(
     }))
 }
 
+impl Hub {
+    pub(crate) fn open_pairing_for(&self, machine: &Id) -> Result<PairingOpened, ApiError> {
+        let id = URL_SAFE_NO_PAD.encode(random::<16>());
+        let code = code_from_random(random());
+        let at = now();
+        let expires_at = at + self.config.pairing_ttl;
+        let store = self.store();
+        store.open_pairing(&id, machine, &digest(&code), at, expires_at)?;
+        store.log(at, "pairing.opened", Some(machine), None, None)?;
+        Ok(PairingOpened {
+            pairing: id,
+            code,
+            expires_at,
+        })
+    }
+}
+
 pub async fn open_pairing(
     State(hub): State<Arc<Hub>>,
     MachineAuth(machine): MachineAuth,
 ) -> Result<Json<PairingOpened>, ApiError> {
-    let id = URL_SAFE_NO_PAD.encode(random::<16>());
-    let code = code_from_random(random());
-    let at = now();
-    let expires_at = at + hub.config.pairing_ttl;
-    let store = hub.store();
-    store.open_pairing(&id, &machine, &digest(&code), at, expires_at)?;
-    store.log(at, "pairing.opened", Some(&machine), None, None)?;
-    Ok(Json(PairingOpened {
-        pairing: id,
-        code,
-        expires_at,
-    }))
+    hub.require_machine_plan(&machine)?;
+    Ok(Json(hub.open_pairing_for(&machine)?))
 }
 
 fn own_pairing(store: &Store, machine: &Id, id: &str) -> Result<Pairing, ApiError> {

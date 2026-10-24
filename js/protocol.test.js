@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { checkPayload, checkShape, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, openEnvelope, pairingCommitment, pairingNonce, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { checkPayload, checkShape, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, machineFingerprint, openEnvelope, pairingCommitment, pairingNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -104,6 +104,18 @@ test("pairing commits before the comparison code and refuses a different reveal"
       assert.equal(await failure(revealed), vector.expect.error, vector.name);
     }
   }
+});
+
+test("a connect link names its machine and the browser commits to its secret", async () => {
+  const vector = load("pairing.json").connect;
+  const machine = parties[vector.machine].public;
+  assert.equal(await machineFingerprint(machine), vector.fingerprint);
+  assert.equal(await machineFingerprint(parties.intruder.public), vector.other_fingerprint);
+  const parsed = parseConnectFragment(new URL(vector.link).hash);
+  assert.deepEqual(parsed, { code: vector.code, fingerprint: vector.fingerprint });
+  const commitment = await pairingCommitment(parties[vector.device].public, fromB64(vector.device_nonce), parsed.code);
+  assert.equal(toB64(commitment), vector.commitment);
+  for (const broken of ["", "#k=AAAA&m=BBBB", `#k=${vector.code}`, `#m=${vector.fingerprint}`, "#k=!!&m=??"]) assert.equal(parseConnectFragment(broken), null, broken);
 });
 
 test("a pairing nonce is 32 fresh bytes", () => {

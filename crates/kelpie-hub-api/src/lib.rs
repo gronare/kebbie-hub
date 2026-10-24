@@ -93,7 +93,11 @@ pub fn normalize_code(typed: &str) -> Option<String> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ErrorBody {
     pub error: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
+
+pub const PLAN_INACTIVE: &str = "plan-inactive";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JoinRequest {
@@ -293,10 +297,15 @@ pub struct Boards {
     pub boards: Vec<BoardEntry>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RegisterBegin {
+    #[serde(default)]
     pub invite: String,
     pub handle: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -335,6 +344,94 @@ pub struct AccountView {
     pub account: String,
     pub handle: String,
     pub created_at: u64,
+    #[serde(default)]
+    pub owner: bool,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub plan: PlanView,
+    #[serde(default)]
+    pub billing_url: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PlanStatus {
+    #[default]
+    Active,
+    Inactive,
+}
+
+impl PlanStatus {
+    pub fn name(self) -> &'static str {
+        match self {
+            PlanStatus::Active => "active",
+            PlanStatus::Inactive => "inactive",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<PlanStatus> {
+        [PlanStatus::Active, PlanStatus::Inactive]
+            .into_iter()
+            .find(|status| status.name() == name)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlanView {
+    pub status: PlanStatus,
+    pub until: Option<u64>,
+    pub entitled: bool,
+}
+
+impl Default for PlanView {
+    fn default() -> PlanView {
+        PlanView {
+            status: PlanStatus::Active,
+            until: None,
+            entitled: true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanUpdate {
+    pub status: PlanStatus,
+    #[serde(default)]
+    pub until: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountPlan {
+    pub account: String,
+    pub handle: String,
+    pub email: Option<String>,
+    pub plan: PlanView,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SignupMode {
+    Invite,
+    Open,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HubInfo {
+    pub signup: SignupMode,
+    pub plans: bool,
+    pub needs_setup: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EmailSignup {
+    pub email: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedEmail {
+    pub email: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -492,6 +589,196 @@ pub struct SignalUpload {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalsAccepted {
     pub rows: usize,
+}
+
+pub const CONNECT_PENDING: &str = "authorization_pending";
+pub const CONNECT_SLOW_DOWN: &str = "slow_down";
+pub const CONNECT_DENIED: &str = "access_denied";
+pub const CONNECT_EXPIRED: &str = "expired_token";
+pub const CONNECT_UNKNOWN: &str = "invalid_grant";
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConnectStart {
+    pub name: String,
+    pub keys: PublicKeys,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectStarted {
+    pub device_code: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub verification_uri_complete: String,
+    pub interval: u64,
+    pub expires_in: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConnectPoll {
+    pub device_code: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Connected {
+    pub machine: Id,
+    pub token: String,
+    pub pairing: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConnectState {
+    Pending,
+    Approved,
+    Denied,
+}
+
+impl ConnectState {
+    pub fn name(self) -> &'static str {
+        match self {
+            ConnectState::Pending => "pending",
+            ConnectState::Approved => "approved",
+            ConnectState::Denied => "denied",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<ConnectState> {
+        [
+            ConnectState::Pending,
+            ConnectState::Approved,
+            ConnectState::Denied,
+        ]
+        .into_iter()
+        .find(|state| state.name() == name)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectRequestView {
+    pub code: String,
+    pub name: String,
+    pub state: ConnectState,
+    pub expires_at: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConnectApproval {
+    pub code: String,
+    #[serde(default)]
+    pub device: Option<Id>,
+    #[serde(default)]
+    pub commitment: Option<Bytes32>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectApproved {
+    pub machine: Id,
+    pub name: String,
+    pub pairing: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConnectDenial {
+    pub code: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceAdd {
+    pub pairing: String,
+    pub code: String,
+    pub url: String,
+    pub expires_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AddView {
+    pub machine: Id,
+    pub name: String,
+    pub expires_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InviteLink {
+    pub code: String,
+    pub url: String,
+    pub expires_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdminOverview {
+    pub accounts: u64,
+    pub machines: u64,
+    pub devices: u64,
+    pub reports: u64,
+    pub quarantined: u64,
+    pub signals_this_week: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdminAccount {
+    pub account: String,
+    pub handle: String,
+    pub email: Option<String>,
+    pub owner: bool,
+    pub created_at: u64,
+    pub deactivated_at: Option<u64>,
+    pub plan: PlanView,
+    pub machines: u64,
+    pub devices: u64,
+    pub last_seen: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminAccounts {
+    pub accounts: Vec<AdminAccount>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdminMachine {
+    pub machine: Id,
+    pub name: String,
+    pub owner: Option<String>,
+    pub joined_at: u64,
+    pub last_seen: Option<u64>,
+    pub devices: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminMachines {
+    pub machines: Vec<AdminMachine>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdminReport {
+    pub id: u64,
+    pub key: Bytes32,
+    pub status: String,
+    pub received_at: u64,
+    pub acked_at: Option<u64>,
+    pub report: BugReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminReports {
+    pub reports: Vec<AdminReport>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdminSignal {
+    pub day: u64,
+    pub version: String,
+    pub commit: String,
+    pub os: String,
+    pub arch: String,
+    pub component: String,
+    pub kind: String,
+    pub vetted: bool,
+    pub count: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdminSignals {
+    pub signals: Vec<AdminSignal>,
 }
 
 pub const EVENT_BOARD: &str = "board";

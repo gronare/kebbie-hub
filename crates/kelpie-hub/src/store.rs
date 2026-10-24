@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use kelpie_hub_api::{PairingFailure, PairingState};
+use kelpie_hub_api::{ConnectState, PairingFailure, PairingState, PlanStatus};
 use kelpie_hub_protocol::{BugReport, ErrorSignals, Header, Id, PublicKeys};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
@@ -209,8 +209,63 @@ CREATE TABLE IF NOT EXISTS signal_senders (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 6;
-const UPGRADES: &[(i64, &str)] = &[(5, REPORTS_SCHEMA), (6, SIGNALS_SCHEMA)];
+const CONNECT_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS connects (
+    device_code_hash BLOB PRIMARY KEY,
+    user_code_hash BLOB NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    signing_key BLOB NOT NULL,
+    encryption_key BLOB NOT NULL,
+    state TEXT NOT NULL,
+    account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+    machine_id TEXT,
+    pairing_id TEXT,
+    poll_interval INTEGER NOT NULL,
+    polled_at INTEGER,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+";
+
+const CONNECT_COLUMNS: &[(&str, &str, &str)] = &[
+    ("accounts", "role", "TEXT NOT NULL DEFAULT 'member'"),
+    ("accounts", "plan", "TEXT NOT NULL DEFAULT 'inactive'"),
+    ("accounts", "plan_until", "INTEGER"),
+    ("accounts", "deactivated_at", "INTEGER"),
+    (
+        "machines",
+        "account_id",
+        "TEXT REFERENCES accounts(id) ON DELETE SET NULL",
+    ),
+    ("invites", "kind", "TEXT NOT NULL DEFAULT 'invite'"),
+    ("invites", "email", "TEXT"),
+    ("admin_tokens", "scope", "TEXT NOT NULL DEFAULT 'reports'"),
+];
+
+fn add_columns(connection: &Connection, columns: &[(&str, &str, &str)]) -> Result<Vec<String>> {
+    let mut added = Vec::new();
+    for (table, column, definition) in columns {
+        let present: bool = connection.query_row(
+            &format!("SELECT EXISTS (SELECT 1 FROM pragma_table_info('{table}') WHERE name = ?1)"),
+            [column],
+            |row| row.get(0),
+        )?;
+        if !present {
+            connection.execute_batch(&format!(
+                "ALTER TABLE {table} ADD COLUMN {column} {definition}"
+            ))?;
+            added.push(format!("{table}.{column}"));
+        }
+    }
+    Ok(added)
+}
+
+const SCHEMA_VERSION: i64 = 7;
+const UPGRADES: &[(i64, &str)] = &[
+    (5, REPORTS_SCHEMA),
+    (6, SIGNALS_SCHEMA),
+    (7, CONNECT_SCHEMA),
+];
 pub const REPORT_KEEP_SECONDS: u64 = 30 * 86_400;
 pub const SIGNAL_KEEP_DAYS: u64 = 180;
 pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
@@ -356,13 +411,18 @@ impl Store {
         }
         let mut connection = connection;
         let tx = connection.transaction()?;
-        if fresh || version == SCHEMA_VERSION {
+        if fresh {
             tx.execute_batch(SCHEMA)?;
-            tx.execute_batch(REPORTS_SCHEMA)?;
-            tx.execute_batch(SIGNALS_SCHEMA)?;
-        } else {
-            for (_, upgrade) in UPGRADES.iter().filter(|(to, _)| *to > version) {
-                tx.execute_batch(upgrade)?;
+        }
+        let from = if fresh { 4 } else { version };
+        for (to, upgrade) in UPGRADES.iter().filter(|(to, _)| *to > from) {
+            tx.execute_batch(upgrade)?;
+            if *to == 7
+                && add_columns(&tx, CONNECT_COLUMNS)?
+                    .iter()
+                    .any(|added| added == "accounts.plan")
+            {
+                tx.execute("UPDATE accounts SET plan = 'active'", [])?;
             }
         }
         tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -407,7 +467,9 @@ impl Store {
     pub fn machine_by_token(&self, token_hash: &[u8]) -> Result<Option<Id>> {
         self.connection
             .query_row(
-                "SELECT id FROM machines WHERE token_hash = ?1",
+                "SELECT id FROM machines WHERE token_hash = ?1 AND NOT EXISTS (
+                     SELECT 1 FROM accounts WHERE accounts.id = machines.account_id
+                         AND accounts.deactivated_at IS NOT NULL)",
                 [token_hash],
                 |row| id_at(row, 0),
             )
@@ -427,7 +489,9 @@ impl Store {
     pub fn device_by_token(&self, token_hash: &[u8]) -> Result<Option<Id>> {
         self.connection
             .query_row(
-                "SELECT id FROM devices WHERE token_hash = ?1",
+                "SELECT id FROM devices WHERE token_hash = ?1 AND NOT EXISTS (
+                     SELECT 1 FROM accounts WHERE accounts.id = devices.account_id
+                         AND accounts.deactivated_at IS NOT NULL)",
                 [token_hash],
                 |row| id_at(row, 0),
             )
@@ -998,7 +1062,10 @@ impl Store {
 
     pub fn machines(&self) -> Result<Vec<MachineRow>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, name, joined_at, last_seen FROM machines ORDER BY joined_at, id",
+            "SELECT machines.id, machines.name, machines.joined_at, machines.last_seen, accounts.handle
+             FROM machines LEFT JOIN accounts ON accounts.id = machines.account_id
+             WHERE NOT EXISTS (SELECT 1 FROM connects WHERE connects.machine_id = machines.id)
+             ORDER BY machines.joined_at, machines.id",
         )?;
         statement
             .query_map([], |row| {
@@ -1007,6 +1074,7 @@ impl Store {
                     name: row.get(1)?,
                     joined_at: row.get(2)?,
                     last_seen: row.get(3)?,
+                    owner: row.get(4)?,
                 })
             })?
             .collect()
@@ -1020,12 +1088,244 @@ impl Store {
         Ok(())
     }
 
-    pub fn invite_valid(&self, code_hash: &[u8], now: u64) -> Result<bool> {
+    pub fn add_ticket(
+        &self,
+        code_hash: &[u8],
+        kind: Ticket,
+        email: Option<&str>,
+        expires_at: u64,
+    ) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO invites (code_hash, expires_at, kind, email) VALUES (?1, ?2, ?3, ?4)",
+            params![code_hash, expires_at, kind.name(), email],
+        )?;
+        Ok(())
+    }
+
+    pub fn replace_setup_ticket(&self, code_hash: &[u8], expires_at: u64) -> Result<()> {
+        let tx = self.connection.unchecked_transaction()?;
+        tx.execute("DELETE FROM invites WHERE kind = 'owner'", [])?;
+        tx.execute(
+            "INSERT INTO invites (code_hash, expires_at, kind) VALUES (?1, ?2, 'owner')",
+            params![code_hash, expires_at],
+        )?;
+        tx.commit()
+    }
+
+    pub fn ticket(&self, code_hash: &[u8], now: u64) -> Result<Option<(Ticket, Option<String>)>> {
+        self.connection
+            .query_row(
+                "SELECT kind, email FROM invites WHERE code_hash = ?1 AND expires_at > ?2",
+                params![code_hash, now],
+                |row| {
+                    let kind =
+                        Ticket::parse(&row.get::<_, String>(0)?).ok_or_else(|| corrupt(0))?;
+                    Ok((kind, row.get(1)?))
+                },
+            )
+            .optional()
+    }
+
+    pub fn account_count(&self) -> Result<u64> {
+        self.connection
+            .query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))
+    }
+
+    pub fn email_taken(&self, email: &str) -> Result<bool> {
         self.connection.query_row(
-            "SELECT EXISTS (SELECT 1 FROM invites WHERE code_hash = ?1 AND expires_at > ?2)",
-            params![code_hash, now],
+            "SELECT EXISTS (SELECT 1 FROM accounts WHERE email = ?1)",
+            [email],
             |row| row.get(0),
         )
+    }
+
+    pub fn account_by_email(&self, email: &str) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT id FROM accounts WHERE email = ?1 AND email_verified_at IS NOT NULL",
+                [email],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn set_plan(&self, account: &str, status: PlanStatus, until: Option<u64>) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE accounts SET plan = ?2, plan_until = ?3 WHERE id = ?1",
+            params![account, status.name(), until],
+        )? > 0)
+    }
+
+    pub fn set_deactivated(&self, account: &str, at: Option<u64>) -> Result<bool> {
+        let tx = self.connection.unchecked_transaction()?;
+        let changed = tx.execute(
+            "UPDATE accounts SET deactivated_at = ?2 WHERE id = ?1 AND role != 'owner'",
+            params![account, at],
+        )? > 0;
+        if changed && at.is_some() {
+            tx.execute("DELETE FROM sessions WHERE account_id = ?1", [account])?;
+        }
+        tx.commit()?;
+        Ok(changed)
+    }
+
+    pub fn machine_owner(&self, machine: &Id) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT account_id FROM machines WHERE id = ?1",
+                [machine.as_str()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map(Option::flatten)
+    }
+
+    pub fn device_account(&self, device: &Id) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT account_id FROM devices WHERE id = ?1",
+                [device.as_str()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map(Option::flatten)
+    }
+
+    pub fn create_connect(&self, new: &NewConnect<'_>) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO connects (device_code_hash, user_code_hash, name, signing_key, encryption_key,
+                                   state, poll_interval, created_at, expires_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6, ?7, ?8)",
+            params![
+                new.device_code_hash,
+                new.user_code_hash,
+                new.name,
+                new.keys.signing,
+                new.keys.encryption,
+                new.interval,
+                new.now,
+                new.expires_at
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn connects_where(&self, filter: &str, hash: &[u8]) -> Result<Option<Connect>> {
+        connect_where(&self.connection, filter, hash)
+    }
+
+    pub fn connect_by_device_code(&self, hash: &[u8]) -> Result<Option<Connect>> {
+        self.connects_where("device_code_hash", hash)
+    }
+
+    pub fn connect_by_user_code(&self, hash: &[u8]) -> Result<Option<Connect>> {
+        self.connects_where("user_code_hash", hash)
+    }
+
+    pub fn polled_connect(&self, device_code_hash: &[u8], now: u64, interval: u64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE connects SET polled_at = ?2, poll_interval = ?3 WHERE device_code_hash = ?1",
+            params![device_code_hash, now, interval],
+        )?;
+        Ok(())
+    }
+
+    pub fn approve_connect(&mut self, approval: &ConnectApproval<'_>) -> Result<Option<Connect>> {
+        let tx = self.connection.transaction()?;
+        let changed = tx.execute(
+            "UPDATE connects SET state = 'approved', account_id = ?3, machine_id = ?4, pairing_id = ?5
+             WHERE user_code_hash = ?1 AND state = 'pending' AND expires_at > ?2",
+            params![
+                approval.user_code_hash,
+                approval.now,
+                approval.account,
+                approval.machine.as_str(),
+                approval.pairing.map(|pairing| pairing.id)
+            ],
+        )?;
+        if changed == 0 {
+            return Ok(None);
+        }
+        let (name, keys) = tx.query_row(
+            "SELECT name, signing_key, encryption_key FROM connects WHERE user_code_hash = ?1",
+            [approval.user_code_hash],
+            |row| Ok((row.get::<_, String>(0)?, keys_at(row, 1)?)),
+        )?;
+        tx.execute(
+            "INSERT INTO machines (id, name, signing_key, encryption_key, token_hash, joined_at, account_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                approval.machine.as_str(),
+                name,
+                keys.signing,
+                keys.encryption,
+                approval.placeholder_token_hash,
+                approval.now,
+                approval.account
+            ],
+        )?;
+        if let Some(pairing) = approval.pairing {
+            tx.execute(
+                "INSERT INTO pairings (id, machine_id, code_hash, state, device_id, commitment, opened_at, expires_at)
+                 VALUES (?1, ?2, ?3, 'committed', ?4, ?5, ?6, ?7)",
+                params![
+                    pairing.id,
+                    approval.machine.as_str(),
+                    pairing.code_hash,
+                    pairing.device.as_str(),
+                    pairing.commitment.as_slice(),
+                    approval.now,
+                    pairing.expires_at
+                ],
+            )?;
+        }
+        let connect = connect_where(&tx, "user_code_hash", approval.user_code_hash)?;
+        tx.commit()?;
+        Ok(connect)
+    }
+
+    pub fn deny_connect(&self, user_code_hash: &[u8], now: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE connects SET state = 'denied'
+             WHERE user_code_hash = ?1 AND state = 'pending' AND expires_at > ?2",
+            params![user_code_hash, now],
+        )? > 0)
+    }
+
+    pub fn end_connect(&self, device_code_hash: &[u8]) -> Result<()> {
+        self.connection.execute(
+            "DELETE FROM connects WHERE device_code_hash = ?1",
+            [device_code_hash],
+        )?;
+        Ok(())
+    }
+
+    pub fn redeem_connect(
+        &mut self,
+        device_code_hash: &[u8],
+        token_hash: &[u8],
+        now: u64,
+    ) -> Result<Option<(Id, Option<String>)>> {
+        let tx = self.connection.transaction()?;
+        let taken: Option<(String, Option<String>)> = tx
+            .query_row(
+                "DELETE FROM connects
+                 WHERE device_code_hash = ?1 AND state = 'approved' AND expires_at > ?2
+                 RETURNING machine_id, pairing_id",
+                params![device_code_hash, now],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let Some((machine, pairing)) = taken else {
+            return Ok(None);
+        };
+        let machine = Id::parse(&machine).map_err(|_| corrupt(0))?;
+        tx.execute(
+            "UPDATE machines SET token_hash = ?2, last_seen = ?3 WHERE id = ?1",
+            params![machine.as_str(), token_hash, now],
+        )?;
+        tx.commit()?;
+        Ok(Some((machine, pairing)))
     }
 
     pub fn handle_taken(&self, handle: &str) -> Result<bool> {
@@ -1049,19 +1349,9 @@ impl Store {
     pub fn account(&self, account: &str) -> Result<Option<AccountRow>> {
         self.connection
             .query_row(
-                "SELECT id, handle, user_handle, created_at FROM accounts WHERE id = ?1",
+                &format!("SELECT {ACCOUNT_COLUMNS} FROM accounts WHERE id = ?1"),
                 [account],
-                |row| {
-                    Ok(AccountRow {
-                        id: row.get(0)?,
-                        handle: row.get(1)?,
-                        user_handle: row
-                            .get::<_, Vec<u8>>(2)?
-                            .try_into()
-                            .map_err(|_| corrupt(2))?,
-                        created_at: row.get(3)?,
-                    })
-                },
+                account_row,
             )
             .optional()
     }
@@ -1119,12 +1409,33 @@ impl Store {
 
     pub fn sign_up(&mut self, signup: &SignUp<'_>) -> Result<SignUpOutcome> {
         let tx = self.connection.transaction()?;
-        let spent = tx.execute(
-            "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2",
-            params![signup.invite_hash, signup.now],
-        )?;
-        if spent == 0 {
+        let spent: Option<(String, Option<String>)> = tx
+            .query_row(
+                "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2 RETURNING kind, email",
+                params![signup.invite_hash, signup.now],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let Some((kind, email)) = spent else {
             return Ok(SignUpOutcome::InviteSpent);
+        };
+        let kind = Ticket::parse(&kind).ok_or_else(|| corrupt(0))?;
+        if kind == Ticket::Owner {
+            let accounts: u64 =
+                tx.query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))?;
+            if accounts > 0 {
+                return Ok(SignUpOutcome::InviteSpent);
+            }
+        }
+        if let Some(email) = &email {
+            let held: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM accounts WHERE email = ?1)",
+                [email],
+                |row| row.get(0),
+            )?;
+            if held {
+                return Ok(SignUpOutcome::EmailTaken);
+            }
         }
         let taken: bool = tx.query_row(
             "SELECT EXISTS (SELECT 1 FROM accounts WHERE handle = ?1)",
@@ -1142,13 +1453,21 @@ impl Store {
         if reused {
             return Ok(SignUpOutcome::CredentialTaken);
         }
+        let role = if kind == Ticket::Owner {
+            "owner"
+        } else {
+            "member"
+        };
         tx.execute(
-            "INSERT INTO accounts (id, handle, user_handle, created_at) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO accounts (id, handle, user_handle, created_at, role, email, email_verified_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, CASE WHEN ?6 IS NULL THEN NULL ELSE ?4 END)",
             params![
                 signup.account,
                 signup.handle,
                 signup.user_handle.to_vec(),
-                signup.now
+                signup.now,
+                role,
+                email
             ],
         )?;
         tx.execute(
@@ -1167,7 +1486,7 @@ impl Store {
             params![signup.session_hash, signup.account, signup.now, signup.session_expires_at],
         )?;
         tx.commit()?;
-        Ok(SignUpOutcome::Created)
+        Ok(SignUpOutcome::Created(kind))
     }
 
     pub fn passkeys(&self, account: &str) -> Result<Vec<StoredPasskey>> {
@@ -1260,11 +1579,18 @@ impl Store {
     }
 
     pub fn session_account(&self, token_hash: &[u8], now: u64) -> Result<Option<String>> {
+        Ok(self.session(token_hash, now)?.map(|(account, _)| account))
+    }
+
+    pub fn session(&self, token_hash: &[u8], now: u64) -> Result<Option<(String, u64)>> {
         self.connection
             .query_row(
-                "SELECT account_id FROM sessions WHERE token_hash = ?1 AND expires_at > ?2",
+                "SELECT sessions.account_id, sessions.created_at FROM sessions
+                 JOIN accounts ON accounts.id = sessions.account_id
+                 WHERE sessions.token_hash = ?1 AND sessions.expires_at > ?2
+                     AND accounts.deactivated_at IS NULL",
                 params![token_hash, now],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()
     }
@@ -1600,28 +1926,94 @@ impl Store {
             .collect()
     }
 
-    pub fn add_admin_token(&self, token_hash: &[u8], name: &str, now: u64) -> Result<bool> {
+    pub fn add_admin_token(
+        &self,
+        token_hash: &[u8],
+        name: &str,
+        scope: AdminScope,
+        now: u64,
+    ) -> Result<bool> {
         Ok(self.connection.execute(
-            "INSERT INTO admin_tokens (token_hash, name, created_at) VALUES (?1, ?2, ?3)
+            "INSERT INTO admin_tokens (token_hash, name, created_at, scope) VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT (name) DO NOTHING",
-            params![token_hash, name, now],
+            params![token_hash, name, now, scope.name()],
         )? > 0)
     }
 
-    pub fn admin_token_valid(&self, token_hash: &[u8], now: u64) -> Result<bool> {
-        Ok(self.connection.execute(
-            "UPDATE admin_tokens SET last_used = ?2 WHERE token_hash = ?1",
-            params![token_hash, now],
-        )? > 0)
+    pub fn admin_token_scope(&self, token_hash: &[u8], now: u64) -> Result<Option<AdminScope>> {
+        self.connection
+            .query_row(
+                "UPDATE admin_tokens SET last_used = ?2 WHERE token_hash = ?1 RETURNING scope",
+                params![token_hash, now],
+                |row| AdminScope::parse(&row.get::<_, String>(0)?).ok_or_else(|| corrupt(0)),
+            )
+            .optional()
     }
 
-    pub fn admin_tokens(&self) -> Result<Vec<(String, u64, Option<u64>)>> {
+    pub fn admin_tokens(&self) -> Result<Vec<AdminToken>> {
         let mut statement = self.connection.prepare(
-            "SELECT name, created_at, last_used FROM admin_tokens ORDER BY created_at, name",
+            "SELECT name, scope, created_at, last_used FROM admin_tokens ORDER BY created_at, name",
         )?;
         statement
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .query_map([], |row| {
+                Ok(AdminToken {
+                    name: row.get(0)?,
+                    scope: AdminScope::parse(&row.get::<_, String>(1)?)
+                        .ok_or_else(|| corrupt(1))?,
+                    created_at: row.get(2)?,
+                    last_used: row.get(3)?,
+                })
+            })?
             .collect()
+    }
+
+    pub fn counts(&self) -> Result<(u64, u64, u64)> {
+        self.connection.query_row(
+            "SELECT (SELECT count(*) FROM accounts), (SELECT count(*) FROM machines
+                 WHERE NOT EXISTS (SELECT 1 FROM connects WHERE connects.machine_id = machines.id)),
+                    (SELECT count(*) FROM devices)",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+    }
+
+    pub fn allowed_unacked_count(&self) -> Result<u64> {
+        self.connection.query_row(
+            "SELECT count(*) FROM reports JOIN report_keys ON report_keys.key = reports.key
+             WHERE report_keys.status = 'allowed' AND reports.acked_at IS NULL",
+            [],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn admin_accounts(&self) -> Result<Vec<AdminAccountRow>> {
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT {ACCOUNT_COLUMNS},
+                    (SELECT count(*) FROM machines WHERE machines.account_id = accounts.id),
+                    (SELECT count(*) FROM devices WHERE devices.account_id = accounts.id),
+                    max(coalesce((SELECT max(last_seen) FROM machines WHERE machines.account_id = accounts.id), 0),
+                        coalesce((SELECT max(last_seen) FROM devices WHERE devices.account_id = accounts.id), 0))
+             FROM accounts ORDER BY created_at, id"
+        ))?;
+        statement
+            .query_map([], |row| {
+                let last_seen: u64 = row.get(ACCOUNT_COLUMN_COUNT + 2)?;
+                Ok(AdminAccountRow {
+                    account: account_row(row)?,
+                    machines: row.get(ACCOUNT_COLUMN_COUNT)?,
+                    devices: row.get(ACCOUNT_COLUMN_COUNT + 1)?,
+                    last_seen: (last_seen > 0).then_some(last_seen),
+                })
+            })?
+            .collect()
+    }
+
+    pub fn admitted_count(&self, machine: &Id) -> Result<u64> {
+        self.connection.query_row(
+            "SELECT count(*) FROM admissions WHERE machine_id = ?1",
+            [machine.as_str()],
+            |row| row.get(0),
+        )
     }
 
     pub fn revoke_admin_token(&self, name: &str) -> Result<bool> {
@@ -1632,6 +2024,13 @@ impl Store {
     }
 
     pub fn sweep(&self, now: u64) -> Result<Sweep> {
+        self.connection.execute(
+            "DELETE FROM machines WHERE id IN (
+                 SELECT machine_id FROM connects WHERE expires_at <= ?1 AND machine_id IS NOT NULL)",
+            [now],
+        )?;
+        self.connection
+            .execute("DELETE FROM connects WHERE expires_at <= ?1", [now])?;
         self.connection
             .execute("DELETE FROM join_codes WHERE expires_at <= ?1", [now])?;
         self.connection
@@ -1786,6 +2185,7 @@ pub struct MachineRow {
     pub name: String,
     pub joined_at: u64,
     pub last_seen: Option<u64>,
+    pub owner: Option<String>,
 }
 
 pub struct AccountRow {
@@ -1793,6 +2193,130 @@ pub struct AccountRow {
     pub handle: String,
     pub user_handle: [u8; 16],
     pub created_at: u64,
+    pub owner: bool,
+    pub email: Option<String>,
+    pub plan: PlanStatus,
+    pub plan_until: Option<u64>,
+    pub deactivated_at: Option<u64>,
+}
+
+pub struct AdminAccountRow {
+    pub account: AccountRow,
+    pub machines: u64,
+    pub devices: u64,
+    pub last_seen: Option<u64>,
+}
+
+const ACCOUNT_COLUMNS: &str = "accounts.id, accounts.handle, accounts.user_handle, accounts.created_at, accounts.role, accounts.email, accounts.plan, accounts.plan_until, accounts.deactivated_at";
+const ACCOUNT_COLUMN_COUNT: usize = 9;
+
+fn account_row(row: &Row<'_>) -> Result<AccountRow> {
+    Ok(AccountRow {
+        id: row.get(0)?,
+        handle: row.get(1)?,
+        user_handle: row
+            .get::<_, Vec<u8>>(2)?
+            .try_into()
+            .map_err(|_| corrupt(2))?,
+        created_at: row.get(3)?,
+        owner: row.get::<_, String>(4)? == "owner",
+        email: row.get(5)?,
+        plan: PlanStatus::parse(&row.get::<_, String>(6)?).ok_or_else(|| corrupt(6))?,
+        plan_until: row.get(7)?,
+        deactivated_at: row.get(8)?,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ticket {
+    Invite,
+    Owner,
+    Email,
+}
+
+impl Ticket {
+    pub fn name(self) -> &'static str {
+        match self {
+            Ticket::Invite => "invite",
+            Ticket::Owner => "owner",
+            Ticket::Email => "email",
+        }
+    }
+
+    fn parse(name: &str) -> Option<Ticket> {
+        [Ticket::Invite, Ticket::Owner, Ticket::Email]
+            .into_iter()
+            .find(|ticket| ticket.name() == name)
+    }
+}
+
+pub struct AdminToken {
+    pub name: String,
+    pub scope: AdminScope,
+    pub created_at: u64,
+    pub last_used: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdminScope {
+    Reports,
+    Billing,
+}
+
+impl AdminScope {
+    pub fn name(self) -> &'static str {
+        match self {
+            AdminScope::Reports => "reports",
+            AdminScope::Billing => "billing",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<AdminScope> {
+        [AdminScope::Reports, AdminScope::Billing]
+            .into_iter()
+            .find(|scope| scope.name() == name)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Connect {
+    pub device_code_hash: Vec<u8>,
+    pub name: String,
+    pub keys: PublicKeys,
+    pub state: ConnectState,
+    pub account: Option<String>,
+    pub machine: Option<Id>,
+    pub pairing: Option<String>,
+    pub interval: u64,
+    pub polled_at: Option<u64>,
+    pub expires_at: u64,
+}
+
+pub struct NewConnect<'a> {
+    pub device_code_hash: &'a [u8],
+    pub user_code_hash: &'a [u8],
+    pub name: &'a str,
+    pub keys: &'a PublicKeys,
+    pub interval: u64,
+    pub now: u64,
+    pub expires_at: u64,
+}
+
+pub struct ConnectPairing<'a> {
+    pub id: &'a str,
+    pub code_hash: &'a [u8],
+    pub device: &'a Id,
+    pub commitment: [u8; 32],
+    pub expires_at: u64,
+}
+
+pub struct ConnectApproval<'a> {
+    pub user_code_hash: &'a [u8],
+    pub account: &'a str,
+    pub machine: &'a Id,
+    pub placeholder_token_hash: &'a [u8],
+    pub pairing: Option<&'a ConnectPairing<'a>>,
+    pub now: u64,
 }
 
 pub struct DeviceRow {
@@ -1860,7 +2384,8 @@ pub struct SignUp<'a> {
 }
 
 pub enum SignUpOutcome {
-    Created,
+    Created(Ticket),
+    EmailTaken,
     InviteSpent,
     HandleTaken,
     CredentialTaken,
@@ -1886,6 +2411,34 @@ fn drop_undelivered(connection: &Connection, device: &Id, machine: Option<&Id>) 
         params![device.as_str(), machine],
     )?;
     Ok(())
+}
+
+fn connect_where(connection: &Connection, filter: &str, hash: &[u8]) -> Result<Option<Connect>> {
+    connection
+        .query_row(
+            &format!(
+                "SELECT device_code_hash, name, signing_key, encryption_key, state, account_id,
+                        machine_id, pairing_id, poll_interval, polled_at, expires_at
+                 FROM connects WHERE {filter} = ?1"
+            ),
+            [hash],
+            |row| {
+                Ok(Connect {
+                    device_code_hash: row.get(0)?,
+                    name: row.get(1)?,
+                    keys: keys_at(row, 2)?,
+                    state: ConnectState::parse(&row.get::<_, String>(4)?)
+                        .ok_or_else(|| corrupt(4))?,
+                    account: row.get(5)?,
+                    machine: optional_id_at(row, 6)?,
+                    pairing: row.get(7)?,
+                    interval: row.get(8)?,
+                    polled_at: row.get(9)?,
+                    expires_at: row.get(10)?,
+                })
+            },
+        )
+        .optional()
 }
 
 fn corrupt(column: usize) -> rusqlite::Error {

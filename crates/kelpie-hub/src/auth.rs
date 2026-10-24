@@ -12,12 +12,16 @@ use sha2::{Digest, Sha256};
 
 use crate::error::ApiError;
 use crate::limit::address_key;
+use crate::store::AdminScope;
 use crate::{Hub, TrustedProxy};
 
 pub const MACHINE_TOKEN_PREFIX: &str = "khm_";
 pub const DEVICE_TOKEN_PREFIX: &str = "khd_";
 pub const SESSION_TOKEN_PREFIX: &str = "khs_";
 pub const ADMIN_TOKEN_PREFIX: &str = "kha_";
+pub const SETUP_TOKEN_PREFIX: &str = "kho_";
+pub const VERIFY_TOKEN_PREFIX: &str = "khe_";
+pub const DEVICE_CODE_PREFIX: &str = "khc_";
 pub const SESSION_COOKIE: &str = "__Host-kelpie_session";
 
 pub fn random<const N: usize>() -> [u8; N] {
@@ -86,7 +90,21 @@ pub struct AccountAuth(pub String);
 
 pub struct SameOrigin;
 
-pub struct AdminAuth;
+pub struct FreshAccount(pub String);
+
+pub struct OwnerAuth(pub String);
+
+pub struct AdminAuth(pub AdminScope);
+
+impl AdminAuth {
+    pub fn require(&self, scope: AdminScope) -> Result<(), ApiError> {
+        if self.0 == scope {
+            Ok(())
+        } else {
+            Err(ApiError::forbidden("wrong-scope"))
+        }
+    }
+}
 
 pub struct Anonymous {
     pub address: String,
@@ -165,6 +183,77 @@ impl FromRequestParts<Arc<Hub>> for AccountAuth {
     }
 }
 
+impl FromRequestParts<Arc<Hub>> for FreshAccount {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        hub: &Arc<Hub>,
+    ) -> Result<FreshAccount, ApiError> {
+        let address = client_address(parts, hub);
+        hub.check_anonymous(&address)?;
+        let at = crate::now();
+        let session = match session_cookie(&parts.headers) {
+            Some(token) => hub.store().session(&digest(token), at)?,
+            None => None,
+        };
+        let Some((account, signed_in_at)) = session else {
+            return Err(hub.refuse_anonymous(&address));
+        };
+        hub.limit(&format!("account:{account}"))?;
+        if at.saturating_sub(signed_in_at) > hub.config().fresh_session_ttl {
+            return Err(ApiError::new(
+                axum::http::StatusCode::UNAUTHORIZED,
+                "reauth-required",
+            ));
+        }
+        Ok(FreshAccount(account))
+    }
+}
+
+pub struct FreshOwner(pub String);
+
+pub fn require_fresh(hub: &Hub, headers: &HeaderMap) -> Result<(), ApiError> {
+    let at = crate::now();
+    let signed_in_at = match session_cookie(headers) {
+        Some(token) => hub.store().session(&digest(token), at)?.map(|(_, at)| at),
+        None => None,
+    };
+    match signed_in_at {
+        Some(signed_in_at) if at.saturating_sub(signed_in_at) <= hub.config().fresh_session_ttl => {
+            Ok(())
+        }
+        Some(_) => Err(ApiError::new(
+            axum::http::StatusCode::UNAUTHORIZED,
+            "reauth-required",
+        )),
+        None => Err(ApiError::unauthorized()),
+    }
+}
+
+impl FromRequestParts<Arc<Hub>> for FreshOwner {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<FreshOwner, ApiError> {
+        let OwnerAuth(owner) = OwnerAuth::from_request_parts(parts, hub).await?;
+        require_fresh(hub, &parts.headers)?;
+        Ok(FreshOwner(owner))
+    }
+}
+
+impl FromRequestParts<Arc<Hub>> for OwnerAuth {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<OwnerAuth, ApiError> {
+        let AccountAuth(account) = AccountAuth::from_request_parts(parts, hub).await?;
+        let owner = hub.store().account(&account)?.is_some_and(|row| row.owner);
+        if !owner {
+            return Err(ApiError::forbidden("not-owner"));
+        }
+        Ok(OwnerAuth(account))
+    }
+}
+
 impl FromRequestParts<Arc<Hub>> for AdminAuth {
     type Rejection = ApiError;
 
@@ -172,16 +261,16 @@ impl FromRequestParts<Arc<Hub>> for AdminAuth {
         let address = client_address(parts, hub);
         hub.check_anonymous(&address)?;
         let token = bearer(&parts.headers).filter(|token| token.starts_with(ADMIN_TOKEN_PREFIX));
-        let valid = match token {
+        let scope = match token {
             Some(token) => hub
                 .store()
-                .admin_token_valid(&digest(token), crate::now())?,
-            None => false,
+                .admin_token_scope(&digest(token), crate::now())?,
+            None => None,
         };
-        if !valid {
+        let Some(scope) = scope else {
             return Err(hub.refuse_anonymous(&address));
-        }
-        Ok(AdminAuth)
+        };
+        Ok(AdminAuth(scope))
     }
 }
 

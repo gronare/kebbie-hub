@@ -104,5 +104,17 @@
     }
   ],
   "commit_domain": "kelpie-pair-commit-v1",
+  "connect": {
+    "code": "XiIC9gRZnNjwJo2r8hAmGNYxz0y6syZzV_aL4OQL_7M",
+    "commitment": "87h87jLINMovRlDw1bYm6ZsE2BaMx9fG6KH94fI9NmQ",
+    "device": "phone",
+    "device_nonce": "Ng6-FsappxM119h-iOxAgCpalhzthJi2fmC1N2yT5vY",
+    "domain": "kelpie-connect-machine-v1",
+    "fingerprint": "KZkg_ymapH3zZzCxPMYSvlUTqclB6-ARz_vSUoosdm0",
+    "link": "https://hub.example.com/connect?code=K7QF-M2XD#k=XiIC9gRZnNjwJo2r8hAmGNYxz0y6syZzV_aL4OQL_7M&m=KZkg_ymapH3zZzCxPMYSvlUTqclB6-ARz_vSUoosdm0",
+    "machine": "machine",
+    "machine_nonce": "JRFgZoM1uJjqGevaeDc5HtGxdHN69PjFo9_Ufs3-RXU",
+    "other_fingerprint": "YIWBXyZoisXeX8XVfX6hrLXGltEy8xtxNAl40FycueI"
+  },
   "sas_domain": "kelpie-pair-v1"
 }

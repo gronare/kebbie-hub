@@ -19,9 +19,16 @@ const JS: &str = "text/javascript; charset=utf-8";
 
 pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/", "web/index.html", HTML),
+    asset!("/setup", "web/index.html", HTML),
+    asset!("/signup", "web/index.html", HTML),
+    asset!("/connect", "web/index.html", HTML),
+    asset!("/add", "web/index.html", HTML),
+    asset!("/admin", "web/index.html", HTML),
     asset!("/app.css", "web/app.css", "text/css; charset=utf-8"),
     asset!("/app.js", "web/app.js", JS),
     asset!("/board.js", "web/board.js", JS),
+    asset!("/connect.js", "web/connect.js", JS),
+    asset!("/pages.js", "web/pages.js", JS),
     asset!("/hub.js", "web/hub.js", JS),
     asset!("/keystore.js", "web/keystore.js", JS),
     asset!("/pairing.js", "web/pairing.js", JS),
@@ -95,5 +102,8 @@ mod tests {
         assert_eq!(find("/index.html").map(|(kind, _)| kind), Some(HTML));
         assert_eq!(find("/js/protocol.js").map(|(kind, _)| kind), Some(JS));
         assert_eq!(find("/v1/d/boards"), None);
+        for page in ["/setup", "/signup", "/connect", "/add", "/admin"] {
+            assert_eq!(find(page), find("/"), "{page}");
+        }
     }
 }

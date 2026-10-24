@@ -42,7 +42,7 @@ function fakeHub({ machineKeys = parties.machine.public, code = vector.machine_c
   };
 }
 
-const run = (hub, extra = {}, answer = { matches: true, name: "  Kontoret " }) => {
+const run = (hub, extra = {}, answer = { matches: true, name: "  Office " }) => {
   const shown = [];
   const confirm = async (digits) => {
     shown.push(digits);
@@ -73,7 +73,7 @@ test("the phone commits, then shows the same six digits as the machine and ends 
   const hub = fakeHub();
   const { promise, shown } = run(hub);
   const machine = await promise;
-  assert.deepEqual(machine, { id: MACHINE, keys: parties.machine.public, name: "Kontoret", hubName: "devbox" });
+  assert.deepEqual(machine, { id: MACHINE, keys: parties.machine.public, name: "Office", hubName: "devbox" });
   assert.deepEqual(shown, [vector.expect.sas]);
   assert.equal(hub.machineSas, vector.expect.sas);
   assert.deepEqual(hub.log.map(([step]) => step), ["commit", "watch", "reveal", "watch"]);

@@ -2,6 +2,7 @@ mod alert;
 mod authorize;
 mod board;
 mod bug_report;
+mod connect;
 mod crypto;
 mod envelope;
 mod error_signal;
@@ -25,6 +26,7 @@ pub use bug_report::{
     MAX_TITLE_CHARS, REPORT_DOMAIN, REPORT_POW_DOMAIN, REPORT_SIGN_DOMAIN, leading_zero_bits,
     meets, pow_hash, solve, verify_report, verify_signals,
 };
+pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 pub use crypto::{
     CLOCK_SKEW, HPKE_INFO, OpenError, PublicKeys, Randomness, SealError, SecretKeys,
     key_commitment, open, seal, verify,

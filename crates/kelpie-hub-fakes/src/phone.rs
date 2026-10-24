@@ -6,8 +6,8 @@ use kelpie_hub_api::{
     PairingView, ResultEntry, Results, RevealRequest, normalize_code,
 };
 use kelpie_hub_protocol::{
-    Board, CommandResult, DevicePairing, Envelope, Header, Id, Notice, OpenError, Payload, Prefix,
-    PublicKeys, SecretKeys, open, seal,
+    Board, CommandResult, ConnectSecret, DevicePairing, Envelope, Header, Id, Notice, OpenError,
+    Payload, Prefix, PublicKeys, SecretKeys, open, seal,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
@@ -119,6 +119,10 @@ impl PhoneState {
         HubClient::new(&self.hub, self.token.as_deref())
     }
 
+    pub fn token(&self) -> Option<&str> {
+        self.token.as_deref()
+    }
+
     pub async fn pair<C>(
         &mut self,
         code: &str,
@@ -166,8 +170,54 @@ impl PhoneState {
             self.token = Some(token);
             self.device = Some(committed.device);
         }
+        self.follow(&committed.pairing, &pairing, deadline, None, confirm)
+            .await
+    }
+
+    pub fn connect_pairing(&self, connect: &ConnectSecret) -> DevicePairing {
+        DevicePairing::start(self.public(), &connect.pairing_code())
+    }
+
+    pub async fn complete_connect(
+        &mut self,
+        pairing_id: &str,
+        pairing: &DevicePairing,
+        connect: &ConnectSecret,
+        timeout: Duration,
+    ) -> Result<Id, PairError> {
+        let outcome = self
+            .follow(
+                pairing_id,
+                pairing,
+                Instant::now() + timeout,
+                Some(connect),
+                async |_: String| true,
+            )
+            .await;
+        self.attempts.push(Attempt {
+            at: now(),
+            machine: outcome.as_ref().ok().cloned(),
+            outcome: match &outcome {
+                Ok(_) => "admitted".to_string(),
+                Err(error) => error.to_string(),
+            },
+        });
+        outcome
+    }
+
+    async fn follow<C>(
+        &mut self,
+        pairing_id: &str,
+        pairing: &DevicePairing,
+        deadline: Instant,
+        connect: Option<&ConnectSecret>,
+        confirm: C,
+    ) -> Result<Id, PairError>
+    where
+        C: AsyncFnOnce(String) -> bool,
+    {
         let client = self.client();
-        let path = format!("/v1/d/pairings/{}", committed.pairing);
+        let path = format!("/v1/d/pairings/{pairing_id}");
         let replied = next_state(&client, &path, PairingState::Committed, deadline).await?;
         if replied.state != PairingState::Replied {
             return Err(ended(&replied));
@@ -178,6 +228,9 @@ impl PhoneState {
         let machine_nonce = replied
             .machine_nonce
             .ok_or(PairError::Incomplete("the machine nonce"))?;
+        if connect.is_some_and(|connect| !connect.names(&machine_keys)) {
+            return Err(PairError::WrongMachine);
+        }
         let (keys, nonce) = pairing.reveal();
         let _: PairingView = client
             .post(

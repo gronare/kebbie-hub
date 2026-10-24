@@ -2,9 +2,11 @@ import { arrange, findTask, followHubNames, highestRevs, isAsleep, openBoards } 
 import { account, deviceClient, follow, HubError } from "./hub.js";
 import { get, identity, loadAttempts, loadDevice, loadMachines, newDeviceKeys, put, recordAttempt, remove, saveDevice, saveMachines } from "./keystore.js";
 import { failureText, pair, PairingFailed } from "./pairing.js";
+import { PAGES, startPage } from "./pages.js";
 import { assertionJSON, creationOptions, registrationJSON, requestOptions, supported as passkeysSupported } from "./passkey.js";
 
 const root = document.getElementById("app");
+const onPage = PAGES.includes(location.pathname);
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const state = { device: null, machines: [], opened: [], attempts: [], offline: false, fetchedAt: null, pairing: { phase: "enter" }, notice: null, push: null, selected: {}, hint: false };
 
@@ -14,10 +16,10 @@ const short = (sha) => (sha ?? "").slice(0, 7);
 const kb = (bytes) => `${Math.max(1, Math.round(bytes / 1024))} kB`;
 
 function when(seconds) {
-  if (!seconds) return "aldrig";
+  if (!seconds) return "never";
   const date = new Date(seconds * 1000);
-  const time = date.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-  return date.toDateString() === new Date().toDateString() ? time : `${date.toLocaleDateString("sv-SE", { day: "numeric", month: "short" })} ${time}`;
+  const time = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return date.toDateString() === new Date().toDateString() ? time : `${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
 }
 
 const isIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -40,7 +42,7 @@ const go = (hash) => {
 function tabbar(active) {
   const questions = arrange(state.opened, nowSeconds()).questions.length;
   const tab = (hash, label, key) => `<a href="${hash}" class="${active === key ? "on" : ""}" ${active === key ? 'aria-current="page"' : ""}>${label}</a>`;
-  return `<nav class="tabbar">${tab("#/board", "Board", "board")}${tab("#/questions", `Frågor${questions ? ` ${questions}` : ""}`, "questions")}${tab("#/machines", "Maskiner", "machines")}</nav>`;
+  return `<nav class="tabbar">${tab("#/board", "Board", "board")}${tab("#/questions", `Questions${questions ? ` ${questions}` : ""}`, "questions")}${tab("#/machines", "Machines", "machines")}</nav>`;
 }
 
 function top(title, aside = "") {
@@ -50,53 +52,53 @@ function top(title, aside = "") {
 function taskRow(row) {
   const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
   const meta = [row.repo, row.item.summary].filter(Boolean).join(" · ");
-  const you = row.item.next_for_you ? `<div class="you"><b>du:</b> ${esc(row.item.next_for_you)}</div>` : "";
+  const you = row.item.next_for_you ? `<div class="you"><b>you:</b> ${esc(row.item.next_for_you)}</div>` : "";
   return `<a class="task" href="${href}"><div class="name">${esc(row.task)} <span class="machine">${esc(row.name)}</span></div><div class="meta">${esc(meta)}</div>${you}</a>`;
 }
 
 const PROBLEMS = {
-  "unknown-machine": "okänd maskin, koppla den igen",
-  "not-sealed-to-this-device": "boardet är inte förseglat till den här telefonen än",
-  "revision-differs": "hubbens revision stämmer inte med maskinens",
-  "bad-signature": "signaturen stämmer inte, visas inte",
-  expired: "boardet är för gammalt",
-  "not-yet-valid": "telefonens klocka går fel",
-  "rolled-back": "äldre version än den senast lästa",
-  "not-a-recipient": "boardet är inte förseglat till den här telefonen",
-  undecryptable: "går inte att avkryptera",
+  "unknown-machine": "unknown machine; connect it again",
+  "not-sealed-to-this-device": "the board is not sealed to this device yet",
+  "revision-differs": "the hub's revision differs from the machine's",
+  "bad-signature": "the signature does not match; not shown",
+  expired: "the board is too old",
+  "not-yet-valid": "this device's clock is wrong",
+  "rolled-back": "older than the board you last read",
+  "not-a-recipient": "the board is not sealed to this device",
+  undecryptable: "does not decrypt",
 };
-const problemText = (code) => PROBLEMS[code] ?? `går inte att öppna (${code})`;
+const problemText = (code) => PROBLEMS[code] ?? `does not open (${code})`;
 
 function installHint() {
   if (!state.hint) return "";
-  return `<div class="hint"><div>Lägg kelpie på hemskärmen: tryck på <b>Dela</b> och välj <b>Lägg till på hemskärmen</b>. Då öppnas appen som en egen app och kan visa notiser.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Stäng">×</button></div>`;
+  return `<div class="hint"><div>Add kelpie to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens as its own app and can show notifications.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>`;
 }
 
 function freshness() {
-  const machines = plural(state.opened.length, "maskin", "maskiner");
-  return state.offline ? "kan inte nå hubben just nu" : machines;
+  const machines = plural(state.opened.length, "machine", "machines");
+  return state.offline ? "can't reach the hub right now" : machines;
 }
 
 function boardScreen() {
   const view = arrange(state.opened, nowSeconds());
   const parts = [top("kelpie", esc(freshness())), installHint()];
   if (state.machines.length === 0) {
-    parts.push(`<div class="center">Ingen maskin är kopplad än.</div><a class="btn primary" href="#/pair">Koppla maskin</a>`);
+    parts.push(`<div class="center">No machine is connected yet. Run <b>kelpie hub connect</b> on your computer.</div><a class="btn primary" href="#/pair">Pair with a code</a>`);
   } else if (state.opened.length === 0) {
-    parts.push(`<div class="center">Ingen kopplad maskin har skickat något board än.</div>`);
+    parts.push(`<div class="center">No connected machine has sent a board yet.</div>`);
   }
   for (const group of view.groups) {
     parts.push(`<h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>`, ...group.rows.map(taskRow));
   }
   if (view.sleeping.length > 0) {
-    parts.push(`<h2 class="group g-muted">Sover</h2>`);
+    parts.push(`<h2 class="group g-muted">Asleep</h2>`);
     for (const machine of view.sleeping) {
-      const working = machine.working ? `${plural(machine.working, "task", "tasks")} arbetade då` : "inget arbetade då";
-      parts.push(`<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">senast sedd ${esc(when(machine.lastSeen))} · ${working}</div></div>`);
+      const working = machine.working ? `${plural(machine.working, "task", "tasks")} were working then` : "nothing was working then";
+      parts.push(`<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">last seen ${esc(when(machine.lastSeen))} · ${working}</div></div>`);
     }
   }
   if (view.problems.length > 0) {
-    parts.push(`<h2 class="group g-muted">Går inte att läsa</h2>`);
+    parts.push(`<h2 class="group g-muted">Can't be read</h2>`);
     for (const machine of view.problems) parts.push(`<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">${esc(problemText(machine.problem))}</div></div>`);
   }
   return parts.join("") + tabbar("board");
@@ -104,15 +106,15 @@ function boardScreen() {
 
 function questionsScreen() {
   const { questions } = arrange(state.opened, nowSeconds());
-  const list = questions.length ? questions.map(taskRow).join("") : `<div class="center">Inga frågor väntar på dig.</div>`;
-  return top("Frågor", questions.length ? plural(questions.length, "väntar", "väntar") : "") + list + tabbar("questions");
+  const list = questions.length ? questions.map(taskRow).join("") : `<div class="center">No questions wait for you.</div>`;
+  return top("Questions", questions.length ? `${questions.length} waiting` : "") + list + tabbar("questions");
 }
 
 function chips(key, options, recommend) {
   const selected = state.selected[key] ?? (recommend ? recommend - 1 : 0);
   const row = options.map((option, index) => `<button type="button" class="chip${index === selected ? " on" : ""}" data-action="choose" data-key="${esc(key)}" data-index="${index}" aria-pressed="${index === selected}">${esc(option.label)}</button>`).join("");
   const chosen = options[selected];
-  const meaning = chosen ? `${esc(chosen.meaning ?? "")}${recommend && selected === recommend - 1 ? " · rekommenderat" : ""}` : "";
+  const meaning = chosen ? `${esc(chosen.meaning ?? "")}${recommend && selected === recommend - 1 ? " · recommended" : ""}` : "";
   return `<div class="chips pad">${row}</div><div class="center">${meaning}</div>`;
 }
 
@@ -120,49 +122,49 @@ function questionBlock(found) {
   const { item } = found;
   if (item.question) {
     const question = item.question;
-    const plan = question.plan ? `<h3 class="sec">Plan</h3><div class="plan"><div>Planen (${kb(question.plan.bytes)}) visas här i nästa steg. Den ligger krypterad hos maskinen.</div></div>` : "";
+    const plan = question.plan ? `<h3 class="sec">Plan</h3><div class="plan"><div>The plan (${kb(question.plan.bytes)}) shows here in a later version. It stays encrypted on the machine.</div></div>` : "";
     const context = [found.repo, item.summary].filter(Boolean).join(" · ");
-    return `<section class="task"><div class="name">${esc(question.text)}</div><div class="meta">${esc(context)} · frågade ${esc(when(question.at))}</div>${plan}</section>
-      <h3 class="sec pad">Svar</h3>${chips(`${found.machine}|${item.address}|${question.id}`, question.options, question.recommend)}
-      <button type="button" class="btn primary off" disabled>Svara · kommer i nästa steg</button>`;
+    return `<section class="task"><div class="name">${esc(question.text)}</div><div class="meta">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}</section>
+      <h3 class="sec pad">Answer</h3>${chips(`${found.machine}|${item.address}|${question.id}`, question.options, question.recommend)}
+      <button type="button" class="btn primary off" disabled>Answer · coming in a later version</button>`;
   }
   const prompt = item.prompt;
   return `<section class="task"><div class="name">${esc(prompt.question)}</div></section>
-    <h3 class="sec pad">Svar</h3>${chips(`${found.machine}|${item.address}|${prompt.id}`, prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "med text" : "" })), null)}
-    <button type="button" class="btn primary off" disabled>Svara · kommer i nästa steg</button>`;
+    <h3 class="sec pad">Answer</h3>${chips(`${found.machine}|${item.address}|${prompt.id}`, prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })), null)}
+    <button type="button" class="btn primary off" disabled>Answer · coming in a later version</button>`;
 }
 
 function cardBlock(found) {
   const { item } = found;
   const lines = [];
   if (item.card) {
-    lines.push(item.card.current ? `<div class="meta ok">✓ aktuellt på ${esc(short(item.card.sha))}</div>` : `<div class="meta warn">kortet gäller ${esc(short(item.card.sha))}, HEAD har gått vidare</div>`);
-    lines.push(`<h3 class="sec">Card</h3><div class="plan"><div>Kortet (${kb(item.card.blob.bytes)}) visas här i nästa steg. Det ligger krypterat hos maskinen.</div></div>`);
+    lines.push(item.card.current ? `<div class="meta ok">✓ current at ${esc(short(item.card.sha))}</div>` : `<div class="meta warn">the card is for ${esc(short(item.card.sha))}; HEAD has moved on</div>`);
+    lines.push(`<h3 class="sec">Card</h3><div class="plan"><div>The card (${kb(item.card.blob.bytes)}) shows here in a later version. It stays encrypted on the machine.</div></div>`);
   }
-  if (item.next_for_you) lines.push(`<div class="you"><b>du:</b> ${esc(item.next_for_you)}</div>`);
+  if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
   const progress = [item.summary, item.report?.summary].filter(Boolean);
-  if (progress.length) lines.push(`<h3 class="sec">Läge</h3><div class="plan">${progress.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`);
+  if (progress.length) lines.push(`<h3 class="sec">Progress</h3><div class="plan">${progress.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`);
   if (item.git) {
     const git = item.git;
-    const facts = [`${git.ahead} före ${git.upstream}`, git.behind ? `${git.behind} efter` : null, git.uncommitted ? `${git.uncommitted} ändringar ej committade` : null, git.approved ? "godkänd för push" : null].filter(Boolean);
+    const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null, git.approved ? "approved for push" : null].filter(Boolean);
     lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}</div>`);
   }
   if (item.verdict) {
     const verdict = item.verdict;
-    const text = verdict.running ? "granskning pågår" : verdict.verdict === "ok" ? `granskad, ok${verdict.sha ? ` på ${short(verdict.sha)}` : ""}` : verdict.verdict === "changes" ? `granskad, ${plural(verdict.findings ?? 0, "fynd", "fynd")}` : "inte granskad";
-    lines.push(`<h3 class="sec">Granskning</h3><div class="plan"><div>${esc(text)}${verdict.stale ? " · inaktuell" : ""}</div></div>`);
+    const text = verdict.running ? "review running" : verdict.verdict === "ok" ? `reviewed, ok${verdict.sha ? ` at ${short(verdict.sha)}` : ""}` : verdict.verdict === "changes" ? `reviewed, ${plural(verdict.findings ?? 0, "finding", "findings")}` : "not reviewed";
+    lines.push(`<h3 class="sec">Review</h3><div class="plan"><div>${esc(text)}${verdict.stale ? " · stale" : ""}</div></div>`);
   }
-  if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI kör" : `CI föll${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
+  if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
   if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
   const card = lines.length ? `<section class="task">${lines.join("")}</section>` : "";
   const pushable = item.group === "READY TO PUSH" || item.card;
-  const push = pushable && item.head ? `<button type="button" class="btn primary off" disabled>Pusha ${esc(short(item.head))} · kommer i nästa steg</button>` : "";
+  const push = pushable && item.head ? `<button type="button" class="btn primary off" disabled>Push ${esc(short(item.head))} · coming in a later version</button>` : "";
   return card + push;
 }
 
 function taskScreen([machine, address]) {
   const found = findTask(state.opened, machine, address);
-  if (!found) return top("Task") + `<div class="center">Tasken finns inte längre på boardet.</div>` + tabbar("board");
+  if (!found) return top("Task") + `<div class="center">This task is no longer on the board.</div>` + tabbar("board");
   const asks = found.item.question || found.item.prompt;
   return top(found.task, esc(found.name)) + (asks ? questionBlock(found) : cardBlock(found)) + tabbar(asks ? "questions" : "board");
 }
@@ -171,15 +173,15 @@ function pushSection() {
   const push = state.push;
   if (!push) return "";
   const text = {
-    "needs-home-screen": "Notiser fungerar när kelpie ligger på hemskärmen.",
-    unsupported: "Den här webbläsaren kan inte ta emot notiser.",
-    denied: "Notiser är avstängda för kelpie i inställningarna.",
-    on: "Notiser är på. Telefonen avkrypterar dem själv.",
-    off: "Få en notis när en task behöver dig.",
+    "needs-home-screen": "Notifications work once kelpie is on your home screen.",
+    unsupported: "This browser can't receive notifications.",
+    denied: "Notifications are off for kelpie in your settings.",
+    on: "Notifications are on. This device decrypts them itself.",
+    off: "Get a notification when a task needs you.",
   }[push.status];
-  const button = push.status === "off" ? `<button type="button" class="btn primary" data-action="push-on">Slå på notiser</button>` : push.status === "on" ? `<button type="button" class="btn" data-action="push-off">Stäng av notiser</button>` : "";
+  const button = push.status === "off" ? `<button type="button" class="btn primary" data-action="push-on">Turn on notifications</button>` : push.status === "on" ? `<button type="button" class="btn" data-action="push-off">Turn off notifications</button>` : "";
   const error = push.error ? `<div class="center warn">${esc(push.error)}</div>` : "";
-  return `<h3 class="sec">Notiser</h3><div class="center left">${text}</div>${button}${error}`;
+  return `<h3 class="sec">Notifications</h3><div class="center left">${text}</div>${button}${error}`;
 }
 
 function machinesScreen() {
@@ -189,61 +191,62 @@ function machinesScreen() {
     const name = machine.name || opened?.name || machine.id.slice(-6);
     const lastSeen = opened?.lastSeen ?? null;
     const awake = !isAsleep({ lastSeen }, now);
-    const facts = opened?.board ? [`senast hörd ${when(lastSeen)}`, `kelpie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened?.problem ? [problemText(opened.problem)] : ["inget board än"];
-    return `<div class="task${awake ? "" : " asleep"}"><div class="name">${esc(name)} <span class="machine">${awake ? "vaken" : "sover"}</span></div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
+    const facts = opened?.board ? [`last heard ${when(lastSeen)}`, `kelpie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened?.problem ? [problemText(opened.problem)] : ["no board yet"];
+    return `<div class="task${awake ? "" : " asleep"}"><div class="name">${esc(name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
   });
   const attempts = state.attempts.length
-    ? `<h3 class="sec">Kopplingsförsök</h3><div class="plan">${state.attempts.map((attempt) => `<div class="meta">${esc(when(attempt.at))} · ${esc(attempt.outcome === "admitted" ? `kopplad till ${state.machines.find((known) => known.id === attempt.machine)?.name ?? attempt.name ?? attempt.machine}` : failureText(attempt.outcome))}</div>`).join("")}</div>`
+    ? `<h3 class="sec">Pairing attempts</h3><div class="plan">${state.attempts.map((attempt) => `<div class="meta">${esc(when(attempt.at))} · ${esc(attempt.outcome === "admitted" ? `paired with ${state.machines.find((known) => known.id === attempt.machine)?.name ?? attempt.name ?? attempt.machine}` : failureText(attempt.outcome))}</div>`).join("")}</div>`
     : "";
-  const device = state.device ? `<h3 class="sec">Den här telefonen</h3><div class="meta pad">${esc(state.device.name ?? "")} · ${esc(state.device.id)}</div>` : "";
-  return top("Maskiner", esc(plural(state.machines.length, "kopplad", "kopplade"))) + rows.join("") + `<a class="btn primary" href="#/pair">Koppla maskin</a>` + pushSection() + attempts + device + tabbar("machines");
+  const device = state.device ? `<h3 class="sec">This device</h3><div class="meta pad">${esc(state.device.name ?? "")} · ${esc(state.device.id)}</div>` : "";
+  return top("Machines", esc(`${state.machines.length} connected`)) + rows.join("") + `<a class="btn primary" href="#/pair">Pair with a code</a>` + pushSection() + attempts + device + tabbar("machines");
 }
 
 function pairScreen() {
   const pairing = state.pairing;
   const busy = ["working", "compare", "admitting"].includes(pairing.phase);
-  const parts = [top("Koppla maskin"), `<div class="center">Kör <b>kelpie hub pair</b> på datorn och skriv koden den visar.</div>`];
-  parts.push(`<form data-form="pair" class="stack"><label class="task field"><span class="meta">Kod</span><input name="code" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="12" placeholder="XXXX-XXXX" value="${esc(pairing.typed ?? "")}" ${busy ? "disabled" : ""} required></label><button class="btn primary" ${busy ? "disabled" : ""}>Koppla</button></form>`);
-  if (pairing.phase === "working") parts.push(`<div class="center">Väntar på maskinen …</div>`);
+  const parts = [top("Pair a machine"), `<div class="center">Run <b>kelpie hub pair</b> on your computer and type the code it shows.</div>`];
+  parts.push(`<form data-form="pair" class="stack"><label class="task field"><span class="meta">Code</span><input name="code" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="12" placeholder="XXXX-XXXX" value="${esc(pairing.typed ?? "")}" ${busy ? "disabled" : ""} required></label><button class="btn primary" ${busy ? "disabled" : ""}>Pair</button></form>`);
+  if (pairing.phase === "working") parts.push(`<div class="center">Waiting for the machine …</div>`);
   if (["compare", "admitting", "done"].includes(pairing.phase)) {
-    parts.push(`<h3 class="sec">Jämför med terminalen</h3><div class="code" aria-live="polite">${esc(pairing.digits)}</div>`);
+    parts.push(`<h3 class="sec">Compare with your terminal</h3><div class="code" aria-live="polite">${esc(pairing.digits)}</div>`);
   }
   if (pairing.phase === "compare") {
-    parts.push(`<div class="center"><b>Stämmer siffrorna med terminalen?</b> Svara likadant här och i terminalen. Skiljer de sig: svara n där och Stämmer inte här, något står mellan dig och maskinen.</div>`);
-    parts.push(`<label class="task field"><span class="meta">Namn på maskinen</span><input name="machine-name" id="machine-name" autocomplete="off" maxlength="64" value="${esc(pairing.hubName)}"></label>`);
-    parts.push(`<div class="pair-answer"><button type="button" class="btn" data-action="pair-no">Stämmer inte</button><button type="button" class="btn primary" data-action="pair-yes">Siffrorna stämmer</button></div>`);
+    parts.push(`<div class="center"><b>Does your terminal show the same digits?</b> Answer the same here and there. If they differ, answer n there and Different here: something is between you and the machine.</div>`);
+    parts.push(`<label class="task field"><span class="meta">Name of the machine</span><input name="machine-name" id="machine-name" autocomplete="off" maxlength="64" value="${esc(pairing.hubName)}"></label>`);
+    parts.push(`<div class="pair-answer"><button type="button" class="btn" data-action="pair-no">Different</button><button type="button" class="btn primary" data-action="pair-yes">Same digits</button></div>`);
   }
-  if (pairing.phase === "admitting") parts.push(`<div class="center">Väntar på att du svarar y i terminalen …</div>`);
-  if (pairing.phase === "done") parts.push(`<div class="center ok">Kopplad till ${esc(pairing.name)}. Boardet laddas.</div>`);
+  if (pairing.phase === "admitting") parts.push(`<div class="center">Waiting for you to answer y in the terminal …</div>`);
+  if (pairing.phase === "done") parts.push(`<div class="center ok">Paired with ${esc(pairing.name)}. Loading the board.</div>`);
   if (pairing.phase === "failed") parts.push(`<div class="center warn" role="alert">${esc(failureText(pairing.reason))}</div>`);
   return parts.join("") + (state.machines.length ? tabbar("machines") : "");
 }
 
 function loginScreen(signUp) {
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  if (!passkeysSupported()) return top("kelpie") + `<div class="center">Den här webbläsaren kan inte logga in med passkey.</div>`;
+  if (!passkeysSupported()) return top("kelpie") + `<div class="center">This browser can't sign in with a passkey.</div>`;
   if (signUp) {
     return (
-      top("Skapa konto") +
-      `<div class="center">Skriv inbjudningskoden du fått och välj ett användarnamn. Sedan lägger telefonen till en passkey.</div>
-      <form data-form="signup" class="stack"><label class="task field"><span class="meta">Inbjudan</span><input name="invite" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required></label>
-      <label class="task field"><span class="meta">Användarnamn</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label>
-      <button class="btn primary">Skapa konto med passkey</button></form>${message}<a class="center link" href="#/login">Har du redan ett konto? Logga in</a>`
+      top("Sign up") +
+      `<div class="center">Enter your invite and pick a handle. Then this device adds a passkey.</div>
+      <form data-form="signup" class="stack"><label class="task field"><span class="meta">Invite</span><input name="invite" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required></label>
+      <label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label>
+      <button class="btn primary">Create account with passkey</button></form>${message}<a class="center link" href="#/login">Have an account? Sign in</a>`
     );
   }
   return (
     top("kelpie") +
-    `<div class="center">Logga in med din passkey. Telefonen får sina egna nycklar och läser boardet själv; hubben ser aldrig vad som står där.</div>
-    <form data-form="login" class="stack"><label class="task field"><span class="meta">Användarnamn</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label>
-    <button class="btn primary">Logga in med passkey</button></form>${message}<a class="center link" href="#/signup">Har du en inbjudan? Skapa konto</a>`
+    `<div class="center">Sign in with your passkey. This device gets its own keys and reads the board itself; the hub never sees what it says.</div>
+    <form data-form="login" class="stack"><label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label>
+    <button class="btn primary">Sign in with passkey</button></form>${message}<a class="center link" href="/signup">No account yet? Sign up</a>`
   );
 }
 
 function unsupportedScreen() {
-  return top("kelpie") + `<div class="center">Den här webbläsaren saknar krypteringen appen behöver (Ed25519, X25519 och base64 i Uint8Array). Uppdatera till iOS 18.2 eller senare, eller en aktuell Chrome eller Firefox.</div>`;
+  return top("kelpie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519 and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
 }
 
 function render() {
+  if (onPage) return;
   const { name, params } = route();
   let html;
   if (!cryptoReady()) html = unsupportedScreen();
@@ -276,7 +279,7 @@ async function refresh() {
     state.fetchedAt = nowSeconds();
     await put("boards", { boards: boards.boards, at: state.fetchedAt });
   } catch (error) {
-    if (error instanceof HubError && error.code === "unknown-device") return forgetDevice("Hubben känner inte längre igen telefonen. Logga in och koppla igen.");
+    if (error instanceof HubError && error.code === "unknown-device") return forgetDevice("The hub no longer knows this device. Sign in and pair again.");
     clearTimeout(retrying);
     retrying = setTimeout(refresh, 15_000);
     state.offline = true;
@@ -316,7 +319,7 @@ function startFeed() {
           if (name === "board" || name === "machine-removed") refresh();
         }, controller.signal);
       } catch (error) {
-        if (error instanceof HubError && error.code === "unknown-device") return forgetDevice("Telefonen togs bort från hubben. Logga in och koppla igen.");
+        if (error instanceof HubError && error.code === "unknown-device") return forgetDevice("This device was removed from the hub. Sign in and pair again.");
       }
       await new Promise((resolve) => setTimeout(resolve, delay));
       delay = Math.min(delay * 2, 60_000);
@@ -325,7 +328,7 @@ function startFeed() {
   loop();
 }
 
-const deviceName = () => (/iPhone/.test(navigator.userAgent) ? "iPhone" : /iPad/.test(navigator.userAgent) ? "iPad" : /Macintosh/.test(navigator.userAgent) ? "Mac" : "Webbläsare");
+const deviceName = () => (/iPhone/.test(navigator.userAgent) ? "iPhone" : /iPad/.test(navigator.userAgent) ? "iPad" : /Macintosh/.test(navigator.userAgent) ? "Mac" : "Browser");
 
 async function becomeDevice() {
   const keys = await newDeviceKeys();
@@ -341,20 +344,20 @@ function hubMessage(error) {
   if (error instanceof HubError) {
     return (
       {
-        unauthorized: "Inbjudan eller användarnamnet stämmer inte.",
-        "handle-taken": "Användarnamnet är upptaget.",
-        "bad-handle": "Användarnamnet får bara ha små bokstäver, siffror och bindestreck och börja med en bokstav.",
-        "rate-limited": "För många försök. Vänta en minut.",
-        "not-found": "Det finns inget konto med det användarnamnet.",
-      }[error.code] ?? `Hubben svarade ${error.status} (${error.code}).`
+        unauthorized: "The invite or the handle does not match.",
+        "handle-taken": "That handle is taken.",
+        "bad-handle": "A handle is lowercase letters, digits and dashes, and starts with a letter.",
+        "rate-limited": "Too many tries. Wait a minute.",
+        "not-found": "There is no account with that handle.",
+      }[error.code] ?? `The hub answered ${error.status} (${error.code}).`
     );
   }
-  if (error?.name === "NotAllowedError") return "Passkeyn avbröts.";
+  if (error?.name === "NotAllowedError") return "The passkey was cancelled.";
   return error?.message ?? String(error);
 }
 
 async function signUp(form) {
-  const begun = await account.registerBegin(form.invite.value.trim(), form.handle.value.trim().toLowerCase());
+  const begun = await account.registerBegin({ invite: form.invite.value.trim(), handle: form.handle.value.trim().toLowerCase() });
   const credential = await navigator.credentials.create(creationOptions(begun.options));
   await account.registerFinish(begun.ceremony, registrationJSON(credential), deviceName());
   await becomeDevice();
@@ -429,7 +432,7 @@ async function pushOn() {
     await client.subscribePush(subscription.toJSON());
     state.push = { status: "on" };
   } catch (error) {
-    state.push = { ...(await pushStatus()), error: error?.name === "NotAllowedError" ? "Notiser tilläts inte." : hubMessage(error) };
+    state.push = { ...(await pushStatus()), error: error?.name === "NotAllowedError" ? "Notifications were not allowed." : hubMessage(error) };
   }
   render();
 }
@@ -496,6 +499,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 async function start() {
+  if (onPage) return startPage(root);
   if (!cryptoReady()) return render();
   try {
     state.hint = isIos() && !isStandalone() && localStorage.getItem("kelpie-hint-dismissed") !== "1";

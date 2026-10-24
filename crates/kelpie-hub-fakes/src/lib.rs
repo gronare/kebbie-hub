@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod client;
 pub mod machine;
 pub mod phone;
@@ -76,6 +77,7 @@ pub enum PairError {
         reason: Option<PairingFailure>,
     },
     Incomplete(&'static str),
+    WrongMachine,
 }
 
 impl fmt::Display for PairError {
@@ -93,6 +95,9 @@ impl fmt::Display for PairError {
                 None => write!(formatter, "pairing {}", state.name()),
             },
             PairError::Incomplete(what) => write!(formatter, "the hub left out {what}"),
+            PairError::WrongMachine => formatter.write_str(
+                "the hub offered keys of another machine than the one that opened the link; not trusted",
+            ),
         }
     }
 }
