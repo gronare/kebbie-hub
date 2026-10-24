@@ -1,14 +1,16 @@
 import { arrange, findTask, followHubNames, highestRevs, isAsleep, openBoards } from "./board.js";
+import { keepDeviceName, proposedName } from "./device-name.js";
+import { addPasskey, autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText } from "./signin.js";
 import { account, deviceClient, follow, HubError } from "./hub.js";
 import { get, identity, loadAttempts, loadDevice, loadMachines, newDeviceKeys, put, recordAttempt, remove, saveDevice, saveMachines } from "./keystore.js";
 import { failureText, pair, PairingFailed } from "./pairing.js";
 import { PAGES, startPage } from "./pages.js";
-import { assertionJSON, creationOptions, registrationJSON, requestOptions, supported as passkeysSupported } from "./passkey.js";
+import { creationOptions, registrationJSON, supported as passkeysSupported } from "./passkey.js";
 
 const root = document.getElementById("app");
 const onPage = PAGES.includes(location.pathname);
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { device: null, machines: [], opened: [], attempts: [], offline: false, fetchedAt: null, pairing: { phase: "enter" }, notice: null, push: null, selected: {}, hint: false };
+const state = { device: null, machines: [], opened: [], attempts: [], offline: false, fetchedAt: null, pairing: { phase: "enter" }, notice: null, byName: false, offerPasskey: false, push: null, selected: {}, hint: false };
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
@@ -204,7 +206,7 @@ function machinesScreen() {
 function pairScreen() {
   const pairing = state.pairing;
   const busy = ["working", "compare", "admitting"].includes(pairing.phase);
-  const parts = [top("Pair a machine"), `<div class="center">Run <b>kelpie hub pair</b> on your computer and type the code it shows.</div>`];
+  const parts = [top("Pair a machine"), passkeyOffer(), `<div class="center">Run <b>kelpie hub pair</b> on your computer and type the code it shows.</div>`];
   parts.push(`<form data-form="pair" class="stack"><label class="task field"><span class="meta">Code</span><input name="code" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="12" placeholder="XXXX-XXXX" value="${esc(pairing.typed ?? "")}" ${busy ? "disabled" : ""} required></label><button class="btn primary" ${busy ? "disabled" : ""}>Pair</button></form>`);
   if (pairing.phase === "working") parts.push(`<div class="center">Waiting for the machine …</div>`);
   if (["compare", "admitting", "done"].includes(pairing.phase)) {
@@ -213,6 +215,7 @@ function pairScreen() {
   if (pairing.phase === "compare") {
     parts.push(`<div class="center"><b>Does your terminal show the same digits?</b> Answer the same here and there. If they differ, answer n there and Different here: something is between you and the machine.</div>`);
     parts.push(`<label class="task field"><span class="meta">Name of the machine</span><input name="machine-name" id="machine-name" autocomplete="off" maxlength="64" value="${esc(pairing.hubName)}"></label>`);
+    parts.push(`<label class="task field"><span class="meta">Name of this device, as the machine lists it</span><input name="device-name" id="device-name" autocomplete="off" maxlength="64" value="${esc(pairing.deviceName)}"></label>`);
     parts.push(`<div class="pair-answer"><button type="button" class="btn" data-action="pair-no">Different</button><button type="button" class="btn primary" data-action="pair-yes">Same digits</button></div>`);
   }
   if (pairing.phase === "admitting") parts.push(`<div class="center">Waiting for you to answer y in the terminal …</div>`);
@@ -227,17 +230,19 @@ function loginScreen(signUp) {
   if (signUp) {
     return (
       top("Sign up") +
-      `<div class="center">Enter your invite and pick a handle. Then this device adds a passkey.</div>
+      `<div class="center">Enter your invite and pick an account name. Then this device adds a passkey.</div>
       <form data-form="signup" class="stack"><label class="task field"><span class="meta">Invite</span><input name="invite" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required></label>
-      <label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label>
+      <label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label>
       <button class="btn primary">Create account with passkey</button></form>${message}<a class="center link" href="#/login">Have an account? Sign in</a>`
     );
   }
+  const fallback = state.byName
+    ? `<form data-form="login" class="stack"><label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label><button class="btn">Sign in with this account</button></form>`
+    : `<button type="button" class="center link" data-action="by-name">Use an account name instead</button>`;
   return (
     top("kelpie") +
     `<div class="center">Sign in with your passkey. This device gets its own keys and reads the board itself; the hub never sees what it says.</div>
-    <form data-form="login" class="stack"><label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label>
-    <button class="btn primary">Sign in with passkey</button></form>${message}<a class="center link" href="/signup">No account yet? Sign up</a>`
+    <button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${message}${fallback}<a class="center link" href="/signup">No account yet? Sign up</a>`
   );
 }
 
@@ -328,7 +333,7 @@ function startFeed() {
   loop();
 }
 
-const deviceName = () => (/iPhone/.test(navigator.userAgent) ? "iPhone" : /iPad/.test(navigator.userAgent) ? "iPad" : /Macintosh/.test(navigator.userAgent) ? "Mac" : "Browser");
+const deviceName = () => proposedName(navigator.userAgent);
 
 async function becomeDevice() {
   const keys = await newDeviceKeys();
@@ -341,19 +346,30 @@ async function becomeDevice() {
 }
 
 function hubMessage(error) {
-  if (error instanceof HubError) {
-    return (
-      {
-        unauthorized: "The invite or the handle does not match.",
-        "handle-taken": "That handle is taken.",
-        "bad-handle": "A handle is lowercase letters, digits and dashes, and starts with a letter.",
-        "rate-limited": "Too many tries. Wait a minute.",
-        "not-found": "There is no account with that handle.",
-      }[error.code] ?? `The hub answered ${error.status} (${error.code}).`
-    );
-  }
+  if (error instanceof HubError) return `The hub answered ${error.status} (${error.code}).`;
   if (error?.name === "NotAllowedError") return "The passkey was cancelled.";
   return error?.message ?? String(error);
+}
+
+const signingIn = signInWith({ account, credentials: navigator.credentials });
+
+async function signedIn(byName) {
+  signingIn.stop();
+  state.byName = false;
+  state.offerPasskey = byName;
+  await becomeDevice();
+}
+
+async function startAutofill() {
+  if (state.device || !(await autofillAvailable())) return;
+  try {
+    await signingIn.autofill();
+    await signedIn(false);
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    state.notice = signInText(error);
+    render();
+  }
 }
 
 async function signUp(form) {
@@ -363,12 +379,37 @@ async function signUp(form) {
   await becomeDevice();
 }
 
-async function logIn(form) {
-  const begun = await account.loginBegin(form.handle.value.trim().toLowerCase());
-  const credential = await navigator.credentials.get(requestOptions(begun.options));
-  await account.loginFinish(begun.ceremony, assertionJSON(credential));
-  await becomeDevice();
+async function signInWithPasskey() {
+  try {
+    await signingIn.withPasskey();
+    await signedIn(false);
+  } catch (error) {
+    if (error instanceof NoPasskeyOffered) state.byName = true;
+    state.notice = signInText(error);
+    render();
+    if (state.byName) startAutofill();
+  }
 }
+
+async function logIn(form) {
+  await signingIn.byName(form.handle.value);
+  await signedIn(true);
+}
+
+async function offerPasskey(yes) {
+  state.offerPasskey = false;
+  if (yes) {
+    try {
+      await addPasskey({ account, credentials: navigator.credentials, name: deviceName() });
+    } catch (error) {
+      state.notice = signUpText(error) ?? hubMessage(error);
+    }
+  }
+  render();
+}
+
+const passkeyOffer = () =>
+  state.offerPasskey ? `<section class="task"><div class="meta">${esc(OFFER_TEXT)}</div><div class="pair-answer"><button type="button" class="btn" data-action="passkey-later">Not now</button><button type="button" class="btn primary" data-action="passkey-add">Add passkey</button></div></section>` : "";
 
 let answerPairing = null;
 
@@ -390,11 +431,12 @@ async function startPairing(form) {
             render();
             resolve(answer);
           };
-          state.pairing = { phase: "compare", typed, digits, hubName: offered.hubName ?? "" };
+          state.pairing = { phase: "compare", typed, digits, hubName: offered.hubName ?? "", deviceName: state.device.name ?? deviceName() };
           render();
         }),
     });
     const name = machine.name ?? machine.hubName ?? machine.id.slice(-6);
+    state.device = await keepDeviceName(client, state.device, state.pairing.deviceName, saveDevice).catch(() => state.device);
     state.machines = [...state.machines.filter((known) => known.id !== machine.id), { id: machine.id, keys: machine.keys, name: machine.name, pairedAt: nowSeconds() }];
     await saveMachines(state.machines);
     await put("revs", { ...((await get("revs")) ?? {}), [machine.id]: 0 });
@@ -457,8 +499,14 @@ root.addEventListener("submit", async (event) => {
   if (button) button.disabled = true;
   try {
     if (form.dataset.form === "pair") return await startPairing(form);
-    if (form.dataset.form === "login") await logIn(form);
-    if (form.dataset.form === "signup") await signUp(form);
+    if (form.dataset.form === "login") await logIn(form).catch((error) => {
+      state.notice = signInText(error);
+      render();
+    });
+    if (form.dataset.form === "signup") await signUp(form).catch((error) => {
+      state.notice = signUpText(error) ?? hubMessage(error);
+      render();
+    });
   } catch (error) {
     state.notice = hubMessage(error);
     render();
@@ -480,12 +528,21 @@ root.addEventListener("click", (event) => {
     render();
   } else if (action === "pair-yes") answerPairing?.({ matches: true, name: document.getElementById("machine-name")?.value ?? "" });
   else if (action === "pair-no") answerPairing?.({ matches: false });
+  else if (action === "sign-in") signInWithPasskey();
+  else if (action === "by-name") {
+    state.byName = true;
+    state.notice = null;
+    render();
+    startAutofill();
+  } else if (action === "passkey-add") offerPasskey(true);
+  else if (action === "passkey-later") offerPasskey(false);
   else if (action === "push-on") pushOn();
   else if (action === "push-off") pushOff();
 });
 
 root.addEventListener("input", (event) => {
   if (event.target.id === "machine-name") state.pairing.hubName = event.target.value;
+  if (event.target.id === "device-name") state.pairing.deviceName = event.target.value;
 });
 
 addEventListener("hashchange", () => {
@@ -513,7 +570,7 @@ async function start() {
   await followNames((await get("boards"))?.boards);
   state.attempts = await loadAttempts();
   render();
-  if (!state.device) return;
+  if (!state.device) return startAutofill();
   await refresh();
   startFeed();
   state.push = await pushStatus().catch(() => ({ status: "unsupported" }));

@@ -16,7 +16,7 @@ use kelpie_hub_fakes::{HubClient, PairError};
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use webauthn_authenticator_rs::WebauthnAuthenticator;
-use webauthn_authenticator_rs::softpasskey::SoftPasskey;
+use kelpie_hub_fakes::passkey::DiscoverablePasskey;
 use webauthn_rs_proto::UserVerificationPolicy;
 
 const SOON: Duration = Duration::from_secs(5);
@@ -645,7 +645,7 @@ async fn a_stranger_cannot_remove_another_accounts_passkey() {
 async fn a_passkey_without_user_verification_is_refused_at_sign_up() {
     let test = start_hub(|_| {}).await;
     let mut person = Person::new(&test.url);
-    person.passkey = WebauthnAuthenticator::new(SoftPasskey::new(false));
+    person.passkey = WebauthnAuthenticator::new(DiscoverablePasskey::new(false));
     let mut ceremony: CreationCeremony =
         body(person.begin_sign_up(&test.hub.mint_invite().unwrap()).await).await;
     if let Some(selection) = &mut ceremony.options.public_key.authenticator_selection {

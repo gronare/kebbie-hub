@@ -1,8 +1,10 @@
 import { CONNECT_TEXT, connectCommitment, connectText, finishConnect, parseConnectFragment, planLine, safeNext, withReauth } from "./connect.js";
+import { keepDeviceName, proposedName } from "./device-name.js";
+import { addPasskey, autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText } from "./signin.js";
 import { account, admin, connectCalls, deviceClient, HubError } from "./hub.js";
 import { get, loadDevice, loadMachines, newDeviceKeys, put, saveDevice, saveMachines } from "./keystore.js";
 import { failureText, pair, PairingFailed } from "./pairing.js";
-import { assertionJSON, creationOptions, registrationJSON, requestOptions, supported as passkeysSupported } from "./passkey.js";
+import { creationOptions, registrationJSON, supported as passkeysSupported } from "./passkey.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/add", "/admin"];
 
@@ -10,12 +12,10 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${ch
 const top = (title, aside = "") => `<header class="top"><b>${esc(title)}</b><span>${esc(aside)}</span></header>`;
 const say = (text, tone = "") => `<div class="center${tone ? ` ${tone}` : ""}"${tone === "warn" ? ' role="alert"' : ""}>${text}</div>`;
 const when = (seconds) => (seconds ? new Date(seconds * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never");
-const deviceName = () => (/iPhone/.test(navigator.userAgent) ? "iPhone" : /iPad/.test(navigator.userAgent) ? "iPad" : /Macintosh/.test(navigator.userAgent) ? "Mac" : "Browser");
+const deviceName = () => proposedName(navigator.userAgent);
 
 const ERRORS = {
-  unauthorized: "That did not match. Check the handle, or ask for a new link.",
-  "handle-taken": "That handle is taken.",
-  "bad-handle": "A handle is lowercase letters, digits and dashes, and starts with a letter.",
+  unauthorized: "That link is used or expired. Ask for a new one.",
   "email-taken": "That email already has an account. Sign in instead.",
   "bad-email": "That does not look like an email address.",
   "signup-closed": "This hub signs people up by invite only.",
@@ -35,7 +35,7 @@ export function startPage(root) {
   const params = new URLSearchParams(location.search);
   const fragment = parseConnectFragment(location.hash);
   if (location.hash && location.pathname === "/connect") history.replaceState(null, "", location.pathname + location.search);
-  const state = { info: null, me: null, notice: null, busy: false, phase: "start", view: null, tab: "overview" };
+  const state = { info: null, me: null, notice: null, busy: false, phase: "start", view: null, tab: "overview", byName: false, offerPasskey: false };
   const path = location.pathname;
   const here = () => location.pathname + location.search;
 
@@ -49,10 +49,35 @@ export function startPage(root) {
     draw();
   };
 
-  async function signIn(handle) {
-    const begun = await account.loginBegin(handle.trim().toLowerCase());
-    const credential = await navigator.credentials.get(requestOptions(begun.options));
-    state.me = await account.loginFinish(begun.ceremony, assertionJSON(credential));
+  const signingIn = signInWith({ account, credentials: navigator.credentials });
+
+  async function signedIn(me, byName) {
+    signingIn.stop();
+    state.me = me;
+    state.byName = false;
+    state.offerPasskey = byName;
+    state.notice = null;
+    const next = path === "/signup" ? safeNext(params.get("next")) : null;
+    if (next) return location.assign(next);
+    await loadView();
+    draw();
+  }
+
+  const signInFailed = (error) => {
+    if (error instanceof NoPasskeyOffered) state.byName = true;
+    state.busy = false;
+    state.notice = signInText(error);
+    draw();
+    if (state.byName) startAutofill();
+  };
+
+  async function startAutofill() {
+    if (state.me || !(await autofillAvailable())) return;
+    try {
+      await signedIn(await signingIn.autofill(), false);
+    } catch (error) {
+      if (error?.name !== "AbortError") signInFailed(error);
+    }
   }
 
   async function signUp(ticket, handle) {
@@ -61,7 +86,9 @@ export function startPage(root) {
     state.me = await account.registerFinish(begun.ceremony, registrationJSON(credential), deviceName());
   }
 
-  const reauth = () => signIn(state.me.handle);
+  const reauth = async () => {
+    state.me = await signingIn.byName(state.me.handle);
+  };
 
   async function thisDevice() {
     const known = await loadDevice();
@@ -83,18 +110,22 @@ export function startPage(root) {
   const signInForm = (purpose) => {
     const next = encodeURIComponent(here());
     const join = state.info?.signup === "open" ? "No account yet? Sign up" : "Have an invite? Sign up";
-    return `${say(esc(purpose))}<form data-form="sign-in" class="stack"><label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label><button class="btn primary">Sign in with passkey</button></form><a class="center link" href="/signup?next=${next}">${join}</a>`;
+    const fallback = state.byName
+      ? `<form data-form="sign-in" class="stack"><label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label><button class="btn">Sign in with this account</button></form>`
+      : `<button type="button" class="center link" data-action="by-name">Use an account name instead</button>`;
+    return `${say(esc(purpose))}<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${notice()}${fallback}<a class="center link" href="/signup?next=${next}">${join}</a>`;
   };
 
-  const handleForm = (button) => `<form data-form="handle" class="stack"><label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label><button class="btn primary">${esc(button)}</button></form>`;
+  const handleForm = (button) => `<form data-form="handle" class="stack"><label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label><button class="btn primary">${esc(button)}</button></form>`;
 
-  const notice = () => (state.notice ? say(esc(state.notice), "warn") : "");
+  const offer = () => (state.offerPasskey && state.me ? `<section class="task"><div class="meta">${esc(OFFER_TEXT)}</div><div class="pair-answer"><button type="button" class="btn" data-action="passkey-later">Not now</button><button type="button" class="btn primary" data-action="passkey-add">Add passkey</button></div></section>` : "");
+  const notice = () => offer() + (state.notice ? say(esc(state.notice), "warn") : "");
 
   function setupPage() {
     if (state.phase === "done") return top("Set up this hub") + say(`You own this hub, ${esc(state.me.handle)}.`, "ok") + `<a class="btn primary" href="/admin">Open admin</a><a class="btn" href="/">Open kelpie</a>`;
     if (!state.info?.needs_setup) return top("Set up this hub") + say("This hub has an owner already.") + `<a class="btn" href="/">Sign in</a>`;
     if (!params.get("token")) return top("Set up this hub") + say("Open the setup link the hub printed in its log when it started.");
-    return top("Set up this hub") + say("Pick a handle for the owner account. A passkey signs you in; there is no password.") + handleForm("Create owner account") + notice();
+    return top("Set up this hub") + say("Pick an account name for the owner. A passkey signs you in; there is no password.") + handleForm("Create owner account") + notice();
   }
 
   function signupPage() {
@@ -102,14 +133,14 @@ export function startPage(root) {
     if (state.me) return parts.join("") + say(`You're signed in as ${esc(state.me.handle)}.`, "ok") + `<a class="btn primary" href="${esc(safeNext(params.get("next")) ?? "/")}">Continue</a>`;
     if (params.get("verify")) {
       if (!state.view) return parts.join("") + say("This link has expired or was already used. Sign up again.", "warn");
-      return parts.join("") + say(`Your email ${esc(state.view.email)} is verified. Pick a handle.`) + handleForm("Create account with passkey") + notice();
+      return parts.join("") + say(`Your email ${esc(state.view.email)} is verified. Pick an account name.`) + handleForm("Create account with passkey") + notice();
     }
-    if (params.get("invite")) return parts.join("") + say("You're invited. Pick a handle; a passkey signs you in.") + handleForm("Create account with passkey") + notice();
+    if (params.get("invite")) return parts.join("") + say("You're invited. Pick an account name; a passkey signs you in.") + handleForm("Create account with passkey") + notice();
     if (state.info?.signup === "open") {
       if (state.phase === "mailed") return parts.join("") + say(`Check your inbox at <b>${esc(state.view)}</b>. The link works once, for 24 hours.`, "ok");
       return parts.join("") + say("Enter your email. You get a link to finish signing up.") + `<form data-form="email" class="stack"><label class="task field"><span class="meta">Email</span><input name="email" type="email" autocomplete="email" required></label><button class="btn primary">Send the link</button></form>` + notice() + `<a class="center link" href="/">Have an account? Sign in</a>`;
     }
-    return parts.join("") + say("Enter your invite and pick a handle.") + `<form data-form="invite" class="stack"><label class="task field"><span class="meta">Invite</span><input name="invite" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required></label><label class="task field"><span class="meta">Handle</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label><button class="btn primary">Create account with passkey</button></form>` + notice();
+    return parts.join("") + say("Enter your invite and pick an account name.") + `<form data-form="invite" class="stack"><label class="task field"><span class="meta">Invite</span><input name="invite" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required></label><label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" required></label><button class="btn primary">Create account with passkey</button></form>` + notice();
   }
 
   function planBlock() {
@@ -122,7 +153,7 @@ export function startPage(root) {
     const code = params.get("code") ?? "";
     const parts = [top("Connect a machine")];
     if (!passkeysSupported()) return parts.join("") + say("This browser cannot sign in with a passkey.");
-    if (!state.me) return parts.join("") + signInForm("Sign in to connect this machine.") + notice();
+    if (!state.me) return parts.join("") + signInForm("Sign in to connect this machine.");
     parts.push(say(`You're signed in as <b>${esc(state.me.handle)}</b>.`));
     if (state.phase === "connected") return parts.join("") + say(`Connected. kelpie on ${esc(state.view.name)} reaches this hub now. You can close this tab.`, "ok");
     if (state.phase === "pairing") return parts.join("") + say(`Connected. Opening ${esc(state.view.name)}'s board in this browser …`, "ok");
@@ -143,12 +174,13 @@ export function startPage(root) {
   function addPage() {
     const parts = [top("Add this phone")];
     if (!passkeysSupported()) return parts.join("") + say("This browser cannot sign in with a passkey.");
-    if (!state.me) return parts.join("") + signInForm("Sign in to add this phone to your machine.") + notice();
+    if (!state.me) return parts.join("") + signInForm("Sign in to add this phone to your machine.");
     if (state.phase === "done") return parts.join("") + say(`Added to ${esc(state.view.name)}. Opening the board …`, "ok");
     if (state.phase === "compare") {
       return (
         parts.join("") +
         `<section class="task"><div class="name">Check that your terminal shows:</div><div class="code" aria-live="polite">${esc(state.digits)}</div><div class="meta">Same digits on both? Answer y in the terminal and tap Same here. Different digits mean someone is in between: answer n there and tap Different.</div></section>` +
+        `<label class="task field"><span class="meta">Name of this device, as the machine lists it</span><input name="device-name" id="device-name" autocomplete="off" maxlength="64" value="${esc(state.deviceName ?? "")}"></label>` +
         `<div class="pair-answer"><button type="button" class="btn" data-action="different">Different</button><button type="button" class="btn primary" data-action="same">Same digits</button></div>`
       );
     }
@@ -204,7 +236,7 @@ export function startPage(root) {
   }
 
   function adminPage() {
-    if (!state.me) return top("Admin") + signInForm("Sign in as the hub's owner.") + notice();
+    if (!state.me) return top("Admin") + signInForm("Sign in as the hub's owner.");
     if (!state.me.owner) return top("Admin") + say("Only the hub's owner sees this page.");
     const tabs = `<nav class="tabs">${TABS.map(([key, label]) => `<a href="#${key}" class="${state.tab === key ? "on" : ""}">${esc(label)}</a>`).join("")}</nav>`;
     return top("Admin", state.me.handle) + tabs + notice() + adminBody();
@@ -281,6 +313,7 @@ export function startPage(root) {
     draw();
     try {
       const device = await thisDevice();
+      state.deviceName = device.name ?? deviceName();
       const machine = await pair({
         hub: deviceClient(device.token),
         publicKeys: device.public,
@@ -299,6 +332,7 @@ export function startPage(root) {
           }),
       });
       await keepMachine(machine);
+      await keepDeviceName(deviceClient(device.token), device, state.deviceName, saveDevice).catch(() => device);
       state.phase = "done";
       draw();
       setTimeout(() => location.assign("/#/board"), 800);
@@ -309,6 +343,10 @@ export function startPage(root) {
     }
   }
 
+  root.addEventListener("input", (event) => {
+    if (event.target.id === "device-name") state.deviceName = event.target.value;
+  });
+
   root.addEventListener("submit", async (event) => {
     const form = event.target.closest("form[data-form]");
     if (!form) return;
@@ -317,7 +355,7 @@ export function startPage(root) {
     if (button) button.disabled = true;
     try {
       const kind = form.dataset.form;
-      if (kind === "sign-in") await signIn(form.handle.value);
+      if (kind === "sign-in") return await signingIn.byName(form.handle.value).then((me) => signedIn(me, true), signInFailed);
       if (kind === "email") {
         await account.emailSignup(form.email.value.trim());
         state.view = form.email.value.trim().toLowerCase();
@@ -338,6 +376,11 @@ export function startPage(root) {
       await loadView();
       draw();
     } catch (error) {
+      const said = signUpText(error);
+      if (said) {
+        state.notice = said;
+        return draw();
+      }
       fail(error);
     }
   });
@@ -347,6 +390,18 @@ export function startPage(root) {
     if (!target) return;
     const action = target.dataset.action;
     try {
+      if (action === "sign-in") return await signingIn.withPasskey().then((me) => signedIn(me, false), signInFailed);
+      if (action === "by-name") {
+        state.byName = true;
+        state.notice = null;
+        draw();
+        return startAutofill();
+      }
+      if (action === "passkey-add" || action === "passkey-later") {
+        state.offerPasskey = false;
+        if (action === "passkey-add") await addPasskey({ account, credentials: navigator.credentials, name: deviceName() }).catch((error) => (state.notice = signUpText(error) ?? message(error)));
+        return draw();
+      }
       if (action === "connect") return await connect();
       if (action === "cancel") {
         await connectCalls.deny(params.get("code"));
@@ -389,5 +444,6 @@ export function startPage(root) {
     state.me = await account.me().catch(() => null);
     await loadView();
     draw();
+    startAutofill();
   })();
 }

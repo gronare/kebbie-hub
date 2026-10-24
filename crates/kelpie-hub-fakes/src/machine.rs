@@ -5,7 +5,7 @@ use std::time::Duration;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
-    BoardStored, BoardUpload, Bytes32, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING,
+    AdmittedDevices, BoardStored, BoardUpload, Bytes32, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING,
     CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, DeviceAdd, Inbox,
     JoinRequest, Joined, MachineName, NoticePosted, NoticeUpload, PairingFailure, PairingOpened,
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
@@ -381,6 +381,11 @@ impl MachineState {
             role: Role::Control,
         });
         Ok(device)
+    }
+
+    pub async fn listed_devices(&self) -> Result<Vec<kelpie_hub_api::AdmittedDevice>, Error> {
+        let listed: AdmittedDevices = self.client().get("/v1/m/devices", &[]).await?;
+        Ok(listed.devices)
     }
 
     pub async fn remove_device(&mut self, device: &Id) -> Result<(), Error> {

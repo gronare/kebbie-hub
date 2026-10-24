@@ -28,8 +28,10 @@ export const account = {
   emailSignup: (email) => call("POST", "/v1/a/signup/email", { body: { email } }),
   verification: (token) => call("GET", `/v1/a/signup/verify?token=${query(token)}`),
   registerFinish: (ceremony, credential, name) => call("POST", "/v1/a/register/finish", { body: { ceremony, credential, name } }),
-  loginBegin: (handle) => call("POST", "/v1/a/login/begin", { body: { handle } }),
+  loginBegin: (handle) => call("POST", "/v1/a/login/begin", { body: handle ? { handle } : {} }),
   loginFinish: (ceremony, credential) => call("POST", "/v1/a/login/finish", { body: { ceremony, credential } }),
+  passkeyBegin: () => call("POST", "/v1/a/passkeys/begin", { body: {} }),
+  passkeyFinish: (ceremony, credential, name) => call("POST", "/v1/a/passkeys/finish", { body: { ceremony, credential, name } }),
   registerDevice: (name) => call("POST", "/v1/a/devices", { body: { name } }),
 };
 
@@ -59,6 +61,7 @@ export function deviceClient(token) {
     commit: (code, commitment) => call("POST", "/v1/d/pairings", { token, body: { code, commitment } }),
     watch: (pairing, seen, wait) => call("GET", `/v1/d/pairings/${encodeURIComponent(pairing)}?seen=${seen}&wait=${wait}`, { token }),
     reveal: (pairing, keys, nonce) => call("POST", `/v1/d/pairings/${encodeURIComponent(pairing)}/reveal`, { token, body: { keys, nonce } }),
+    rename: (name) => call("PUT", "/v1/d/name", { token, body: { name } }),
     subscribePush: (subscription) => call("PUT", "/v1/d/push", { token, body: subscription }),
     unsubscribePush: () => call("DELETE", "/v1/d/push", { token }),
     vapid: () => call("GET", "/v1/push/vapid"),

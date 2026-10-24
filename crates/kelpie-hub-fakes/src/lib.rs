@@ -1,6 +1,7 @@
 pub mod browser;
 pub mod client;
 pub mod machine;
+pub mod passkey;
 pub mod phone;
 pub mod push;
 

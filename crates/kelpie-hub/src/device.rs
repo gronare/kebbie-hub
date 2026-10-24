@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use kelpie_hub_api::{
-    BoardEntry, Boards, CommitRequest, Committed, PairingFailure, PairingState, PairingView,
+    BoardEntry, Boards, CommitRequest, Committed, DeviceName, PairingFailure, PairingState, PairingView,
     RevealRequest, normalize_code,
 };
 use kelpie_hub_protocol::{Envelope, Id, Prefix};
@@ -13,7 +13,7 @@ use crate::error::ApiError;
 use crate::pairing::{Side, Watch, view};
 use crate::store::{Pairing, Store};
 use crate::wake::pairing_key;
-use crate::{Hub, now};
+use crate::{Hub, clean_name, now};
 
 pub async fn commit(
     State(hub): State<Arc<Hub>>,
@@ -183,4 +183,18 @@ pub async fn boards(
         })
         .collect::<Result<Vec<_>, ApiError>>()?;
     Ok(Json(Boards { boards }))
+}
+
+pub async fn rename(
+    State(hub): State<Arc<Hub>>,
+    DeviceAuth(device): DeviceAuth,
+    Json(request): Json<DeviceName>,
+) -> Result<Json<DeviceName>, ApiError> {
+    let name = clean_name(&request.name).ok_or(ApiError::bad_request("bad-name"))?;
+    let store = hub.store();
+    store.rename_device(&device, name)?;
+    store.log(now(), "device.renamed", None, Some(&device), None)?;
+    Ok(Json(DeviceName {
+        name: name.to_string(),
+    }))
 }

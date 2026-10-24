@@ -17,7 +17,12 @@ use kelpie_hub_protocol::{Id, Prefix};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use webauthn_rs::prelude::{
-    CredentialID, Passkey, PasskeyAuthentication, PasskeyRegistration, Uuid, WebauthnError,
+    AuthenticationResult, CreationChallengeResponse, CredentialID, DiscoverableAuthentication,
+    DiscoverableKey, Passkey, PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential,
+    Uuid, WebauthnError,
+};
+use webauthn_rs_proto::{
+    AuthenticatorSelectionCriteria, ResidentKeyRequirement, UserVerificationPolicy,
 };
 
 use crate::auth::{
@@ -60,6 +65,17 @@ fn new_id() -> String {
 fn refused(error: WebauthnError) -> ApiError {
     eprintln!("kelpie-hub: passkey refused: {error}");
     ApiError::bad_request("passkey-refused")
+}
+
+// Sign-in names no account, so every passkey the hub makes must be one the authenticator can offer by itself.
+fn discoverable(mut options: CreationChallengeResponse) -> CreationChallengeResponse {
+    options.public_key.authenticator_selection = Some(AuthenticatorSelectionCriteria {
+        authenticator_attachment: None,
+        resident_key: Some(ResidentKeyRequirement::Required),
+        require_resident_key: true,
+        user_verification: UserVerificationPolicy::Required,
+    });
+    options
 }
 
 fn to_json<T: Serialize>(value: &T) -> Result<String, ApiError> {
@@ -206,6 +222,7 @@ pub async fn register_begin(
         .webauthn()
         .start_passkey_registration(user, &handle, &handle, None)
         .map_err(refused)?;
+    let options = discoverable(options);
     let ceremony = save_ceremony(
         &hub,
         Purpose::SignUp,
@@ -280,7 +297,16 @@ pub async fn login_begin(
     Json(request): Json<LoginBegin>,
 ) -> Result<Json<RequestCeremony>, ApiError> {
     hub.limit_anonymous(&client.address)?;
-    let handle = normalize_handle(&request.handle).ok_or_else(ApiError::unauthorized)?;
+    let Some(typed) = request.handle.filter(|typed| !typed.trim().is_empty()) else {
+        let (mut options, state) = hub
+            .webauthn()
+            .start_discoverable_authentication()
+            .map_err(refused)?;
+        options.mediation = None;
+        let ceremony = save_ceremony(&hub, Purpose::LogIn, None, to_json(&state)?, None)?;
+        return Ok(Json(RequestCeremony { ceremony, options }));
+    };
+    let handle = normalize_handle(&typed).ok_or_else(ApiError::unauthorized)?;
     let (account, stored) = {
         let store = hub.store();
         let account = store
@@ -310,6 +336,50 @@ pub async fn login_begin(
     Ok(Json(RequestCeremony { ceremony, options }))
 }
 
+fn unknown_passkey() -> ApiError {
+    ApiError::new(StatusCode::UNAUTHORIZED, "unknown-passkey")
+}
+
+fn passkey_failed(error: WebauthnError) -> ApiError {
+    eprintln!("kelpie-hub: passkey refused: {error}");
+    ApiError::unauthorized()
+}
+
+// The authenticator named the account through the credential's user handle, so the account is looked up from it and only its own passkeys are allowed.
+fn discovered(
+    hub: &Hub,
+    credential: &PublicKeyCredential,
+    state: &str,
+) -> Result<(String, AuthenticationResult), ApiError> {
+    let state: DiscoverableAuthentication = from_json(state)?;
+    let (user, _) = hub
+        .webauthn()
+        .identify_discoverable_authentication(credential)
+        .map_err(|_| unknown_passkey())?;
+    let (account, stored) = {
+        let store = hub.store();
+        let account = store
+            .account_by_user_handle(user.as_bytes())?
+            .ok_or_else(unknown_passkey)?;
+        if store
+            .account(&account)?
+            .is_none_or(|row| row.deactivated_at.is_some())
+        {
+            return Err(ApiError::unauthorized());
+        }
+        (account.clone(), store.passkeys(&account)?)
+    };
+    let keys = stored
+        .iter()
+        .map(|stored| from_json::<Passkey>(&stored.passkey).map(|passkey| DiscoverableKey::from(&passkey)))
+        .collect::<Result<Vec<_>, _>>()?;
+    let result = hub
+        .webauthn()
+        .finish_discoverable_authentication(credential, state, &keys)
+        .map_err(passkey_failed)?;
+    Ok((account, result))
+}
+
 pub async fn login_finish(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
@@ -318,15 +388,17 @@ pub async fn login_finish(
 ) -> Result<WithCookie<AccountView>, ApiError> {
     hub.limit_anonymous(&client.address)?;
     let ceremony = take_ceremony(&hub, &request.ceremony, Purpose::LogIn)?;
-    let account = ceremony.account.ok_or_else(ApiError::internal)?;
-    let state: PasskeyAuthentication = from_json(&ceremony.state)?;
-    let result = hub
-        .webauthn()
-        .finish_passkey_authentication(&request.credential, &state)
-        .map_err(|error| {
-            eprintln!("kelpie-hub: passkey refused: {error}");
-            ApiError::unauthorized()
-        })?;
+    let (account, result) = match ceremony.account {
+        Some(account) => {
+            let state: PasskeyAuthentication = from_json(&ceremony.state)?;
+            let result = hub
+                .webauthn()
+                .finish_passkey_authentication(&request.credential, &state)
+                .map_err(passkey_failed)?;
+            (account, result)
+        }
+        None => discovered(&hub, &request.credential, &ceremony.state)?,
+    };
     let used: &[u8] = result.cred_id().as_ref();
     let at = now();
     let session = new_token(SESSION_TOKEN_PREFIX);
@@ -503,6 +575,7 @@ pub async fn passkey_begin(
             Some(exclude),
         )
         .map_err(refused)?;
+    let options = discoverable(options);
     let ceremony = save_ceremony(
         &hub,
         Purpose::AddPasskey,

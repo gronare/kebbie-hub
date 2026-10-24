@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use kelpie_hub_api::{ConnectState, PairingFailure, PairingState, PlanStatus};
+use kelpie_hub_api::{AdmittedDevice, ConnectState, PairingFailure, PairingState, PlanStatus};
 use kelpie_hub_protocol::{BugReport, ErrorSignals, Header, Id, PublicKeys};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
@@ -271,6 +271,7 @@ pub const SIGNAL_KEEP_DAYS: u64 = 180;
 pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
+pub const DEVICE_SEEN_EVERY: u64 = 60;
 
 pub struct Store {
     connection: Connection,
@@ -530,8 +531,8 @@ impl Store {
 
     pub fn touch_device(&self, device: &Id, now: u64) -> Result<()> {
         self.connection.execute(
-            "UPDATE devices SET last_seen = ?2 WHERE id = ?1",
-            params![device.as_str(), now],
+            "UPDATE devices SET last_seen = ?2 WHERE id = ?1 AND (last_seen IS NULL OR last_seen + ?3 <= ?2)",
+            params![device.as_str(), now, DEVICE_SEEN_EVERY],
         )?;
         Ok(())
     }
@@ -1021,6 +1022,33 @@ impl Store {
             .collect()
     }
 
+    pub fn admitted_device_views(&self, machine: &Id) -> Result<Vec<AdmittedDevice>> {
+        let mut statement = self.connection.prepare(
+            "SELECT devices.id, devices.name, admissions.admitted_at, devices.last_seen,
+                    EXISTS (SELECT 1 FROM push_subscriptions WHERE push_subscriptions.device_id = devices.id)
+             FROM admissions JOIN devices ON devices.id = admissions.device_id
+             WHERE admissions.machine_id = ?1 ORDER BY admissions.admitted_at, devices.id",
+        )?;
+        statement
+            .query_map([machine.as_str()], |row| {
+                Ok(AdmittedDevice {
+                    device: id_at(row, 0)?,
+                    name: row.get(1)?,
+                    paired_at: row.get(2)?,
+                    last_seen: row.get(3)?,
+                    notifications: row.get(4)?,
+                })
+            })?
+            .collect()
+    }
+
+    pub fn rename_device(&self, device: &Id, name: &str) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE devices SET name = ?2 WHERE id = ?1",
+            params![device.as_str(), name],
+        )? == 1)
+    }
+
     pub fn device_exists(&self, device: &Id) -> Result<bool> {
         self.connection.query_row(
             "SELECT EXISTS (SELECT 1 FROM devices WHERE id = ?1)",
@@ -1393,6 +1421,16 @@ impl Store {
             .query_row(
                 "SELECT id FROM accounts WHERE handle = ?1",
                 [handle],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn account_by_user_handle(&self, user_handle: &[u8]) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT id FROM accounts WHERE user_handle = ?1",
+                [user_handle],
                 |row| row.get(0),
             )
             .optional()

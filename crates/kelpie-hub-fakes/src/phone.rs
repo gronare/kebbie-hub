@@ -2,7 +2,8 @@ use std::fmt;
 use std::time::Duration;
 
 use kelpie_hub_api::{
-    Boards, Bytes32, CommandQueued, CommandUpload, CommitRequest, Committed, PairingState,
+    Boards, Bytes32, CommandQueued, CommandUpload, CommitRequest, Committed, DeviceName,
+    PairingState,
     PairingView, ResultEntry, Results, RevealRequest, normalize_code,
 };
 use kelpie_hub_protocol::{
@@ -412,6 +413,19 @@ impl PhoneState {
             Payload::Result(_) => Err("the result names another command".into()),
             _ => Err("is not a result".into()),
         }
+    }
+
+    pub async fn rename(&self, name: &str) -> Result<String, Error> {
+        let renamed: DeviceName = self
+            .client()
+            .put(
+                "/v1/d/name",
+                &DeviceName {
+                    name: name.to_string(),
+                },
+            )
+            .await?;
+        Ok(renamed.name)
     }
 
     pub async fn subscribe_push(&mut self, endpoint: &str) -> Result<PushSecret, Error> {

@@ -310,7 +310,8 @@ pub struct RegisterBegin {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoginBegin {
-    pub handle: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handle: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -471,6 +472,25 @@ pub struct DeviceView {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Devices {
     pub devices: Vec<DeviceView>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmittedDevice {
+    pub device: Id,
+    pub name: Option<String>,
+    pub paired_at: u64,
+    pub last_seen: Option<u64>,
+    pub notifications: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdmittedDevices {
+    pub devices: Vec<AdmittedDevice>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceName {
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

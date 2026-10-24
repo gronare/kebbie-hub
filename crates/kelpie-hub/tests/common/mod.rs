@@ -20,7 +20,7 @@ use tempfile::TempDir;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use webauthn_authenticator_rs::WebauthnAuthenticator;
-use webauthn_authenticator_rs::softpasskey::SoftPasskey;
+use kelpie_hub_fakes::passkey::DiscoverablePasskey;
 use webauthn_rs::prelude::Url;
 
 pub const EXAMPLE_BOARD: &str = include_str!("../../../../examples/board.json");
@@ -111,8 +111,8 @@ pub fn origin() -> Url {
     Url::parse(DEV_ORIGIN).unwrap()
 }
 
-pub fn soft_passkey() -> WebauthnAuthenticator<SoftPasskey> {
-    WebauthnAuthenticator::new(SoftPasskey::new(true))
+pub fn soft_passkey() -> WebauthnAuthenticator<DiscoverablePasskey> {
+    WebauthnAuthenticator::new(DiscoverablePasskey::new(true))
 }
 
 static PEOPLE: AtomicUsize = AtomicUsize::new(0);
@@ -126,7 +126,7 @@ pub struct Person {
     pub handle: String,
     pub cookie: Option<String>,
     pub origin: Option<String>,
-    pub passkey: WebauthnAuthenticator<SoftPasskey>,
+    pub passkey: WebauthnAuthenticator<DiscoverablePasskey>,
     http: reqwest::Client,
 }
 
@@ -241,12 +241,16 @@ impl Person {
             self.post(
                 "/v1/a/login/begin",
                 &LoginBegin {
-                    handle: self.handle.clone(),
+                    handle: Some(self.handle.clone()),
                 },
             )
             .await,
         )
         .await
+    }
+
+    pub async fn begin_discoverable_log_in(&self) -> RequestCeremony {
+        body(self.post("/v1/a/login/begin", &LoginBegin { handle: None }).await).await
     }
 
     pub async fn finish_log_in(&mut self, ceremony: RequestCeremony) -> Response {
@@ -276,7 +280,7 @@ impl Person {
 
     pub async fn add_passkey(
         &self,
-        authenticator: &mut WebauthnAuthenticator<SoftPasskey>,
+        authenticator: &mut WebauthnAuthenticator<DiscoverablePasskey>,
     ) -> PasskeyView {
         let ceremony: CreationCeremony = body(self.post("/v1/a/passkeys/begin", &()).await).await;
         let credential = authenticator

@@ -1366,6 +1366,7 @@ dependencies = [
  "sha2",
  "tokio",
  "webauthn-authenticator-rs",
+ "webauthn-rs-proto",
 ]
 
 [[package]]

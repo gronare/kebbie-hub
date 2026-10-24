@@ -11,8 +11,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use webauthn_authenticator_rs::WebauthnAuthenticator;
 use webauthn_authenticator_rs::prelude::Url;
-use webauthn_authenticator_rs::softpasskey::SoftPasskey;
 
+use crate::passkey::DiscoverablePasskey;
 use crate::phone::PhoneState;
 use crate::{HubError, PairError};
 
@@ -23,7 +23,7 @@ pub struct Browser {
     pub origin: String,
     pub handle: String,
     pub cookie: Option<String>,
-    pub passkey: WebauthnAuthenticator<SoftPasskey>,
+    pub passkey: WebauthnAuthenticator<DiscoverablePasskey>,
     pub device: Option<PhoneState>,
     http: reqwest::Client,
 }
@@ -69,7 +69,7 @@ impl Browser {
             origin: origin.to_string(),
             handle: handle.to_string(),
             cookie: None,
-            passkey: WebauthnAuthenticator::new(SoftPasskey::new(true)),
+            passkey: WebauthnAuthenticator::new(DiscoverablePasskey::new(true)),
             device: None,
             http: reqwest::Client::new(),
         }
@@ -200,13 +200,16 @@ impl Browser {
     }
 
     pub async fn log_in(&mut self) -> Result<AccountView, HubError> {
+        self.log_in_as(None).await
+    }
+
+    pub async fn log_in_with_handle(&mut self) -> Result<AccountView, HubError> {
+        self.log_in_as(Some(self.handle.clone())).await
+    }
+
+    async fn log_in_as(&mut self, handle: Option<String>) -> Result<AccountView, HubError> {
         let ceremony: RequestCeremony = self
-            .post(
-                "/v1/a/login/begin",
-                &LoginBegin {
-                    handle: self.handle.clone(),
-                },
-            )
+            .post("/v1/a/login/begin", &LoginBegin { handle })
             .await?;
         let credential = self
             .passkey

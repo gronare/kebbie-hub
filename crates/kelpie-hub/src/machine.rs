@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kelpie_hub_api::{
-    BoardStored, BoardUpload, Inbox, JoinRequest, Joined, MachineName, PairingFailure,
+    AdmittedDevices, BoardStored, BoardUpload, Inbox, JoinRequest, Joined, MachineName, PairingFailure,
     PairingOpened, PairingRefusal, PairingReply, PairingState, PairingView, QueuedMessage,
     code_from_random, normalize_code,
 };
@@ -300,6 +300,14 @@ pub async fn refuse(
     drop(store);
     hub.wake_pairing(&pairing);
     Ok(Json(view(&pairing, Side::Machine, at)))
+}
+
+pub async fn devices(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+) -> Result<Json<AdmittedDevices>, ApiError> {
+    let devices = hub.store().admitted_device_views(&machine)?;
+    Ok(Json(AdmittedDevices { devices }))
 }
 
 pub async fn remove_device(
