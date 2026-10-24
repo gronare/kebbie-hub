@@ -1303,7 +1303,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kelpie-hub"
+name = "kebbie-hub"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
@@ -1318,9 +1318,9 @@ dependencies = [
  "http-body",
  "hyper",
  "hyper-util",
- "kelpie-hub-api",
- "kelpie-hub-fakes",
- "kelpie-hub-protocol",
+ "kebbie-hub-api",
+ "kebbie-hub-fakes",
+ "kebbie-hub-protocol",
  "openssl",
  "p256",
  "reqwest",
@@ -1339,17 +1339,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "kelpie-hub-api"
+name = "kebbie-hub-api"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
- "kelpie-hub-protocol",
+ "kebbie-hub-protocol",
  "serde",
  "webauthn-rs-proto",
 ]
 
 [[package]]
-name = "kelpie-hub-fakes"
+name = "kebbie-hub-fakes"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
@@ -1357,8 +1357,8 @@ dependencies = [
  "clap",
  "getrandom 0.4.3",
  "hkdf",
- "kelpie-hub-api",
- "kelpie-hub-protocol",
+ "kebbie-hub-api",
+ "kebbie-hub-protocol",
  "p256",
  "reqwest",
  "serde",
@@ -1370,7 +1370,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kelpie-hub-protocol"
+name = "kebbie-hub-protocol"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",

@@ -13,11 +13,11 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM toolchain AS build
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
-    cargo build --locked --release -j ${JOBS} -p kelpie-hub \
-    && cp target/release/kelpie-hub /kelpie-hub
+    cargo build --locked --release -j ${JOBS} -p kebbie-hub \
+    && cp target/release/kebbie-hub /kebbie-hub
 
 FROM gcr.io/distroless/static-debian12:nonroot
-COPY --from=build /kelpie-hub /usr/local/bin/kelpie-hub
+COPY --from=build /kebbie-hub /usr/local/bin/kebbie-hub
 USER 65532:65532
 EXPOSE 8470
-ENTRYPOINT ["/usr/local/bin/kelpie-hub"]
+ENTRYPOINT ["/usr/local/bin/kebbie-hub"]

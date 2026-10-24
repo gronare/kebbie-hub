@@ -61,14 +61,14 @@ export async function pair({ hub, publicKeys, typed, confirm, timeoutMs = 10 * 6
 }
 
 export const FAILURE_TEXT = {
-  "bad-code": "The code is eight characters, like the one kelpie hub pair shows.",
-  "unknown-code": "That code does not exist or has expired. Run kelpie hub pair again.",
+  "bad-code": "The code is eight characters, like the one kebbie hub pair shows.",
+  "unknown-code": "That code does not exist or has expired. Run kebbie hub pair again.",
   "refused-mismatch": "The machine stopped: the keys did not match. Something may be between you and the machine.",
   "refused-declined": "You answered n in the terminal. This device was not paired.",
-  "refused-timeout": "The machine stopped waiting. Run kelpie hub pair again.",
-  "second-commitment": "Another device used the code at the same time. Run kelpie hub pair again.",
-  expired: "The code expired. Run kelpie hub pair again.",
-  timeout: "Nobody answered in time. Run kelpie hub pair again.",
+  "refused-timeout": "The machine stopped waiting. Run kebbie hub pair again.",
+  "second-commitment": "Another device used the code at the same time. Run kebbie hub pair again.",
+  expired: "The code expired. Run kebbie hub pair again.",
+  timeout: "Nobody answered in time. Run kebbie hub pair again.",
   "machine-changed": "The hub switched machines halfway. This device does not trust it.",
   incomplete: "The hub left out the machine's keys.",
   "phone-mismatch": "You saw different digits than the terminal. This device does not trust the machine; answer n in the terminal and try again.",

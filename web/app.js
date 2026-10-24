@@ -73,7 +73,7 @@ const problemText = (code) => PROBLEMS[code] ?? `does not open (${code})`;
 
 function installHint() {
   if (!state.hint) return "";
-  return `<div class="hint"><div>Add kelpie to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens as its own app and can show notifications.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>`;
+  return `<div class="hint"><div>Add kebbie to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens as its own app and can show notifications.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>`;
 }
 
 function freshness() {
@@ -83,9 +83,9 @@ function freshness() {
 
 function boardScreen() {
   const view = arrange(state.opened, nowSeconds());
-  const parts = [top("kelpie", esc(freshness())), installHint()];
+  const parts = [top("kebbie", esc(freshness())), installHint()];
   if (state.machines.length === 0) {
-    parts.push(`<div class="center">No machine is connected yet. Run <b>kelpie hub connect</b> on your computer.</div><a class="btn primary" href="#/pair">Pair with a code</a>`);
+    parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div><a class="btn primary" href="#/pair">Pair with a code</a>`);
   } else if (state.opened.length === 0) {
     parts.push(`<div class="center">No connected machine has sent a board yet.</div>`);
   }
@@ -175,9 +175,9 @@ function pushSection() {
   const push = state.push;
   if (!push) return "";
   const text = {
-    "needs-home-screen": "Notifications work once kelpie is on your home screen.",
+    "needs-home-screen": "Notifications work once kebbie is on your home screen.",
     unsupported: "This browser can't receive notifications.",
-    denied: "Notifications are off for kelpie in your settings.",
+    denied: "Notifications are off for kebbie in your settings.",
     on: "Notifications are on. This device decrypts them itself.",
     off: "Get a notification when a task needs you.",
   }[push.status];
@@ -193,7 +193,7 @@ function machinesScreen() {
     const name = machine.name || opened?.name || machine.id.slice(-6);
     const lastSeen = opened?.lastSeen ?? null;
     const awake = !isAsleep({ lastSeen }, now);
-    const facts = opened?.board ? [`last heard ${when(lastSeen)}`, `kelpie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened?.problem ? [problemText(opened.problem)] : ["no board yet"];
+    const facts = opened?.board ? [`last heard ${when(lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened?.problem ? [problemText(opened.problem)] : ["no board yet"];
     return `<div class="task${awake ? "" : " asleep"}"><div class="name">${esc(name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
   });
   const attempts = state.attempts.length
@@ -206,7 +206,7 @@ function machinesScreen() {
 function pairScreen() {
   const pairing = state.pairing;
   const busy = ["working", "compare", "admitting"].includes(pairing.phase);
-  const parts = [top("Pair a machine"), passkeyOffer(), `<div class="center">Run <b>kelpie hub pair</b> on your computer and type the code it shows.</div>`];
+  const parts = [top("Pair a machine"), passkeyOffer(), `<div class="center">Run <b>kebbie hub pair</b> on your computer and type the code it shows.</div>`];
   parts.push(`<form data-form="pair" class="stack"><label class="task field"><span class="meta">Code</span><input name="code" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="12" placeholder="XXXX-XXXX" value="${esc(pairing.typed ?? "")}" ${busy ? "disabled" : ""} required></label><button class="btn primary" ${busy ? "disabled" : ""}>Pair</button></form>`);
   if (pairing.phase === "working") parts.push(`<div class="center">Waiting for the machine …</div>`);
   if (["compare", "admitting", "done"].includes(pairing.phase)) {
@@ -226,7 +226,7 @@ function pairScreen() {
 
 function loginScreen(signUp) {
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  if (!passkeysSupported()) return top("kelpie") + `<div class="center">This browser can't sign in with a passkey.</div>`;
+  if (!passkeysSupported()) return top("kebbie") + `<div class="center">This browser can't sign in with a passkey.</div>`;
   if (signUp) {
     return (
       top("Sign up") +
@@ -240,14 +240,14 @@ function loginScreen(signUp) {
     ? `<form data-form="login" class="stack"><label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label><button class="btn">Sign in with this account</button></form>`
     : `<button type="button" class="center link" data-action="by-name">Use an account name instead</button>`;
   return (
-    top("kelpie") +
+    top("kebbie") +
     `<div class="center">Sign in with your passkey. This device gets its own keys and reads the board itself; the hub never sees what it says.</div>
     <button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${message}${fallback}<a class="center link" href="/signup">No account yet? Sign up</a>`
   );
 }
 
 function unsupportedScreen() {
-  return top("kelpie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519 and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
+  return top("kebbie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519 and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
 }
 
 function render() {
@@ -263,7 +263,7 @@ function render() {
   else if (name === "task") html = taskScreen(params);
   else html = boardScreen();
   root.innerHTML = `<main class="screen">${html}</main>`;
-  document.title = name === "task" && params[1] ? `${params[1].split("@")[0]} · kelpie` : "kelpie";
+  document.title = name === "task" && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
 }
 
 let retrying = null;
@@ -523,7 +523,7 @@ root.addEventListener("click", (event) => {
   } else if (action === "dismiss-hint") {
     state.hint = false;
     try {
-      localStorage.setItem("kelpie-hint-dismissed", "1");
+      localStorage.setItem("kebbie-hint-dismissed", "1");
     } catch {}
     render();
   } else if (action === "pair-yes") answerPairing?.({ matches: true, name: document.getElementById("machine-name")?.value ?? "" });
@@ -559,7 +559,7 @@ async function start() {
   if (onPage) return startPage(root);
   if (!cryptoReady()) return render();
   try {
-    state.hint = isIos() && !isStandalone() && localStorage.getItem("kelpie-hint-dismissed") !== "1";
+    state.hint = isIos() && !isStandalone() && localStorage.getItem("kebbie-hint-dismissed") !== "1";
   } catch {
     state.hint = isIos() && !isStandalone();
   }

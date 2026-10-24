@@ -12,7 +12,7 @@ const { parties } = load("keys.json");
 const envelopes = load("envelopes.json");
 
 test("passkey options from the hub become the buffers WebAuthn takes", () => {
-  const created = creationOptions({ publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" }, rp: { id: "localhost", name: "kelpie hub" }, excludeCredentials: [{ type: "public-key", id: "Bg" }] } });
+  const created = creationOptions({ publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" }, rp: { id: "localhost", name: "kebbie hub" }, excludeCredentials: [{ type: "public-key", id: "Bg" }] } });
   assert.deepEqual([...created.publicKey.challenge], [1, 2, 3]);
   assert.deepEqual([...created.publicKey.user.id], [4, 5]);
   assert.deepEqual([...created.publicKey.excludeCredentials[0].id], [6]);

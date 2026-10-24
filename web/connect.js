@@ -36,14 +36,14 @@ export async function finishConnect({ hub, pairing, publicKeys, fragment, nonce,
 }
 
 export const CONNECT_TEXT = {
-  "unknown-code": "This code has expired or was already used. Run kelpie hub connect again.",
-  "wrong-machine": "The hub offered keys of another machine than the one that opened this link. Nothing was trusted. Run kelpie hub connect again.",
+  "unknown-code": "This code has expired or was already used. Run kebbie hub connect again.",
+  "wrong-machine": "The hub offered keys of another machine than the one that opened this link. Nothing was trusted. Run kebbie hub connect again.",
   "machine-changed": "The hub switched machines halfway. Nothing was trusted.",
-  "refused-mismatch": "The machine refused this browser. Run kelpie hub connect again.",
+  "refused-mismatch": "The machine refused this browser. Run kebbie hub connect again.",
   "not-your-machine": "This machine belongs to another account.",
   "rate-limited": "Too many tries. Wait a minute.",
-  expired: "The connection timed out. Run kelpie hub connect again.",
-  timeout: "The machine did not answer in time. Run kelpie hub connect again.",
+  expired: "The connection timed out. Run kebbie hub connect again.",
+  timeout: "The machine did not answer in time. Run kebbie hub connect again.",
 };
 
 export const connectText = (reason) => CONNECT_TEXT[reason] ?? `That did not work (${reason}).`;

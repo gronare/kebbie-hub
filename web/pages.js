@@ -122,7 +122,7 @@ export function startPage(root) {
   const notice = () => offer() + (state.notice ? say(esc(state.notice), "warn") : "");
 
   function setupPage() {
-    if (state.phase === "done") return top("Set up this hub") + say(`You own this hub, ${esc(state.me.handle)}.`, "ok") + `<a class="btn primary" href="/admin">Open admin</a><a class="btn" href="/">Open kelpie</a>`;
+    if (state.phase === "done") return top("Set up this hub") + say(`You own this hub, ${esc(state.me.handle)}.`, "ok") + `<a class="btn primary" href="/admin">Open admin</a><a class="btn" href="/">Open kebbie</a>`;
     if (!state.info?.needs_setup) return top("Set up this hub") + say("This hub has an owner already.") + `<a class="btn" href="/">Sign in</a>`;
     if (!params.get("token")) return top("Set up this hub") + say("Open the setup link the hub printed in its log when it started.");
     return top("Set up this hub") + say("Pick an account name for the owner. A passkey signs you in; there is no password.") + handleForm("Create owner account") + notice();
@@ -155,7 +155,7 @@ export function startPage(root) {
     if (!passkeysSupported()) return parts.join("") + say("This browser cannot sign in with a passkey.");
     if (!state.me) return parts.join("") + signInForm("Sign in to connect this machine.");
     parts.push(say(`You're signed in as <b>${esc(state.me.handle)}</b>.`));
-    if (state.phase === "connected") return parts.join("") + say(`Connected. kelpie on ${esc(state.view.name)} reaches this hub now. You can close this tab.`, "ok");
+    if (state.phase === "connected") return parts.join("") + say(`Connected. kebbie on ${esc(state.view.name)} reaches this hub now. You can close this tab.`, "ok");
     if (state.phase === "pairing") return parts.join("") + say(`Connected. Opening ${esc(state.view.name)}'s board in this browser …`, "ok");
     if (state.phase === "paired") return parts.join("") + say("Done. Opening the board …", "ok");
     if (state.phase === "cancelled") return parts.join("") + say("Cancelled. The terminal shows it too.");
@@ -232,7 +232,7 @@ export function startPage(root) {
       }).join("");
     }
     if (!view.signals.length) return say("No error signals in the last 7 days.");
-    return view.signals.map((row) => `<div class="task"><div class="row"><div class="name">${esc(`${row.component} ${row.kind}`)}</div><span class="machine">${esc(row.count)}</span></div><div class="meta">${esc([new Date(row.day * 86_400_000).toISOString().slice(0, 10), `kelpie ${row.version}${row.commit ? ` (${row.commit})` : ""}`, `${row.os} ${row.arch}`, row.vetted ? null : "unvetted"].filter(Boolean).join(" · "))}</div></div>`).join("");
+    return view.signals.map((row) => `<div class="task"><div class="row"><div class="name">${esc(`${row.component} ${row.kind}`)}</div><span class="machine">${esc(row.count)}</span></div><div class="meta">${esc([new Date(row.day * 86_400_000).toISOString().slice(0, 10), `kebbie ${row.version}${row.commit ? ` (${row.commit})` : ""}`, `${row.os} ${row.arch}`, row.vetted ? null : "unvetted"].filter(Boolean).join(" · "))}</div></div>`).join("");
   }
 
   function adminPage() {
@@ -245,7 +245,7 @@ export function startPage(root) {
   function draw() {
     const html = { "/setup": setupPage, "/signup": signupPage, "/connect": connectPage, "/add": addPage, "/admin": adminPage }[path]();
     render(html);
-    document.title = `${{ "/setup": "Set up", "/signup": "Sign up", "/connect": "Connect", "/add": "Add phone", "/admin": "Admin" }[path]} · kelpie`;
+    document.title = `${{ "/setup": "Set up", "/signup": "Sign up", "/connect": "Connect", "/add": "Add phone", "/admin": "Admin" }[path]} · kebbie`;
   }
 
   async function loadView() {
@@ -439,7 +439,7 @@ export function startPage(root) {
   });
 
   (async () => {
-    render(top("kelpie"));
+    render(top("kebbie"));
     state.info = await account.hub().catch(() => null);
     state.me = await account.me().catch(() => null);
     await loadView();

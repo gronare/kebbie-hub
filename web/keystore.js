@@ -1,6 +1,6 @@
 import { toB64 } from "../js/protocol.js";
 
-const DB = "kelpie-hub";
+const DB = "kebbie-hub";
 const STORE = "kv";
 let opening = null;
 

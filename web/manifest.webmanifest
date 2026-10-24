@@ -1,7 +1,7 @@
 {
-  "name": "kelpie",
-  "short_name": "kelpie",
-  "description": "The board from every kelpie machine, encrypted end to end.",
+  "name": "kebbie",
+  "short_name": "kebbie",
+  "description": "The board from every kebbie machine, encrypted end to end.",
   "lang": "en",
   "id": "/",
   "start_url": "/#/board",

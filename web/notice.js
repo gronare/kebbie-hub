@@ -1,6 +1,6 @@
 import { importSender, openEnvelope } from "../js/protocol.js";
 
-export const FALLBACK = { title: "kelpie", body: "Something on the board changed.", tag: "kelpie", retract: null, url: "/#/board" };
+export const FALLBACK = { title: "kebbie", body: "Something on the board changed.", tag: "kebbie", retract: null, url: "/#/board" };
 
 export async function openNotice(envelope, identity, machines, now) {
   const machine = machines.find((candidate) => candidate.id === envelope?.machine);

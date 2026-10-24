@@ -1,15 +1,15 @@
-# kelpie-hub
+# kebbie-hub
 
-A hub that lets you follow and steer [kelpie](https://github.com/gronare/kelpie) from your phone. Each machine running kelpie dials out to the hub; your devices read every machine's board, get notified when a task needs you, and answer questions, approve pushes or start tasks.
+A hub that lets you follow and steer [kebbie](https://github.com/gronare/kebbie) from your phone. Each machine running kebbie dials out to the hub; your devices read every machine's board, get notified when a task needs you, and answer questions, approve pushes or start tasks.
 
 The hub is a mailbox, never a party. Everything it carries is end-to-end encrypted between a machine and the devices that machine has paired with, and every command is signed by a device the machine trusts. The hub sees who talks to whom and when, not what is said, and it cannot start anything on a machine.
 
 This repository holds:
 
-- `kelpie-hub-protocol`: envelopes, messages and pairing, error reports, error signals and their proof of work, plus the test vectors other implementations are checked against.
-- `kelpie-hub`: the hub server. It relays sealed boards from machines to the devices they paired with, signed commands from devices to machines and sealed results back, pushes sealed notices to devices through Web Push, and carries pairing between them. It also takes error reports and error signals from kelpie installs for kelpie's maintainers.
-- `kelpie-hub-api`: the request and response bodies of the hub's HTTP API.
-- `kelpie-hub-fakes`: `fake-machine` and `fake-phone`, two CLIs that stand in for kelpie and the web app. The fake machine never runs anything: it prints what kelpie would do.
+- `kebbie-hub-protocol`: envelopes, messages and pairing, error reports, error signals and their proof of work, plus the test vectors other implementations are checked against.
+- `kebbie-hub`: the hub server. It relays sealed boards from machines to the devices they paired with, signed commands from devices to machines and sealed results back, pushes sealed notices to devices through Web Push, and carries pairing between them. It also takes error reports and error signals from kebbie installs for kebbie's maintainers.
+- `kebbie-hub-api`: the request and response bodies of the hub's HTTP API.
+- `kebbie-hub-fakes`: `fake-machine` and `fake-phone`, two CLIs that stand in for kebbie and the web app. The fake machine never runs anything: it prints what kebbie would do.
 
 ## The protocol
 
@@ -19,7 +19,7 @@ This repository holds:
 - **Signature.** Ed25519 over the header bytes followed by the ciphertext. Key rows are outside it, so the hub can hand each device only its own row.
 - **Commands.** `authorize` drops, without any reply, anything that fails before the signature is verified: wrong version or shape, not a command, another machine, an unknown device, a bad signature. A validly signed command whose id the machine already applied for that device gets the stored result again, even once it has expired. Otherwise the machine applies it only if it is unexpired, from a device with the `control` role, of a kind the machine accepts and well formed, and answers a refusal with a reason the device can show.
 
-The message types (board snapshot, notice, answer, push approval, start task, run routine, result, alert) are in `crates/kelpie-hub-protocol/src`. A board carries only allow-listed fields: no local paths, hostnames, pane ids or terminal titles.
+The message types (board snapshot, notice, answer, push approval, start task, run routine, result, alert) are in `crates/kebbie-hub-protocol/src`. A board carries only allow-listed fields: no local paths, hostnames, pane ids or terminal titles.
 
 ## Pairing
 
@@ -32,7 +32,7 @@ Pairing a device with a machine binds both parties' keys without trusting the hu
 
 The flow holds only if each side takes one chance per attempt:
 
-- One pairing invocation (`kelpie hub pair` on the machine, "Pair" in the app) accepts exactly one commitment.
+- One pairing invocation (`kebbie hub pair` on the machine, "Pair" in the app) accepts exactly one commitment.
 - A commitment mismatch, a second commitment or a timeout ends the invocation with a visible failure. The user starts again; nothing retries quietly.
 - The device shows every attempt, including failed ones, so an attempt the user did not start is visible.
 
@@ -40,7 +40,7 @@ A hub that swaps keys has to fix its substitutes before it sees `n_d`, so it mat
 
 ## Connecting a machine
 
-`kelpie hub connect` connects a machine to a hub in one step, in the shape of OAuth's device authorization grant (RFC 8628). Nobody needs a join code or a shell on the hub.
+`kebbie hub connect` connects a machine to a hub in one step, in the shape of OAuth's device authorization grant (RFC 8628). Nobody needs a join code or a shell on the hub.
 
 1. The machine posts its public keys and a name to `POST /v1/m/connect` and gets a `device_code` (its secret for polling), a `user_code` like `K7QF-M2XD`, `verification_uri` and `verification_uri_complete` (`<origin>/connect?code=K7QF-M2XD`), `interval` and `expires_in`.
 2. The machine draws a 32-byte secret of its own and opens `verification_uri_complete#k=<secret>&m=<fingerprint>` in the browser, where the fingerprint is `SHA-256("kelpie-connect-machine-v1" || M)` over its signing and encryption keys. A browser never sends the part after `#` to the hub. `ConnectSecret` in the protocol crate and `parseConnectFragment` and `machineFingerprint` in `js/protocol.js` carry it.
@@ -56,11 +56,11 @@ The codes:
 - Starting a connect is limited per address (10 at once, 10 a minute), looking up and approving codes per account (10 at once, 10 a minute).
 - An approval that is never redeemed leaves nothing: the machine it named is deleted with the expired code.
 
-`kelpie-hub admin join-code` keeps working for scripts; a machine that joined with one belongs to no account.
+`kebbie-hub admin join-code` keeps working for scripts; a machine that joined with one belongs to no account.
 
 ## Adding a phone from the machine
 
-`POST /v1/m/devices/add` opens a pairing as `POST /v1/m/pairings` does and returns `{pairing, code, url, expires_at}`, where `url` is `<origin>/add?code=<code>`. kelpie shows the link and a QR code of it. The phone opens it, signs in with a passkey or signs up (sign-up brings it back to the link), reads "Add this phone to <machine>?" and taps Add. From there it is the pairing above: the phone commits, the machine replies, the phone reveals, and both show six digits. The person answers `y` in the terminal and taps Same on the phone; the machine admits only on its own `y`, because the phone's tap goes through the hub.
+`POST /v1/m/devices/add` opens a pairing as `POST /v1/m/pairings` does and returns `{pairing, code, url, expires_at}`, where `url` is `<origin>/add?code=<code>`. kebbie shows the link and a QR code of it. The phone opens it, signs in with a passkey or signs up (sign-up brings it back to the link), reads "Add this phone to <machine>?" and taps Add. From there it is the pairing above: the phone commits, the machine replies, the phone reveals, and both show six digits. The person answers `y` in the terminal and taps Same on the phone; the machine admits only on its own `y`, because the phone's tap goes through the hub.
 
 The digits stay here because the phone is not where the code was shown: anyone who read the link over a shoulder or photographed the QR code could commit first. The digits come from the reveal, so the machine learns them from `GET /v1/m/pairings/<id>` like any pairing's, not from the call that opens it. A machine that belongs to an account takes devices only from that account (`403 not-your-machine`, at `GET /v1/a/add` and at the commitment).
 
@@ -68,44 +68,44 @@ The digits stay here because the phone is not where the code was shown: anyone w
 
 The hub knows whether each account's plan is `active` or `inactive`, with an optional `until`; subscriptions themselves live in a separate billing service. `--plans off` (the default, for a hub you run for yourself) makes every account entitled. With `--plans on`:
 
-- approving a connect, and every call a machine makes to post or read (board, notice, inbox, results, pairings, adding a device), needs an entitled plan on the account the machine belongs to: `active` with no `until` or one still ahead. Otherwise the answer is `402` with `{"error": "plan-inactive", "url": <--billing-url>}`, for kelpie to show "Start a subscription at <url>".
+- approving a connect, and every call a machine makes to post or read (board, notice, inbox, results, pairings, adding a device), needs an entitled plan on the account the machine belongs to: `active` with no `until` or one still ahead. Otherwise the answer is `402` with `{"error": "plan-inactive", "url": <--billing-url>}`, for kebbie to show "Start a subscription at <url>".
 - signing in, the account page and removing devices keep working. `GET /v1/a/account` carries the plan and, when it is not entitled, `billing_url`.
 - the owner is always entitled, and machines that joined with a join code (no account) are not gated.
 - an account created after the upgrade to schema 7 starts `inactive` until the billing service sets it; accounts carried over from an older schema start `active`.
 
-The billing service uses an admin token with the `billing` scope (`kelpie-hub admin token --name billing --scope billing`): `GET /v1/admin/accounts?email=<address>` finds an account by its verified email, and `PUT /v1/admin/accounts/<id>/plan` with `{status, until?}` sets the plan. Both answer `{account, handle, email, plan: {status, until, entitled}}`. A token of the other scope gets `403 wrong-scope`.
+The billing service uses an admin token with the `billing` scope (`kebbie-hub admin token --name billing --scope billing`): `GET /v1/admin/accounts?email=<address>` finds an account by its verified email, and `PUT /v1/admin/accounts/<id>/plan` with `{status, until?}` sets the plan. Both answer `{account, handle, email, plan: {status, until, entitled}}`. A token of the other scope gets `403 wrong-scope`.
 
 ## Running a hub locally
 
 ```sh
 cargo build --workspace
-target/debug/kelpie-hub --dev
+target/debug/kebbie-hub --dev
 ```
 
 The hub links OpenSSL (through `webauthn-rs`) built from source and statically, so the binary needs no system OpenSSL; building it needs a C compiler, `make` and `perl`.
 
-`--dev` listens on `127.0.0.1:8470`, keeps its sqlite file in `kelpie-hub-dev` under the system temp directory, uses `localhost` as the passkey relying party with `http://localhost:8470` as the origin, signs push requests with this repository's URL as the VAPID subject, and lets a pairing code create a device without an account so the fake phone can pair. `--data <dir>`, `--listen <address>`, `--rp-id <domain>`, `--origin <url>` and `--vapid-subject <contact>` override these; without `--dev` all five are required, and with `--dev` the hub refuses to listen on anything but a loopback address.
+`--dev` listens on `127.0.0.1:8470`, keeps its sqlite file in `kebbie-hub-dev` under the system temp directory, uses `localhost` as the passkey relying party with `http://localhost:8470` as the origin, signs push requests with this repository's URL as the VAPID subject, and lets a pairing code create a device without an account so the fake phone can pair. `--data <dir>`, `--listen <address>`, `--rp-id <domain>`, `--origin <url>` and `--vapid-subject <contact>` override these; without `--dev` all five are required, and with `--dev` the hub refuses to listen on anything but a loopback address.
 
 The VAPID subject is the contact every push service sees in the hub's push requests: `mailto:you@your-domain` or the hub's `https:` URL. The hub refuses to start with anything else, including a `localhost`, `.local`, `.test`, `.internal` or IP address, because Apple answers such tokens with `403 BadJwtToken`. The hub's VAPID key pair is made on first start and kept in `vapid.key` in the data directory (mode 0600, the P-256 private scalar as base64url); `--vapid-key <file>` keeps it elsewhere. The hub refuses to start when the key file is readable by group or others. The push services are reached over TLS with the platform's root certificates, so a container image needs its CA bundle (`ca-certificates` on Debian or Alpine) for real pushes. Keep the file across restarts and moves: a new key invalidates every device's push subscription, and the web app has to subscribe again. `--push-allow-host <host>` (repeatable, `*.example.com` for subdomains) accepts push endpoints on a host beyond the known push services, for a self-hosted push service or tests; on a loopback host it may be plain `http:`. Behind Cloudflare, `--trusted-proxy cloudflare` takes the client address from `CF-Connecting-IP`; without it the hub uses the TCP peer and ignores that header.
 
 A public hub:
 
 ```sh
-kelpie-hub --data /var/lib/kelpie-hub --listen 0.0.0.0:8470 \
+kebbie-hub --data /var/lib/kebbie-hub --listen 0.0.0.0:8470 \
   --rp-id hub.example.com --origin https://hub.example.com --trusted-proxy cloudflare \
   --vapid-subject mailto:you@example.com
-kelpie-hub --data /var/lib/kelpie-hub admin invite
+kebbie-hub --data /var/lib/kebbie-hub admin invite
 ```
 
 On its first start with no accounts, the hub prints a one-time setup link (`<origin>/setup?token=kho_…`) to its log; whoever opens it picks a handle and a passkey and becomes the hub's owner. Without the link nobody can claim a fresh hub. Each start mints a new link while no account exists, and the previous one stops working.
 
-`--signup invite` (the default) lets people in by invite only: from `admin invite`, or as a link the owner makes in the admin page. `--signup open` lets anyone sign up who verifies an email address by a link the hub mails; it needs `--smtp-host <host>` and `--mail-from <address>` (`--smtp-port`, 587 by default; `--smtp-security starttls`, `tls` or `none`, the last only for a loopback host; `--smtp-user <user>` with the password in `KELPIE_HUB_SMTP_PASSWORD`). Without `--smtp-host`, and always with `--dev`, the hub prints each mail to its log instead of sending it. `--plans on` and `--billing-url <url>` turn on [plans](#plans).
+`--signup invite` (the default) lets people in by invite only: from `admin invite`, or as a link the owner makes in the admin page. `--signup open` lets anyone sign up who verifies an email address by a link the hub mails; it needs `--smtp-host <host>` and `--mail-from <address>` (`--smtp-port`, 587 by default; `--smtp-security starttls`, `tls` or `none`, the last only for a loopback host; `--smtp-user <user>` with the password in `KEBBIE_HUB_SMTP_PASSWORD`, or in `KELPIE_HUB_SMTP_PASSWORD` while that is the name the deployment sets). Without `--smtp-host`, and always with `--dev`, the hub prints each mail to its log instead of sending it. `--plans on` and `--billing-url <url>` turn on [plans](#plans).
 
 `GET /healthz` answers `204` without credentials, for a load balancer's or Kubernetes' probes. `SIGTERM` and `Ctrl-C` both stop the hub, giving open requests 5 seconds to finish.
 
 Error reports and signals arrive at `/v1/reports` and `/v1/signals` without credentials, so in front of a public hub a WAF rate-limit rule on those paths (Cloudflare's rate limiting rules, for one) is recommended on top of the hub's own limits. `--report-difficulty <bits>` sets the proof of work for both (20 by default, about a second on a laptop).
 
-Upgrading a live hub from schema 6 to 7 (the release that adds connecting, owners, sign-up by email and plans) goes the same way as below, with the backup named `hub-v6.sqlite3`; the new binary adds the connect table and the account, machine, invite and admin token columns at start-up and keeps everything there. Existing accounts keep an `active` plan, existing admin tokens have the `reports` scope, and existing machines belong to no account. The oldest account becomes the owner and the rest are members; this happens once, during that upgrade. To make another account the owner, run `kelpie-hub admin owner <handle> --replace`.
+Upgrading a live hub from schema 6 to 7 (the release that adds connecting, owners, sign-up by email and plans) goes the same way as below, with the backup named `hub-v6.sqlite3`; the new binary adds the connect table and the account, machine, invite and admin token columns at start-up and keeps everything there. Existing accounts keep an `active` plan, existing admin tokens have the `reports` scope, and existing machines belong to no account. The oldest account becomes the owner and the rest are members; this happens once, during that upgrade. To make another account the owner, run `kebbie-hub admin owner <handle> --replace`.
 
 Upgrading a live hub from schema 5 to 6 (the release that adds error signals) goes the same way as below, with the backup named `hub-v5.sqlite3`; the new binary adds the signal tables at start-up and keeps every report, key standing and token. A schema 4 database gains both releases' tables at once.
 
@@ -116,7 +116,7 @@ Upgrading a live hub from schema 4 to 5 (the release that adds error reports): s
 In a second terminal, mint a join code and join a machine:
 
 ```sh
-target/debug/kelpie-hub admin join-code --dev
+target/debug/kebbie-hub admin join-code --dev
 target/debug/fake-machine --state machine.json join http://127.0.0.1:8470 <join code> --name mac
 ```
 
@@ -154,7 +154,7 @@ target/debug/fake-machine --state machine.json notice "Keep the old endpoint for
 target/debug/fake-machine --state machine.json notice "answered" --collapse refunds@greenhouse --retract
 ```
 
-`push-subscribe` makes fresh subscription keys, keeps the private half in the state file and registers the endpoint; `--keys` prints the subscription it sent. A command-line phone has no push service of its own, so the endpoint is one the hub accepts (a known push service, or a host given with `--push-allow-host`). `--collapse` takes the task's `task@repo`: the fake machine turns it into an opaque tag (a SHA-256 over its own key and `event:address`; kelpie will use an HMAC key shared at pairing), so the next notice for that task replaces this one. `--retract` sends a notice whose `retract` names that tag, for the app to close the earlier one.
+`push-subscribe` makes fresh subscription keys, keeps the private half in the state file and registers the endpoint; `--keys` prints the subscription it sent. A command-line phone has no push service of its own, so the endpoint is one the hub accepts (a known push service, or a host given with `--push-allow-host`). `--collapse` takes the task's `task@repo`: the fake machine turns it into an opaque tag (a SHA-256 over its own key and `event:address`; kebbie will use an HMAC key shared at pairing), so the next notice for that task replaces this one. `--retract` sends a notice whose `retract` names that tag, for the app to close the earlier one.
 
 `fake-machine apply` runs until stopped (`--once` polls once); it keeps the ids it applied, with their results, in its state file. `fake-machine role <device> read` makes a device read-only, so its commands are refused with `not-allowed`. `fake-machine poll` long-polls the machine's queue once, and `fake-phone attempts` lists every pairing attempt, failed ones included. Both CLIs keep their keys and tokens in the `--state` file, written with mode 0600. Against a hub without `--dev`, give the phone a device an account registered: `fake-phone init <hub> --device <id> --token <token>`.
 
@@ -162,11 +162,11 @@ target/debug/fake-machine --state machine.json notice "answered" --collapse refu
 
 People sign in to the hub with its own accounts. An account holds passkeys (WebAuthn, user verification required) and the devices it registered; it never sees a board, because boards are sealed to device keys the account does not have.
 
-- **Sign-up** takes a handle (lowercase letters, digits and `-`, starting with a letter) and one ticket, then registers the first passkey: the setup token of a fresh hub (`setup`, which makes the owner and works only while there is no account), an invite (`invite`, from `kelpie-hub admin invite` or an invite link), or on an open hub an email verification token (`verification`, from the mailed link; the account keeps the address as verified). `POST /v1/a/signup/email` mails the link and answers `202` whether or not the address already has an account, sending nothing then; it is limited per address and per email (3 at once, 1 a minute). The ticket is spent when the passkey is accepted, so two ceremonies started with one make one account. The account table has room for a GitHub id, for sign-up through GitHub later.
-- **The owner** is the account made from the setup link, or the one `kelpie-hub admin owner <handle>` names. Only the owner opens `/admin` and the `/v1/a/admin/` endpoints (`403 not-owner` for anyone else): counts of accounts, machines, devices, reports and signals; accounts with their plan, machines, devices and when they were last seen; invite links; deactivating and activating an account; removing a machine; allowing, blocking and acknowledging error reports; error signal counts. Deactivating an account, removing a machine and blocking a report key need a session a passkey signed in within 5 minutes (`401 reauth-required`, and the page asks for the passkey again); reading, inviting, activating, allowing and acknowledging do not. A deactivated account's sessions are deleted, it cannot log in, and its devices' and machines' tokens are refused until it is activated again. The owner cannot be deactivated (`409 owner-stays`). Safari refuses `Secure` and `__Host-` cookies on `http://localhost`, so a `--dev` hub signs in from Chrome or Firefox, or from Safari behind a local TLS name.
+- **Sign-up** takes a handle (lowercase letters, digits and `-`, starting with a letter) and one ticket, then registers the first passkey: the setup token of a fresh hub (`setup`, which makes the owner and works only while there is no account), an invite (`invite`, from `kebbie-hub admin invite` or an invite link), or on an open hub an email verification token (`verification`, from the mailed link; the account keeps the address as verified). `POST /v1/a/signup/email` mails the link and answers `202` whether or not the address already has an account, sending nothing then; it is limited per address and per email (3 at once, 1 a minute). The ticket is spent when the passkey is accepted, so two ceremonies started with one make one account. The account table has room for a GitHub id, for sign-up through GitHub later.
+- **The owner** is the account made from the setup link, or the one `kebbie-hub admin owner <handle>` names. Only the owner opens `/admin` and the `/v1/a/admin/` endpoints (`403 not-owner` for anyone else): counts of accounts, machines, devices, reports and signals; accounts with their plan, machines, devices and when they were last seen; invite links; deactivating and activating an account; removing a machine; allowing, blocking and acknowledging error reports; error signal counts. Deactivating an account, removing a machine and blocking a report key need a session a passkey signed in within 5 minutes (`401 reauth-required`, and the page asks for the passkey again); reading, inviting, activating, allowing and acknowledging do not. A deactivated account's sessions are deleted, it cannot log in, and its devices' and machines' tokens are refused until it is activated again. The owner cannot be deactivated (`409 owner-stays`). Safari refuses `Secure` and `__Host-` cookies on `http://localhost`, so a `--dev` hub signs in from Chrome or Firefox, or from Safari behind a local TLS name.
 - **Passkeys are discoverable.** Sign-up and adding a passkey ask for a resident credential with user verification (`residentKey: "required"`), so the authenticator itself offers the account.
 - **Signing in** names no account: `POST /v1/a/login/begin` with `{}` returns request options with no `allowCredentials`, the authenticator offers its passkey for the hub, and the hub finds the account from the credential's user handle and accepts only that account's passkeys. The web app has one "Sign in with passkey" button and, where the browser supports it, starts a conditional request so the passkey shows in autofill; the request options carry no `mediation`, so the page picks a button or autofill. A passkey made before passkeys were discoverable is not offered by the authenticator: the page then asks for the account name (`{handle}`, the old path, which tells whether an account exists) and, after that sign-in, offers to add a new passkey that is. The hub keeps each passkey's signature counter and refuses a login whose counter does not move past it (unless both are zero), as a sign the passkey was cloned; a user handle no account holds gets `401 unknown-passkey`.
-- **The session** is an opaque `khs_` token in the cookie `__Host-kelpie_session` with `HttpOnly`, `Secure`, `SameSite=Strict` and `Path=/`, valid 14 days. The hub stores its SHA-256 hash. Logging out deletes it.
+- **The session** is an opaque `khs_` token in the cookie `__Host-kebbie_session` with `HttpOnly`, `Secure`, `SameSite=Strict` and `Path=/`, valid 14 days. The hub stores its SHA-256 hash. Logging out deletes it.
 - **Cross-site requests.** Every state-changing `/v1/a/` call needs an `Origin` header equal to `--origin`, or gets `403 cross-origin`. The cookie is accepted on `/v1/a/` only.
 - **Devices.** A logged-in account registers a device and gets its `khd_` token once. Every `/v1/d/` call, the event feed included (read with `fetch`, since `EventSource` cannot send a bearer token), takes that token as a bearer token and never the cookie, so no device call rides on an ambient credential and none needs a CSRF check. The web app keeps the token next to its non-extractable device keys in IndexedDB, and uses its session only to register a device or manage the account. Logging out leaves the device working; removing the device ends it.
 - **Removal.** A machine removes a device it admitted, and the hub stops handing that device the machine's board. An account removes its own devices, which deletes their tokens and ends their event feeds. An admin removes a machine.
@@ -175,12 +175,12 @@ Ceremony state (the challenge a passkey must sign) is kept on the hub for 5 minu
 
 ## The hub's API
 
-Every endpoint is under `/v1`. Admin endpoints (`/v1/admin/`) take a `kha_` bearer token from `kelpie-hub admin token --name <name>`, with the `reports` scope (the default) for the report endpoints and the `billing` scope (`--scope billing`) for the account endpoints. Machine endpoints (`/v1/m/`) take a `khm_` bearer token, except joining and connecting, where the join code or device code is the credential. Account endpoints marked *owner* need the owner's session, and *fresh* a session a passkey signed in within 5 minutes. Device endpoints (`/v1/d/`) take a `khd_` bearer token. Account endpoints (`/v1/a/`) take the session cookie, except signing up and logging in.
+Every endpoint is under `/v1`. Admin endpoints (`/v1/admin/`) take a `kha_` bearer token from `kebbie-hub admin token --name <name>`, with the `reports` scope (the default) for the report endpoints and the `billing` scope (`--scope billing`) for the account endpoints. Machine endpoints (`/v1/m/`) take a `khm_` bearer token, except joining and connecting, where the join code or device code is the credential. Account endpoints marked *owner* need the owner's session, and *fresh* a session a passkey signed in within 5 minutes. Device endpoints (`/v1/d/`) take a `khd_` bearer token. Account endpoints (`/v1/a/`) take the session cookie, except signing up and logging in.
 
 | Call | Who | What |
 |---|---|---|
 | `GET /v1/hub` | anyone | `{signup: "invite"\|"open", plans, needs_setup}` |
-| `POST /v1/m/join` | machine, join code | trades a code from `kelpie-hub admin join-code` and the machine's public keys for a machine id and token |
+| `POST /v1/m/join` | machine, join code | trades a code from `kebbie-hub admin join-code` and the machine's public keys for a machine id and token |
 | `POST /v1/m/connect` | anyone | `{name, keys}`; `{device_code, user_code, verification_uri, verification_uri_complete, interval, expires_in}`. See [Connecting a machine](#connecting-a-machine) |
 | `POST /v1/m/connect/token` | machine, device code | `{device_code}`; `{machine, token, pairing}` once approved, `pairing` naming the browser's pairing or `null`; otherwise `400` with `authorization_pending`, `slow_down`, `access_denied`, `expired_token` or `invalid_grant` |
 | `POST /v1/m/devices/add` | machine | `{pairing, code, url, expires_at}`: a pairing, valid 10 minutes, with the link a phone opens. See [Adding a phone](#adding-a-phone-from-the-machine) |
@@ -244,20 +244,20 @@ Every endpoint is under `/v1`. Admin endpoints (`/v1/admin/`) take a `kha_` bear
 
 ## Error reports
 
-kelpie keeps the problems it meets as local issues. When kelpie or its lead files one of kind `bug`, the board shows it with the exact text that would go out, and asks the user whether to send it to kelpie's maintainers; only the user's yes sends it. The report is plain text, not sealed: it is meant for the people who run the hub.
+kebbie keeps the problems it meets as local issues. When kebbie or its lead files one of kind `bug`, the board shows it with the exact text that would go out, and asks the user whether to send it to kebbie's maintainers; only the user's yes sends it. The report is plain text, not sealed: it is meant for the people who run the hub.
 
-- **What a report holds.** `title`, `text`, `version` and `os` (`BugReport` in the protocol crate). kelpie redacts paths under the home directory to `~`, repository names, remote URLs and anything shaped like a token before the user sees it. The hub refuses a title that is empty, longer than 200 characters or holds a control character (`400 bad-title`), a `version` or `os` that is empty or longer than 64 characters (`400 bad-field`), and a text over 12 KiB or a body over 16 KiB (`413 too-large`).
+- **What a report holds.** `title`, `text`, `version` and `os` (`BugReport` in the protocol crate). kebbie redacts paths under the home directory to `~`, repository names, remote URLs and anything shaped like a token before the user sees it. The hub refuses a title that is empty, longer than 200 characters or holds a control character (`400 bad-title`), a `version` or `os` that is empty or longer than 64 characters (`400 bad-field`), and a text over 12 KiB or a body over 16 KiB (`413 too-large`).
 - **The install key.** Each install makes an Ed25519 key on its first report. The key is the sender's id. It signs `"kelpie-report-sign-v1" || nonce || SHA-256(report bytes)`, where the report bytes are `"kelpie-report-v1"` followed by each of the four fields as a 4-byte big-endian length and its UTF-8 bytes.
 - **Proof of work.** `GET /v1/reports/challenge` hands out `{nonce, difficulty, expires, tag}`: a fresh 32-byte nonce, the difficulty in bits, an expiry 10 minutes out and an HMAC-SHA256 tag over the three under a key the hub draws at start, so a client cannot lower the difficulty or extend the expiry. The sender looks for a `counter` such that `SHA-256("kelpie-report-pow-v1" || nonce || SHA-256(report bytes) || counter as 8 bytes big-endian)` starts with `difficulty` zero bits. `vectors/reports.json` has a worked case.
 - **What the hub checks.** In order: the per-address rate (20 at once, 4 a minute; `429 rate-limited`), the tag (`400 bad-challenge`), the expiry (`400 expired-challenge`), the report's size and shape, the work (`400 insufficient-work`), the signature (`400 bad-signature`), the per-key rate (5 at once, 1 a minute) and that the challenge was not used before (`409 challenge-used`). A challenge is spent by the first report that passes, so a hub restart only ends the challenges handed out before it.
 - **Quarantine.** A report from a key the hub has not seen waits in quarantine; at most 20 per key and 10 000 in all do, and further ones are dropped, answered like any other. The operator lets a key through with `admin reports allow <key>`, which releases the ones it has waiting, or drops it with `admin reports block <key>`. A blocked key's reports get the same `202` and an id from the same sequence as any other, and are not kept, so a sender cannot tell it was blocked.
-- **Reading them.** `admin reports` lists the allowed reports not yet acknowledged, `--quarantine` the waiting ones, `--json` either as JSON; `admin reports ack <id>` marks one handled. `admin token --name <name>` mints a `kha_` token for a maintainer's machine, shown once and kept as a hash under that name; `admin token list` lists the names with when each was made and last used, and `admin token revoke <name>` ends one at once. The token is for `GET /v1/admin/reports` and `POST /v1/admin/reports/<id>/ack`. kelpie on that machine files each allowed report as a local issue of its own and acknowledges it.
+- **Reading them.** `admin reports` lists the allowed reports not yet acknowledged, `--quarantine` the waiting ones, `--json` either as JSON; `admin reports ack <id>` marks one handled. `admin token --name <name>` mints a `kha_` token for a maintainer's machine, shown once and kept as a hash under that name; `admin token list` lists the names with when each was made and last used, and `admin token revoke <name>` ends one at once. The token is for `GET /v1/admin/reports` and `POST /v1/admin/reports/<id>/ack`. kebbie on that machine files each allowed report as a local issue of its own and acknowledges it.
 
 Acknowledged reports and those still in quarantine are deleted 30 days after they arrived.
 
 ## Error signals
 
-kelpie also counts its own failures, a panic, an internal error or a state file of its own it cannot read, and sends the counts at most once a day, on unless the user turned them off. A signal carries no text.
+kebbie also counts its own failures, a panic, an internal error or a state file of its own it cannot read, and sends the counts at most once a day, on unless the user turned them off. A signal carries no text.
 
 - **What a signal holds.** `ErrorSignals` in the protocol crate: `version`, an optional `commit`, `os`, `arch`, and `counts`, a list of `{component, kind, count}`. Every text field is a `Name`: 1 to 48 of lowercase ASCII letters, digits and `.` `_` `+` `-`, starting and ending with a letter or digit, so no sentence, path, quote or capital fits. `kind` is one of `panic`, `internal-error` and `corrupt-state`. The hub refuses an unknown field at any level, a value that is not a `Name` and an unknown kind with `422`, and no counts (`400 no-signals`), more than 64 (`400 too-many-signals`), a count of 0 or over 10 000 (`400 bad-count`), a component and kind twice (`400 repeated-signal`) and a commit that is not up to 40 hex digits (`400 bad-commit`).
 - **Signing and work.** The same install key and challenge as a report. The signal bytes are `"kelpie-signal-v1"`, then `version`, `commit` (empty when absent), `os` and `arch` each as a 4-byte big-endian length and its bytes, the number of counts as 4 bytes, and per count its `component` and `kind` the same way and the count as 4 bytes. The key signs `"kelpie-signal-sign-v1" || nonce || SHA-256(signal bytes)`, and the work is the report's over that digest. A challenge is spent by whichever report or signal passes first. The difficulty is the report's: a sender spends about a second once a day, in the background.
@@ -281,7 +281,7 @@ The hub checks what it can without the content, and queues nothing that fails:
 - sizes: a request of at most 64 KiB, a ciphertext of at most 36 KiB for `answer` and `start` and 4 KiB for `push` and `routine` (`413 too-large`), at most 1000 envelopes waiting in a machine's queue and at most 100 undelivered commands from one device to one machine (`429 queue-full`);
 - a rate per device and kind: 30 at once and 30 a minute for `answer` and `routine`, 5 at once and 5 a minute for `start` and `push` (`429 rate-limited`), on top of the per-token limit every call has.
 
-The machine applies a command with `authorize` from the protocol crate. It drops, without a reply, anything that fails before the signature checks out against its own list of trusted devices. It answers a command it applied before with the stored result. Otherwise it refuses, with a result the device can show, a command that expired while it waited in the queue (`expired`), one from a device with the `read` role or of a kind the machine does not take (`not-allowed`), and one that does not decrypt or is not well formed. Only then does the machine act: a push goes through only if the task's HEAD is still the sha the device signed (`head-moved` otherwise), and in kelpie an answer to a question that no longer waits is `already-settled`.
+The machine applies a command with `authorize` from the protocol crate. It drops, without a reply, anything that fails before the signature checks out against its own list of trusted devices. It answers a command it applied before with the stored result. Otherwise it refuses, with a result the device can show, a command that expired while it waited in the queue (`expired`), one from a device with the `read` role or of a kind the machine does not take (`not-allowed`), and one that does not decrypt or is not well formed. Only then does the machine act: a push goes through only if the task's HEAD is still the sha the device signed (`head-moved` otherwise), and in kebbie an answer to a question that no longer waits is `already-settled`.
 
 The hub drops a queued envelope once its `exp` has passed, so a machine that slept through the window comes back to an empty queue. Removing a device, by its account or by a machine, drops its commands that machine has not been handed yet.
 
@@ -330,7 +330,7 @@ Apart from error reports, which are plain text by design, and error signals, whi
 ## Not yet
 
 - Answering, pushing and starting tasks from the web app: the buttons are there, disabled.
-- The bridge in kelpie that applies commands and posts notices for real, and the collapse key a machine shares with its devices at pairing.
+- The bridge in kebbie that applies commands and posts notices for real, and the collapse key a machine shares with its devices at pairing.
 - APNs for an iOS app.
 - Signing up through GitHub, and OIDC sign-in for self-hosted hubs.
 - Adding or changing a verified email on an existing account.
@@ -351,7 +351,7 @@ node --test
 The vectors are generated from fixed keys and randomness:
 
 ```sh
-cargo run -p kelpie-hub-protocol --features test-vectors --bin vectors
+cargo run -p kebbie-hub-protocol --features test-vectors --bin vectors
 ```
 
 ## License

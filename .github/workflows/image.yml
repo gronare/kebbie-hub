@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   image:
-    runs-on: ${{ vars.CI_RUNNER || 'kelpie-hub-ci' }}
+    runs-on: ${{ vars.CI_RUNNER || 'kebbie-hub-ci' }}
     timeout-minutes: 60
     env:
-      IMAGE: registry.gronare.com/kelpie-hub
+      IMAGE: registry.gronare.com/kebbie-hub
       SHA: ${{ github.sha }}
     steps:
       - name: Checkout
@@ -62,4 +62,4 @@ jobs:
             docker tag "${IMAGE}:${SHA}" "${IMAGE}:${tag}"
             docker push "${IMAGE}:${tag}"
           done
-          echo "kelpie-hub \`${SHA}\` ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"
+          echo "kebbie-hub \`${SHA}\` ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"
