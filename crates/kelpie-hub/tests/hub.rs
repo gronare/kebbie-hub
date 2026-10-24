@@ -662,8 +662,13 @@ async fn unknown_expired_and_finished_codes_all_get_the_same_401() {
             code: "unauthorized".to_string()
         }
     );
+}
 
-    let mut machine = machine;
+#[tokio::test]
+async fn a_finished_pairing_code_gets_the_same_401() {
+    let test = start_hub(|_| {}).await;
+    let mut machine = joined_machine(&test).await;
+    let device = device_client(&test, &signed_up(&test).await.register_device().await);
     let mut phone = phone(&test).await;
     let (code_out, code_in) = oneshot::channel::<String>();
     let used = std::sync::Mutex::new(None);
