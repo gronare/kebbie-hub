@@ -417,12 +417,17 @@ impl Store {
         let from = if fresh { 4 } else { version };
         for (to, upgrade) in UPGRADES.iter().filter(|(to, _)| *to > from) {
             tx.execute_batch(upgrade)?;
-            if *to == 7
-                && add_columns(&tx, CONNECT_COLUMNS)?
-                    .iter()
-                    .any(|added| added == "accounts.plan")
-            {
-                tx.execute("UPDATE accounts SET plan = 'active'", [])?;
+            if *to == 7 {
+                let added = add_columns(&tx, CONNECT_COLUMNS)?;
+                if added.iter().any(|added| added == "accounts.plan") {
+                    tx.execute("UPDATE accounts SET plan = 'active'", [])?;
+                }
+                if added.iter().any(|added| added == "accounts.role") {
+                    tx.execute(
+                        "UPDATE accounts SET role = 'owner' WHERE id = (SELECT id FROM accounts ORDER BY created_at, rowid LIMIT 1)",
+                        [],
+                    )?;
+                }
             }
         }
         tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -1167,6 +1172,53 @@ impl Store {
         }
         tx.commit()?;
         Ok(changed)
+    }
+
+    pub fn make_owner(&self, handle: &str, replace: bool, now: u64) -> Result<MadeOwner> {
+        let tx = self.connection.unchecked_transaction()?;
+        let Some((account, role, deactivated)) = tx
+            .query_row(
+                "SELECT id, role, deactivated_at IS NOT NULL FROM accounts WHERE handle = ?1",
+                [handle],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get(2)?,
+                    ))
+                },
+            )
+            .optional()?
+        else {
+            return Ok(MadeOwner::NoAccount);
+        };
+        if role == "owner" {
+            return Ok(MadeOwner::AlreadyOwner);
+        }
+        if deactivated {
+            return Ok(MadeOwner::Deactivated);
+        }
+        let others: Vec<String> = tx
+            .prepare("SELECT handle FROM accounts WHERE role = 'owner' ORDER BY handle")?
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<_>>()?;
+        if !others.is_empty() && !replace {
+            return Ok(MadeOwner::OtherOwner(others));
+        }
+        tx.execute(
+            "UPDATE accounts SET role = 'member' WHERE role = 'owner'",
+            [],
+        )?;
+        tx.execute(
+            "UPDATE accounts SET role = 'owner' WHERE id = ?1",
+            [&account],
+        )?;
+        tx.execute(
+            "INSERT INTO events (at, kind, detail) VALUES (?1, 'account.owner', ?2)",
+            params![now, format!("{account} by=cli")],
+        )?;
+        tx.commit()?;
+        Ok(MadeOwner::Made { replaced: others })
     }
 
     pub fn machine_owner(&self, machine: &Id) -> Result<Option<String>> {
@@ -2198,6 +2250,15 @@ pub struct AccountRow {
     pub plan: PlanStatus,
     pub plan_until: Option<u64>,
     pub deactivated_at: Option<u64>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum MadeOwner {
+    Made { replaced: Vec<String> },
+    AlreadyOwner,
+    OtherOwner(Vec<String>),
+    Deactivated,
+    NoAccount,
 }
 
 pub struct AdminAccountRow {

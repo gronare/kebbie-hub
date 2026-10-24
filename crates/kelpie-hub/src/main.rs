@@ -6,7 +6,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kelpie_hub::mail::{MailSettings, SmtpSecurity, SmtpSettings};
-use kelpie_hub::store::{AdminScope, KeyStatus, SignalRow, Store, StoredReport};
+use kelpie_hub::store::{AdminScope, KeyStatus, MadeOwner, SignalRow, Store, StoredReport};
 use kelpie_hub::{
     Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy,
     database_path, mint_admin_token, mint_invite, mint_join_code, serve,
@@ -169,6 +169,15 @@ enum Admin {
     Machines,
     #[command(about = "Remove a machine, its board, queue and admissions")]
     RemoveMachine { machine: String },
+    #[command(about = "Make an account the hub's owner, the one account that opens the admin page")]
+    Owner {
+        handle: String,
+        #[arg(
+            long,
+            help = "Demote the current owner to member; without it an existing owner is kept and nothing changes"
+        )]
+        replace: bool,
+    },
     #[command(
         about = "Mint a named token for the admin API (reports for kelpie's maintainers, billing for a billing service), or list or revoke them"
     )]
@@ -262,6 +271,35 @@ fn token(
                 ),
             }
         }
+    }
+    Ok(())
+}
+
+fn make_owner(data: &std::path::Path, handle: &str, replace: bool) -> Result<(), String> {
+    let store = open_store(data)?;
+    match store
+        .make_owner(handle, replace, kelpie_hub::now())
+        .map_err(|error| error.to_string())?
+    {
+        MadeOwner::Made { replaced } if replaced.is_empty() => println!("{handle} is the owner"),
+        MadeOwner::Made { replaced } => println!(
+            "{handle} is the owner; {} is a member now",
+            replaced.join(", ")
+        ),
+        MadeOwner::AlreadyOwner => println!("{handle} is the owner already"),
+        MadeOwner::OtherOwner(owners) => {
+            return Err(format!(
+                "{} is the owner; add --replace to make {handle} the owner and {} a member",
+                owners.join(", "),
+                owners.join(", ")
+            ));
+        }
+        MadeOwner::Deactivated => {
+            return Err(format!(
+                "{handle} is deactivated; activate it before making it the owner"
+            ));
+        }
+        MadeOwner::NoAccount => return Err(format!("no account with the handle {handle}")),
     }
     Ok(())
 }
@@ -572,6 +610,9 @@ async fn run(cli: Cli) -> Result<(), String> {
             action,
         })) => reports(&data, *quarantine, *json, action.as_ref()),
         Some(Command::Admin(Admin::Signals { days, json })) => signals(&data, *days, *json),
+        Some(Command::Admin(Admin::Owner { handle, replace })) => {
+            make_owner(&data, handle, *replace)
+        }
         Some(Command::Admin(Admin::RemoveMachine { machine })) => {
             let machine = Id::parse(machine).map_err(|error| error.to_string())?;
             let store = open_store(&data)?;

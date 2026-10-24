@@ -312,7 +312,8 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
         .unwrap();
     connection
         .execute_batch(
-            "INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'carl', x'00112233445566778899aabbccddeeff', 1);
+            "INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_later', 'ada', x'ffeeddccbbaa99887766554433221100', 5);
+             INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'carl', x'00112233445566778899aabbccddeeff', 1);
              INSERT INTO machines (id, name, signing_key, encryption_key, token_hash, joined_at)
                  VALUES ('mch_00000000000000000000000000', 'mac', zeroblob(32), zeroblob(32), x'01', 1);
              INSERT INTO invites (code_hash, expires_at) VALUES (x'02', 9999999999);
@@ -322,7 +323,12 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
     drop(connection);
     let store = Store::open(&path).unwrap();
     let account = store.account("acc_kept").unwrap().unwrap();
-    assert_eq!((account.handle.as_str(), account.owner), ("carl", false));
+    assert_eq!(
+        (account.handle.as_str(), account.owner),
+        ("carl", true),
+        "the oldest account becomes the owner"
+    );
+    assert!(!store.account("acc_later").unwrap().unwrap().owner);
     assert_eq!(
         account.plan,
         kelpie_hub_api::PlanStatus::Active,
@@ -361,12 +367,130 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
     assert_eq!(version, 7);
+    assert!(!store_account_is_owner(&path, "acc_new"));
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch("UPDATE accounts SET role = 'member'")
+        .unwrap();
     let reopened = Store::open(&path).unwrap();
     assert_eq!(
         reopened.account("acc_new").unwrap().unwrap().plan,
         kelpie_hub_api::PlanStatus::Inactive,
         "a later start does not activate new accounts"
     );
+    for account in ["acc_kept", "acc_later", "acc_new"] {
+        assert!(
+            !reopened.account(account).unwrap().unwrap().owner,
+            "a later start makes no owner"
+        );
+    }
+}
+
+fn store_account_is_owner(path: &std::path::Path, account: &str) -> bool {
+    Store::open(path)
+        .unwrap()
+        .account(account)
+        .unwrap()
+        .unwrap()
+        .owner
+}
+
+#[tokio::test]
+async fn the_admin_cli_makes_an_account_the_one_owner() {
+    let test = start_hub(|_| {}).await;
+    let admin = |args: &[&str]| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_kelpie-hub"))
+            .arg("--data")
+            .arg(test.data.path())
+            .arg("admin")
+            .arg("owner")
+            .args(args)
+            .output()
+            .unwrap()
+    };
+    let mut first = owner(&test).await;
+    let mut second = member(&test).await;
+    let refused = admin(&[&second.handle]);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("--replace"),
+        "{refused:?}"
+    );
+    first
+        .get::<AdminOverview>("/v1/a/admin/overview")
+        .await
+        .unwrap();
+
+    let replaced = admin(&[&second.handle, "--replace"]);
+    assert!(replaced.status.success(), "{replaced:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&replaced.stdout).trim(),
+        format!(
+            "{} is the owner; {} is a member now",
+            second.handle, first.handle
+        )
+    );
+    second
+        .get::<AdminOverview>("/v1/a/admin/overview")
+        .await
+        .unwrap();
+    assert_eq!(
+        hub_code(
+            first
+                .get::<AdminOverview>("/v1/a/admin/overview")
+                .await
+                .unwrap_err()
+        ),
+        (403, "not-owner".to_string())
+    );
+    let again = admin(&[&second.handle]);
+    assert!(again.status.success());
+    assert!(String::from_utf8_lossy(&again.stdout).contains("already"));
+    let unknown = admin(&["nobody"]);
+    assert_eq!(unknown.status.code(), Some(1));
+
+    let store = Store::open(&test.data.path().join("hub.sqlite3")).unwrap();
+    let owners = store
+        .admin_accounts()
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.account.owner)
+        .count();
+    assert_eq!(owners, 1);
+    let logged: i64 = rusqlite::Connection::open(test.data.path().join("hub.sqlite3"))
+        .unwrap()
+        .query_row(
+            "SELECT count(*) FROM events WHERE kind = 'account.owner'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(logged, 1);
+}
+
+#[test]
+fn an_owner_made_without_another_owner_needs_no_replace() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    let store = Store::open(&path).unwrap();
+    drop(store);
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_a', 'ada', x'00112233445566778899aabbccddeeff', 1);
+             INSERT INTO accounts (id, handle, user_handle, created_at, deactivated_at) VALUES ('acc_b', 'bo', x'ffeeddccbbaa99887766554433221100', 2, 3);",
+        )
+        .unwrap();
+    let store = Store::open(&path).unwrap();
+    assert_eq!(
+        store.make_owner("bo", false, 4).unwrap(),
+        kelpie_hub::store::MadeOwner::Deactivated
+    );
+    assert_eq!(
+        store.make_owner("ada", false, 4).unwrap(),
+        kelpie_hub::store::MadeOwner::Made { replaced: vec![] }
+    );
+    assert!(store.account("acc_a").unwrap().unwrap().owner);
 }
 
 #[tokio::test]
