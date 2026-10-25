@@ -8,7 +8,7 @@ use hmac::{Hmac, KeyInit, Mac};
 use kebbie_hub_api::{
     AccountKeySetup, AccountReveal, AccountView, Boards, Bytes32, Bytes64, ConnectApproval,
     ConnectApproved, ConnectDenial, ConnectRequestView, CreationCeremony, DeviceRegistered,
-    DeviceRequest, EmailSignup, LoginBegin, LoginFinish, PairingState, PairingView, PasskeyView,
+    DeviceRequest, LoginBegin, LoginFinish, PairingState, PairingView, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony, SignedIn, SignedMachineList, WrapperUpload,
 };
 use kebbie_hub_protocol::{
@@ -134,11 +134,11 @@ fn decoded(text: &str) -> Result<Vec<u8>, HubError> {
 }
 
 impl Browser {
-    pub fn new(hub: &str, origin: &str, handle: &str) -> Browser {
+    pub fn new(hub: &str, origin: &str) -> Browser {
         Browser {
             hub: hub.trim_end_matches('/').to_string(),
             origin: origin.to_string(),
-            handle: handle.to_string(),
+            handle: String::new(),
             cookie: None,
             passkey: WebauthnAuthenticator::new(DiscoverablePasskey::new(true)),
             device: None,
@@ -254,10 +254,6 @@ impl Browser {
     }
 
     pub async fn sign_up(&mut self, begin: RegisterBegin) -> Result<AccountView, HubError> {
-        let begin = RegisterBegin {
-            handle: self.handle.clone(),
-            ..begin
-        };
         let ceremony: CreationCeremony = self.post("/v1/a/register/begin", &begin).await?;
         let credential = self
             .passkey
@@ -275,7 +271,19 @@ impl Browser {
             )
             .await?;
         self.unlock(&signed).await?;
+        self.handle = signed.account.handle.clone();
         Ok(signed.account)
+    }
+
+    pub async fn sign_up_from_connect(&mut self, link: &str) -> Result<AccountView, HubError> {
+        let code = link
+            .split_once("code=")
+            .map_or(link, |(_, code)| code.split(['&', '#']).next().unwrap_or(code));
+        self.sign_up(RegisterBegin {
+            connect: Some(code.to_string()),
+            ..RegisterBegin::default()
+        })
+        .await
     }
 
     pub async fn sign_up_with_invite(&mut self, invite: &str) -> Result<AccountView, HubError> {
@@ -297,36 +305,8 @@ impl Browser {
         .await
     }
 
-    pub async fn sign_up_verified(&mut self, link: &str) -> Result<AccountView, HubError> {
-        let token = link.split_once("verify=").map_or(link, |(_, token)| token);
-        self.sign_up(RegisterBegin {
-            verification: Some(token.trim().to_string()),
-            ..RegisterBegin::default()
-        })
-        .await
-    }
-
-    pub async fn request_email(&mut self, email: &str) -> Result<(), HubError> {
-        self.post::<_, Option<()>>(
-            "/v1/a/signup/email",
-            &EmailSignup {
-                email: email.to_string(),
-            },
-        )
-        .await
-        .map(drop)
-    }
-
     pub async fn log_in(&mut self) -> Result<AccountView, HubError> {
         self.log_in_as(LoginBegin::default()).await
-    }
-
-    pub async fn log_in_with_handle(&mut self) -> Result<AccountView, HubError> {
-        self.log_in_as(LoginBegin {
-            handle: Some(self.handle.clone()),
-            credential: None,
-        })
-        .await
     }
 
     pub async fn log_in_with_credential(
@@ -334,7 +314,6 @@ impl Browser {
         credential: &[u8],
     ) -> Result<AccountView, HubError> {
         self.log_in_as(LoginBegin {
-            handle: None,
             credential: Some(URL_SAFE_NO_PAD.encode(credential)),
         })
         .await

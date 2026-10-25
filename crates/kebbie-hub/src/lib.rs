@@ -9,7 +9,6 @@ mod error;
 mod events;
 mod limit;
 mod machine;
-pub mod mail;
 mod pairing;
 mod push;
 mod report;
@@ -37,7 +36,6 @@ pub use auth::SESSION_COOKIE;
 pub use error::ApiError;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
-use mail::{LogMailer, MailSettings, Mailer, SmtpMailer};
 use push::Pusher;
 pub use server::serve;
 use store::{AccountRow, AdminScope, Pairing, Store};
@@ -109,14 +107,12 @@ pub struct Config {
     pub signup: SignupMode,
     pub plans: bool,
     pub billing_url: Option<String>,
-    pub mail: MailSettings,
+    pub github_client_id: Option<String>,
     pub fresh_session_ttl: u64,
     pub connect_ttl: u64,
     pub connect_interval: u64,
-    pub verify_ttl: u64,
     pub connect_rate: RateLimit,
     pub code_rate: RateLimit,
-    pub email_rate: RateLimit,
 }
 
 impl Config {
@@ -185,11 +181,10 @@ impl Config {
             signup: SignupMode::Invite,
             plans: false,
             billing_url: None,
-            mail: MailSettings::Log,
+            github_client_id: None,
             fresh_session_ttl: 300,
             connect_ttl: 600,
             connect_interval: 5,
-            verify_ttl: 86_400,
             connect_rate: RateLimit {
                 burst: 10,
                 per_minute: 10,
@@ -197,10 +192,6 @@ impl Config {
             code_rate: RateLimit {
                 burst: 10,
                 per_minute: 10,
-            },
-            email_rate: RateLimit {
-                burst: 3,
-                per_minute: 1,
             },
         }
     }
@@ -258,7 +249,6 @@ pub enum OpenError {
     RelyingParty(String),
     Push(String),
     Report(String),
-    Mail(String),
 }
 
 impl std::fmt::Display for OpenError {
@@ -267,8 +257,7 @@ impl std::fmt::Display for OpenError {
             OpenError::Store(error) => error.fmt(formatter),
             OpenError::RelyingParty(message)
             | OpenError::Push(message)
-            | OpenError::Report(message)
-            | OpenError::Mail(message) => formatter.write_str(message),
+            | OpenError::Report(message) => formatter.write_str(message),
         }
     }
 }
@@ -310,9 +299,6 @@ pub struct Hub {
     report_address_limiter: Limiter,
     connect_limiter: Limiter,
     code_limiter: Limiter,
-    email_limiter: Limiter,
-    mailer: Arc<dyn Mailer>,
-    mail_log: Option<Arc<LogMailer>>,
     setup_url: Mutex<Option<String>>,
     signal_addresses: Mutex<(u64, HashMap<String, u32>)>,
     challenge_secret: [u8; 32],
@@ -366,20 +352,6 @@ impl Hub {
         )
         .map_err(OpenError::Push)?;
         let store = Store::open(&config.database())?;
-        let (mailer, mail_log): (Arc<dyn Mailer>, _) = match &config.mail {
-            MailSettings::Log => {
-                let log = Arc::new(LogMailer::default());
-                (log.clone(), Some(log))
-            }
-            MailSettings::Smtp(settings) => {
-                let helo = Url::parse(&origin)
-                    .ok()
-                    .and_then(|url| url.host_str().map(str::to_string))
-                    .unwrap_or_else(|| "localhost".to_string());
-                let smtp = SmtpMailer::new(settings.clone(), &helo).map_err(OpenError::Mail)?;
-                (Arc::new(smtp), None)
-            }
-        };
         let setup_url = if store.account_count()? == 0 {
             let token = auth::new_token(auth::SETUP_TOKEN_PREFIX);
             store.replace_setup_ticket(&auth::digest(&token), now() + SETUP_TTL)?;
@@ -390,9 +362,6 @@ impl Hub {
         Ok(Arc::new(Hub {
             connect_limiter: Limiter::new(config.connect_rate, config.max_buckets),
             code_limiter: Limiter::new(config.code_rate, config.max_buckets),
-            email_limiter: Limiter::new(config.email_rate, config.max_buckets),
-            mailer,
-            mail_log,
             setup_url: Mutex::new(setup_url),
             store: Mutex::new(store),
             limiter: Limiter::new(config.rate, config.max_buckets),
@@ -480,13 +449,6 @@ impl Hub {
             .setup_url
             .lock()
             .expect("the setup lock is never poisoned") = None;
-    }
-
-    pub fn mail_log(&self) -> Vec<mail::Mail> {
-        self.mail_log
-            .as_ref()
-            .map(|log| log.sent())
-            .unwrap_or_default()
     }
 
     pub fn plan_view(&self, row: &AccountRow, at: u64) -> PlanView {
@@ -669,7 +631,6 @@ impl Hub {
         self.report_address_limiter.forget_idle();
         self.connect_limiter.forget_idle();
         self.code_limiter.forget_idle();
-        self.email_limiter.forget_idle();
         self.wakeups.forget_idle();
         swept
     }
@@ -686,6 +647,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/m/join", post(machine::join))
         .route("/v1/m/connect", post(connect::start))
         .route("/v1/m/connect/token", post(connect::token))
+        .route("/v1/connect", get(connect::peek))
         .route("/v1/a/connect", get(connect::view))
         .route("/v1/a/connect/approve", post(connect::approve))
         .route("/v1/a/connect/deny", post(connect::deny))
@@ -696,8 +658,6 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/a/machines/{id}", delete(boards::remove_machine))
         .route("/v1/a/events", get(events::account_events))
         .route("/v1/a/key", post(account::set_key))
-        .route("/v1/a/signup/email", post(account::email_signup))
-        .route("/v1/a/signup/verify", get(account::verification))
         .route("/v1/a/admin/overview", get(admin::overview))
         .route("/v1/a/admin/accounts", get(admin::accounts))
         .route(

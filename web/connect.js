@@ -68,6 +68,29 @@ export function connectBlock({ fragment, session }) {
   return session?.state ?? "locked";
 }
 
+export async function approveFromLink({ fragment, session, unlock, approve, commit = connectCommitment }) {
+  const current = fragment && session?.state === "locked" ? await unlock() : session;
+  const blocked = connectBlock({ fragment, session: current });
+  if (blocked) return { session: current, blocked, approved: null, sealed: null };
+  const sealed = fragment && current?.state === "unlocked" ? await commit(current.identity.key, fragment) : null;
+  const approved = await approve(sealed?.commitment ?? null);
+  return { session: current, blocked: null, approved, sealed };
+}
+
+export function unlockFailedText(error, name) {
+  if (error?.name === "NotAllowedError") return `The passkey was cancelled, so ${name} isn't connected yet.`;
+  if (error?.name === "AbortError") return `The passkey was stopped, so ${name} isn't connected yet.`;
+  return null;
+}
+
+export function connectBlockText(blocked, name) {
+  if (blocked === "no-prf") return `This browser's passkey can't unlock your account, so it can't hand ${name} your key.`;
+  if (blocked === "not-wrapped") return `This passkey can't unlock your account yet, so it can't hand ${name} your key.`;
+  if (blocked === "key-missing") return "The hub says your account has no key, but this browser has unlocked one before. Nothing was handed over.";
+  if (blocked === "key-changed") return "The hub offers another key for your account than this browser unlocked before. Nothing was handed over.";
+  return `Unlock your account with your passkey to hand ${name} your key.`;
+}
+
 const FRAGMENT = (code) => `kebbie-connect:${code}`;
 
 export function keptFragment(storage, code, hash) {

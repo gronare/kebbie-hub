@@ -107,7 +107,7 @@ test("signing up with a passkey whose create() gives a PRF makes a random accoun
   const account = hub();
   const credentials = authenticator();
   const kept = storage();
-  const session = await unlockAfter({ account, credentials }, await signUpWith({ account, credentials }, { invite: "K7QF-M2XD" }, " Carl ", "iPhone"), kept);
+  const session = await unlockAfter({ account, credentials }, await signUpWith({ account, credentials }, { invite: "K7QF-M2XD" }, "iPhone"), kept);
   assert.equal(session.state, "unlocked");
   assert.equal(credentials.asked.length, 0, "no second prompt");
   const { setup } = account.state;
@@ -125,7 +125,7 @@ test("signing up with a passkey whose create() gives a PRF makes a random accoun
 test("a create() without a PRF result is followed by one get() before PRF counts as missing", async () => {
   const account = hub();
   const credentials = authenticator({ prfAtCreate: false });
-  const session = await unlockAfter({ account, credentials }, await signUpWith({ account, credentials }, { invite: "K7QF-M2XD" }, "carl", "Mac"), storage());
+  const session = await unlockAfter({ account, credentials }, await signUpWith({ account, credentials }, { invite: "K7QF-M2XD" }, "Mac"), storage());
   assert.equal(session.state, "unlocked");
   assert.equal(credentials.asked.length, 1);
   assert.deepEqual(credentials.asked[0].publicKey.allowCredentials.map((allowed) => toB64(allowed.id)), [credentials.made[0]]);
@@ -136,7 +136,7 @@ test("a create() without a PRF result is followed by one get() before PRF counts
 test("an authenticator without PRF leaves a no-prf state and no key on the hub", async () => {
   const account = hub();
   const credentials = authenticator({ prf: false });
-  const session = await unlockAfter({ account, credentials }, await signUpWith({ account, credentials }, { invite: "K7QF-M2XD" }, "carl", "Mac"), storage());
+  const session = await unlockAfter({ account, credentials }, await signUpWith({ account, credentials }, { invite: "K7QF-M2XD" }, "Mac"), storage());
   assert.equal(session.state, "no-prf");
   assert.equal(session.identity, undefined);
   assert.equal(account.state.key, null);

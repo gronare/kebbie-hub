@@ -86,6 +86,17 @@ test("a machine not heard from shows as sleeping with what was working, not as t
   assert.equal(isAsleep({ lastSeen: now - SLEEP_AFTER }, now), false);
 });
 
+test("a machine whose last board expired is asleep with the hub's last-seen time, not a problem", async () => {
+  const lastSeen = vector.envelope.exp - 3600;
+  const later = vector.envelope.exp + 60;
+  const { opened } = await openBoards(listing([entry({ last_seen: lastSeen })]), await account(), later);
+  assert.equal(opened[0].problem, null);
+  assert.equal(opened[0].expired, true);
+  const view = arrange(opened, later);
+  assert.deepEqual(view.problems, []);
+  assert.deepEqual(view.sleeping, [{ machine: machine.id, name: "devbox", lastSeen, working: null }]);
+});
+
 test("problems are listed by machine and never mixed into the board", () => {
   const view = arrange([{ machine: "mch_x", name: "x", lastSeen: now, rev: 1, storedAt: now, board: null, problem: "bad-signature" }], now);
   assert.deepEqual(view.groups, []);

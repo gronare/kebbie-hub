@@ -322,17 +322,14 @@ pub struct Boards {
 pub struct RegisterBegin {
     #[serde(default)]
     pub invite: String,
-    pub handle: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub setup: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub verification: Option<String>,
+    pub connect: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct LoginBegin {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub handle: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential: Option<String>,
 }
@@ -480,16 +477,8 @@ pub struct HubInfo {
     pub signup: SignupMode,
     pub plans: bool,
     pub needs_setup: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EmailSignup {
-    pub email: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VerifiedEmail {
-    pub email: String,
+    #[serde(default)]
+    pub github: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

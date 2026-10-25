@@ -3,7 +3,7 @@ mod common;
 
 use common::*;
 use kebbie_hub::store::AdminScope;
-use kebbie_hub_api::{AccountPlan, PlanStatus, PlanUpdate, PlanView, SignupMode};
+use kebbie_hub_api::{AccountPlan, PlanStatus, PlanUpdate, PlanView};
 use kebbie_hub_fakes::machine::{AdmittedDevice, connect};
 use kebbie_hub_fakes::{Error, HubClient, HubError};
 use kebbie_hub_protocol::{Event, Id, Notice, Prefix, Role, SecretKeys, Urgency};
@@ -19,7 +19,7 @@ fn on(config: &mut kebbie_hub::Config) {
 fn admin(test: &TestHub, scope: AdminScope) -> HubClient {
     let token = test
         .hub
-        .mint_admin_token(&format!("{scope:?}-{}", fresh_handle()), scope)
+        .mint_admin_token(&format!("{scope:?}-{}", fresh_name()), scope)
         .unwrap()
         .unwrap();
     HubClient::new(&test.url, Some(&token))
@@ -196,21 +196,17 @@ async fn the_plan_api_takes_only_a_billing_token() {
 }
 
 #[tokio::test]
-async fn the_billing_service_finds_an_account_by_its_verified_email() {
-    let test = start_hub(|config| {
-        on(config);
-        config.signup = SignupMode::Open;
-    })
-    .await;
-    let mut person = browser(&test);
-    person.request_email("carl@example.com").await.unwrap();
-    let link = test.hub.mail_log()[0]
-        .text
-        .split_whitespace()
-        .find(|word| word.contains("verify="))
+async fn the_billing_service_finds_an_account_carried_over_with_a_verified_email() {
+    let test = start_hub(on).await;
+    let mut person = member(&test).await;
+    let account = person.account().await.unwrap();
+    rusqlite::Connection::open(test.hub.config().database())
         .unwrap()
-        .to_string();
-    let account = person.sign_up_verified(&link).await.unwrap();
+        .execute(
+            "UPDATE accounts SET email = 'carl@example.com', email_verified_at = 1 WHERE id = ?1",
+            [&account.account],
+        )
+        .unwrap();
     let billing = admin(&test, AdminScope::Billing);
     let found: AccountPlan = billing
         .get(

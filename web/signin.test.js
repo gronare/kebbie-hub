@@ -50,15 +50,11 @@ test("a remembered passkey is asked for by its id with its PRF salt, and one the
   assert.deepEqual(forgotten.begun, [{ credential: "Cg" }, {}]);
 });
 
-test("a device that offers no passkey is told to use the account name, a refusal by name talks about that account", async () => {
+test("a device that offers no passkey says so without asking for an account name", async () => {
   await assert.rejects(fakes({ refuse: "NotAllowedError" }).signingIn.withPasskey(), NoPasskeyOffered);
   const said = signInText(new NoPasskeyOffered());
-  assert.match(said, /account name/);
-  const byName = fakes({ refuse: "NotAllowedError" });
-  const error = await byName.signingIn.byName("  Carl ").catch((error) => error);
-  assert.deepEqual(byName.begun, [{ handle: "carl" }]);
-  assert.equal(error.name, "NotAllowedError");
-  assert.equal(signInText(error), "No passkey for this account on this device, or it was cancelled.");
+  assert.equal(said, "This device offered no passkey for this hub, or it was cancelled.");
+  assert.doesNotMatch(said, /account name/);
 });
 
 test("autofill waits as a conditional request until a sign-in by button takes its place", async () => {
@@ -74,11 +70,11 @@ test("autofill waits as a conditional request until a sign-in by button takes it
   assert.equal(await autofillAvailable({ isConditionalMediationAvailable: async () => { throw new Error(); } }), false);
 });
 
-test("sign-in errors talk about signing in and sign-up errors about the invite", () => {
+test("sign-in and sign-up errors name no account, invite field or account name", () => {
   const unauthorized = new HubError(401, "unauthorized");
-  assert.equal(signInText(unauthorized), "No passkey for this account on this device.");
+  assert.equal(signInText(unauthorized), "This passkey isn't one this hub knows.");
   assert.equal(signInText(new HubError(401, "unknown-passkey")), "That passkey belongs to an account this hub does not have.");
-  assert.doesNotMatch(signInText(unauthorized), /invite|handle/i);
-  assert.match(signUpText(unauthorized), /invite/);
-  assert.match(signUpText(new HubError(409, "handle-taken")), /account name/);
+  assert.equal(signUpText(unauthorized), "That link is used or expired. Ask for a new one.");
+  assert.equal(signUpText(new HubError(403, "signup-closed")), "This hub makes new accounts by invite only.");
+  for (const said of [signInText(unauthorized), signUpText(unauthorized), signUpText(new HubError(409, "passkey-taken"))]) assert.doesNotMatch(said, /account name|handle/i);
 });

@@ -2,12 +2,8 @@
 mod common;
 
 use common::*;
-use kebbie_hub::mail::{MailSettings, SmtpSecurity, SmtpSettings};
 use kebbie_hub::{Config, Hub};
-use kebbie_hub_api::{HubInfo, InviteLink, RegisterBegin, SignupMode, VerifiedEmail};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpListener;
-use tokio::sync::oneshot;
+use kebbie_hub_api::{HubInfo, InviteLink, RegisterBegin, SignupMode};
 
 #[tokio::test]
 async fn a_fresh_hub_is_claimed_only_with_its_setup_link() {
@@ -24,7 +20,8 @@ async fn a_fresh_hub_is_claimed_only_with_its_setup_link() {
         HubInfo {
             signup: SignupMode::Invite,
             plans: false,
-            needs_setup: true
+            needs_setup: true,
+            github: false
         }
     );
     let token = setup.split_once("token=").unwrap().1.to_string();
@@ -110,169 +107,108 @@ async fn the_owner_hands_out_invite_links() {
 }
 
 #[tokio::test]
-async fn open_sign_up_verifies_the_email_by_a_link_first() {
+async fn the_hub_takes_no_email_sign_ups() {
     let test = start_hub(|config| config.signup = SignupMode::Open).await;
     let mut person = browser(&test);
-    person.request_email(" Carl@Example.com ").await.unwrap();
-    let sent = test.hub.mail_log();
-    assert_eq!(sent.len(), 1);
-    assert_eq!(sent[0].to, "carl@example.com");
-    let link = sent[0]
-        .text
-        .split_whitespace()
-        .find(|word| word.starts_with("http://localhost:8470/signup?verify=khe_"))
-        .unwrap()
-        .to_string();
-    let token = link.split_once("verify=").unwrap().1;
-    let shown: VerifiedEmail = person
-        .get(&format!("/v1/a/signup/verify?token={token}"))
+    for path in ["/v1/a/signup/email", "/v1/a/signup/verify?token=khe_x"] {
+        let refused = person.get::<serde_json::Value>(path).await;
+        assert_eq!(hub_code(refused.unwrap_err()).0, 404, "{path}");
+    }
+}
+
+#[tokio::test]
+async fn an_open_hub_makes_an_account_from_a_pending_connect_without_a_name() {
+    let test = start_hub(|config| config.signup = SignupMode::Open).await;
+    let pending = kebbie_hub_fakes::machine::connect(&test.url, "mac")
         .await
         .unwrap();
-    assert_eq!(shown.email, "carl@example.com");
-    assert!(!holds(&database_bytes(&test), token.as_bytes()));
-
-    let created = person.sign_up_verified(&link).await.unwrap();
-    assert_eq!(created.email.as_deref(), Some("carl@example.com"));
-    let verified: Option<u64> = rusqlite::Connection::open(test.hub.config().database())
-        .unwrap()
-        .query_row("SELECT email_verified_at FROM accounts", [], |row| {
-            row.get(0)
-        })
+    let code = pending.started.user_code.clone();
+    let mut person = browser(&test);
+    let shown: kebbie_hub_api::ConnectRequestView = person
+        .get(&format!("/v1/connect?code={code}"))
+        .await
         .unwrap();
-    assert!(verified.is_some());
-    let mut reuse = browser(&test);
+    assert_eq!(shown.name, "mac");
+
+    let created = person.sign_up_from_connect(&pending.link()).await.unwrap();
+    assert!(!created.owner);
+    assert!(
+        created.handle.starts_with('k') && created.handle.len() == 13,
+        "{}",
+        created.handle
+    );
+    let mut second = browser(&test);
     assert_eq!(
-        hub_code(reuse.sign_up_verified(&link).await.unwrap_err()).0,
+        hub_code(second.sign_up_from_connect(&pending.link()).await.unwrap_err()).0,
         401
     );
 
-    let mut again = browser(&test);
-    again.request_email("carl@example.com").await.unwrap();
-    assert_eq!(
-        test.hub.mail_log().len(),
-        1,
-        "a held address gets no second mail"
+    let approval = person.approve_connect(&pending.link(), true).await.unwrap();
+    let (mut machine, pairing, secret) = pending.wait(WAIT).await.unwrap();
+    let pairing = pairing.expect("the approval opened a handoff");
+    let (pinned, confirmed) = tokio::join!(
+        machine.finish_connect(&pairing, &secret, WAIT),
+        person.hand_off(approval, WAIT)
     );
-    let refused = again.request_email("not an address").await;
-    assert_eq!(
-        hub_code(refused.unwrap_err()),
-        (400, "bad-email".to_string())
-    );
+    pinned.unwrap();
+    assert_eq!(confirmed.unwrap(), machine.machine);
 }
 
 #[tokio::test]
-async fn an_invite_hub_takes_no_email_sign_ups() {
+async fn an_invite_hub_makes_no_account_from_a_connect() {
     let test = start_hub(|_| {}).await;
-    let mut person = browser(&test);
-    let refused = person.request_email("carl@example.com").await;
-    assert_eq!(
-        hub_code(refused.unwrap_err()),
-        (403, "signup-closed".to_string())
-    );
-    assert!(test.hub.mail_log().is_empty());
-}
-
-#[tokio::test]
-async fn sign_up_mail_is_rate_limited_per_address() {
-    let test = start_hub(|config| config.signup = SignupMode::Open).await;
-    let mut person = browser(&test);
-    for count in 0..3 {
-        person
-            .request_email(&format!("person{count}@example.com"))
-            .await
-            .unwrap();
-    }
-    let refused = person.request_email("person9@example.com").await;
-    assert_eq!(hub_code(refused.unwrap_err()).0, 429);
-}
-
-async fn fake_smtp() -> (u16, oneshot::Receiver<Vec<String>>) {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let port = listener.local_addr().unwrap().port();
-    let (done, transcript) = oneshot::channel();
-    tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let (read, mut write) = stream.into_split();
-        let mut lines = BufReader::new(read).lines();
-        let mut seen = Vec::new();
-        write.write_all(b"220 fake ready\r\n").await.unwrap();
-        let mut in_data = false;
-        while let Some(line) = lines.next_line().await.unwrap() {
-            seen.push(line.clone());
-            let reply: &[u8] = if in_data {
-                if line != "." {
-                    continue;
-                }
-                in_data = false;
-                b"250 queued\r\n"
-            } else if line.starts_with("EHLO") {
-                b"250-fake\r\n250 AUTH PLAIN\r\n"
-            } else if line.starts_with("AUTH PLAIN") {
-                b"235 ok\r\n"
-            } else if line == "DATA" {
-                in_data = true;
-                b"354 go on\r\n"
-            } else if line == "QUIT" {
-                write.write_all(b"221 bye\r\n").await.unwrap();
-                break;
-            } else {
-                b"250 ok\r\n"
-            };
-            write.write_all(reply).await.unwrap();
-        }
-        let _ = done.send(seen);
-    });
-    (port, transcript)
-}
-
-#[tokio::test]
-async fn sign_up_mail_goes_out_over_smtp() {
-    let (port, transcript) = fake_smtp().await;
-    let test = start_hub(|config| {
-        config.signup = SignupMode::Open;
-        config.mail = MailSettings::Smtp(SmtpSettings {
-            host: "127.0.0.1".to_string(),
-            port,
-            security: SmtpSecurity::Plain,
-            user: Some("hub".to_string()),
-            password: Some("secret".to_string()),
-            from: "hub@example.com".to_string(),
-        });
-    })
-    .await;
-    browser(&test)
-        .request_email("carl@example.com")
+    let pending = kebbie_hub_fakes::machine::connect(&test.url, "mac")
         .await
         .unwrap();
-    let seen = transcript.await.unwrap();
-    assert_eq!(seen[0], "EHLO localhost");
-    assert!(
-        seen.contains(&"AUTH PLAIN AGh1YgBzZWNyZXQ=".to_string()),
-        "{seen:?}"
+    let mut person = browser(&test);
+    assert_eq!(
+        hub_code(person.sign_up_from_connect(&pending.link()).await.unwrap_err()),
+        (403, "signup-closed".to_string())
     );
-    assert!(seen.contains(&"MAIL FROM:<hub@example.com>".to_string()));
-    assert!(seen.contains(&"RCPT TO:<carl@example.com>".to_string()));
-    assert!(seen.contains(&"Subject: Finish signing up to kebbie hub".to_string()));
-    assert!(
-        seen.iter()
-            .any(|line| line.starts_with("http://localhost:8470/signup?verify=khe_"))
-    );
-    assert_eq!(seen.last().map(String::as_str), Some("QUIT"));
-    assert!(test.hub.mail_log().is_empty());
 }
 
-#[test]
-fn plain_smtp_is_refused_beyond_loopback() {
-    let data = tempfile::tempdir().unwrap();
-    let mut config = Config::new(data.path());
-    config.mail = MailSettings::Smtp(SmtpSettings {
-        host: "smtp.example.com".to_string(),
-        port: 25,
-        security: SmtpSecurity::Plain,
-        user: Some("hub".to_string()),
-        password: Some("secret".to_string()),
-        from: "hub@example.com".to_string(),
-    });
-    let refused = Hub::open(config).err().unwrap().to_string();
-    assert!(refused.contains("plain SMTP"), "{refused}");
+#[tokio::test]
+async fn a_connect_code_that_is_not_pending_makes_no_account() {
+    let test = start_hub(|config| config.signup = SignupMode::Open).await;
+    let mut person = browser(&test);
+    assert_eq!(
+        hub_code(
+            person
+                .sign_up_from_connect("http://localhost:8470/connect?code=K7QF-M2XD")
+                .await
+                .unwrap_err()
+        )
+        .0,
+        401
+    );
+    let pending = kebbie_hub_fakes::machine::connect(&test.url, "mac")
+        .await
+        .unwrap();
+    let mut approver = member(&test).await;
+    approver.approve_connect(&pending.link(), false).await.unwrap();
+    assert_eq!(
+        hub_code(person.sign_up_from_connect(&pending.link()).await.unwrap_err()).0,
+        401
+    );
+}
+
+#[tokio::test]
+async fn an_invite_signs_up_without_an_account_name() {
+    let test = start_hub(|_| {}).await;
+    let mut person = browser(&test);
+    let created = person
+        .sign_up_with_invite(&test.hub.mint_invite().unwrap())
+        .await
+        .unwrap();
+    assert!(created.handle.starts_with('k'), "{}", created.handle);
+}
+
+#[tokio::test]
+async fn the_hub_says_whether_github_sign_in_is_configured() {
+    let plain = start_hub(|_| {}).await;
+    let info: HubInfo = browser(&plain).get("/v1/hub").await.unwrap();
+    assert!(!info.github);
+    let configured = start_hub(|config| config.github_client_id = Some("Iv1.test".into())).await;
+    let info: HubInfo = browser(&configured).get("/v1/hub").await.unwrap();
+    assert!(info.github);
 }

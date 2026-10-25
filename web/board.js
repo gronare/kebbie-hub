@@ -50,7 +50,7 @@ export async function openBoards(listing, identity, now, marks = emptyMarks()) {
   const opened = [];
   const next = mergeMarks(marks, trusted.list ? { list: trusted.list.counter } : null);
   for (const entry of listing.boards) {
-    const base = { machine: entry.machine, name: entry.name || entry.machine.slice(-6), lastSeen: entry.last_seen ?? null, rev: entry.rev ?? null, storedAt: entry.stored_at ?? null, board: null, problem: null };
+    const base = { machine: entry.machine, name: entry.name || entry.machine.slice(-6), lastSeen: entry.last_seen ?? null, rev: entry.rev ?? null, storedAt: entry.stored_at ?? null, board: null, problem: null, expired: false };
     if (trusted.problem || !machineListTrusts(trusted.list, entry.machine, entry.machine_keys)) {
       opened.push({ ...base, problem: trusted.problem ?? "unknown-machine" });
       continue;
@@ -74,7 +74,7 @@ export async function openBoards(listing, identity, now, marks = emptyMarks()) {
       }
     } catch (error) {
       if (!(error instanceof ProtocolError)) throw error;
-      opened.push({ ...base, problem: error.code });
+      opened.push(error.code === "expired" ? { ...base, expired: true } : { ...base, problem: error.code });
     }
   }
   const gone = trusted.list ? trusted.list.machines.filter((listed) => !listing.boards.some((entry) => entry.machine === listed.machine)).map((listed) => listed.machine) : [];
@@ -90,8 +90,8 @@ export function arrange(opened, now) {
   const rows = awake.flatMap((machine) => machine.board.items.map((item) => ({ machine: machine.machine, name: machine.name, item, ...splitAddress(item.address) })));
   const groups = GROUPS.map((group) => ({ ...group, rows: rows.filter((row) => row.item.group === group.key).sort(byUrgency) })).filter((group) => group.rows.length > 0);
   const sleeping = opened
-    .filter((machine) => machine.board && isAsleep(machine, now))
-    .map((machine) => ({ machine: machine.machine, name: machine.name, lastSeen: machine.lastSeen ?? machine.storedAt, working: machine.board.items.filter((item) => item.group === "WORKING").length }));
+    .filter((machine) => machine.expired || (machine.board && isAsleep(machine, now)))
+    .map((machine) => ({ machine: machine.machine, name: machine.name, lastSeen: machine.lastSeen ?? machine.storedAt, working: machine.board ? machine.board.items.filter((item) => item.group === "WORKING").length : null }));
   const problems = opened.filter((machine) => machine.problem).map(({ machine, name, problem }) => ({ machine, name, problem }));
   const questions = rows.filter((row) => row.item.question || row.item.prompt).sort(byUrgency);
   return { groups, sleeping, problems, questions, machines: opened.length };

@@ -181,3 +181,25 @@ a.task:active { background: var(--sel); }
 .btn.small { display: inline-block; width: auto; min-height: 34px; padding: 6px 12px; font-size: 14px; }
 .report { margin: 4px 0 0; font: 13px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); max-height: 240px; overflow-y: auto; }
 .page { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+
+.brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 15px; color: var(--muted); }
+.brand-mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 14px; font-weight: 700; line-height: 1; }
+.brand b { color: var(--ink); font-weight: 650; }
+.title { font-size: 26px; line-height: 1.25; font-weight: 700; margin: 8px 8px 0; overflow-wrap: anywhere; }
+.lead { color: var(--muted); font-size: 15px; margin: 0 8px 4px; }
+.foot { text-align: center; color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+.foot code, .center code { font-family: ui-monospace, Menlo, monospace; color: var(--ink); }
+.link.inline { border: 0; background: transparent; font: inherit; padding: 0; cursor: pointer; }
+button.link { border: 0; background: transparent; font: inherit; font-size: 14px; cursor: pointer; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.row-start { display: flex; align-items: center; gap: 12px; }
+.icon { width: 28px; height: 28px; flex: none; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.code.peach { color: var(--peach); padding: 12px 0 6px; }
+.small-card { gap: 2px; font-size: 14px; }
+.done { display: grid; gap: 4px; }
+.title-ok { font-size: 20px; font-weight: 700; padding: 0 8px; }
+.done .lead { margin-bottom: 0; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; vertical-align: -2px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

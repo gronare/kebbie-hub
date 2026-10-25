@@ -76,7 +76,6 @@ async fn the_first_sign_in_sets_the_account_key_and_every_later_one_unwraps_it()
         .post(
             "/v1/a/login/begin",
             &LoginBegin {
-                handle: None,
                 credential: Some(named.clone()),
             },
         )
@@ -86,8 +85,7 @@ async fn the_first_sign_in_sets_the_account_key_and_every_later_one_unwraps_it()
         .post(
             "/v1/a/login/begin",
             &LoginBegin {
-                handle: Some(person.handle.clone()),
-                credential: None,
+                credential: Some(named.clone()),
             },
         )
         .await
@@ -107,7 +105,6 @@ async fn the_first_sign_in_sets_the_account_key_and_every_later_one_unwraps_it()
         .post::<_, RequestCeremony>(
             "/v1/a/login/begin",
             &LoginBegin {
-                handle: None,
                 credential: Some(URL_SAFE_NO_PAD.encode(b"nobody")),
             },
         )

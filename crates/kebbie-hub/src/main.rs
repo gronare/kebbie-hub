@@ -5,7 +5,6 @@ use std::process::ExitCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kebbie_hub::mail::{MailSettings, SmtpSecurity, SmtpSettings};
 use kebbie_hub::store::{AdminScope, KeyStatus, MadeOwner, SignalRow, Store, StoredReport};
 use kebbie_hub::{
     Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy,
@@ -76,7 +75,7 @@ struct Cli {
         long,
         value_enum,
         default_value_t = Signup::Invite,
-        help = "Who signs up: people with an invite, or anyone who verifies an email address"
+        help = "Who signs up: people with an invite, or anyone whose machine opened a connect link"
     )]
     signup: Signup,
     #[arg(
@@ -92,31 +91,6 @@ struct Cli {
         help = "Where people start a subscription, shown when their plan is inactive"
     )]
     billing_url: Option<String>,
-    #[arg(
-        long,
-        help = "SMTP server for sign-up mail; without it the hub logs the links it would send"
-    )]
-    smtp_host: Option<String>,
-    #[arg(long, default_value_t = 587, help = "SMTP port")]
-    smtp_port: u16,
-    #[arg(
-        long,
-        value_enum,
-        default_value_t = Security::Starttls,
-        help = "How to reach the SMTP server; none only for a loopback host"
-    )]
-    smtp_security: Security,
-    #[arg(
-        long,
-        help = "SMTP user; the password comes from KEBBIE_HUB_SMTP_PASSWORD"
-    )]
-    smtp_user: Option<String>,
-    #[arg(
-        long,
-        value_name = "ADDRESS",
-        help = "The address sign-up mail comes from"
-    )]
-    mail_from: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -134,20 +108,10 @@ enum Plans {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum Security {
-    Tls,
-    Starttls,
-    None,
-}
-
-#[derive(Clone, Copy, ValueEnum)]
 enum Scope {
     Reports,
     Billing,
 }
-
-const SMTP_PASSWORD_ENV: &str = "KEBBIE_HUB_SMTP_PASSWORD";
-const OLD_SMTP_PASSWORD_ENV: &str = "KELPIE_HUB_SMTP_PASSWORD";
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Proxy {
@@ -170,9 +134,12 @@ enum Admin {
     Machines,
     #[command(about = "Remove a machine, its board, queue and admissions")]
     RemoveMachine { machine: String },
+    #[command(about = "List the accounts by id, with role, machines and when they were last seen")]
+    Accounts,
     #[command(about = "Make an account the hub's owner, the one account that opens the admin page")]
     Owner {
-        handle: String,
+        #[arg(help = "The account's id (acc_…), as admin accounts lists it")]
+        account: String,
         #[arg(
             long,
             help = "Demote the current owner to member; without it an existing owner is kept and nothing changes"
@@ -276,31 +243,37 @@ fn token(
     Ok(())
 }
 
-fn make_owner(data: &std::path::Path, handle: &str, replace: bool) -> Result<(), String> {
+fn make_owner(data: &std::path::Path, account: &str, replace: bool) -> Result<(), String> {
+    let account = account.trim();
+    if !account.starts_with("acc_") {
+        return Err(format!(
+            "{account} is not an account id; kebbie-hub admin accounts lists them (acc_…)"
+        ));
+    }
     let store = open_store(data)?;
     match store
-        .make_owner(handle, replace, kebbie_hub::now())
+        .make_owner(account, replace, kebbie_hub::now())
         .map_err(|error| error.to_string())?
     {
-        MadeOwner::Made { replaced } if replaced.is_empty() => println!("{handle} is the owner"),
+        MadeOwner::Made { replaced } if replaced.is_empty() => println!("{account} is the owner"),
         MadeOwner::Made { replaced } => println!(
-            "{handle} is the owner; {} is a member now",
+            "{account} is the owner; {} is a member now",
             replaced.join(", ")
         ),
-        MadeOwner::AlreadyOwner => println!("{handle} is the owner already"),
+        MadeOwner::AlreadyOwner => println!("{account} is the owner already"),
         MadeOwner::OtherOwner(owners) => {
             return Err(format!(
-                "{} is the owner; add --replace to make {handle} the owner and {} a member",
+                "{} is the owner; add --replace to make {account} the owner and {} a member",
                 owners.join(", "),
                 owners.join(", ")
             ));
         }
         MadeOwner::Deactivated => {
             return Err(format!(
-                "{handle} is deactivated; activate it before making it the owner"
+                "{account} is deactivated; activate it before making it the owner"
             ));
         }
-        MadeOwner::NoAccount => return Err(format!("no account with the handle {handle}")),
+        MadeOwner::NoAccount => return Err(format!("no account {account}")),
     }
     Ok(())
 }
@@ -523,36 +496,6 @@ fn vapid_subject(cli: &Cli) -> Result<String, String> {
     }
 }
 
-fn mail_settings(cli: &Cli) -> Result<MailSettings, String> {
-    let Some(host) = &cli.smtp_host else {
-        return match (cli.signup, cli.dev) {
-            (Signup::Open, false) => Err(
-                "--signup open sends verification mail: pass --smtp-host and --mail-from, or --dev to log the links"
-                    .to_string(),
-            ),
-            _ => Ok(MailSettings::Log),
-        };
-    };
-    let from = cli
-        .mail_from
-        .clone()
-        .ok_or("--smtp-host needs --mail-from <address>")?;
-    Ok(MailSettings::Smtp(SmtpSettings {
-        host: host.clone(),
-        port: cli.smtp_port,
-        security: match cli.smtp_security {
-            Security::Tls => SmtpSecurity::Tls,
-            Security::Starttls => SmtpSecurity::StartTls,
-            Security::None => SmtpSecurity::Plain,
-        },
-        user: cli.smtp_user.clone(),
-        password: [SMTP_PASSWORD_ENV, OLD_SMTP_PASSWORD_ENV]
-            .into_iter()
-            .find_map(|name| std::env::var(name).ok().filter(|value| !value.is_empty())),
-        from,
-    }))
-}
-
 fn open_store(data: &std::path::Path) -> Result<Store, String> {
     Store::open(&database_path(data)).map_err(|error| error.to_string())
 }
@@ -611,8 +554,27 @@ async fn run(cli: Cli) -> Result<(), String> {
             action,
         })) => reports(&data, *quarantine, *json, action.as_ref()),
         Some(Command::Admin(Admin::Signals { days, json })) => signals(&data, *days, *json),
-        Some(Command::Admin(Admin::Owner { handle, replace })) => {
-            make_owner(&data, handle, *replace)
+        Some(Command::Admin(Admin::Owner { account, replace })) => {
+            make_owner(&data, account, *replace)
+        }
+        Some(Command::Admin(Admin::Accounts)) => {
+            let accounts = open_store(&data)?
+                .admin_accounts()
+                .map_err(|error| error.to_string())?;
+            for row in accounts {
+                let role = if row.account.owner { "owner" } else { "member" };
+                let seen = row.last_seen.map_or("-".to_string(), |at| at.to_string());
+                let off = if row.account.deactivated_at.is_some() {
+                    " deactivated"
+                } else {
+                    ""
+                };
+                println!(
+                    "{} {role}{off} created {} machines {} seen {seen}",
+                    row.account.id, row.account.created_at, row.machines
+                );
+            }
+            Ok(())
         }
         Some(Command::Admin(Admin::RemoveMachine { machine })) => {
             let machine = Id::parse(machine).map_err(|error| error.to_string())?;
@@ -661,7 +623,6 @@ async fn run(cli: Cli) -> Result<(), String> {
             };
             config.plans = matches!(cli.plans, Plans::On);
             config.billing_url = cli.billing_url.clone();
-            config.mail = mail_settings(&cli)?;
             let hub = Hub::open(config).map_err(|error| error.to_string())?;
             let listener = tokio::net::TcpListener::bind(address)
                 .await

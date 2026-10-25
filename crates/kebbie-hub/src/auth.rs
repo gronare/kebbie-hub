@@ -20,7 +20,6 @@ pub const DEVICE_TOKEN_PREFIX: &str = "khd_";
 pub const SESSION_TOKEN_PREFIX: &str = "khs_";
 pub const ADMIN_TOKEN_PREFIX: &str = "kha_";
 pub const SETUP_TOKEN_PREFIX: &str = "kho_";
-pub const VERIFY_TOKEN_PREFIX: &str = "khe_";
 pub const DEVICE_CODE_PREFIX: &str = "khc_";
 pub const SESSION_COOKIE: &str = "__Host-kebbie_session";
 

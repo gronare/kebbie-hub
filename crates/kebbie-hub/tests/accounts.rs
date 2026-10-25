@@ -44,7 +44,7 @@ async fn a_passkey_signs_up_and_logs_in_with_a_strict_http_only_cookie() {
         .await;
     let set_cookie = person.keep_cookie(&response);
     let created: AccountView = body(response).await;
-    assert_eq!(created.handle, person.handle);
+    assert!(created.handle.starts_with('k'), "{}", created.handle);
     let attributes: Vec<&str> = set_cookie.split(';').map(str::trim).collect();
     assert!(attributes[0].starts_with(&format!("{SESSION_COOKIE}=khs_")));
     for flag in ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"] {
@@ -96,24 +96,6 @@ async fn an_invite_signs_up_one_account_even_when_two_ceremonies_race() {
 }
 
 #[tokio::test]
-async fn a_taken_handle_and_a_bad_handle_are_refused_at_sign_up() {
-    let test = start_hub(|_| {}).await;
-    let taken = signed_up(&test).await;
-    let mut again = Person::new(&test.url);
-    again.handle = taken.handle.to_uppercase();
-    let invite = test.hub.mint_invite().unwrap();
-    assert_eq!(
-        refusal(again.begin_sign_up(&invite).await).await,
-        (409, "handle-taken".to_string())
-    );
-    again.handle = "not a handle".to_string();
-    assert_eq!(
-        refusal(again.begin_sign_up(&invite).await).await,
-        (400, "bad-handle".to_string())
-    );
-}
-
-#[tokio::test]
 async fn a_ceremony_works_once() {
     let test = start_hub(|_| {}).await;
     let mut person = signed_up(&test).await;
@@ -138,24 +120,6 @@ async fn a_ceremony_works_once() {
         refusal(person.post("/v1/a/login/finish", &finish).await).await,
         (401, "unauthorized".to_string())
     );
-}
-
-#[tokio::test]
-async fn a_passkey_from_another_account_does_not_log_in() {
-    let test = start_hub(|_| {}).await;
-    let mut person = signed_up(&test).await;
-    let mut stranger = signed_up(&test).await;
-    stranger.handle = person.handle.clone();
-    let ceremony = stranger.begin_log_in().await;
-    assert!(
-        stranger
-            .passkey
-            .do_authentication(origin(), ceremony.options)
-            .is_err(),
-        "the stranger's authenticator holds no passkey the account allows"
-    );
-    person.cookie = None;
-    assert!(person.log_in().await.status().is_success());
 }
 
 #[tokio::test]
@@ -283,13 +247,11 @@ async fn an_account_adds_and_removes_passkeys_but_never_its_last() {
     person.cookie = None;
     assert!(person.log_in().await.status().is_success());
     std::mem::swap(&mut person.passkey, &mut second);
-    let ceremony = person.begin_log_in().await;
-    assert!(
-        person
-            .passkey
-            .do_authentication(origin(), ceremony.options)
-            .is_err(),
-        "the removed passkey is no longer offered"
+    person.cookie = None;
+    assert_eq!(
+        person.log_in().await.status(),
+        401,
+        "the removed passkey no longer signs in"
     );
 }
 

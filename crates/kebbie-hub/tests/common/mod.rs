@@ -117,13 +117,12 @@ pub fn soft_passkey() -> WebauthnAuthenticator<DiscoverablePasskey> {
 
 static PEOPLE: AtomicUsize = AtomicUsize::new(0);
 
-pub fn fresh_handle() -> String {
+pub fn fresh_name() -> String {
     format!("person-{}", PEOPLE.fetch_add(1, Ordering::Relaxed))
 }
 
 pub struct Person {
     pub url: String,
-    pub handle: String,
     pub cookie: Option<String>,
     pub origin: Option<String>,
     pub passkey: WebauthnAuthenticator<DiscoverablePasskey>,
@@ -150,7 +149,6 @@ impl Person {
     pub fn new(url: &str) -> Person {
         Person {
             url: url.to_string(),
-            handle: fresh_handle(),
             cookie: None,
             origin: Some(DEV_ORIGIN.to_string()),
             passkey: soft_passkey(),
@@ -203,7 +201,6 @@ impl Person {
             "/v1/a/register/begin",
             &RegisterBegin {
                 invite: invite.to_string(),
-                handle: self.handle.clone(),
                 ..RegisterBegin::default()
             },
         )
@@ -237,20 +234,6 @@ impl Person {
     }
 
     pub async fn begin_log_in(&self) -> RequestCeremony {
-        body(
-            self.post(
-                "/v1/a/login/begin",
-                &LoginBegin {
-                    handle: Some(self.handle.clone()),
-                    credential: None,
-                },
-            )
-            .await,
-        )
-        .await
-    }
-
-    pub async fn begin_discoverable_log_in(&self) -> RequestCeremony {
         body(self.post("/v1/a/login/begin", &LoginBegin::default()).await).await
     }
 
@@ -455,7 +438,7 @@ impl EventStream {
 }
 
 pub fn browser(test: &TestHub) -> Browser {
-    Browser::new(&test.url, DEV_ORIGIN, &fresh_handle())
+    Browser::new(&test.url, DEV_ORIGIN)
 }
 
 pub async fn member(test: &TestHub) -> Browser {

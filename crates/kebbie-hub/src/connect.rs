@@ -136,7 +136,11 @@ impl Hub {
     }
 
     fn limit_code(&self, account: &str) -> Result<(), ApiError> {
-        if self.code_limiter.allow(&format!("account:{account}")) {
+        self.limit_code_by(&format!("account:{account}"))
+    }
+
+    fn limit_code_by(&self, key: &str) -> Result<(), ApiError> {
+        if self.code_limiter.allow(key) {
             Ok(())
         } else {
             Err(ApiError::rate_limited())
@@ -158,19 +162,32 @@ fn pending(store: &store::Store, typed: &str, at: u64) -> Result<(String, Connec
     Ok((code, connect))
 }
 
-pub async fn view(
-    State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
-    Query(query): Query<CodeQuery>,
-) -> Result<Json<ConnectRequestView>, ApiError> {
-    hub.limit_code(&account)?;
-    let (code, connect) = pending(&hub.store(), &query.code, now())?;
+fn shown(hub: &Hub, typed: &str) -> Result<Json<ConnectRequestView>, ApiError> {
+    let (code, connect) = pending(&hub.store(), typed, now())?;
     Ok(Json(ConnectRequestView {
         code,
         name: connect.name,
         state: connect.state,
         expires_at: connect.expires_at,
     }))
+}
+
+pub async fn peek(
+    State(hub): State<Arc<Hub>>,
+    client: Anonymous,
+    Query(query): Query<CodeQuery>,
+) -> Result<Json<ConnectRequestView>, ApiError> {
+    hub.limit_code_by(&format!("address:{}", client.address))?;
+    shown(&hub, &query.code)
+}
+
+pub async fn view(
+    State(hub): State<Arc<Hub>>,
+    AccountAuth(account): AccountAuth,
+    Query(query): Query<CodeQuery>,
+) -> Result<Json<ConnectRequestView>, ApiError> {
+    hub.limit_code(&account)?;
+    shown(&hub, &query.code)
 }
 
 pub async fn approve(

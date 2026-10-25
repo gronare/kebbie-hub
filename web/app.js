@@ -1,17 +1,17 @@
 import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, withReauth } from "./connect.js";
-import { proposedName } from "./device-name.js";
-import { autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText, signUpWith } from "./signin.js";
+import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
-import { addUnlockingPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "./unlock.js";
+import { rememberedCredential, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { PAGES, startPage } from "./pages.js";
 import { supported as passkeysSupported } from "./passkey.js";
+import { cantUnlockScreen, connectDone, installHint, lastSeenText, signInScreen, sleepingRow, unlockingScreen } from "./screens.js";
 
 const root = document.getElementById("app");
-const onPage = PAGES.includes(location.pathname);
+let pageMode = PAGES.includes(location.pathname);
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, byName: false, offerPasskey: false, selected: {}, hint: false };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, selected: {}, hint: false, unlocking: false, connected: null };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 const lists = { boards: account.boards, putMachines: connectCalls.putMachines };
 
@@ -66,7 +66,6 @@ const PROBLEMS = {
   "not-sealed-to-this-account": "the board is not sealed to your account yet",
   "revision-differs": "the hub's revision differs from the machine's",
   "bad-signature": "the signature does not match; not shown",
-  expired: "the board is too old",
   "not-yet-valid": "this device's clock is wrong",
   "rolled-back": "older than the board you last read",
   "rolled-back-list": "the hub served an older list of your machines than this device has seen; not shown",
@@ -75,11 +74,6 @@ const PROBLEMS = {
 };
 const problemText = (code) => PROBLEMS[code] ?? `does not open (${code})`;
 
-function installHint() {
-  if (!state.hint) return "";
-  return `<div class="hint"><div>Add kebbie to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens as its own app.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>`;
-}
-
 function freshness() {
   const machines = plural(state.opened.length, "machine", "machines");
   return state.offline ? "can't reach the hub right now" : machines;
@@ -87,27 +81,23 @@ function freshness() {
 
 function boardScreen() {
   const view = arrange(state.opened, nowSeconds());
-  const parts = [top("kebbie", esc(freshness())), installHint(), passkeyOffer(), storeWarning()];
+  const parts = [top("kebbie", esc(freshness())), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning()];
   if (state.opened.length === 0) {
     parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div>`);
-  } else if (!state.opened.some((machine) => machine.board || machine.problem)) {
+  } else if (!state.opened.some((machine) => machine.board || machine.problem || machine.expired)) {
     parts.push(`<div class="center">No connected machine has sent a board yet.</div>`);
   }
   for (const group of view.groups) {
     parts.push(`<h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>`, ...group.rows.map(taskRow));
   }
   if (view.sleeping.length > 0) {
-    parts.push(`<h2 class="group g-muted">Asleep</h2>`);
-    for (const machine of view.sleeping) {
-      const working = machine.working ? `${plural(machine.working, "task", "tasks")} were working then` : "nothing was working then";
-      parts.push(`<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">last seen ${esc(when(machine.lastSeen))} · ${working}</div></div>`);
-    }
+    parts.push(`<h2 class="group g-muted">Asleep</h2>`, ...view.sleeping.map((machine) => sleepingRow(machine, nowSeconds())));
   }
   if (view.problems.length > 0) {
     parts.push(`<h2 class="group g-muted">Can't be read</h2>`);
     for (const machine of view.problems) parts.push(`<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">${esc(problemText(machine.problem))}</div></div>`);
   }
-  return parts.join("") + tabbar("board");
+  return parts.join("") + installHint(state.hint) + tabbar("board");
 }
 
 function questionsScreen() {
@@ -182,43 +172,21 @@ function storeWarning() {
 function machinesScreen() {
   const now = nowSeconds();
   const rows = state.opened.map((opened) => {
-    const awake = !isAsleep({ lastSeen: opened.lastSeen }, now);
-    const facts = opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened.problem ? [problemText(opened.problem)] : ["no board yet"];
+    const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
+    const facts = opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : opened.problem ? [problemText(opened.problem)] : ["no board yet"];
     const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(opened.machine)}" data-name="${esc(opened.name)}">Remove</button>`;
     return `<div class="task${awake ? "" : " asleep"}"><div class="row"><div class="name">${esc(opened.name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div>${remove}</div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
   });
-  const signedIn = state.me ? `<h3 class="sec">Account</h3><div class="meta pad">${esc(state.me.handle)}</div>` : "";
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  return top("Machines", esc(`${state.opened.length} connected`)) + storeWarning() + message + rows.join("") + signedIn + tabbar("machines");
+  return top("Machines", esc(`${state.opened.length} connected`)) + storeWarning() + message + rows.join("") + tabbar("machines");
 }
 
 function lockedScreen() {
-  const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
   const status = state.session?.state ?? "locked";
-  const again = status === "locked" ? "Unlock with passkey" : "Try another passkey";
-  return top("kebbie", esc(state.me?.handle ?? "")) + `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div><button type="button" class="btn primary" data-action="unlock">${again}</button>${message}`;
-}
-
-function loginScreen(signUp) {
+  if (status === "locked") return signInScreen({ github: Boolean(state.info?.github), notice: state.notice });
+  if (status === "no-prf" || status === "not-wrapped") return cantUnlockScreen({ state: status, notice: state.notice });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  if (!passkeysSupported()) return top("kebbie") + `<div class="center">This browser can't sign in with a passkey.</div>`;
-  if (signUp) {
-    return (
-      top("Sign up") +
-      `<div class="center">Enter your invite and pick an account name. Then this device adds a passkey.</div>
-      <form data-form="signup" class="stack"><label class="task field"><span class="meta">Invite</span><input name="invite" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required></label>
-      <label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z][a-zA-Z0-9\\-]*" maxlength="32" required></label>
-      <button class="btn primary">Create account with passkey</button></form>${message}<a class="center link" href="#/login">Have an account? Sign in</a>`
-    );
-  }
-  const fallback = state.byName
-    ? `<form data-form="login" class="stack"><label class="task field"><span class="meta">Account name</span><input name="handle" autocomplete="username webauthn" autocapitalize="none" spellcheck="false" required></label><button class="btn">Sign in with this account</button></form>`
-    : `<button type="button" class="center link" data-action="by-name">Use an account name instead</button>`;
-  return (
-    top("kebbie") +
-    `<div class="center">Sign in with your passkey. It unlocks your account's key on this device, which reads the board itself; the hub never sees what it says.</div>
-    <button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${message}${fallback}<a class="center link" href="/signup">No account yet? Sign up</a>`
-  );
+  return top("kebbie") + `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div><button type="button" class="btn primary" data-action="other-passkey">Try another passkey</button>${message}`;
 }
 
 function unsupportedScreen() {
@@ -226,11 +194,12 @@ function unsupportedScreen() {
 }
 
 function render() {
-  if (onPage) return;
+  if (pageMode) return;
   const { name, params } = route();
   let html;
   if (!cryptoReady()) html = unsupportedScreen();
-  else if (!state.me) html = loginScreen(name === "signup");
+  else if (state.unlocking) html = unlockingScreen();
+  else if (!state.me) html = signInScreen({ github: Boolean(state.info?.github), notice: state.notice });
   else if (state.session?.state !== "unlocked") html = lockedScreen();
   else if (name === "questions") html = questionsScreen();
   else if (name === "machines") html = machinesScreen();
@@ -357,8 +326,6 @@ function startFeed() {
   loop();
 }
 
-const deviceName = () => proposedName(navigator.userAgent);
-
 function hubMessage(error) {
   if (error instanceof HubError) return `The hub answered ${error.status} (${error.code}).`;
   if (error?.name === "NotAllowedError") return "The passkey was cancelled.";
@@ -367,25 +334,32 @@ function hubMessage(error) {
 
 const signingIn = signInWith(hub);
 
-async function unlocked(ceremony, byName) {
+async function unlocked(ceremony) {
   signingIn.stop();
-  state.byName = false;
   const previous = state.me?.account;
-  state.session = await unlockAfter(hub, ceremony);
+  state.unlocking = true;
+  render();
+  try {
+    state.session = await unlockAfter(hub, ceremony);
+  } finally {
+    state.unlocking = false;
+  }
   state.me = state.session.me;
   if (previous !== state.me.account) state.marks = emptyMarks();
-  state.offerPasskey = byName && state.session.state === "unlocked";
   state.notice = null;
   if (state.session.state !== "unlocked") return render();
+  state.unlocking = true;
   go("#/board");
   await refresh();
+  state.unlocking = false;
+  render();
   startFeed();
 }
 
 async function startAutofill() {
   if (state.me || !(await autofillAvailable())) return;
   try {
-    await unlocked(await signingIn.autofill(), false);
+    await unlocked(await signingIn.autofill());
   } catch (error) {
     if (error?.name === "AbortError") return;
     state.notice = signInText(error);
@@ -393,72 +367,32 @@ async function startAutofill() {
   }
 }
 
-async function signUp(form) {
-  await unlocked(await signUpWith(hub, { invite: form.invite.value.trim() }, form.handle.value, deviceName()), false);
-}
-
-async function signInWithPasskey() {
+async function signInWithPasskey(remembered) {
   try {
-    await unlocked(await signingIn.withPasskey(rememberedCredential()), false);
+    await unlocked(await signingIn.withPasskey(remembered));
   } catch (error) {
-    if (error instanceof NoPasskeyOffered) state.byName = true;
-    state.notice = signInText(error);
-    render();
-    if (state.byName) startAutofill();
-  }
-}
-
-async function unlock() {
-  const remembered = state.session?.state === "locked" ? rememberedCredential() : null;
-  try {
-    await unlocked(await signingIn.withPasskey(remembered), false);
-  } catch (error) {
+    state.unlocking = false;
     state.notice = signInText(error);
     render();
   }
 }
 
-async function logIn(form) {
-  await unlocked(await signingIn.byName(form.handle.value), true);
-}
-
-async function offerPasskey(yes) {
-  state.offerPasskey = false;
-  if (yes) {
-    try {
-      await addUnlockingPasskey(hub, state.session, deviceName());
-    } catch (error) {
-      state.notice = signUpText(error) ?? hubMessage(error);
-    }
-  }
+function showBoard(session, name) {
+  pageMode = false;
+  history.replaceState(null, "", "/#/board");
+  state.session = session;
+  state.me = session.me;
+  state.connected = name;
+  state.marks = emptyMarks();
+  showHint();
   render();
+  refresh();
+  startFeed();
+  setInterval(() => document.visibilityState === "visible" && refresh(), 60_000);
 }
-
-const passkeyOffer = () =>
-  state.offerPasskey ? `<section class="task"><div class="meta">${esc(OFFER_TEXT)}</div><div class="pair-answer"><button type="button" class="btn" data-action="passkey-later">Not now</button><button type="button" class="btn primary" data-action="passkey-add">Add passkey</button></div></section>` : "";
-
-root.addEventListener("submit", async (event) => {
-  const form = event.target.closest("form[data-form]");
-  if (!form) return;
-  event.preventDefault();
-  const button = form.querySelector("button");
-  if (button) button.disabled = true;
-  try {
-    if (form.dataset.form === "login") await logIn(form).catch((error) => {
-      state.notice = signInText(error);
-      render();
-    });
-    if (form.dataset.form === "signup") await signUp(form).catch((error) => {
-      state.notice = signUpText(error) ?? hubMessage(error);
-      render();
-    });
-  } catch (error) {
-    state.notice = hubMessage(error);
-    render();
-  }
-});
 
 root.addEventListener("click", (event) => {
+  if (pageMode) return;
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
@@ -471,19 +405,14 @@ root.addEventListener("click", (event) => {
       localStorage.setItem("kebbie-hint-dismissed", "1");
     } catch {}
     render();
-  } else if (action === "sign-in") signInWithPasskey();
-  else if (action === "unlock") unlock();
+  } else if (action === "sign-in") signInWithPasskey(rememberedCredential());
+  else if (action === "other-passkey") signInWithPasskey(null);
   else if (action === "remove-machine") removeMachine(target.dataset.id, target.dataset.name);
-  else if (action === "by-name") {
-    state.byName = true;
-    state.notice = null;
-    render();
-    startAutofill();
-  } else if (action === "passkey-add") offerPasskey(true);
-  else if (action === "passkey-later") offerPasskey(false);
 });
 
 addEventListener("hashchange", () => {
+  if (pageMode) return;
+  if (route().name !== "board") state.connected = null;
   render();
   window.scrollTo(0, 0);
 });
@@ -492,16 +421,21 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refresh();
 });
 
-async function start() {
-  if (onPage) return startPage(root);
-  if (!cryptoReady()) return render();
+function showHint() {
   try {
     state.hint = isIos() && !isStandalone() && localStorage.getItem("kebbie-hint-dismissed") !== "1";
   } catch {
     state.hint = isIos() && !isStandalone();
   }
+}
+
+async function start() {
+  if (pageMode) return startPage(root, { showBoard });
+  if (!cryptoReady()) return render();
+  showHint();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { type: "module", scope: "/" }).catch(() => {});
   await forgetDeviceKeys();
+  state.info = await account.hub().catch(() => null);
   state.me = await account.me().catch(() => null);
   state.session = state.me ? { state: "locked", me: state.me } : null;
   render();

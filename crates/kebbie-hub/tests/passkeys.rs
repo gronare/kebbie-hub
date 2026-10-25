@@ -9,7 +9,7 @@ use webauthn_authenticator_rs::WebauthnAuthenticator;
 use webauthn_authenticator_rs::prelude::WebauthnCError;
 
 async fn finish_discoverable(person: &mut Person) -> Result<reqwest::Response, WebauthnCError> {
-    let ceremony = person.begin_discoverable_log_in().await;
+    let ceremony = person.begin_log_in().await;
     let credential = person.passkey.do_authentication(origin(), ceremony.options)?;
     let response = person
         .post(
@@ -41,7 +41,7 @@ async fn sign_up_asks_for_a_discoverable_passkey_with_user_verification() {
 async fn a_passkey_signs_in_without_the_account_name_and_the_hub_finds_the_account_from_it() {
     let test = start_hub(|_| {}).await;
     let mut person = signed_up(&test).await;
-    let handle = person.handle.clone();
+    let account: AccountView = body(person.get("/v1/a/account").await).await;
     person.cookie = None;
     let ceremony: Value = body(
         person
@@ -55,7 +55,7 @@ async fn a_passkey_signs_in_without_the_account_name_and_the_hub_finds_the_accou
 
     let response = finish_discoverable(&mut person).await.unwrap();
     let view: AccountView = body(response).await;
-    assert_eq!(view.handle, handle);
+    assert_eq!(view.account, account.account);
     assert!(person.cookie.is_some());
     assert!(person.get("/v1/a/account").await.status().is_success());
 }
@@ -73,16 +73,17 @@ async fn a_passkey_of_an_account_this_hub_does_not_have_is_refused_as_unknown() 
 }
 
 #[tokio::test]
-async fn a_passkey_made_before_sign_in_named_no_account_signs_in_by_name_and_a_new_one_is_found_by_itself() {
+async fn a_passkey_the_authenticator_does_not_offer_cannot_sign_in_but_a_session_can_add_one_it_does() {
     let test = start_hub(|_| {}).await;
     let mut person = Person::new(&test.url);
     person.passkey = WebauthnAuthenticator::new(DiscoverablePasskey::without_resident_keys(true));
     let ceremony: CreationCeremony = body(person.begin_sign_up(&test.hub.mint_invite().unwrap()).await).await;
     assert!(person.finish_sign_up(ceremony).await.status().is_success());
+    let session = person.cookie.clone();
     person.cookie = None;
     assert!(matches!(finish_discoverable(&mut person).await, Err(WebauthnCError::NoSelectedToken)), "the authenticator offers nothing");
 
-    assert!(person.log_in().await.status().is_success(), "the account name finds the old passkey");
+    person.cookie = session;
     let mut fresh = WebauthnAuthenticator::new(DiscoverablePasskey::new(true));
     person.add_passkey(&mut fresh).await;
     person.passkey = fresh;

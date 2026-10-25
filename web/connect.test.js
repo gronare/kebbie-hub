@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, fromB64, machineListTrusts, verifyMachineList } from "../js/protocol.js";
-import { connectBlock, connectCommitment, finishConnect, forgetFragment, keptFragment, PairingFailed, parseConnectFragment, planLine, safeNext, withReauth } from "./connect.js";
+import { approveFromLink, connectBlock, connectCommitment, finishConnect, forgetFragment, keptFragment, PairingFailed, parseConnectFragment, planLine, safeNext, unlockFailedText, withReauth } from "./connect.js";
 import { HubError } from "./hub.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
@@ -149,4 +149,22 @@ test("an inactive plan points at the billing page when the hub names one", () =>
   assert.equal(planLine({ entitled: true }, "https://billing.example"), null);
   assert.deepEqual(planLine({ entitled: false }, "https://billing.example"), { text: "Your plan is not active. Start a subscription to connect machines.", url: "https://billing.example" });
   assert.equal(planLine({ entitled: false }, null).url, null);
+});
+
+test("Connect on a cookie-only session unlocks first, and a cancelled unlock approves nothing", async () => {
+  const approvals = [];
+  const approve = async (commitment) => (approvals.push(commitment), { name: "mac", pairing: "p1" });
+  const cancelled = Object.assign(new Error("cancelled"), { name: "NotAllowedError" });
+  await assert.rejects(approveFromLink({ fragment, session: { state: "locked" }, unlock: async () => Promise.reject(cancelled), approve }), { name: "NotAllowedError" });
+  assert.deepEqual(approvals, [], "the code stays unspent");
+  assert.equal(unlockFailedText(cancelled, "mac"), "The passkey was cancelled, so mac isn't connected yet.");
+
+  const noPrf = await approveFromLink({ fragment, session: { state: "locked" }, unlock: async () => ({ state: "no-prf" }), approve });
+  assert.equal(noPrf.blocked, "no-prf");
+  assert.deepEqual(approvals, [], "a passkey that can't unlock spends no code either");
+
+  const identity = await account();
+  const done = await approveFromLink({ fragment, session: { state: "locked" }, unlock: async () => ({ state: "unlocked", identity }), approve, commit: async () => ({ commitment: "c1", nonce: nonce }) });
+  assert.equal(done.blocked, null);
+  assert.deepEqual(approvals, ["c1"]);
 });

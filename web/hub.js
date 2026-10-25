@@ -24,8 +24,6 @@ export const account = {
   hub: () => call("GET", "/v1/hub"),
   me: () => call("GET", "/v1/a/account"),
   registerBegin: (ticket) => call("POST", "/v1/a/register/begin", { body: ticket }),
-  emailSignup: (email) => call("POST", "/v1/a/signup/email", { body: { email } }),
-  verification: (token) => call("GET", `/v1/a/signup/verify?token=${query(token)}`),
   registerFinish: (ceremony, credential, name) => call("POST", "/v1/a/register/finish", { body: { ceremony, credential, name } }),
   loginBegin: (request = {}) => call("POST", "/v1/a/login/begin", { body: request }),
   loginFinish: (ceremony, credential) => call("POST", "/v1/a/login/finish", { body: { ceremony, credential } }),
@@ -37,6 +35,7 @@ export const account = {
 };
 
 export const connectCalls = {
+  peek: (code) => call("GET", `/v1/connect?code=${query(code)}`),
   view: (code) => call("GET", `/v1/a/connect?code=${query(code)}`),
   approve: (approval) => call("POST", "/v1/a/connect/approve", { body: approval }),
   deny: (code) => call("POST", "/v1/a/connect/deny", { body: { code } }),

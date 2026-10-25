@@ -295,6 +295,7 @@ const ACCOUNT_KEY_COLUMNS: &[(&str, &str, &str)] = &[
     ),
     ("pairings", "account_key_version", "INTEGER"),
     ("ceremonies", "prf_salt", "BLOB"),
+    ("connects", "signup_at", "INTEGER"),
 ];
 
 const SCHEMA_VERSION: i64 = 8;
@@ -463,6 +464,7 @@ impl Store {
             }
             if *to == 8 {
                 add_columns(&tx, ACCOUNT_KEY_COLUMNS)?;
+                tx.execute("DELETE FROM invites WHERE kind = 'email'", [])?;
                 let unsalted: Vec<Vec<u8>> = tx
                     .prepare("SELECT credential_id FROM passkeys WHERE prf_salt IS NULL")?
                     .query_map([], |row| row.get(0))?
@@ -1299,8 +1301,8 @@ impl Store {
 
     pub fn machines(&self) -> Result<Vec<MachineRow>> {
         let mut statement = self.connection.prepare(
-            "SELECT machines.id, machines.name, machines.joined_at, machines.last_seen, accounts.handle
-             FROM machines LEFT JOIN accounts ON accounts.id = machines.account_id
+            "SELECT machines.id, machines.name, machines.joined_at, machines.last_seen, machines.account_id
+             FROM machines
              WHERE NOT EXISTS (SELECT 1 FROM connects WHERE connects.machine_id = machines.id)
              ORDER BY machines.joined_at, machines.id",
         )?;
@@ -1325,20 +1327,6 @@ impl Store {
         Ok(())
     }
 
-    pub fn add_ticket(
-        &self,
-        code_hash: &[u8],
-        kind: Ticket,
-        email: Option<&str>,
-        expires_at: u64,
-    ) -> Result<()> {
-        self.connection.execute(
-            "INSERT INTO invites (code_hash, expires_at, kind, email) VALUES (?1, ?2, ?3, ?4)",
-            params![code_hash, expires_at, kind.name(), email],
-        )?;
-        Ok(())
-    }
-
     pub fn replace_setup_ticket(&self, code_hash: &[u8], expires_at: u64) -> Result<()> {
         let tx = self.connection.unchecked_transaction()?;
         tx.execute("DELETE FROM invites WHERE kind = 'owner'", [])?;
@@ -1349,16 +1337,12 @@ impl Store {
         tx.commit()
     }
 
-    pub fn ticket(&self, code_hash: &[u8], now: u64) -> Result<Option<(Ticket, Option<String>)>> {
+    pub fn ticket(&self, code_hash: &[u8], now: u64) -> Result<Option<Ticket>> {
         self.connection
             .query_row(
-                "SELECT kind, email FROM invites WHERE code_hash = ?1 AND expires_at > ?2",
+                "SELECT kind FROM invites WHERE code_hash = ?1 AND expires_at > ?2",
                 params![code_hash, now],
-                |row| {
-                    let kind =
-                        Ticket::parse(&row.get::<_, String>(0)?).ok_or_else(|| corrupt(0))?;
-                    Ok((kind, row.get(1)?))
-                },
+                |row| Ticket::parse(&row.get::<_, String>(0)?).ok_or_else(|| corrupt(0)),
             )
             .optional()
     }
@@ -1366,14 +1350,6 @@ impl Store {
     pub fn account_count(&self) -> Result<u64> {
         self.connection
             .query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))
-    }
-
-    pub fn email_taken(&self, email: &str) -> Result<bool> {
-        self.connection.query_row(
-            "SELECT EXISTS (SELECT 1 FROM accounts WHERE email = ?1)",
-            [email],
-            |row| row.get(0),
-        )
     }
 
     pub fn account_by_email(&self, email: &str) -> Result<Option<String>> {
@@ -1406,12 +1382,12 @@ impl Store {
         Ok(changed)
     }
 
-    pub fn make_owner(&self, handle: &str, replace: bool, now: u64) -> Result<MadeOwner> {
+    pub fn make_owner(&self, account: &str, replace: bool, now: u64) -> Result<MadeOwner> {
         let tx = self.connection.unchecked_transaction()?;
         let Some((account, role, deactivated)) = tx
             .query_row(
-                "SELECT id, role, deactivated_at IS NOT NULL FROM accounts WHERE handle = ?1",
-                [handle],
+                "SELECT id, role, deactivated_at IS NOT NULL FROM accounts WHERE id = ?1",
+                [account],
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,
@@ -1431,7 +1407,7 @@ impl Store {
             return Ok(MadeOwner::Deactivated);
         }
         let others: Vec<String> = tx
-            .prepare("SELECT handle FROM accounts WHERE role = 'owner' ORDER BY handle")?
+            .prepare("SELECT id FROM accounts WHERE role = 'owner' ORDER BY id")?
             .query_map([], |row| row.get(0))?
             .collect::<Result<_>>()?;
         if !others.is_empty() && !replace {
@@ -1504,6 +1480,15 @@ impl Store {
 
     pub fn connect_by_user_code(&self, hash: &[u8]) -> Result<Option<Connect>> {
         self.connects_where("user_code_hash", hash)
+    }
+
+    pub fn connect_open_for_sign_up(&self, user_code_hash: &[u8], now: u64) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM connects WHERE user_code_hash = ?1 AND state = 'pending'
+                            AND expires_at > ?2 AND signup_at IS NULL)",
+            params![user_code_hash, now],
+            |row| row.get(0),
+        )
     }
 
     pub fn polled_connect(&self, device_code_hash: &[u8], now: u64, interval: u64) -> Result<()> {
@@ -1620,16 +1605,6 @@ impl Store {
         )
     }
 
-    pub fn account_by_handle(&self, handle: &str) -> Result<Option<String>> {
-        self.connection
-            .query_row(
-                "SELECT id FROM accounts WHERE handle = ?1",
-                [handle],
-                |row| row.get(0),
-            )
-            .optional()
-    }
-
     pub fn passkey_account(&self, credential: &[u8]) -> Result<Option<String>> {
         self.connection
             .query_row(
@@ -1682,7 +1657,7 @@ impl Store {
     pub fn take_ceremony(
         &self,
         id_hash: &[u8],
-        purpose: Purpose,
+        purposes: &[Purpose],
         now: u64,
     ) -> Result<Option<Ceremony>> {
         let ceremony = self
@@ -1710,37 +1685,40 @@ impl Store {
                 },
             )
             .optional()?;
-        Ok(ceremony.filter(|ceremony| ceremony.purpose == purpose && ceremony.expires_at > now))
+        Ok(ceremony
+            .filter(|ceremony| purposes.contains(&ceremony.purpose) && ceremony.expires_at > now))
     }
 
     pub fn sign_up(&mut self, signup: &SignUp<'_>) -> Result<SignUpOutcome> {
         let tx = self.connection.transaction()?;
-        let spent: Option<(String, Option<String>)> = tx
-            .query_row(
-                "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2 RETURNING kind, email",
+        let kind = if signup.connect {
+            let claimed = tx.execute(
+                "UPDATE connects SET signup_at = ?2
+                 WHERE user_code_hash = ?1 AND state = 'pending' AND expires_at > ?2 AND signup_at IS NULL",
                 params![signup.invite_hash, signup.now],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()?;
-        let Some((kind, email)) = spent else {
-            return Ok(SignUpOutcome::InviteSpent);
+            )?;
+            if claimed == 0 {
+                return Ok(SignUpOutcome::InviteSpent);
+            }
+            Ticket::Connect
+        } else {
+            let spent: Option<String> = tx
+                .query_row(
+                    "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2 RETURNING kind",
+                    params![signup.invite_hash, signup.now],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let Some(kind) = spent else {
+                return Ok(SignUpOutcome::InviteSpent);
+            };
+            Ticket::parse(&kind).ok_or_else(|| corrupt(0))?
         };
-        let kind = Ticket::parse(&kind).ok_or_else(|| corrupt(0))?;
         if kind == Ticket::Owner {
             let accounts: u64 =
                 tx.query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))?;
             if accounts > 0 {
                 return Ok(SignUpOutcome::InviteSpent);
-            }
-        }
-        if let Some(email) = &email {
-            let held: bool = tx.query_row(
-                "SELECT EXISTS (SELECT 1 FROM accounts WHERE email = ?1)",
-                [email],
-                |row| row.get(0),
-            )?;
-            if held {
-                return Ok(SignUpOutcome::EmailTaken);
             }
         }
         let taken: bool = tx.query_row(
@@ -1765,15 +1743,14 @@ impl Store {
             "member"
         };
         tx.execute(
-            "INSERT INTO accounts (id, handle, user_handle, created_at, role, email, email_verified_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, CASE WHEN ?6 IS NULL THEN NULL ELSE ?4 END)",
+            "INSERT INTO accounts (id, handle, user_handle, created_at, role)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 signup.account,
                 signup.handle,
                 signup.user_handle.to_vec(),
                 signup.now,
-                role,
-                email
+                role
             ],
         )?;
         tx.execute(
@@ -2560,7 +2537,7 @@ fn account_row(row: &Row<'_>) -> Result<AccountRow> {
 pub enum Ticket {
     Invite,
     Owner,
-    Email,
+    Connect,
 }
 
 impl Ticket {
@@ -2568,12 +2545,12 @@ impl Ticket {
         match self {
             Ticket::Invite => "invite",
             Ticket::Owner => "owner",
-            Ticket::Email => "email",
+            Ticket::Connect => "connect",
         }
     }
 
     fn parse(name: &str) -> Option<Ticket> {
-        [Ticket::Invite, Ticket::Owner, Ticket::Email]
+        [Ticket::Invite, Ticket::Owner]
             .into_iter()
             .find(|ticket| ticket.name() == name)
     }
@@ -2669,6 +2646,7 @@ pub struct StoredPasskey {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Purpose {
     SignUp,
+    ConnectSignUp,
     AddPasskey,
     LogIn,
 }
@@ -2677,13 +2655,19 @@ impl Purpose {
     pub fn name(self) -> &'static str {
         match self {
             Purpose::SignUp => "sign-up",
+            Purpose::ConnectSignUp => "connect-sign-up",
             Purpose::AddPasskey => "add-passkey",
             Purpose::LogIn => "log-in",
         }
     }
 
     fn parse(name: &str) -> Option<Purpose> {
-        [Purpose::SignUp, Purpose::AddPasskey, Purpose::LogIn]
+        [
+            Purpose::SignUp,
+            Purpose::ConnectSignUp,
+            Purpose::AddPasskey,
+            Purpose::LogIn,
+        ]
             .into_iter()
             .find(|purpose| purpose.name() == name)
     }
@@ -2703,6 +2687,7 @@ pub struct Ceremony {
 
 pub struct SignUp<'a> {
     pub invite_hash: &'a [u8],
+    pub connect: bool,
     pub account: &'a str,
     pub handle: &'a str,
     pub user_handle: [u8; 16],
@@ -2717,7 +2702,6 @@ pub struct SignUp<'a> {
 
 pub enum SignUpOutcome {
     Created(Ticket),
-    EmailTaken,
     InviteSpent,
     HandleTaken,
     CredentialTaken,

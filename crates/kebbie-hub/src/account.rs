@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::Query;
 use axum::extract::{Path, State};
 use axum::http::header::SET_COOKIE;
 use axum::http::{HeaderMap, StatusCode};
@@ -12,9 +11,9 @@ use std::collections::BTreeMap;
 
 use kebbie_hub_api::{
     AccountKeySetup, AccountView, Bytes32, CreationCeremony, DeviceRegistered, DeviceRequest,
-    DeviceView, Devices, EmailSignup, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys,
+    DeviceView, Devices, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys,
     RegisterBegin, RegisterFinish, RequestCeremony, SignedIn, SignupMode, Unlocking,
-    VerifiedEmail, WrapperUpload, normalize_code,
+    WrapperUpload, normalize_code,
 };
 use kebbie_hub_protocol::{Id, Prefix, WRAPPED_LEN};
 use serde::Serialize;
@@ -30,16 +29,14 @@ use webauthn_rs_proto::{
 
 use crate::auth::{
     AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, SESSION_COOKIE, SESSION_TOKEN_PREFIX,
-    SETUP_TOKEN_PREFIX, SameOrigin, VERIFY_TOKEN_PREFIX, digest, new_token, random, session_cookie,
+    SETUP_TOKEN_PREFIX, SameOrigin, digest, new_token, random, session_cookie,
 };
 use crate::error::ApiError;
-use crate::mail::{Mail, plausible_address};
 use crate::store::{
     Ceremony, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey, Ticket,
 };
 use crate::{Hub, clean_name, now};
 
-const MAX_HANDLE_CHARS: usize = 32;
 const ACCOUNT_PREFIX: &str = "acc_";
 
 type WithCookie<T> = (
@@ -51,17 +48,6 @@ pub fn counter_regressed(stored: u32, presented: u32) -> bool {
     (stored != 0 || presented != 0) && presented <= stored
 }
 
-pub fn normalize_handle(typed: &str) -> Option<String> {
-    let handle = typed.trim().to_ascii_lowercase();
-    let starts_with_letter = handle
-        .chars()
-        .next()
-        .is_some_and(|first| first.is_ascii_lowercase());
-    let allowed = handle
-        .chars()
-        .all(|char| char.is_ascii_lowercase() || char.is_ascii_digit() || char == '-');
-    (starts_with_letter && allowed && handle.len() <= MAX_HANDLE_CHARS).then_some(handle)
-}
 
 fn new_id() -> String {
     URL_SAFE_NO_PAD.encode(random::<16>())
@@ -177,19 +163,12 @@ pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
 }
 
 fn ticket_of(request: &RegisterBegin) -> Option<(Ticket, Vec<u8>)> {
-    match (&request.setup, &request.verification) {
-        (Some(setup), None) => setup
+    match &request.setup {
+        Some(setup) => setup
             .trim()
             .starts_with(SETUP_TOKEN_PREFIX)
             .then(|| (Ticket::Owner, digest(setup.trim()))),
-        (None, Some(verification)) => verification
-            .trim()
-            .starts_with(VERIFY_TOKEN_PREFIX)
-            .then(|| (Ticket::Email, digest(verification.trim()))),
-        (None, None) => {
-            normalize_code(&request.invite).map(|invite| (Ticket::Invite, digest(&invite)))
-        }
-        (Some(_), Some(_)) => None,
+        None => normalize_code(&request.invite).map(|invite| (Ticket::Invite, digest(&invite))),
     }
 }
 
@@ -220,9 +199,9 @@ fn save_ceremony(
     Ok(id)
 }
 
-fn take_ceremony(hub: &Hub, id: &str, purpose: Purpose) -> Result<Ceremony, ApiError> {
+fn take_ceremony(hub: &Hub, id: &str, purposes: &[Purpose]) -> Result<Ceremony, ApiError> {
     hub.store()
-        .take_ceremony(&digest(id), purpose, now())?
+        .take_ceremony(&digest(id), purposes, now())?
         .ok_or_else(ApiError::unauthorized)
 }
 
@@ -233,30 +212,13 @@ pub async fn register_begin(
     Json(request): Json<RegisterBegin>,
 ) -> Result<Json<CreationCeremony>, ApiError> {
     hub.limit_anonymous(&client.address)?;
-    let handle = normalize_handle(&request.handle).ok_or(ApiError::bad_request("bad-handle"))?;
-    let (kind, invite_hash) = ticket_of(&request).ok_or_else(ApiError::unauthorized)?;
-    {
-        let store = hub.store();
-        let (held, email) = store
-            .ticket(&invite_hash, now())?
-            .ok_or_else(ApiError::unauthorized)?;
-        if held != kind {
-            return Err(ApiError::unauthorized());
-        }
-        if kind == Ticket::Owner && store.account_count()? > 0 {
-            return Err(ApiError::unauthorized());
-        }
-        if kind == Ticket::Email && hub.config().signup != SignupMode::Open {
-            return Err(ApiError::forbidden("signup-closed"));
-        }
-        if let Some(email) = email
-            && store.email_taken(&email)?
-        {
-            return Err(ApiError::conflict("email-taken"));
-        }
-        if store.handle_taken(&handle)? {
-            return Err(ApiError::conflict("handle-taken"));
-        }
+    let handle = generated_handle();
+    let (purpose, invite_hash) = match &request.connect {
+        Some(typed) => (Purpose::ConnectSignUp, connect_ticket(&hub, &request, typed)?),
+        None => (Purpose::SignUp, checked_ticket(&hub, &request)?),
+    };
+    if hub.store().handle_taken(&handle)? {
+        return Err(ApiError::conflict("handle-taken"));
     }
     let user = Uuid::new_v4();
     let (options, state) = hub
@@ -267,7 +229,7 @@ pub async fn register_begin(
     let prf_salt = random::<32>();
     let ceremony = save_ceremony(
         &hub,
-        Purpose::SignUp,
+        purpose,
         None,
         to_json(&state)?,
         Some((handle, *user.as_bytes(), invite_hash)),
@@ -280,6 +242,43 @@ pub async fn register_begin(
     }))
 }
 
+fn generated_handle() -> String {
+    let tail: String = random::<6>().iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("k{tail}")
+}
+
+fn connect_ticket(hub: &Hub, request: &RegisterBegin, typed: &str) -> Result<Vec<u8>, ApiError> {
+    if request.setup.is_some() || !request.invite.is_empty() {
+        return Err(ApiError::unauthorized());
+    }
+    if hub.config().signup != SignupMode::Open {
+        return Err(ApiError::forbidden("signup-closed"));
+    }
+    let code = normalize_code(typed).ok_or_else(ApiError::unauthorized)?;
+    let hash = digest(&code);
+    if !hub.store().connect_open_for_sign_up(&hash, now())? {
+        return Err(ApiError::unauthorized());
+    }
+    Ok(hash)
+}
+
+fn checked_ticket(hub: &Hub, request: &RegisterBegin) -> Result<Vec<u8>, ApiError> {
+    let (kind, invite_hash) = ticket_of(request).ok_or_else(ApiError::unauthorized)?;
+    {
+        let store = hub.store();
+        let held = store
+            .ticket(&invite_hash, now())?
+            .ok_or_else(ApiError::unauthorized)?;
+        if held != kind {
+            return Err(ApiError::unauthorized());
+        }
+        if kind == Ticket::Owner && store.account_count()? > 0 {
+            return Err(ApiError::unauthorized());
+        }
+    }
+    Ok(invite_hash)
+}
+
 pub async fn register_finish(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
@@ -288,7 +287,7 @@ pub async fn register_finish(
 ) -> Result<WithCookie<SignedIn>, ApiError> {
     hub.limit_anonymous(&client.address)?;
     let name = optional_name(request.name.as_deref())?;
-    let ceremony = take_ceremony(&hub, &request.ceremony, Purpose::SignUp)?;
+    let ceremony = take_ceremony(&hub, &request.ceremony, &[Purpose::SignUp, Purpose::ConnectSignUp])?;
     let state: PasskeyRegistration = from_json(&ceremony.state)?;
     let passkey = hub
         .webauthn()
@@ -308,6 +307,7 @@ pub async fn register_finish(
     let mut store = hub.store();
     let outcome = store.sign_up(&SignUp {
         invite_hash: &invite_hash,
+        connect: ceremony.purpose == Purpose::ConnectSignUp,
         account: &account,
         handle: &handle,
         user_handle,
@@ -321,7 +321,6 @@ pub async fn register_finish(
     })?;
     let kind = match outcome {
         SignUpOutcome::Created(kind) => kind,
-        SignUpOutcome::EmailTaken => return Err(ApiError::conflict("email-taken")),
         SignUpOutcome::InviteSpent => return Err(ApiError::unauthorized()),
         SignUpOutcome::HandleTaken => return Err(ApiError::conflict("handle-taken")),
         SignUpOutcome::CredentialTaken => return Err(ApiError::conflict("passkey-taken")),
@@ -348,10 +347,9 @@ pub async fn login_begin(
     Json(request): Json<LoginBegin>,
 ) -> Result<Json<RequestCeremony>, ApiError> {
     hub.limit_anonymous(&client.address)?;
-    let handle = request.handle.filter(|typed| !typed.trim().is_empty());
     let credential = request.credential.filter(|typed| !typed.trim().is_empty());
-    let (account, stored) = match (handle, credential) {
-        (None, None) => {
+    let (account, stored) = match credential {
+        None => {
             let (mut options, state) = hub
                 .webauthn()
                 .start_discoverable_authentication()
@@ -365,16 +363,7 @@ pub async fn login_begin(
                 prf_salts: BTreeMap::new(),
             }));
         }
-        (Some(typed), None) => {
-            let handle = normalize_handle(&typed).ok_or_else(ApiError::unauthorized)?;
-            let store = hub.store();
-            let account = store
-                .account_by_handle(&handle)?
-                .ok_or_else(ApiError::unauthorized)?;
-            let stored = store.passkeys(&account)?;
-            (account, stored)
-        }
-        (None, Some(typed)) => {
+        Some(typed) => {
             let credential = URL_SAFE_NO_PAD
                 .decode(typed.trim())
                 .map_err(|_| ApiError::unauthorized())?;
@@ -386,10 +375,9 @@ pub async fn login_begin(
                 .passkeys(&account)?
                 .into_iter()
                 .filter(|stored| stored.credential_id == credential)
-                .collect();
+                .collect::<Vec<_>>();
             (account, stored)
         }
-        (Some(_), Some(_)) => return Err(ApiError::bad_request("handle-or-credential")),
     };
     if hub
         .store()
@@ -475,7 +463,7 @@ pub async fn login_finish(
     Json(request): Json<LoginFinish>,
 ) -> Result<WithCookie<SignedIn>, ApiError> {
     hub.limit_anonymous(&client.address)?;
-    let ceremony = take_ceremony(&hub, &request.ceremony, Purpose::LogIn)?;
+    let ceremony = take_ceremony(&hub, &request.ceremony, &[Purpose::LogIn])?;
     let (account, result) = match ceremony.account {
         Some(account) => {
             let state: PasskeyAuthentication = from_json(&ceremony.state)?;
@@ -551,85 +539,8 @@ pub async fn hub_info(
         signup: hub.config().signup,
         plans: hub.config().plans,
         needs_setup: hub.store().account_count()? == 0,
+        github: hub.config().github_client_id.is_some(),
     }))
-}
-
-pub async fn email_signup(
-    State(hub): State<Arc<Hub>>,
-    _: SameOrigin,
-    client: Anonymous,
-    Json(request): Json<EmailSignup>,
-) -> Result<StatusCode, ApiError> {
-    hub.limit_anonymous(&client.address)?;
-    if hub.config().signup != SignupMode::Open {
-        return Err(ApiError::forbidden("signup-closed"));
-    }
-    let email = request.email.trim().to_ascii_lowercase();
-    if !plausible_address(&email) {
-        return Err(ApiError::bad_request("bad-email"));
-    }
-    if !hub
-        .email_limiter
-        .allow(&format!("address:{}", client.address))
-        || !hub.email_limiter.allow(&format!("email:{email}"))
-    {
-        return Err(ApiError::rate_limited());
-    }
-    let at = now();
-    let token = new_token(VERIFY_TOKEN_PREFIX);
-    {
-        let store = hub.store();
-        if store.email_taken(&email)? {
-            store.log(at, "signup.email-held", None, None, None)?;
-            return Ok(StatusCode::ACCEPTED);
-        }
-        store.add_ticket(
-            &digest(&token),
-            Ticket::Email,
-            Some(&email),
-            at + hub.config().verify_ttl,
-        )?;
-    }
-    let mail = Mail {
-        to: email,
-        subject: "Finish signing up to kebbie hub".to_string(),
-        text: format!(
-            "Open this link to pick a handle and add a passkey:\n\n{}/signup?verify={token}\n\nThe link works once, for {} hours. If you did not ask for it, ignore this mail.",
-            hub.origin(),
-            hub.config().verify_ttl / 3600
-        ),
-    };
-    if let Err(error) = hub.mailer.send(&mail).await {
-        eprintln!("kebbie-hub: sign-up mail failed: {error}");
-        hub.store()
-            .log(at, "signup.mail-failed", None, None, None)?;
-        return Err(ApiError::new(StatusCode::BAD_GATEWAY, "mail-failed"));
-    }
-    hub.store().log(at, "signup.mail-sent", None, None, None)?;
-    Ok(StatusCode::ACCEPTED)
-}
-
-#[derive(serde::Deserialize)]
-pub struct VerificationQuery {
-    token: String,
-}
-
-pub async fn verification(
-    State(hub): State<Arc<Hub>>,
-    client: Anonymous,
-    Query(query): Query<VerificationQuery>,
-) -> Result<Json<VerifiedEmail>, ApiError> {
-    hub.limit_anonymous(&client.address)?;
-    let ticket = query
-        .token
-        .starts_with(VERIFY_TOKEN_PREFIX)
-        .then(|| hub.store().ticket(&digest(&query.token), now()))
-        .transpose()?
-        .flatten();
-    match ticket {
-        Some((Ticket::Email, Some(email))) => Ok(Json(VerifiedEmail { email })),
-        _ => Err(ApiError::unauthorized()),
-    }
 }
 
 pub async fn account(
@@ -688,7 +599,7 @@ pub async fn passkey_finish(
     Json(request): Json<RegisterFinish>,
 ) -> Result<Json<PasskeyView>, ApiError> {
     let name = optional_name(request.name.as_deref())?;
-    let ceremony = take_ceremony(&hub, &request.ceremony, Purpose::AddPasskey)?;
+    let ceremony = take_ceremony(&hub, &request.ceremony, &[Purpose::AddPasskey])?;
     if ceremony.account.as_deref() != Some(account.as_str()) {
         return Err(ApiError::unauthorized());
     }
@@ -876,7 +787,7 @@ pub async fn remove_device(
 
 #[cfg(test)]
 mod tests {
-    use super::{counter_regressed, normalize_handle};
+    use super::counter_regressed;
 
     #[test]
     fn a_counter_that_does_not_move_forward_is_a_clone_unless_both_are_zero() {
@@ -888,12 +799,4 @@ mod tests {
         assert!(counter_regressed(5, 0));
     }
 
-    #[test]
-    fn handles_are_lowercase_words_that_start_with_a_letter() {
-        assert_eq!(normalize_handle(" Carl ").as_deref(), Some("carl"));
-        assert_eq!(normalize_handle("carl-2").as_deref(), Some("carl-2"));
-        for refused in ["", "2carl", "carl green", "carl_", "ä", &"a".repeat(33)] {
-            assert_eq!(normalize_handle(refused), None, "{refused:?}");
-        }
-    }
 }

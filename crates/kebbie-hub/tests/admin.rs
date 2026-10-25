@@ -79,10 +79,11 @@ async fn the_owner_sees_accounts_with_their_machines_devices_and_plans() {
         (2, 1, 1)
     );
     let listed: AdminAccounts = owner.get("/v1/a/admin/accounts").await.unwrap();
+    let id = person.account().await.unwrap().account;
     let row = listed
         .accounts
         .iter()
-        .find(|row| row.handle == person.handle)
+        .find(|row| row.account == id)
         .unwrap();
     assert_eq!((row.machines, row.devices, row.owner), (1, 1, false));
     assert!(row.last_seen.is_some());
@@ -91,7 +92,7 @@ async fn the_owner_sees_accounts_with_their_machines_devices_and_plans() {
     let machines: AdminMachines = owner.get("/v1/a/admin/machines").await.unwrap();
     assert_eq!(
         machines.machines[0].owner.as_deref(),
-        Some(person.handle.as_str())
+        Some(id.as_str())
     );
 }
 
@@ -303,6 +304,7 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
     let outcome = store
         .sign_up(&kebbie_hub::store::SignUp {
             invite_hash: b"\x02",
+            connect: false,
             account: "acc_new",
             handle: "newcomer",
             user_handle: [9; 16],
@@ -363,19 +365,31 @@ fn store_account_is_owner(path: &std::path::Path, account: &str) -> bool {
 #[tokio::test]
 async fn the_admin_cli_makes_an_account_the_one_owner() {
     let test = start_hub(|_| {}).await;
-    let admin = |args: &[&str]| {
+    let cli = |args: &[&str]| {
         std::process::Command::new(env!("CARGO_BIN_EXE_kebbie-hub"))
             .arg("--data")
             .arg(test.data.path())
             .arg("admin")
-            .arg("owner")
             .args(args)
             .output()
             .unwrap()
     };
+    let admin = |args: &[&str]| cli(&[&["owner"], args].concat());
     let mut first = owner(&test).await;
     let mut second = member(&test).await;
-    let refused = admin(&[&second.handle]);
+    let first_id = first.account().await.unwrap().account;
+    let second_id = second.account().await.unwrap().account;
+    let listed = String::from_utf8_lossy(&cli(&["accounts"]).stdout).to_string();
+    assert!(listed.contains(&format!("{first_id} owner")), "{listed}");
+    assert!(listed.contains(&format!("{second_id} member")), "{listed}");
+    assert!(!listed.contains(&second.handle), "{listed}");
+    let by_handle = admin(&[&second.handle]);
+    assert_eq!(by_handle.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&by_handle.stderr).contains("not an account id"),
+        "{by_handle:?}"
+    );
+    let refused = admin(&[&second_id]);
     assert_eq!(refused.status.code(), Some(1));
     assert!(
         String::from_utf8_lossy(&refused.stderr).contains("--replace"),
@@ -386,14 +400,11 @@ async fn the_admin_cli_makes_an_account_the_one_owner() {
         .await
         .unwrap();
 
-    let replaced = admin(&[&second.handle, "--replace"]);
+    let replaced = admin(&[&second_id, "--replace"]);
     assert!(replaced.status.success(), "{replaced:?}");
     assert_eq!(
         String::from_utf8_lossy(&replaced.stdout).trim(),
-        format!(
-            "{} is the owner; {} is a member now",
-            second.handle, first.handle
-        )
+        format!("{second_id} is the owner; {first_id} is a member now")
     );
     second
         .get::<AdminOverview>("/v1/a/admin/overview")
@@ -408,10 +419,10 @@ async fn the_admin_cli_makes_an_account_the_one_owner() {
         ),
         (403, "not-owner".to_string())
     );
-    let again = admin(&[&second.handle]);
+    let again = admin(&[&second_id]);
     assert!(again.status.success());
     assert!(String::from_utf8_lossy(&again.stdout).contains("already"));
-    let unknown = admin(&["nobody"]);
+    let unknown = admin(&["acc_nobody"]);
     assert_eq!(unknown.status.code(), Some(1));
 
     let store = Store::open(&test.data.path().join("hub.sqlite3")).unwrap();
@@ -448,11 +459,11 @@ fn an_owner_made_without_another_owner_needs_no_replace() {
         .unwrap();
     let store = Store::open(&path).unwrap();
     assert_eq!(
-        store.make_owner("bo", false, 4).unwrap(),
+        store.make_owner("acc_b", false, 4).unwrap(),
         kebbie_hub::store::MadeOwner::Deactivated
     );
     assert_eq!(
-        store.make_owner("ada", false, 4).unwrap(),
+        store.make_owner("acc_a", false, 4).unwrap(),
         kebbie_hub::store::MadeOwner::Made { replaced: vec![] }
     );
     assert!(store.account("acc_a").unwrap().unwrap().owner);
