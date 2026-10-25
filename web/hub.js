@@ -32,6 +32,7 @@ export const account = {
   setKey: (setup) => call("POST", "/v1/a/key", { body: setup }),
   putWrapper: (passkey, wrapper) => call("PUT", `/v1/a/passkeys/${query(passkey)}/wrapper`, { body: wrapper }),
   boards: () => call("GET", "/v1/a/boards"),
+  removeGitHub: () => call("DELETE", "/v1/a/github"),
 };
 
 export const connectCalls = {

@@ -23,11 +23,39 @@ export function sleepingRow(machine, now) {
   return `<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">asleep · last seen ${esc(lastSeenText(machine.lastSeen, now))}${working}</div></div>`;
 }
 
-export function connectWelcome({ name, signupOpen, github, notice = null, busy = false }) {
+export function githubHref({ next = null, connect = null, invite = null, setup = null, link = false } = {}) {
+  const query = new URLSearchParams();
+  if (link) query.set("link", "1");
+  if (connect) query.set("connect", connect);
+  if (invite) query.set("invite", invite);
+  if (setup) query.set("setup", setup);
+  if (next) query.set("next", next);
+  const said = query.toString();
+  return said ? `/auth/github?${said}` : "/auth/github";
+}
+
+const githubButton = (label, href) => `<div class="or"><span>or</span></div><a class="btn" href="${esc(href)}">${esc(label)}</a>`;
+
+const GITHUB_ERRORS = {
+  expired: "The GitHub sign-in expired or was already used. Try again.",
+  denied: "GitHub sign-in was cancelled.",
+  failed: "GitHub sign-in did not work. Try again.",
+  "no-account": "No account on this hub uses this GitHub account. New to kebbie? Start in your terminal: kebbie setup",
+  "signup-closed": "This hub makes new accounts by invite only.",
+  unauthorized: "That link is used or expired. Ask for a new one.",
+  "github-taken": "That GitHub account already belongs to another kebbie account.",
+  "signed-out": "Sign in first, then connect GitHub.",
+  deactivated: "This account is deactivated.",
+};
+
+export const githubErrorText = (code) => (code ? (GITHUB_ERRORS[code] ?? GITHUB_ERRORS.failed) : null);
+
+export function connectWelcome({ name, code = "", signupOpen, github, notice = null, busy = false }) {
   const lead = signupOpen
     ? `The hub shows ${name}'s board on your phone and in any browser, end-to-end encrypted. Create a passkey to start: it signs you in and unlocks your boards wherever it's saved.`
     : `The hub shows ${name}'s board on your phone and in any browser, end-to-end encrypted. Sign in with your passkey to connect it.`;
-  const gh = github ? `<div class="or"><span>or</span></div><a class="btn" href="/auth/github?next=${encodeURIComponent("/connect")}">Continue with GitHub</a>` : "";
+  const back = `/connect?code=${encodeURIComponent(code)}`;
+  const gh = github ? githubButton(signupOpen ? "Continue with GitHub" : "Sign in with GitHub", githubHref({ connect: signupOpen ? code : null, next: back })) : "";
   const start = signupOpen
     ? `<button type="button" class="btn primary" data-action="create-passkey"${disabled(busy)}>Create passkey</button>${gh}${warn(notice)}<p class="foot">Already have a kebbie account? <button type="button" class="link inline" data-action="sign-in">Sign in</button></p>`
     : `<button type="button" class="btn primary" data-action="sign-in"${disabled(busy)}>Sign in with passkey</button>${gh}${warn(notice)}`;
@@ -64,7 +92,7 @@ export function connectCancelled() {
 }
 
 export function signInScreen({ github, notice = null }) {
-  const gh = github ? `<a class="btn" href="/auth/github">Sign in with GitHub</a>` : "";
+  const gh = github ? `<a class="btn" href="${esc(githubHref())}">Sign in with GitHub</a>` : "";
   return (
     brand +
     heading("See your boards", "Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie.") +
@@ -80,7 +108,28 @@ export function unlockingScreen() {
 const CANT_UNLOCK = {
   "no-prf": "You're signed in, but this browser can't unlock your boards with its passkey.",
   "not-wrapped": "You're signed in, but this passkey can't unlock your boards yet.",
+  github: "You're signed in with GitHub, but GitHub can't unlock your boards.",
 };
+
+export function addPasskeyScreen({ login, notice = null, busy = false }) {
+  return (
+    brand +
+    `<div class="center ok">✓ Signed in with GitHub as ${esc(login)}</div>` +
+    heading("Add a passkey to unlock your boards", "GitHub signs you in. A passkey also unlocks your boards on every phone and browser, so you never approve one by hand.") +
+    `<button type="button" class="btn primary" data-action="add-passkey"${disabled(busy)}>Add passkey</button><button type="button" class="link" data-action="not-now"${disabled(busy)}>Not now</button>${warn(notice)}`
+  );
+}
+
+export const needsFirstPasskey = (me, session) => Boolean(me?.github && !me.key && (!session || session.state === "locked"));
+
+export function accountScreen({ me, github, notice = null }) {
+  const linked = me.github
+    ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
+    : github
+      ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
+      : "";
+  return brand + `<h1 class="title">Account</h1><div class="center mono">${esc(me.account)}</div>` + linked + warn(notice) + `<a class="btn" href="/">Back to your boards</a>`;
+}
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {
   return (
@@ -97,18 +146,18 @@ export function installHint(show) {
   return show ? `<div class="hint"><div>${esc(INSTALL_HINT)}</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>` : "";
 }
 
-export function setupScreen({ phase, needsSetup, token, notice = null }) {
+export function setupScreen({ phase, needsSetup, token, github = false, notice = null }) {
   const top = brand + `<h1 class="title">Set up this hub</h1>`;
   if (phase === "done") return top + `<div class="center ok">You own this hub.</div><a class="btn primary" href="/admin">Open admin</a><a class="btn" href="/">Open kebbie</a>`;
   if (!needsSetup) return top + `<div class="center">This hub has an owner already.</div><a class="btn" href="/">Sign in</a>`;
   if (!token) return top + `<div class="center">Open the setup link the hub printed in its log when it started.</div>`;
-  return top + `<p class="lead">Create a passkey to become this hub's owner. It signs you in; there is no password.</p><button type="button" class="btn primary" data-action="create-passkey">Create passkey</button>${warn(notice)}`;
+  return top + `<p class="lead">Create a passkey to become this hub's owner. It signs you in; there is no password.</p><button type="button" class="btn primary" data-action="create-passkey">Create passkey</button>${github ? githubButton("Continue with GitHub", githubHref({ setup: token })) : ""}${warn(notice)}`;
 }
 
-export function signupScreen({ signedIn, next, invite, notice = null }) {
+export function signupScreen({ signedIn, next, invite, github = false, notice = null }) {
   const top = brand + `<h1 class="title">Sign up</h1>`;
   if (signedIn) return top + `<div class="center ok">You're signed in.</div><a class="btn primary" href="${esc(next ?? "/")}">Continue</a>`;
-  if (invite) return top + `<p class="lead">You're invited to this hub. Create a passkey to start: it signs you in and unlocks your boards.</p><button type="button" class="btn primary" data-action="create-passkey">Create passkey</button>${warn(notice)}`;
+  if (invite) return top + `<p class="lead">You're invited to this hub. Create a passkey to start: it signs you in and unlocks your boards.</p><button type="button" class="btn primary" data-action="create-passkey">Create passkey</button>${github ? githubButton("Continue with GitHub", githubHref({ invite, next })) : ""}${warn(notice)}`;
   return top + `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p><a class="btn" href="/">Sign in</a>`;
 }
 
@@ -119,7 +168,9 @@ export function connectScreen({ supported = true, phase = "start", view = null, 
   if (phase === "cancelled") return connectCancelled();
   if (phase === "pairing") return brand + `<div class="center ok">Handing ${esc(name)} your account's key …</div>`;
   if (!view) return brand + (notice ? warn(notice) : `<div class="center">Loading …</div>`);
-  if (!me) return connectWelcome({ name, signupOpen, github, notice, busy });
+  if (!me) return connectWelcome({ name, code: view.code || code, signupOpen, github, notice, busy });
+  if (needsFirstPasskey(me, session)) return addPasskeyScreen({ login: me.github, notice, busy });
+  if (session?.state === "github") return cantUnlockScreen({ state: "github", notice });
   const blocked = session?.state === "locked" ? null : connectBlock({ fragment, session });
   return connectAsk({ name, code: view.code || code, machines, blocked: blocked ? connectBlockText(blocked, name) : null, typed: !fragment, plan, notice, busy });
 }

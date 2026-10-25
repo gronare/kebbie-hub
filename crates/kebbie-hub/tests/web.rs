@@ -79,7 +79,7 @@ async fn every_shipped_file_is_served_byte_for_byte_and_nothing_else() {
     let mut served: Vec<String> = ASSETS
         .iter()
         .map(|(path, _, _)| match *path {
-            "/" | "/setup" | "/signup" | "/connect" | "/add" | "/admin" => {
+            "/" | "/setup" | "/signup" | "/connect" | "/add" | "/admin" | "/account" => {
                 "web/index.html".to_string()
             }
             path if path.starts_with("/js/") => path.trim_start_matches('/').to_string(),

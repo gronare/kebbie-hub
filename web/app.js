@@ -3,10 +3,11 @@ import { connectText, listWithout, PairingFailed, publishList, withReauth } from
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
-import { rememberedCredential, STATE_TEXT, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "./unlock.js";
+import { proposedName } from "./device-name.js";
 import { PAGES, startPage } from "./pages.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { cantUnlockScreen, connectDone, installHint, lastSeenText, signInScreen, sleepingRow, unlockingScreen } from "./screens.js";
+import { addPasskeyScreen, cantUnlockScreen, connectDone, githubErrorText, installHint, lastSeenText, needsFirstPasskey, signInScreen, sleepingRow, unlockingScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -178,13 +179,14 @@ function machinesScreen() {
     return `<div class="task${awake ? "" : " asleep"}"><div class="row"><div class="name">${esc(opened.name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div>${remove}</div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
   });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  return top("Machines", esc(`${state.opened.length} connected`)) + storeWarning() + message + rows.join("") + tabbar("machines");
+  return top("Machines", esc(`${state.opened.length} connected`)) + storeWarning() + message + rows.join("") + `<p class="foot"><a class="link" href="/account">Account</a></p>` + tabbar("machines");
 }
 
 function lockedScreen() {
   const status = state.session?.state ?? "locked";
-  if (status === "locked") return signInScreen({ github: Boolean(state.info?.github), notice: state.notice });
-  if (status === "no-prf" || status === "not-wrapped") return cantUnlockScreen({ state: status, notice: state.notice });
+  if (needsFirstPasskey(state.me, state.session)) return addPasskeyScreen({ login: state.me.github, notice: state.notice, busy: state.busy });
+  if (status === "locked") return signInScreen({ github: false, notice: state.notice });
+  if (status === "no-prf" || status === "not-wrapped" || status === "github") return cantUnlockScreen({ state: status, notice: state.notice });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
   return top("kebbie") + `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div><button type="button" class="btn primary" data-action="other-passkey">Try another passkey</button>${message}`;
 }
@@ -334,13 +336,15 @@ function hubMessage(error) {
 
 const signingIn = signInWith(hub);
 
-async function unlocked(ceremony) {
+const unlocked = (ceremony) => entered(() => unlockAfter(hub, ceremony));
+
+async function entered(unlock) {
   signingIn.stop();
   const previous = state.me?.account;
   state.unlocking = true;
   render();
   try {
-    state.session = await unlockAfter(hub, ceremony);
+    state.session = await unlock();
   } finally {
     state.unlocking = false;
   }
@@ -377,6 +381,22 @@ async function signInWithPasskey(remembered) {
   }
 }
 
+async function addPasskey() {
+  state.busy = true;
+  state.notice = null;
+  const me = state.me;
+  try {
+    await entered(() => addFirstPasskey(hub, me, proposedName(navigator.userAgent)));
+  } catch (error) {
+    state.me = me;
+    state.session = { state: "locked", me };
+    state.notice = hubMessage(error);
+    render();
+  } finally {
+    state.busy = false;
+  }
+}
+
 function showBoard(session, name) {
   pageMode = false;
   history.replaceState(null, "", "/#/board");
@@ -407,6 +427,11 @@ root.addEventListener("click", (event) => {
     render();
   } else if (action === "sign-in") signInWithPasskey(rememberedCredential());
   else if (action === "other-passkey") signInWithPasskey(null);
+  else if (action === "add-passkey") addPasskey();
+  else if (action === "not-now") {
+    state.session = { state: "github", me: state.me };
+    render();
+  }
   else if (action === "remove-machine") removeMachine(target.dataset.id, target.dataset.name);
 });
 
@@ -435,6 +460,9 @@ async function start() {
   showHint();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { type: "module", scope: "/" }).catch(() => {});
   await forgetDeviceKeys();
+  const params = new URLSearchParams(location.search);
+  state.notice = githubErrorText(params.get("github_error"));
+  if (params.has("github_error")) history.replaceState(null, "", location.pathname + location.hash);
   state.info = await account.hub().catch(() => null);
   state.me = await account.me().catch(() => null);
   state.session = state.me ? { state: "locked", me: state.me } : null;

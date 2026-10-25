@@ -3,6 +3,7 @@ mod common;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::Json;
 use axum::body::Bytes;
@@ -13,8 +14,9 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use common::*;
 use kebbie_hub::{Config, RateLimit, Secret};
-use kebbie_hub_api::{AccountView, HubInfo, SignupMode};
+use kebbie_hub_api::{AccountKeySetup, AccountView, Bytes64, HubInfo, SignupMode};
 use kebbie_hub_fakes::browser::Browser;
+use kebbie_hub_protocol::{AccountKey, Id, SecretKeys, Unlock, sign_wrapper};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::net::TcpListener;
@@ -328,6 +330,51 @@ async fn github_signs_up_from_a_pending_connect_and_a_passkey_then_makes_the_key
     );
     pinned.unwrap();
     assert_eq!(confirmed.unwrap(), machine.machine);
+}
+
+fn key_setup(account: &str, credential: &[u8]) -> AccountKeySetup {
+    let secret = SecretKeys::generate();
+    let key = AccountKey::new(Id::parse(account).unwrap(), 1, secret.public()).unwrap();
+    let wrapped = Unlock {
+        account: &key.account,
+        credential,
+        version: 1,
+        prf_output: &[4; 32],
+        salt: &[5; 32],
+    }
+    .wrap(&secret)
+    .unwrap();
+    let signature = sign_wrapper(&secret, &key, credential, &wrapped).unwrap();
+    AccountKeySetup {
+        key,
+        credential: URL_SAFE_NO_PAD.encode(credential),
+        wrapped: URL_SAFE_NO_PAD.encode(&wrapped),
+        signature: Bytes64(signature),
+    }
+}
+
+#[tokio::test]
+async fn a_passkey_added_long_after_a_github_sign_in_still_makes_the_account_key() {
+    let github = fake_github().await;
+    let test = github_hub(&github, |config| config.fresh_session_ttl = 1).await;
+    let invite = test.hub.mint_invite().unwrap();
+    let mut arriving = GitHubBrowser::new(&test);
+    arriving
+        .through_github(&github, &format!("?invite={invite}"), 314, "late-passkey")
+        .await;
+    let mut person = arriving.browser(&test);
+    let account = person.account().await.unwrap().account;
+    tokio::time::sleep(Duration::from_millis(2100)).await;
+    let stale = person
+        .post::<_, Option<()>>("/v1/a/key", &key_setup(&account, b"not-mine"))
+        .await;
+    assert_eq!(hub_code(stale.unwrap_err()), (401, "reauth-required".to_string()));
+
+    let added = person.add_passkey().await.unwrap();
+    let credential = URL_SAFE_NO_PAD.decode(&added.passkey).unwrap();
+    let setup = key_setup(&account, &credential);
+    person.post::<_, Option<()>>("/v1/a/key", &setup).await.unwrap();
+    assert_eq!(person.account().await.unwrap().key, Some(setup.key));
 }
 
 fn urlencode(text: &str) -> String {

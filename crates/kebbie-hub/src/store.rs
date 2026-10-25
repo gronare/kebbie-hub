@@ -1952,6 +1952,14 @@ impl Store {
             .optional()
     }
 
+    pub fn refresh_session(&self, token_hash: &[u8], now: u64) -> Result<()> {
+        self.connection.execute(
+            "UPDATE sessions SET created_at = ?2 WHERE token_hash = ?1 AND expires_at > ?2",
+            params![token_hash, now],
+        )?;
+        Ok(())
+    }
+
     pub fn end_session(&self, token_hash: &[u8]) -> Result<()> {
         self.connection
             .execute("DELETE FROM sessions WHERE token_hash = ?1", [token_hash])?;

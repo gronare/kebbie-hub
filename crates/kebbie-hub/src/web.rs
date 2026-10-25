@@ -23,6 +23,7 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/signup", "web/index.html", HTML),
     asset!("/connect", "web/index.html", HTML),
     asset!("/admin", "web/index.html", HTML),
+    asset!("/account", "web/index.html", HTML),
     asset!("/app.css", "web/app.css", "text/css; charset=utf-8"),
     asset!("/app.js", "web/app.js", JS),
     asset!("/board.js", "web/board.js", JS),
@@ -104,7 +105,7 @@ mod tests {
         assert_eq!(find("/js/protocol.js").map(|(kind, _)| kind), Some(JS));
         assert_eq!(find("/v1/a/boards"), None);
         assert_eq!(find("/add"), None);
-        for page in ["/setup", "/signup", "/connect", "/admin"] {
+        for page in ["/setup", "/signup", "/connect", "/admin", "/account"] {
             assert_eq!(find(page), find("/"), "{page}");
         }
     }

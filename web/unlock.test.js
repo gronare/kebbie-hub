@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { fromB64, importSender, openEnvelope, toB64, unwrapAccountSecrets, wrapperStatement } from "../js/protocol.js";
 import { HubError } from "./hub.js";
 import { signUpWith, signInWith } from "./signin.js";
-import { addUnlockingPasskey, rememberedCredential, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, addUnlockingPasskey, rememberedCredential, unlockAfter } from "./unlock.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -217,4 +217,35 @@ test("a hub that offers another account key, or one of another account, than thi
   assert.equal((await unlockAfter({ account, credentials }, await signingIn.withPasskey(accounts.wrap.credential), kept)).state, "key-changed");
   account.state.key = { ...accounts.key, account: "acc_AAAAAAAAAAAAAAAAAAAAAA" };
   assert.equal((await unlockAfter({ account, credentials }, await signingIn.withPasskey(accounts.wrap.credential), storage())).state, "key-changed");
+});
+
+const githubMe = () => ({ account: ACCOUNT, handle: "carl", created_at: 1, owner: false, email: null, github: "octocat", key: null });
+
+test("a passkey added after GitHub sign-in makes the account key and wraps it, in one prompt when create() gives a PRF", async () => {
+  const account = hub();
+  const credentials = authenticator();
+  const session = await addFirstPasskey({ account, credentials }, githubMe(), "iPhone", storage());
+  assert.equal(session.state, "unlocked");
+  assert.equal(credentials.asked.length, 0, "no second prompt");
+  const { setup } = account.state;
+  assert.equal(setup.credential, credentials.made[0]);
+  assert.deepEqual(session.me.key, setup.key);
+  assert.ok(await verifies(setup.key, setup.credential, setup.wrapped, setup.signature));
+  assert.ok(extensionsStripped(account));
+});
+
+test("a passkey added after GitHub sign-in without a PRF from create() asks once more and then makes the key", async () => {
+  const account = hub();
+  const credentials = authenticator({ prfAtCreate: false });
+  const session = await addFirstPasskey({ account, credentials }, githubMe(), "Mac", storage());
+  assert.equal(session.state, "unlocked");
+  assert.equal(credentials.asked.length, 1);
+  assert.equal(account.state.setup.credential, credentials.made[0]);
+});
+
+test("a passkey added after GitHub sign-in on a device without PRF leaves the account without a key", async () => {
+  const account = hub();
+  const session = await addFirstPasskey({ account, credentials: authenticator({ prf: false }) }, githubMe(), "Mac", storage());
+  assert.equal(session.state, "no-prf");
+  assert.equal(account.state.key, null);
 });

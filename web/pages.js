@@ -4,11 +4,11 @@ import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, admin, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
-import { rememberedCredential, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, rememberedCredential, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { connectScreen, esc, setupScreen, signupScreen } from "./screens.js";
+import { accountScreen, connectScreen, esc, githubErrorText, setupScreen, signupScreen } from "./screens.js";
 
-export const PAGES = ["/setup", "/signup", "/connect", "/admin"];
+export const PAGES = ["/setup", "/signup", "/connect", "/admin", "/account"];
 
 const top = (title, aside = "") => `<header class="top"><b>${esc(title)}</b><span>${esc(aside)}</span></header>`;
 const say = (text, tone = "") => `<div class="center${tone ? ` ${tone}` : ""}"${tone === "warn" ? ' role="alert"' : ""}>${text}</div>`;
@@ -39,7 +39,13 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   })();
   const fragment = location.pathname === "/connect" ? keptFragment(sessionStore, params.get("code") ?? "", location.hash) : null;
   if (location.hash && location.pathname === "/connect") history.replaceState(null, "", location.pathname + location.search);
-  const state = { info: null, me: null, session: null, notice: null, busy: false, phase: "start", view: null, machines: [], tab: "overview", left: false };
+  const githubError = githubErrorText(params.get("github_error"));
+  if (params.has("github_error")) {
+    params.delete("github_error");
+    const rest = params.toString();
+    history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
+  }
+  const state = { info: null, me: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], tab: "overview", left: false };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -97,11 +103,11 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   const signInBlock = (purpose) => `${say(esc(purpose))}<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${state.notice ? say(esc(state.notice), "warn") : ""}`;
 
   function setupPage() {
-    return setupScreen({ phase: state.phase, needsSetup: state.info?.needs_setup, token: params.get("token"), notice: state.notice });
+    return setupScreen({ phase: state.phase, needsSetup: state.info?.needs_setup, token: params.get("token"), github: Boolean(state.info?.github), notice: state.notice });
   }
 
   function signupPage() {
-    return signupScreen({ signedIn: Boolean(state.me), next: safeNext(params.get("next")), invite: params.get("invite"), notice: state.notice });
+    return signupScreen({ signedIn: Boolean(state.me), next: safeNext(params.get("next")), invite: params.get("invite"), github: Boolean(state.info?.github), notice: state.notice });
   }
 
   function planBlock() {
@@ -112,6 +118,11 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
 
   function connectPage() {
     return connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), machines: state.machines, plan: planBlock(), notice: state.notice, busy: state.busy, code });
+  }
+
+  function accountPage() {
+    if (!state.me) return top("Account") + signInBlock("Sign in to see your account.");
+    return accountScreen({ me: state.me, github: Boolean(state.info?.github), notice: state.notice });
   }
 
   const TABS = [
@@ -169,13 +180,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
 
   function draw() {
     if (state.left) return;
-    const html = { "/setup": setupPage, "/signup": signupPage, "/connect": connectPage, "/admin": adminPage }[path]();
+    const html = { "/setup": setupPage, "/signup": signupPage, "/connect": connectPage, "/admin": adminPage, "/account": accountPage }[path]();
     render(html);
-    document.title = `${{ "/setup": "Set up", "/signup": "Sign up", "/connect": "Connect", "/admin": "Admin" }[path]} · kebbie`;
+    document.title = `${{ "/setup": "Set up", "/signup": "Sign up", "/connect": "Connect", "/admin": "Admin", "/account": "Account" }[path]} · kebbie`;
   }
 
   async function loadView() {
-    state.notice = null;
     try {
       if (path === "/connect") await loadConnect();
       if (path === "/admin" && state.me?.owner) await loadAdmin();
@@ -284,7 +294,25 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     }
   }
 
+  async function addPasskey() {
+    state.busy = true;
+    state.notice = null;
+    draw();
+    try {
+      state.session = await addFirstPasskey(hub, state.me, deviceName());
+      state.me = state.session.me;
+      state.busy = false;
+      await loadView();
+      draw();
+    } catch (error) {
+      state.busy = false;
+      state.notice = signUpText(error) ?? message(error);
+      draw();
+    }
+  }
+
   async function signInClicked() {
+    state.notice = null;
     try {
       await signIn();
       const next = path === "/signup" ? safeNext(params.get("next")) : null;
@@ -304,7 +332,16 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     if (!target) return;
     const action = target.dataset.action;
     try {
-      if (action === "sign-in") return await signInClicked();
+      if (action === "sign-in" || action === "other-passkey") return await signInClicked();
+      if (action === "add-passkey") return await addPasskey();
+      if (action === "not-now") {
+        state.session = { state: "github", me: state.me };
+        return draw();
+      }
+      if (action === "remove-github") {
+        await account.removeGitHub();
+        state.me = await account.me();
+      }
       if (action === "create-passkey") return await createPasskey();
       if (action === "connect") return await connect();
       if (action === "cancel") {
@@ -334,6 +371,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   addEventListener("hashchange", async () => {
     if (path !== "/admin") return;
     state.view = null;
+    state.notice = null;
     draw();
     await loadView();
     draw();

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { cantUnlockScreen, connectDone, connectScreen, installHint, lastSeenText, signInScreen, signupScreen, setupScreen, sleepingRow, unlockingScreen } from "./screens.js";
+import { accountScreen, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, installHint, lastSeenText, signInScreen, signupScreen, setupScreen, sleepingRow, unlockingScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -133,6 +133,60 @@ test("every hub screen opens with the k mark before kebbie hub", () => {
     cantUnlockScreen({ state: "no-prf" }),
     setupScreen({ phase: "start", needsSetup: true, token: "kho_x" }),
     signupScreen({}),
+    addPasskeyScreen({ login: "octocat" }),
+    accountScreen({ me: { ...me, github: "octocat" }, github: true }),
   ];
   for (const html of screens) assert.ok(html.startsWith(mark), html);
+});
+
+const hrefs = (html) => [...html.matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([^<]*)</g)].map(([, href, label]) => ({ label: label.trim(), href: href.replace(/&#38;/g, "&") }));
+
+test("the GitHub buttons start GitHub sign-in and come back to the page they left", () => {
+  assert.deepEqual(hrefs(connectScreen({ view, signupOpen: true, github: true })), [{ label: "Continue with GitHub", href: "/auth/github?connect=Z78K-XF53&next=%2Fconnect%3Fcode%3DZ78K-XF53" }]);
+  assert.deepEqual(hrefs(connectScreen({ view, signupOpen: false, github: true })), [{ label: "Sign in with GitHub", href: "/auth/github?next=%2Fconnect%3Fcode%3DZ78K-XF53" }]);
+  assert.deepEqual(hrefs(signInScreen({ github: true })), [{ label: "Sign in with GitHub", href: "/auth/github" }]);
+  assert.deepEqual(hrefs(signupScreen({ invite: "K7QF-M2XD", next: "/connect?code=Z78K-XF53", github: true })), [{ label: "Continue with GitHub", href: "/auth/github?invite=K7QF-M2XD&next=%2Fconnect%3Fcode%3DZ78K-XF53" }]);
+  assert.deepEqual(hrefs(setupScreen({ phase: "start", needsSetup: true, token: "kho_x", github: true })), [{ label: "Continue with GitHub", href: "/auth/github?setup=kho_x" }]);
+  assert.doesNotMatch(signupScreen({ invite: "K7QF-M2XD", github: false }) + setupScreen({ phase: "start", needsSetup: true, token: "kho_x" }), /GitHub/);
+});
+
+test("after GitHub a new account is asked to add a passkey, with Not now beside it", () => {
+  const html = addPasskeyScreen({ login: "octocat" });
+  assert.equal(
+    text(html),
+    "kebbie hub ✓ Signed in with GitHub as octocat Add a passkey to unlock your boards GitHub signs you in. A passkey also unlocks your boards on every phone and browser, so you never approve one by hand. Add passkey Not now",
+  );
+  assert.deepEqual(buttons(html), [
+    { label: "Add passkey", disabled: false },
+    { label: "Not now", disabled: false },
+  ]);
+  assert.deepEqual(buttons(addPasskeyScreen({ login: "octocat", busy: true }))[0], { label: "Add passkey", disabled: true });
+  assert.match(addPasskeyScreen({ login: "<b>" }), /as &#60;b&#62;/);
+});
+
+test("the connect link after GitHub asks for a passkey first, and Not now says honestly that GitHub can't unlock", () => {
+  const github = { ...me, github: "octocat", key: null };
+  assert.match(text(connectScreen({ view, me: github, session: { state: "locked", me: github }, fragment })), /^kebbie hub ✓ Signed in with GitHub as octocat Add a passkey to unlock your boards/);
+  const later = text(connectScreen({ view, me: github, session: { state: "github", me: github }, fragment }));
+  assert.equal(later, text(cantUnlockScreen({ state: "github" })));
+  assert.match(later, /This browser can't unlock your boards You're signed in with GitHub, but GitHub can't unlock your boards\. What works today: .* Use a passkey instead$/);
+  const keyed = { ...github, key: { account: "acc_1", version: 1 } };
+  assert.match(text(connectScreen({ view, me: keyed, session: { state: "locked", me: keyed }, fragment })), /^kebbie hub Connect mac\?/);
+});
+
+test("the account page connects GitHub or removes it", () => {
+  const linked = accountScreen({ me: { ...me, github: "octocat" }, github: true });
+  assert.equal(text(linked), "kebbie hub Account acc_1 GitHub Signed in with GitHub as octocat Remove Back to your boards");
+  assert.deepEqual(buttons(linked)[0], { label: "Remove", disabled: false });
+  const unlinked = accountScreen({ me, github: true });
+  assert.deepEqual(hrefs(unlinked)[0], { label: "Connect GitHub", href: "/auth/github?link=1&next=%2Faccount" });
+  assert.doesNotMatch(text(accountScreen({ me, github: false })), /GitHub/);
+});
+
+test("every way GitHub sign-in comes back refused reads as one line", () => {
+  assert.equal(githubErrorText(null), null);
+  assert.equal(githubErrorText("no-account"), "No account on this hub uses this GitHub account. New to kebbie? Start in your terminal: kebbie setup");
+  assert.equal(githubErrorText("github-taken"), "That GitHub account already belongs to another kebbie account.");
+  assert.equal(githubErrorText("something-new"), githubErrorText("failed"));
+  for (const code of ["expired", "denied", "signup-closed", "unauthorized", "signed-out", "deactivated"]) assert.ok(githubErrorText(code) && githubErrorText(code) !== githubErrorText("failed"), code);
 });

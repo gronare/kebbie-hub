@@ -599,6 +599,7 @@ pub async fn passkey_finish(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
     AccountAuth(account): AccountAuth,
+    headers: HeaderMap,
     Json(request): Json<RegisterFinish>,
 ) -> Result<Json<PasskeyView>, ApiError> {
     let name = optional_name(request.name.as_deref())?;
@@ -624,6 +625,9 @@ pub async fn passkey_finish(
         at,
     )? {
         return Err(ApiError::conflict("passkey-taken"));
+    }
+    if let Some(token) = session_cookie(&hub, &headers) {
+        store.refresh_session(&digest(token), at)?;
     }
     store.log(at, "passkey.added", None, None, Some(&account))?;
     Ok(Json(PasskeyView {
