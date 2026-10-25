@@ -298,12 +298,15 @@ const ACCOUNT_KEY_COLUMNS: &[(&str, &str, &str)] = &[
     ("connects", "signup_at", "INTEGER"),
 ];
 
-const SCHEMA_VERSION: i64 = 8;
+const GITHUB_COLUMNS: &[(&str, &str, &str)] = &[("accounts", "github_login", "TEXT")];
+
+const SCHEMA_VERSION: i64 = 9;
 const UPGRADES: &[(i64, &str)] = &[
     (5, REPORTS_SCHEMA),
     (6, SIGNALS_SCHEMA),
     (7, CONNECT_SCHEMA),
     (8, ACCOUNT_KEY_SCHEMA),
+    (9, ""),
 ];
 pub const REPORT_KEEP_SECONDS: u64 = 30 * 86_400;
 pub const SIGNAL_KEEP_DAYS: u64 = 180;
@@ -475,6 +478,9 @@ impl Store {
                         params![credential, crate::auth::random::<32>().as_slice()],
                     )?;
                 }
+            }
+            if *to == 9 {
+                add_columns(&tx, GITHUB_COLUMNS)?;
             }
         }
         tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -1598,11 +1604,7 @@ impl Store {
     }
 
     pub fn handle_taken(&self, handle: &str) -> Result<bool> {
-        self.connection.query_row(
-            "SELECT EXISTS (SELECT 1 FROM accounts WHERE handle = ?1)",
-            [handle],
-            |row| row.get(0),
-        )
+        handle_held(&self.connection, handle)
     }
 
     pub fn passkey_account(&self, credential: &[u8]) -> Result<Option<String>> {
@@ -1691,42 +1693,10 @@ impl Store {
 
     pub fn sign_up(&mut self, signup: &SignUp<'_>) -> Result<SignUpOutcome> {
         let tx = self.connection.transaction()?;
-        let kind = if signup.connect {
-            let claimed = tx.execute(
-                "UPDATE connects SET signup_at = ?2
-                 WHERE user_code_hash = ?1 AND state = 'pending' AND expires_at > ?2 AND signup_at IS NULL",
-                params![signup.invite_hash, signup.now],
-            )?;
-            if claimed == 0 {
-                return Ok(SignUpOutcome::InviteSpent);
-            }
-            Ticket::Connect
-        } else {
-            let spent: Option<String> = tx
-                .query_row(
-                    "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2 RETURNING kind",
-                    params![signup.invite_hash, signup.now],
-                    |row| row.get(0),
-                )
-                .optional()?;
-            let Some(kind) = spent else {
-                return Ok(SignUpOutcome::InviteSpent);
-            };
-            Ticket::parse(&kind).ok_or_else(|| corrupt(0))?
+        let Some(kind) = spend_ticket(&tx, signup.invite_hash, signup.connect, signup.now)? else {
+            return Ok(SignUpOutcome::InviteSpent);
         };
-        if kind == Ticket::Owner {
-            let accounts: u64 =
-                tx.query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))?;
-            if accounts > 0 {
-                return Ok(SignUpOutcome::InviteSpent);
-            }
-        }
-        let taken: bool = tx.query_row(
-            "SELECT EXISTS (SELECT 1 FROM accounts WHERE handle = ?1)",
-            [signup.handle],
-            |row| row.get(0),
-        )?;
-        if taken {
+        if handle_held(&tx, signup.handle)? {
             return Ok(SignUpOutcome::HandleTaken);
         }
         let reused: bool = tx.query_row(
@@ -1737,11 +1707,6 @@ impl Store {
         if reused {
             return Ok(SignUpOutcome::CredentialTaken);
         }
-        let role = if kind == Ticket::Owner {
-            "owner"
-        } else {
-            "member"
-        };
         tx.execute(
             "INSERT INTO accounts (id, handle, user_handle, created_at, role)
              VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -1750,7 +1715,7 @@ impl Store {
                 signup.handle,
                 signup.user_handle.to_vec(),
                 signup.now,
-                role
+                role_of(kind)
             ],
         )?;
         tx.execute(
@@ -1771,6 +1736,102 @@ impl Store {
         )?;
         tx.commit()?;
         Ok(SignUpOutcome::Created(kind))
+    }
+
+    pub fn sign_up_github(&mut self, signup: &GitHubSignUp<'_>) -> Result<SignUpOutcome> {
+        let tx = self.connection.transaction()?;
+        let Some(kind) = spend_ticket(&tx, signup.invite_hash, signup.connect, signup.now)? else {
+            return Ok(SignUpOutcome::InviteSpent);
+        };
+        if handle_held(&tx, signup.handle)? {
+            return Ok(SignUpOutcome::HandleTaken);
+        }
+        let linked: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM accounts WHERE github_id = ?1)",
+            [signup.github_id],
+            |row| row.get(0),
+        )?;
+        if linked {
+            return Ok(SignUpOutcome::GitHubTaken);
+        }
+        tx.execute(
+            "INSERT INTO accounts (id, handle, user_handle, created_at, role, github_id, github_login)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                signup.account,
+                signup.handle,
+                signup.user_handle.to_vec(),
+                signup.now,
+                role_of(kind),
+                signup.github_id,
+                signup.github_login
+            ],
+        )?;
+        tx.execute(
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
+            params![signup.session_hash, signup.account, signup.now, signup.session_expires_at],
+        )?;
+        tx.commit()?;
+        Ok(SignUpOutcome::Created(kind))
+    }
+
+    pub fn account_by_github(&self, github_id: u64) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT id FROM accounts WHERE github_id = ?1",
+                [github_id],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn set_github_login(&self, account: &str, login: &str) -> Result<()> {
+        self.connection.execute(
+            "UPDATE accounts SET github_login = ?2 WHERE id = ?1",
+            params![account, login],
+        )?;
+        Ok(())
+    }
+
+    pub fn link_github(&self, account: &str, github_id: u64, login: &str) -> Result<bool> {
+        match self.connection.execute(
+            "UPDATE accounts SET github_id = ?2, github_login = ?3 WHERE id = ?1",
+            params![account, github_id, login],
+        ) {
+            Ok(changed) => Ok(changed > 0),
+            Err(rusqlite::Error::SqliteFailure(failure, _))
+                if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+            {
+                Ok(false)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn unlink_github(&mut self, account: &str) -> Result<GitHubUnlink> {
+        let tx = self.connection.transaction()?;
+        let linked: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM accounts WHERE id = ?1 AND github_id IS NOT NULL)",
+            [account],
+            |row| row.get(0),
+        )?;
+        if !linked {
+            return Ok(GitHubUnlink::NotLinked);
+        }
+        let passkeys: u64 = tx.query_row(
+            "SELECT count(*) FROM passkeys WHERE account_id = ?1",
+            [account],
+            |row| row.get(0),
+        )?;
+        if passkeys == 0 {
+            return Ok(GitHubUnlink::LastSignIn);
+        }
+        tx.execute(
+            "UPDATE accounts SET github_id = NULL, github_login = NULL WHERE id = ?1",
+            [account],
+        )?;
+        tx.commit()?;
+        Ok(GitHubUnlink::Removed)
     }
 
     pub fn passkeys(&self, account: &str) -> Result<Vec<StoredPasskey>> {
@@ -2495,6 +2556,8 @@ pub struct AccountRow {
     pub plan: PlanStatus,
     pub plan_until: Option<u64>,
     pub deactivated_at: Option<u64>,
+    pub github_id: Option<u64>,
+    pub github_login: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -2513,8 +2576,8 @@ pub struct AdminAccountRow {
     pub last_seen: Option<u64>,
 }
 
-const ACCOUNT_COLUMNS: &str = "accounts.id, accounts.handle, accounts.user_handle, accounts.created_at, accounts.role, accounts.email, accounts.plan, accounts.plan_until, accounts.deactivated_at";
-const ACCOUNT_COLUMN_COUNT: usize = 9;
+const ACCOUNT_COLUMNS: &str = "accounts.id, accounts.handle, accounts.user_handle, accounts.created_at, accounts.role, accounts.email, accounts.plan, accounts.plan_until, accounts.deactivated_at, accounts.github_id, accounts.github_login";
+const ACCOUNT_COLUMN_COUNT: usize = 11;
 
 fn account_row(row: &Row<'_>) -> Result<AccountRow> {
     Ok(AccountRow {
@@ -2530,7 +2593,59 @@ fn account_row(row: &Row<'_>) -> Result<AccountRow> {
         plan: PlanStatus::parse(&row.get::<_, String>(6)?).ok_or_else(|| corrupt(6))?,
         plan_until: row.get(7)?,
         deactivated_at: row.get(8)?,
+        github_id: row.get(9)?,
+        github_login: row.get(10)?,
     })
+}
+
+fn role_of(kind: Ticket) -> &'static str {
+    if kind == Ticket::Owner {
+        "owner"
+    } else {
+        "member"
+    }
+}
+
+fn handle_held(connection: &Connection, handle: &str) -> Result<bool> {
+    connection.query_row(
+        "SELECT EXISTS (SELECT 1 FROM accounts WHERE handle = ?1)",
+        [handle],
+        |row| row.get(0),
+    )
+}
+
+fn spend_ticket(connection: &Connection, hash: &[u8], connect: bool, now: u64) -> Result<Option<Ticket>> {
+    let kind = if connect {
+        let claimed = connection.execute(
+            "UPDATE connects SET signup_at = ?2
+             WHERE user_code_hash = ?1 AND state = 'pending' AND expires_at > ?2 AND signup_at IS NULL",
+            params![hash, now],
+        )?;
+        if claimed == 0 {
+            return Ok(None);
+        }
+        Ticket::Connect
+    } else {
+        let spent: Option<String> = connection
+            .query_row(
+                "DELETE FROM invites WHERE code_hash = ?1 AND expires_at > ?2 RETURNING kind",
+                params![hash, now],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(kind) = spent else {
+            return Ok(None);
+        };
+        Ticket::parse(&kind).ok_or_else(|| corrupt(0))?
+    };
+    if kind == Ticket::Owner {
+        let accounts: u64 =
+            connection.query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))?;
+        if accounts > 0 {
+            return Ok(None);
+        }
+    }
+    Ok(Some(kind))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2649,6 +2764,9 @@ pub enum Purpose {
     ConnectSignUp,
     AddPasskey,
     LogIn,
+    GitHub,
+    GitHubConnect,
+    GitHubLink,
 }
 
 impl Purpose {
@@ -2658,6 +2776,9 @@ impl Purpose {
             Purpose::ConnectSignUp => "connect-sign-up",
             Purpose::AddPasskey => "add-passkey",
             Purpose::LogIn => "log-in",
+            Purpose::GitHub => "github",
+            Purpose::GitHubConnect => "github-connect",
+            Purpose::GitHubLink => "github-link",
         }
     }
 
@@ -2667,6 +2788,9 @@ impl Purpose {
             Purpose::ConnectSignUp,
             Purpose::AddPasskey,
             Purpose::LogIn,
+            Purpose::GitHub,
+            Purpose::GitHubConnect,
+            Purpose::GitHubLink,
         ]
             .into_iter()
             .find(|purpose| purpose.name() == name)
@@ -2705,6 +2829,27 @@ pub enum SignUpOutcome {
     InviteSpent,
     HandleTaken,
     CredentialTaken,
+    GitHubTaken,
+}
+
+pub struct GitHubSignUp<'a> {
+    pub invite_hash: &'a [u8],
+    pub connect: bool,
+    pub account: &'a str,
+    pub handle: &'a str,
+    pub user_handle: [u8; 16],
+    pub github_id: u64,
+    pub github_login: &'a str,
+    pub session_hash: &'a [u8],
+    pub session_expires_at: u64,
+    pub now: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum GitHubUnlink {
+    Removed,
+    NotLinked,
+    LastSignIn,
 }
 
 pub enum Removal {

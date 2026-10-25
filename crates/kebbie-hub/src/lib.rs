@@ -7,6 +7,7 @@ mod connect;
 mod device;
 mod error;
 mod events;
+mod github;
 mod limit;
 mod machine;
 mod pairing;
@@ -34,6 +35,8 @@ use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
 
 pub use auth::{DEV_SESSION_COOKIE, SESSION_COOKIE};
 pub use error::ApiError;
+pub use github::{GITHUB_API_URL, GITHUB_WEB_URL, Secret};
+use github::GitHub;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
 use push::Pusher;
@@ -108,6 +111,9 @@ pub struct Config {
     pub plans: bool,
     pub billing_url: Option<String>,
     pub github_client_id: Option<String>,
+    pub github_client_secret: Option<Secret>,
+    pub github_api_url: String,
+    pub github_web_url: String,
     pub fresh_session_ttl: u64,
     pub connect_ttl: u64,
     pub connect_interval: u64,
@@ -182,6 +188,9 @@ impl Config {
             plans: false,
             billing_url: None,
             github_client_id: None,
+            github_client_secret: None,
+            github_api_url: GITHUB_API_URL.to_string(),
+            github_web_url: GITHUB_WEB_URL.to_string(),
             fresh_session_ttl: 300,
             connect_ttl: 600,
             connect_interval: 5,
@@ -249,6 +258,7 @@ pub enum OpenError {
     RelyingParty(String),
     Push(String),
     Report(String),
+    GitHub(String),
 }
 
 impl std::fmt::Display for OpenError {
@@ -257,7 +267,8 @@ impl std::fmt::Display for OpenError {
             OpenError::Store(error) => error.fmt(formatter),
             OpenError::RelyingParty(message)
             | OpenError::Push(message)
-            | OpenError::Report(message) => formatter.write_str(message),
+            | OpenError::Report(message)
+            | OpenError::GitHub(message) => formatter.write_str(message),
         }
     }
 }
@@ -321,6 +332,7 @@ pub struct Hub {
     wakeups: Wakeups,
     closing: watch::Sender<bool>,
     webauthn: Webauthn,
+    github: Option<GitHub>,
     origin: String,
     feeds: Mutex<HashMap<String, usize>>,
     config: Config,
@@ -366,6 +378,18 @@ impl Hub {
             config.push_pending,
         )
         .map_err(OpenError::Push)?;
+        let github = match (&config.github_client_id, &config.github_client_secret) {
+            (Some(id), Some(secret)) => Some(
+                GitHub::new(id, secret.clone(), &config.github_api_url, &config.github_web_url)
+                    .map_err(OpenError::GitHub)?,
+            ),
+            (Some(_), None) => {
+                return Err(OpenError::GitHub(
+                    "a GitHub client id needs its client secret in KEBBIE_HUB_GITHUB_CLIENT_SECRET".to_string(),
+                ));
+            }
+            (None, _) => None,
+        };
         let store = Store::open(&config.database())?;
         let setup_url = if store.account_count()? == 0 {
             let token = auth::new_token(auth::SETUP_TOKEN_PREFIX);
@@ -392,6 +416,7 @@ impl Hub {
             wakeups: Wakeups::new(),
             closing: watch::Sender::new(false),
             webauthn,
+            github,
             origin,
             feeds: Mutex::new(HashMap::new()),
             config,
@@ -422,6 +447,10 @@ impl Hub {
 
     pub fn webauthn(&self) -> &Webauthn {
         &self.webauthn
+    }
+
+    fn github(&self) -> Option<&GitHub> {
+        self.github.as_ref()
     }
 
     pub fn origin(&self) -> &str {
@@ -671,6 +700,9 @@ pub fn router(hub: Arc<Hub>) -> Router {
     Router::new()
         .route("/healthz", get(health))
         .route("/v1/hub", get(account::hub_info))
+        .route("/auth/github", get(github::start))
+        .route("/auth/github/callback", get(github::callback))
+        .route("/v1/a/github", delete(account::remove_github))
         .route("/v1/m/join", post(machine::join))
         .route("/v1/m/connect", post(connect::start))
         .route("/v1/m/connect/token", post(connect::token))

@@ -22,6 +22,8 @@ esac
 cargo build --manifest-path "$root/Cargo.toml" -p kebbie-hub --bin kebbie-hub
 mkdir -p "$data"
 chmod 700 "$data"
+github=""
+if [ -n "${KEBBIE_HUB_GITHUB_CLIENT_ID:-}" ]; then github="--github-client-id $KEBBIE_HUB_GITHUB_CLIENT_ID"; fi
 echo "kebbie hub dev: http://localhost:$port (data in $data, Ctrl-C stops it)"
 exec "${CARGO_TARGET_DIR:-$root/target}/debug/kebbie-hub" --dev --signup open --data "$data" \
-  --listen "127.0.0.1:$port" --rp-id localhost --origin "http://localhost:$port"
+  --listen "127.0.0.1:$port" --rp-id localhost --origin "http://localhost:$port" $github

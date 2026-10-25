@@ -33,11 +33,12 @@ use crate::auth::{
 };
 use crate::error::ApiError;
 use crate::store::{
-    Ceremony, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey, Ticket,
+    Ceremony, GitHubUnlink, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey,
+    Ticket,
 };
 use crate::{Hub, clean_name, now};
 
-const ACCOUNT_PREFIX: &str = "acc_";
+pub(crate) const ACCOUNT_PREFIX: &str = "acc_";
 
 type WithCookie<T> = (
     AppendHeaders<[(axum::http::HeaderName, String); 1]>,
@@ -49,7 +50,7 @@ pub fn counter_regressed(stored: u32, presented: u32) -> bool {
 }
 
 
-fn new_id() -> String {
+pub(crate) fn new_id() -> String {
     URL_SAFE_NO_PAD.encode(random::<16>())
 }
 
@@ -86,7 +87,7 @@ fn optional_name(name: Option<&str>) -> Result<Option<String>, ApiError> {
     .transpose()
 }
 
-fn session_set_cookie(hub: &Hub, token: &str, max_age: u64) -> String {
+pub(crate) fn session_set_cookie(hub: &Hub, token: &str, max_age: u64) -> String {
     let name = hub.session_cookie_name();
     let secure = if hub.plain_http() { "" } else { " Secure;" };
     format!("{name}={token}; Path=/; Max-Age={max_age}; HttpOnly;{secure} SameSite=Strict")
@@ -157,6 +158,7 @@ pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
         created_at: row.created_at,
         owner: row.owner,
         email: row.email,
+        github: row.github_login,
         billing_url: hub.config().billing_url.clone().filter(|_| !plan.entitled),
         plan,
     })
@@ -242,12 +244,12 @@ pub async fn register_begin(
     }))
 }
 
-fn generated_handle() -> String {
+pub(crate) fn generated_handle() -> String {
     let tail: String = random::<6>().iter().map(|byte| format!("{byte:02x}")).collect();
     format!("k{tail}")
 }
 
-fn connect_ticket(hub: &Hub, request: &RegisterBegin, typed: &str) -> Result<Vec<u8>, ApiError> {
+pub(crate) fn connect_ticket(hub: &Hub, request: &RegisterBegin, typed: &str) -> Result<Vec<u8>, ApiError> {
     if request.setup.is_some() || !request.invite.is_empty() {
         return Err(ApiError::unauthorized());
     }
@@ -262,7 +264,7 @@ fn connect_ticket(hub: &Hub, request: &RegisterBegin, typed: &str) -> Result<Vec
     Ok(hash)
 }
 
-fn checked_ticket(hub: &Hub, request: &RegisterBegin) -> Result<Vec<u8>, ApiError> {
+pub(crate) fn checked_ticket(hub: &Hub, request: &RegisterBegin) -> Result<Vec<u8>, ApiError> {
     let (kind, invite_hash) = ticket_of(request).ok_or_else(ApiError::unauthorized)?;
     {
         let store = hub.store();
@@ -324,6 +326,7 @@ pub async fn register_finish(
         SignUpOutcome::InviteSpent => return Err(ApiError::unauthorized()),
         SignUpOutcome::HandleTaken => return Err(ApiError::conflict("handle-taken")),
         SignUpOutcome::CredentialTaken => return Err(ApiError::conflict("passkey-taken")),
+        SignUpOutcome::GitHubTaken => return Err(ApiError::internal()),
     };
     store.log(
         at,
@@ -539,7 +542,7 @@ pub async fn hub_info(
         signup: hub.config().signup,
         plans: hub.config().plans,
         needs_setup: hub.store().account_count()? == 0,
-        github: hub.config().github_client_id.is_some(),
+        github: hub.github().is_some(),
     }))
 }
 
@@ -660,6 +663,22 @@ pub async fn remove_passkey(
         Removal::LastUnlocking => Err(ApiError::conflict("last-unlocking-passkey")),
         Removal::Missing => Err(ApiError::not_found()),
     }
+}
+
+pub async fn remove_github(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    AccountAuth(account): AccountAuth,
+) -> Result<StatusCode, ApiError> {
+    let at = now();
+    let mut store = hub.store();
+    match store.unlink_github(&account)? {
+        GitHubUnlink::Removed => {}
+        GitHubUnlink::NotLinked => return Err(ApiError::not_found()),
+        GitHubUnlink::LastSignIn => return Err(ApiError::conflict("last-sign-in")),
+    }
+    store.log(at, "account.github-removed", None, None, Some(&account))?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn set_key(

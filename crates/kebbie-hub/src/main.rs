@@ -7,13 +7,15 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kebbie_hub::store::{AdminScope, KeyStatus, MadeOwner, SignalRow, Store, StoredReport};
 use kebbie_hub::{
-    Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, Hub, TrustedProxy,
-    database_path, mint_admin_token, mint_invite, mint_join_code, serve,
+    Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, GITHUB_API_URL,
+    GITHUB_WEB_URL, Hub, Secret, TrustedProxy, database_path, mint_admin_token, mint_invite,
+    mint_join_code, serve,
 };
 use kebbie_hub_api::SignupMode;
 use kebbie_hub_protocol::Id;
 
 const DEV_LISTEN: &str = "127.0.0.1:8470";
+const GITHUB_SECRET_ENV: &str = "KEBBIE_HUB_GITHUB_CLIENT_SECRET";
 
 #[derive(Parser)]
 #[command(
@@ -91,6 +93,26 @@ struct Cli {
         help = "Where people start a subscription, shown when their plan is inactive"
     )]
     billing_url: Option<String>,
+    #[arg(
+        long,
+        value_name = "ID",
+        help = "Client id of the GitHub OAuth app people sign in with; its secret comes from KEBBIE_HUB_GITHUB_CLIENT_SECRET"
+    )]
+    github_client_id: Option<String>,
+    #[arg(
+        long,
+        value_name = "URL",
+        default_value = GITHUB_API_URL,
+        help = "Where the hub reads the GitHub user, for GitHub Enterprise or a test double"
+    )]
+    github_api_url: String,
+    #[arg(
+        long,
+        value_name = "URL",
+        default_value = GITHUB_WEB_URL,
+        help = "Where people approve the hub on GitHub and the hub trades the code for a token"
+    )]
+    github_web_url: String,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -499,6 +521,18 @@ fn vapid_subject(cli: &Cli) -> Result<String, String> {
     }
 }
 
+fn github_secret(cli: &Cli) -> Result<Option<Secret>, String> {
+    if cli.github_client_id.is_none() {
+        return Ok(None);
+    }
+    match std::env::var(GITHUB_SECRET_ENV) {
+        Ok(secret) if !secret.trim().is_empty() => Ok(Some(Secret::new(secret.trim()))),
+        _ => Err(format!(
+            "--github-client-id needs the app's client secret in {GITHUB_SECRET_ENV}"
+        )),
+    }
+}
+
 fn open_store(data: &std::path::Path) -> Result<Store, String> {
     Store::open(&database_path(data)).map_err(|error| error.to_string())
 }
@@ -626,6 +660,10 @@ async fn run(cli: Cli) -> Result<(), String> {
             };
             config.plans = matches!(cli.plans, Plans::On);
             config.billing_url = cli.billing_url.clone();
+            config.github_client_secret = github_secret(&cli)?;
+            config.github_client_id = cli.github_client_id.clone();
+            config.github_api_url = cli.github_api_url.clone();
+            config.github_web_url = cli.github_web_url.clone();
             let hub = Hub::open(config).map_err(|error| error.to_string())?;
             let listener = tokio::net::TcpListener::bind(address)
                 .await

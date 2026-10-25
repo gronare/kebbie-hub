@@ -333,7 +333,7 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
         .unwrap()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 8);
+    assert_eq!(version, 9);
     assert!(!store_account_is_owner(&path, "acc_new"));
     rusqlite::Connection::open(&path)
         .unwrap()

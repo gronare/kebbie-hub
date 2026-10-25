@@ -504,7 +504,7 @@ fn a_schema_5_database_gains_the_signal_tables_and_keeps_its_reports() {
         .unwrap()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 8);
+    assert_eq!(version, 9);
 }
 
 #[test]

@@ -27,7 +27,7 @@ export function connectWelcome({ name, signupOpen, github, notice = null, busy =
   const lead = signupOpen
     ? `The hub shows ${name}'s board on your phone and in any browser, end-to-end encrypted. Create a passkey to start: it signs you in and unlocks your boards wherever it's saved.`
     : `The hub shows ${name}'s board on your phone and in any browser, end-to-end encrypted. Sign in with your passkey to connect it.`;
-  const gh = github ? `<div class="or"><span>or</span></div><a class="btn" href="/v1/a/github?next=${encodeURIComponent("/connect")}">Continue with GitHub</a>` : "";
+  const gh = github ? `<div class="or"><span>or</span></div><a class="btn" href="/auth/github?next=${encodeURIComponent("/connect")}">Continue with GitHub</a>` : "";
   const start = signupOpen
     ? `<button type="button" class="btn primary" data-action="create-passkey"${disabled(busy)}>Create passkey</button>${gh}${warn(notice)}<p class="foot">Already have a kebbie account? <button type="button" class="link inline" data-action="sign-in">Sign in</button></p>`
     : `<button type="button" class="btn primary" data-action="sign-in"${disabled(busy)}>Sign in with passkey</button>${gh}${warn(notice)}`;
@@ -64,7 +64,7 @@ export function connectCancelled() {
 }
 
 export function signInScreen({ github, notice = null }) {
-  const gh = github ? `<a class="btn" href="/v1/a/github">Sign in with GitHub</a>` : "";
+  const gh = github ? `<a class="btn" href="/auth/github">Sign in with GitHub</a>` : "";
   return (
     brand +
     heading("See your boards", "Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie.") +

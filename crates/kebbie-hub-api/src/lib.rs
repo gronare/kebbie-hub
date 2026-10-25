@@ -402,6 +402,8 @@ pub struct AccountView {
     #[serde(default)]
     pub email: Option<String>,
     #[serde(default)]
+    pub github: Option<String>,
+    #[serde(default)]
     pub plan: PlanView,
     #[serde(default)]
     pub billing_url: Option<String>,

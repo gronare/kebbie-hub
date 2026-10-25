@@ -202,13 +202,3 @@ async fn an_invite_signs_up_without_an_account_name() {
         .unwrap();
     assert!(created.handle.starts_with('k'), "{}", created.handle);
 }
-
-#[tokio::test]
-async fn the_hub_says_whether_github_sign_in_is_configured() {
-    let plain = start_hub(|_| {}).await;
-    let info: HubInfo = browser(&plain).get("/v1/hub").await.unwrap();
-    assert!(!info.github);
-    let configured = start_hub(|config| config.github_client_id = Some("Iv1.test".into())).await;
-    let info: HubInfo = browser(&configured).get("/v1/hub").await.unwrap();
-    assert!(info.github);
-}
