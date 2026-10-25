@@ -269,3 +269,98 @@ fn reports_sign_and_solve_as_the_vectors_say() {
     assert!(verify_report(&key.public(), &nonce, &report, &signature));
     assert!(!verify_report(&key.public(), &digest, &report, &signature));
 }
+
+fn bytes(value: &Value) -> Vec<u8> {
+    URL_SAFE_NO_PAD.decode(value.as_str().unwrap()).unwrap()
+}
+
+#[test]
+fn account_keys_wrap_sign_and_pin_as_the_vectors_say() {
+    use kebbie_hub_protocol::{
+        AccountFingerprints, AccountHandoff, AccountKey, MachineList, Unlock, pin_account,
+        sign_wrapper, wrap_associated_data, wrap_key, wrapper_statement,
+    };
+    let parties = parties();
+    let vectors = load("accounts.json");
+    let account = &parties[vectors["account"].as_str().unwrap()];
+    let key: AccountKey = serde_json::from_value(vectors["key"].clone()).unwrap();
+    assert_eq!((&key.account, key.keys), (&account.id, account.public));
+    let wrap = &vectors["wrap"];
+    let credential = bytes(&wrap["credential"]);
+    let (salt, prf_output) = (bytes32(&wrap["salt"]), bytes32(&wrap["prf_output"]));
+    assert_eq!(wrap_key(&prf_output, &salt), bytes32(&wrap["wrap_key"]));
+    assert_eq!(
+        wrap_associated_data(&key.account, &credential, key.version).unwrap(),
+        bytes(&wrap["associated_data"])
+    );
+    let unlock = Unlock {
+        account: &key.account,
+        credential: &credential,
+        version: key.version,
+        prf_output: &prf_output,
+        salt: &salt,
+    };
+    let wrapped = bytes(&wrap["wrapped"]);
+    let nonce: [u8; 12] = bytes(&wrap["nonce"]).try_into().unwrap();
+    assert_eq!(unlock.wrap_with_nonce(&account.secret, nonce).unwrap(), wrapped);
+    assert_eq!(unlock.unwrap(&wrapped).unwrap().public(), account.public);
+    for refusal in wrap["refusals"].as_array().unwrap() {
+        let changed_account = Id::parse(refusal["account"].as_str().unwrap()).unwrap();
+        let changed_credential = bytes(&refusal["credential"]);
+        let changed = Unlock {
+            account: &changed_account,
+            credential: &changed_credential,
+            version: refusal["key_version"].as_u64().unwrap() as u32,
+            prf_output: &bytes32(&refusal["prf_output"]),
+            salt: &bytes32(&refusal["salt"]),
+        };
+        assert!(changed.unwrap(&wrapped).is_err(), "{}", refusal["name"]);
+    }
+    let fingerprints: AccountFingerprints =
+        serde_json::from_value(vectors["fingerprints"].clone()).unwrap();
+    assert_eq!(key.fingerprints(), fingerprints);
+    let wrapper = &vectors["wrapper"];
+    assert_eq!(
+        wrapper_statement(&key, &credential, &wrapped).unwrap(),
+        bytes(&wrapper["statement"])
+    );
+    let signature: [u8; 64] = bytes(&wrapper["signature"]).try_into().unwrap();
+    assert_eq!(sign_wrapper(&account.secret, &key, &credential, &wrapped).unwrap(), signature);
+    assert!(key.verifies_wrapper(&credential, &wrapped, &signature));
+    let lists = &vectors["machines"];
+    let list: MachineList = serde_json::from_value(lists["list"].clone()).unwrap();
+    assert_eq!(list.statement(&key.account).unwrap(), bytes(&lists["statement"]));
+    let signature: [u8; 64] = bytes(&lists["signature"]).try_into().unwrap();
+    assert_eq!(list.sign(&account.secret, &key.account).unwrap(), signature);
+    assert!(key.verifies_list(&list, &signature));
+    let removed: MachineList = serde_json::from_value(lists["removed"].clone()).unwrap();
+    let removed_signature: [u8; 64] = bytes(&lists["removed_signature"]).try_into().unwrap();
+    assert!(key.verifies_list(&removed, &removed_signature));
+    assert!(!key.verifies_list(&removed, &signature));
+    assert!(removed.counter > list.counter);
+    let trusted = &parties[lists["trusted"].as_str().unwrap()];
+    let gone = &parties[lists["removed_machine"].as_str().unwrap()];
+    assert!(list.trusts(&gone.id, &gone.public) && !removed.trusts(&gone.id, &gone.public));
+    assert!(removed.trusts(&trusted.id, &trusted.public));
+    let handoff = &vectors["handoff"];
+    let code = handoff["code"].as_str().unwrap();
+    let nonce = bytes32(&handoff["nonce"]);
+    let commitment = AccountHandoff::with_nonce(key.clone(), nonce, code).commitment();
+    assert_eq!(commitment, bytes32(&handoff["commitment"]));
+    for reveal in handoff["reveals"].as_array().unwrap() {
+        let revealed: AccountKey = serde_json::from_value(reveal["revealed"].clone()).unwrap();
+        let pinned = pin_account(
+            &commitment,
+            &revealed,
+            &nonce,
+            reveal["machine_code"].as_str().unwrap(),
+        );
+        match reveal["expect"].get("pinned") {
+            Some(expected) => assert_eq!(
+                pinned.unwrap(),
+                serde_json::from_value::<AccountFingerprints>(expected.clone()).unwrap()
+            ),
+            None => assert!(pinned.is_err(), "{}", reveal["name"]),
+        }
+    }
+}

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { checkPayload, checkShape, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, machineFingerprint, openEnvelope, pairingCommitment, pairingNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, machineFingerprint, openEnvelope, pairingCommitment, pairingNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -173,4 +173,102 @@ test("a header of the wrong types is refused before any crypto", () => {
   for (const [change, code] of variants) {
     assert.throws(() => checkShape({ ...good, ...change }), (error) => error.code === code, JSON.stringify(change));
   }
+});
+
+test("account keys wrap, sign and hand over as the Rust vectors say", async () => {
+  const vectors = load("accounts.json");
+  const party = parties[vectors.account];
+  const { key, wrap } = vectors;
+  assert.deepEqual([key.account, key.keys], [party.id, party.public]);
+  const credential = fromB64(wrap.credential);
+  const unlock = { account: key.account, credential, version: key.version, prfOutput: fromB64(wrap.prf_output), salt: fromB64(wrap.salt) };
+  assert.equal(toB64(await accountWrapKey(unlock.prfOutput, unlock.salt)), wrap.wrap_key);
+  assert.equal(toB64(wrapAssociatedData(key.account, credential, key.version)), wrap.associated_data);
+  const secrets = { signing: fromB64(party.signing_secret), encryption: fromB64(party.encryption_secret) };
+  assert.equal(toB64(await wrapAccountSecrets(unlock, secrets, fromB64(wrap.nonce))), wrap.wrapped);
+  const opened = await unwrapAccountSecrets(unlock, fromB64(wrap.wrapped));
+  assert.deepEqual([toB64(opened.signing), toB64(opened.encryption)], [party.signing_secret, party.encryption_secret]);
+  for (const refusal of wrap.refusals) {
+    const changed = { account: refusal.account, credential: fromB64(refusal.credential), version: refusal.key_version, prfOutput: fromB64(refusal.prf_output), salt: fromB64(refusal.salt) };
+    assert.equal(await failure(unwrapAccountSecrets(changed, fromB64(wrap.wrapped))), refusal.expect, refusal.name);
+  }
+  const account = await accountIdentity(key, opened, key.account);
+  assert.equal(account.signing.extractable, false);
+  assert.equal(account.encryption.privateKey.extractable, false);
+  assert.equal(await failure(accountIdentity({ ...key, keys: parties.intruder.public }, opened, key.account)), "key-mismatch");
+  assert.equal(await failure(accountIdentity({ ...key, keys: { ...key.keys, encryption: parties.intruder.public.encryption } }, opened, key.account)), "key-mismatch");
+  assert.deepEqual(await accountFingerprints(key), vectors.fingerprints);
+  const statement = await wrapperStatement(key, credential, fromB64(wrap.wrapped));
+  assert.equal(toB64(statement), vectors.wrapper.statement);
+  assert.equal(toB64(await signStatement(account, statement)), vectors.wrapper.signature);
+  const lists = vectors.machines;
+  assert.equal(toB64(machineListStatement(key.account, lists.list)), lists.statement);
+  assert.equal(await signMachineList(account, lists.list), lists.signature);
+  assert.equal(await verifyMachineList(account, { list: lists.list, signature: lists.signature }), true);
+  assert.equal(await verifyMachineList(account, { list: lists.removed, signature: lists.removed_signature }), true);
+  assert.equal(await verifyMachineList(account, { list: lists.removed, signature: lists.signature }), false);
+  assert.equal(await verifyMachineList(account, { list: { ...lists.list, counter: lists.removed.counter }, signature: lists.signature }), false);
+  assert.equal(await verifyMachineList(account, { list: { ...lists.list, machines: [...lists.list.machines].reverse() }, signature: lists.signature }), false);
+  const trusted = parties[lists.trusted];
+  const gone = parties[lists.removed_machine];
+  assert.ok(machineListTrusts(lists.list, gone.id, gone.public) && !machineListTrusts(lists.removed, gone.id, gone.public));
+  assert.ok(machineListTrusts(lists.removed, trusted.id, trusted.public) && !machineListTrusts(lists.removed, trusted.id, parties.intruder.public));
+  const rebuilt = machineListWith(machineListWith(emptyMachineList(), gone.id, gone.public), trusted.id, trusted.public);
+  assert.deepEqual(rebuilt, lists.list);
+  assert.deepEqual(machineListWithout(rebuilt, gone.id), lists.removed);
+  const { handoff } = vectors;
+  assert.equal(toB64(await accountCommitment(key, fromB64(handoff.nonce), handoff.code)), handoff.commitment);
+  for (const reveal of handoff.reveals) {
+    const matches = toB64(await accountCommitment(reveal.revealed, fromB64(handoff.nonce), reveal.machine_code)) === handoff.commitment;
+    assert.equal(matches, Boolean(reveal.expect.pinned), reveal.name);
+    if (reveal.expect.pinned) assert.deepEqual(await accountFingerprints(reveal.revealed), reveal.expect.pinned);
+  }
+});
+
+test("a board sealed to the account opens with the unwrapped account key and no device row", async () => {
+  const vectors = load("accounts.json");
+  const party = parties[vectors.account];
+  const account = await accountIdentity(vectors.key, { signing: fromB64(party.signing_secret), encryption: fromB64(party.encryption_secret) }, vectors.key.account);
+  const vector = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-the-account");
+  assert.deepEqual(await openEnvelope(vector.envelope, account, await sender("machine"), envelopes.now), vector.expect.payload);
+  assert.equal(await failure(openEnvelope(vector.envelope, await identity("phone"), await sender("machine"), envelopes.now)), "not-a-recipient");
+});
+
+test("a fresh account key is random, and its public half is what the browser reports", async () => {
+  const [first, second] = [await newAccountSecrets(parties.account.id), await newAccountSecrets(parties.account.id)];
+  assert.notDeepEqual(first.key.keys, second.key.keys);
+  const account = await accountIdentity(first.key, first.secrets, parties.account.id);
+  assert.equal(account.id, parties.account.id);
+  first.wipe();
+  assert.deepEqual([...first.secrets.signing], new Array(32).fill(0));
+});
+
+test("an account key is used only for the account the hub signed in", async () => {
+  const vectors = load("accounts.json");
+  const party = parties[vectors.account];
+  const secrets = { signing: fromB64(party.signing_secret), encryption: fromB64(party.encryption_secret) };
+  assert.equal(await failure(accountIdentity(vectors.key, secrets, "acc_AAAAAAAAAAAAAAAAAAAAAA")), "wrong-account");
+  assert.equal(await failure(accountIdentity(vectors.key, secrets)), "wrong-account");
+});
+
+test("making and checking account keys never exports a private key as JWK", async () => {
+  const subtle = globalThis.crypto.subtle;
+  const exportKey = subtle.exportKey.bind(subtle);
+  subtle.exportKey = async (format, key) => {
+    if (format === "jwk") throw new Error("a private key was exported as JWK");
+    return exportKey(format, key);
+  };
+  try {
+    const fresh = await newAccountSecrets(parties.account.id);
+    const account = await accountIdentity(fresh.key, fresh.secrets, parties.account.id);
+    assert.equal(account.key.keys.signing, fresh.key.keys.signing);
+  } finally {
+    subtle.exportKey = exportKey;
+  }
+});
+
+test("a board lives at most a day", () => {
+  const board = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-the-account").envelope;
+  checkShape({ ...board, exp: board.at + 86_400 });
+  assert.throws(() => checkShape({ ...board, exp: board.at + 86_401 }), (error) => error.code === "malformed");
 });

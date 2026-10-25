@@ -1,16 +1,19 @@
-import { arrange, findTask, followHubNames, highestRevs, isAsleep, openBoards } from "./board.js";
-import { keepDeviceName, proposedName } from "./device-name.js";
-import { addPasskey, autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText } from "./signin.js";
-import { account, deviceClient, follow, HubError } from "./hub.js";
-import { get, identity, loadAttempts, loadDevice, loadMachines, newDeviceKeys, put, recordAttempt, remove, saveDevice, saveMachines } from "./keystore.js";
-import { failureText, pair, PairingFailed } from "./pairing.js";
+import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
+import { connectText, listWithout, PairingFailed, publishList, withReauth } from "./connect.js";
+import { proposedName } from "./device-name.js";
+import { autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText, signUpWith } from "./signin.js";
+import { account, connectCalls, follow, HubError } from "./hub.js";
+import { forgetDeviceKeys, get, put } from "./store.js";
+import { addUnlockingPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { PAGES, startPage } from "./pages.js";
-import { creationOptions, registrationJSON, supported as passkeysSupported } from "./passkey.js";
+import { supported as passkeysSupported } from "./passkey.js";
 
 const root = document.getElementById("app");
 const onPage = PAGES.includes(location.pathname);
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { device: null, machines: [], opened: [], attempts: [], offline: false, fetchedAt: null, pairing: { phase: "enter" }, notice: null, byName: false, offerPasskey: false, push: null, selected: {}, hint: false };
+const state = { me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, byName: false, offerPasskey: false, selected: {}, hint: false };
+const hub = { account, credentials: globalThis.navigator?.credentials };
+const lists = { boards: account.boards, putMachines: connectCalls.putMachines };
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
@@ -59,21 +62,22 @@ function taskRow(row) {
 }
 
 const PROBLEMS = {
-  "unknown-machine": "unknown machine; connect it again",
-  "not-sealed-to-this-device": "the board is not sealed to this device yet",
+  "unknown-machine": "not confirmed by your account; connect it again",
+  "not-sealed-to-this-account": "the board is not sealed to your account yet",
   "revision-differs": "the hub's revision differs from the machine's",
   "bad-signature": "the signature does not match; not shown",
   expired: "the board is too old",
   "not-yet-valid": "this device's clock is wrong",
   "rolled-back": "older than the board you last read",
-  "not-a-recipient": "the board is not sealed to this device",
+  "rolled-back-list": "the hub served an older list of your machines than this device has seen; not shown",
+  "not-a-recipient": "the board is not sealed to your account",
   undecryptable: "does not decrypt",
 };
 const problemText = (code) => PROBLEMS[code] ?? `does not open (${code})`;
 
 function installHint() {
   if (!state.hint) return "";
-  return `<div class="hint"><div>Add kebbie to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens as its own app and can show notifications.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>`;
+  return `<div class="hint"><div>Add kebbie to your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens as its own app.</div><button type="button" class="close" data-action="dismiss-hint" aria-label="Close">×</button></div>`;
 }
 
 function freshness() {
@@ -83,10 +87,10 @@ function freshness() {
 
 function boardScreen() {
   const view = arrange(state.opened, nowSeconds());
-  const parts = [top("kebbie", esc(freshness())), installHint()];
-  if (state.machines.length === 0) {
-    parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div><a class="btn primary" href="#/pair">Pair with a code</a>`);
-  } else if (state.opened.length === 0) {
+  const parts = [top("kebbie", esc(freshness())), installHint(), passkeyOffer(), storeWarning()];
+  if (state.opened.length === 0) {
+    parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div>`);
+  } else if (!state.opened.some((machine) => machine.board || machine.problem)) {
     parts.push(`<div class="center">No connected machine has sent a board yet.</div>`);
   }
   for (const group of view.groups) {
@@ -171,57 +175,28 @@ function taskScreen([machine, address]) {
   return top(found.task, esc(found.name)) + (asks ? questionBlock(found) : cardBlock(found)) + tabbar(asks ? "questions" : "board");
 }
 
-function pushSection() {
-  const push = state.push;
-  if (!push) return "";
-  const text = {
-    "needs-home-screen": "Notifications work once kebbie is on your home screen.",
-    unsupported: "This browser can't receive notifications.",
-    denied: "Notifications are off for kebbie in your settings.",
-    on: "Notifications are on. This device decrypts them itself.",
-    off: "Get a notification when a task needs you.",
-  }[push.status];
-  const button = push.status === "off" ? `<button type="button" class="btn primary" data-action="push-on">Turn on notifications</button>` : push.status === "on" ? `<button type="button" class="btn" data-action="push-off">Turn off notifications</button>` : "";
-  const error = push.error ? `<div class="center warn">${esc(push.error)}</div>` : "";
-  return `<h3 class="sec">Notifications</h3><div class="center left">${text}</div>${button}${error}`;
+function storeWarning() {
+  return state.storeFailed ? `<div class="center warn" role="alert">This browser can't remember which boards and machines it has seen, so an older board replayed by the hub is only caught during this visit.</div>` : "";
 }
 
 function machinesScreen() {
   const now = nowSeconds();
-  const rows = state.machines.map((machine) => {
-    const opened = state.opened.find((candidate) => candidate.machine === machine.id);
-    const name = machine.name || opened?.name || machine.id.slice(-6);
-    const lastSeen = opened?.lastSeen ?? null;
-    const awake = !isAsleep({ lastSeen }, now);
-    const facts = opened?.board ? [`last heard ${when(lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened?.problem ? [problemText(opened.problem)] : ["no board yet"];
-    return `<div class="task${awake ? "" : " asleep"}"><div class="name">${esc(name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
+  const rows = state.opened.map((opened) => {
+    const awake = !isAsleep({ lastSeen: opened.lastSeen }, now);
+    const facts = opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened.problem ? [problemText(opened.problem)] : ["no board yet"];
+    const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(opened.machine)}" data-name="${esc(opened.name)}">Remove</button>`;
+    return `<div class="task${awake ? "" : " asleep"}"><div class="row"><div class="name">${esc(opened.name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div>${remove}</div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
   });
-  const attempts = state.attempts.length
-    ? `<h3 class="sec">Pairing attempts</h3><div class="plan">${state.attempts.map((attempt) => `<div class="meta">${esc(when(attempt.at))} · ${esc(attempt.outcome === "admitted" ? `paired with ${state.machines.find((known) => known.id === attempt.machine)?.name ?? attempt.name ?? attempt.machine}` : failureText(attempt.outcome))}</div>`).join("")}</div>`
-    : "";
-  const device = state.device ? `<h3 class="sec">This device</h3><div class="meta pad">${esc(state.device.name ?? "")} · ${esc(state.device.id)}</div>` : "";
-  return top("Machines", esc(`${state.machines.length} connected`)) + rows.join("") + `<a class="btn primary" href="#/pair">Pair with a code</a>` + pushSection() + attempts + device + tabbar("machines");
+  const signedIn = state.me ? `<h3 class="sec">Account</h3><div class="meta pad">${esc(state.me.handle)}</div>` : "";
+  const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
+  return top("Machines", esc(`${state.opened.length} connected`)) + storeWarning() + message + rows.join("") + signedIn + tabbar("machines");
 }
 
-function pairScreen() {
-  const pairing = state.pairing;
-  const busy = ["working", "compare", "admitting"].includes(pairing.phase);
-  const parts = [top("Pair a machine"), passkeyOffer(), `<div class="center">Run <b>kebbie hub pair</b> on your computer and type the code it shows.</div>`];
-  parts.push(`<form data-form="pair" class="stack"><label class="task field"><span class="meta">Code</span><input name="code" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="12" placeholder="XXXX-XXXX" value="${esc(pairing.typed ?? "")}" ${busy ? "disabled" : ""} required></label><button class="btn primary" ${busy ? "disabled" : ""}>Pair</button></form>`);
-  if (pairing.phase === "working") parts.push(`<div class="center">Waiting for the machine …</div>`);
-  if (["compare", "admitting", "done"].includes(pairing.phase)) {
-    parts.push(`<h3 class="sec">Compare with your terminal</h3><div class="code" aria-live="polite">${esc(pairing.digits)}</div>`);
-  }
-  if (pairing.phase === "compare") {
-    parts.push(`<div class="center"><b>Does your terminal show the same digits?</b> Answer the same here and there. If they differ, answer n there and Different here: something is between you and the machine.</div>`);
-    parts.push(`<label class="task field"><span class="meta">Name of the machine</span><input name="machine-name" id="machine-name" autocomplete="off" maxlength="64" value="${esc(pairing.hubName)}"></label>`);
-    parts.push(`<label class="task field"><span class="meta">Name of this device, as the machine lists it</span><input name="device-name" id="device-name" autocomplete="off" maxlength="64" value="${esc(pairing.deviceName)}"></label>`);
-    parts.push(`<div class="pair-answer"><button type="button" class="btn" data-action="pair-no">Different</button><button type="button" class="btn primary" data-action="pair-yes">Same digits</button></div>`);
-  }
-  if (pairing.phase === "admitting") parts.push(`<div class="center">Waiting for you to answer y in the terminal …</div>`);
-  if (pairing.phase === "done") parts.push(`<div class="center ok">Paired with ${esc(pairing.name)}. Loading the board.</div>`);
-  if (pairing.phase === "failed") parts.push(`<div class="center warn" role="alert">${esc(failureText(pairing.reason))}</div>`);
-  return parts.join("") + (state.machines.length ? tabbar("machines") : "");
+function lockedScreen() {
+  const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
+  const status = state.session?.state ?? "locked";
+  const again = status === "locked" ? "Unlock with passkey" : "Try another passkey";
+  return top("kebbie", esc(state.me?.handle ?? "")) + `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div><button type="button" class="btn primary" data-action="unlock">${again}</button>${message}`;
 }
 
 function loginScreen(signUp) {
@@ -241,13 +216,13 @@ function loginScreen(signUp) {
     : `<button type="button" class="center link" data-action="by-name">Use an account name instead</button>`;
   return (
     top("kebbie") +
-    `<div class="center">Sign in with your passkey. This device gets its own keys and reads the board itself; the hub never sees what it says.</div>
+    `<div class="center">Sign in with your passkey. It unlocks your account's key on this device, which reads the board itself; the hub never sees what it says.</div>
     <button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${message}${fallback}<a class="center link" href="/signup">No account yet? Sign up</a>`
   );
 }
 
 function unsupportedScreen() {
-  return top("kebbie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519 and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
+  return top("kebbie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519, HKDF and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
 }
 
 function render() {
@@ -255,9 +230,8 @@ function render() {
   const { name, params } = route();
   let html;
   if (!cryptoReady()) html = unsupportedScreen();
-  else if (!state.device) html = loginScreen(name === "signup");
-  else if (name === "pair") html = pairScreen();
-  else if (state.machines.length === 0) html = pairScreen();
+  else if (!state.me) html = loginScreen(name === "signup");
+  else if (state.session?.state !== "unlocked") html = lockedScreen();
   else if (name === "questions") html = questionsScreen();
   else if (name === "machines") html = machinesScreen();
   else if (name === "task") html = taskScreen(params);
@@ -268,63 +242,113 @@ function render() {
 
 let retrying = null;
 
-async function followNames(entries) {
-  const followed = followHubNames(state.machines, entries ?? []);
-  if (!followed) return;
-  state.machines = followed;
-  await saveMachines(followed);
+const marksKey = () => `marks:${state.me?.account}`;
+
+async function storedMarks() {
+  const { marks, failed } = await readMarks(get, marksKey());
+  if (failed) state.storeFailed = true;
+  return marks;
+}
+
+async function keepMarks() {
+  try {
+    await put(marksKey(), state.marks);
+  } catch {
+    state.storeFailed = true;
+  }
+}
+
+async function cachedListing() {
+  try {
+    return (await get("listing")) ?? null;
+  } catch {
+    state.storeFailed = true;
+    return null;
+  }
 }
 
 async function refresh() {
-  if (!state.device) return;
-  let boards;
+  if (state.session?.state !== "unlocked") return;
+  let listing;
   try {
-    boards = await deviceClient(state.device.token).boards();
+    listing = await account.boards();
     state.offline = false;
     state.fetchedAt = nowSeconds();
-    await put("boards", { boards: boards.boards, at: state.fetchedAt });
+    await put("listing", { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
   } catch (error) {
-    if (error instanceof HubError && error.code === "unknown-device") return forgetDevice("The hub no longer knows this device. Sign in and pair again.");
+    if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
     clearTimeout(retrying);
     retrying = setTimeout(refresh, 15_000);
     state.offline = true;
-    const cached = await get("boards");
-    if (!cached) return render();
-    boards = cached;
+    const cached = await cachedListing();
+    if (!cached?.listing) return render();
+    listing = cached.listing;
     state.fetchedAt = cached.at;
   }
-  await followNames(boards.boards);
-  const highest = (await get("revs")) ?? {};
-  state.opened = await openBoards(boards.boards, identity(state.device), state.machines, nowSeconds(), highest);
-  await put("revs", highestRevs(state.opened, highest));
+  state.marks = mergeMarks(state.marks, await storedMarks());
+  const result = await openBoards(listing, state.session.identity, nowSeconds(), state.marks);
+  state.opened = result.opened;
+  state.marks = result.marks;
+  await keepMarks();
+  if (result.gone.length && !state.offline) {
+    try {
+      const pruned = await publishList({ hub: lists, identity: state.session.identity, marks: state.marks, change: (list) => result.gone.reduce((next, machine) => listWithout(machine)(next), list) });
+      state.marks = mergeMarks(state.marks, { list: pruned.counter });
+      await keepMarks();
+      return refresh();
+    } catch (error) {
+      state.notice = error instanceof PairingFailed ? connectText(error.reason) : hubMessage(error);
+    }
+  }
   render();
 }
 
-async function forgetDevice(message) {
-  await remove("device");
-  await saveMachines([]);
-  state.device = null;
-  state.machines = [];
+async function removeMachine(machine, name) {
+  if (!confirm(`Remove ${name}? Its token stops working and your account stops trusting it.`)) return;
+  state.notice = null;
+  try {
+    const list = await publishList({ hub: lists, identity: state.session.identity, marks: state.marks, change: listWithout(machine) });
+    state.marks = mergeMarks(state.marks, { list: list.counter });
+    await keepMarks();
+    await withReauth(
+      () => connectCalls.removeMachine(machine),
+      async () => {
+        state.session = await unlockAfter(hub, await signingIn.withPasskey(rememberedCredential()));
+        state.me = state.session.me;
+      },
+    );
+  } catch (error) {
+    state.notice = error instanceof PairingFailed ? connectText(error.reason) : hubMessage(error);
+  }
+  await refresh();
+}
+
+function signedOut(message) {
+  following?.abort();
+  following = null;
+  state.me = null;
+  state.session = null;
   state.opened = [];
+  state.marks = emptyMarks();
   state.notice = message;
   go("#/login");
 }
 
 let following = null;
 function startFeed() {
-  if (!state.device || following) return;
+  if (state.session?.state !== "unlocked" || following) return;
   const controller = new AbortController();
   following = controller;
   let delay = 2000;
   const loop = async () => {
     while (!controller.signal.aborted) {
       try {
-        await follow(state.device.token, (name) => {
+        await follow((name) => {
           delay = 2000;
-          if (name === "board" || name === "machine-removed") refresh();
+          if (name === "board" || name === "machine-removed" || name === "machines") refresh();
         }, controller.signal);
       } catch (error) {
-        if (error instanceof HubError && error.code === "unknown-device") return forgetDevice("This device was removed from the hub. Sign in and pair again.");
+        if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
       }
       await new Promise((resolve) => setTimeout(resolve, delay));
       delay = Math.min(delay * 2, 60_000);
@@ -335,36 +359,33 @@ function startFeed() {
 
 const deviceName = () => proposedName(navigator.userAgent);
 
-async function becomeDevice() {
-  const keys = await newDeviceKeys();
-  const name = deviceName();
-  const registered = await account.registerDevice(name);
-  state.device = { id: registered.device, token: registered.token, name, keys, public: keys.public };
-  await saveDevice(state.device);
-  state.notice = null;
-  go("#/pair");
-}
-
 function hubMessage(error) {
   if (error instanceof HubError) return `The hub answered ${error.status} (${error.code}).`;
   if (error?.name === "NotAllowedError") return "The passkey was cancelled.";
   return error?.message ?? String(error);
 }
 
-const signingIn = signInWith({ account, credentials: navigator.credentials });
+const signingIn = signInWith(hub);
 
-async function signedIn(byName) {
+async function unlocked(ceremony, byName) {
   signingIn.stop();
   state.byName = false;
-  state.offerPasskey = byName;
-  await becomeDevice();
+  const previous = state.me?.account;
+  state.session = await unlockAfter(hub, ceremony);
+  state.me = state.session.me;
+  if (previous !== state.me.account) state.marks = emptyMarks();
+  state.offerPasskey = byName && state.session.state === "unlocked";
+  state.notice = null;
+  if (state.session.state !== "unlocked") return render();
+  go("#/board");
+  await refresh();
+  startFeed();
 }
 
 async function startAutofill() {
-  if (state.device || !(await autofillAvailable())) return;
+  if (state.me || !(await autofillAvailable())) return;
   try {
-    await signingIn.autofill();
-    await signedIn(false);
+    await unlocked(await signingIn.autofill(), false);
   } catch (error) {
     if (error?.name === "AbortError") return;
     state.notice = signInText(error);
@@ -373,16 +394,12 @@ async function startAutofill() {
 }
 
 async function signUp(form) {
-  const begun = await account.registerBegin({ invite: form.invite.value.trim(), handle: form.handle.value.trim().toLowerCase() });
-  const credential = await navigator.credentials.create(creationOptions(begun.options));
-  await account.registerFinish(begun.ceremony, registrationJSON(credential), deviceName());
-  await becomeDevice();
+  await unlocked(await signUpWith(hub, { invite: form.invite.value.trim() }, form.handle.value, deviceName()), false);
 }
 
 async function signInWithPasskey() {
   try {
-    await signingIn.withPasskey();
-    await signedIn(false);
+    await unlocked(await signingIn.withPasskey(rememberedCredential()), false);
   } catch (error) {
     if (error instanceof NoPasskeyOffered) state.byName = true;
     state.notice = signInText(error);
@@ -391,16 +408,25 @@ async function signInWithPasskey() {
   }
 }
 
+async function unlock() {
+  const remembered = state.session?.state === "locked" ? rememberedCredential() : null;
+  try {
+    await unlocked(await signingIn.withPasskey(remembered), false);
+  } catch (error) {
+    state.notice = signInText(error);
+    render();
+  }
+}
+
 async function logIn(form) {
-  await signingIn.byName(form.handle.value);
-  await signedIn(true);
+  await unlocked(await signingIn.byName(form.handle.value), true);
 }
 
 async function offerPasskey(yes) {
   state.offerPasskey = false;
   if (yes) {
     try {
-      await addPasskey({ account, credentials: navigator.credentials, name: deviceName() });
+      await addUnlockingPasskey(hub, state.session, deviceName());
     } catch (error) {
       state.notice = signUpText(error) ?? hubMessage(error);
     }
@@ -411,86 +437,6 @@ async function offerPasskey(yes) {
 const passkeyOffer = () =>
   state.offerPasskey ? `<section class="task"><div class="meta">${esc(OFFER_TEXT)}</div><div class="pair-answer"><button type="button" class="btn" data-action="passkey-later">Not now</button><button type="button" class="btn primary" data-action="passkey-add">Add passkey</button></div></section>` : "";
 
-let answerPairing = null;
-
-async function startPairing(form) {
-  const typed = form.code.value;
-  state.pairing = { phase: "working", typed };
-  render();
-  const client = deviceClient(state.device.token);
-  try {
-    const machine = await pair({
-      hub: client,
-      publicKeys: state.device.public,
-      typed,
-      confirm: (digits, offered) =>
-        new Promise((resolve) => {
-          answerPairing = (answer) => {
-            answerPairing = null;
-            state.pairing = { ...state.pairing, phase: answer.matches ? "admitting" : "working" };
-            render();
-            resolve(answer);
-          };
-          state.pairing = { phase: "compare", typed, digits, hubName: offered.hubName ?? "", deviceName: state.device.name ?? deviceName() };
-          render();
-        }),
-    });
-    const name = machine.name ?? machine.hubName ?? machine.id.slice(-6);
-    state.device = await keepDeviceName(client, state.device, state.pairing.deviceName, saveDevice).catch(() => state.device);
-    state.machines = [...state.machines.filter((known) => known.id !== machine.id), { id: machine.id, keys: machine.keys, name: machine.name, pairedAt: nowSeconds() }];
-    await saveMachines(state.machines);
-    await put("revs", { ...((await get("revs")) ?? {}), [machine.id]: 0 });
-    state.attempts = await recordAttempt({ at: nowSeconds(), machine: machine.id, name, outcome: "admitted" });
-    state.pairing = { ...state.pairing, phase: "done", name };
-    render();
-    startFeed();
-    await refresh();
-    setTimeout(() => route().name === "pair" && go("#/board"), 1500);
-  } catch (error) {
-    answerPairing = null;
-    const reason = error instanceof PairingFailed ? error.reason : error instanceof HubError ? error.code : "failed";
-    state.attempts = await recordAttempt({ at: nowSeconds(), machine: error.machine ?? null, outcome: reason });
-    state.pairing = { phase: "failed", typed, reason };
-    render();
-  }
-}
-
-async function pushStatus() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    return { status: isIos() && !isStandalone() ? "needs-home-screen" : "unsupported" };
-  }
-  if (Notification.permission === "denied") return { status: "denied" };
-  const registration = await navigator.serviceWorker.getRegistration();
-  if (!registration) return { status: "unsupported" };
-  return { status: (await registration.pushManager.getSubscription()) ? "on" : "off" };
-}
-
-async function pushOn() {
-  const client = deviceClient(state.device.token);
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    const { key } = await client.vapid();
-    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.fromBase64(key, { alphabet: "base64url" }) });
-    await client.subscribePush(subscription.toJSON());
-    state.push = { status: "on" };
-  } catch (error) {
-    state.push = { ...(await pushStatus()), error: error?.name === "NotAllowedError" ? "Notifications were not allowed." : hubMessage(error) };
-  }
-  render();
-}
-
-async function pushOff() {
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    await (await registration.pushManager.getSubscription())?.unsubscribe();
-    await deviceClient(state.device.token).unsubscribePush();
-    state.push = { status: "off" };
-  } catch (error) {
-    state.push = { ...(await pushStatus()), error: hubMessage(error) };
-  }
-  render();
-}
-
 root.addEventListener("submit", async (event) => {
   const form = event.target.closest("form[data-form]");
   if (!form) return;
@@ -498,7 +444,6 @@ root.addEventListener("submit", async (event) => {
   const button = form.querySelector("button");
   if (button) button.disabled = true;
   try {
-    if (form.dataset.form === "pair") return await startPairing(form);
     if (form.dataset.form === "login") await logIn(form).catch((error) => {
       state.notice = signInText(error);
       render();
@@ -526,9 +471,9 @@ root.addEventListener("click", (event) => {
       localStorage.setItem("kebbie-hint-dismissed", "1");
     } catch {}
     render();
-  } else if (action === "pair-yes") answerPairing?.({ matches: true, name: document.getElementById("machine-name")?.value ?? "" });
-  else if (action === "pair-no") answerPairing?.({ matches: false });
-  else if (action === "sign-in") signInWithPasskey();
+  } else if (action === "sign-in") signInWithPasskey();
+  else if (action === "unlock") unlock();
+  else if (action === "remove-machine") removeMachine(target.dataset.id, target.dataset.name);
   else if (action === "by-name") {
     state.byName = true;
     state.notice = null;
@@ -536,17 +481,9 @@ root.addEventListener("click", (event) => {
     startAutofill();
   } else if (action === "passkey-add") offerPasskey(true);
   else if (action === "passkey-later") offerPasskey(false);
-  else if (action === "push-on") pushOn();
-  else if (action === "push-off") pushOff();
-});
-
-root.addEventListener("input", (event) => {
-  if (event.target.id === "machine-name") state.pairing.hubName = event.target.value;
-  if (event.target.id === "device-name") state.pairing.deviceName = event.target.value;
 });
 
 addEventListener("hashchange", () => {
-  if (route().name === "pair" && !["working", "compare", "admitting"].includes(state.pairing.phase)) state.pairing = { phase: "enter" };
   render();
   window.scrollTo(0, 0);
 });
@@ -564,17 +501,11 @@ async function start() {
     state.hint = isIos() && !isStandalone();
   }
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { type: "module", scope: "/" }).catch(() => {});
-  state.device = (await loadDevice()) ?? null;
-  state.machines = await loadMachines();
-  // The boards cached by the last read hold the names the phone saw then, before any rename since.
-  await followNames((await get("boards"))?.boards);
-  state.attempts = await loadAttempts();
+  await forgetDeviceKeys();
+  state.me = await account.me().catch(() => null);
+  state.session = state.me ? { state: "locked", me: state.me } : null;
   render();
-  if (!state.device) return startAutofill();
-  await refresh();
-  startFeed();
-  state.push = await pushStatus().catch(() => ({ status: "unsupported" }));
-  render();
+  if (!state.me) return startAutofill();
   setInterval(() => document.visibilityState === "visible" && refresh(), 60_000);
 }
 

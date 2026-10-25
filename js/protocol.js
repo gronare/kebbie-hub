@@ -8,6 +8,15 @@ const KEY_COMMIT_DOMAIN = text.encode("kelpie-hub key commit v1");
 const PAIR_COMMIT_DOMAIN = text.encode("kelpie-pair-commit-v1");
 const SAS_DOMAIN = text.encode("kelpie-pair-v1");
 const CONNECT_DOMAIN = text.encode("kelpie-connect-machine-v1");
+const WRAP_KEY_INFO = text.encode("kebbie-hub account key v1");
+const WRAP_AD_DOMAIN = text.encode("kebbie-hub account key wrap v1");
+const WRAPPER_SIGN_DOMAIN = text.encode("kebbie-hub account key wrapper v1");
+const MACHINE_LIST_DOMAIN = text.encode("kebbie-hub account machines v1");
+const SIGNING_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account signing key v1");
+const ENCRYPTION_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account encryption key v1");
+const ACCOUNT_COMMIT_DOMAIN = text.encode("kebbie-connect-account-commit-v1");
+export const WRAP_NONCE_LEN = 12;
+const WRAPPED_LEN = WRAP_NONCE_LEN + 64 + 16;
 const PKCS8_ED25519 = Uint8Array.fromHex("302e020100300506032b657004220420");
 const PKCS8_X25519 = Uint8Array.fromHex("302e020100300506032b656e04220420");
 const NONCE_LEN = 12;
@@ -18,7 +27,7 @@ export const CLOCK_SKEW = 300;
 
 const command = { prefix: "cmd", maxTtl: DAY, command: true };
 export const KINDS = {
-  board: { prefix: "brd", maxTtl: 30 * DAY, command: false },
+  board: { prefix: "brd", maxTtl: DAY, command: false },
   notice: { prefix: "ntc", maxTtl: DAY, command: false },
   result: { prefix: "cmd", maxTtl: 7 * DAY, command: false },
   answer: command,
@@ -27,7 +36,7 @@ export const KINDS = {
   routine: command,
 };
 
-const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64})$/;
+const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
 const BASE64URL = /^[A-Za-z0-9_-]*$/;
 
 export class ProtocolError extends Error {
@@ -61,22 +70,27 @@ const concat = (...parts) => {
 const sha256 = async (...parts) => new Uint8Array(await subtle.digest("SHA-256", concat(...parts)));
 
 const u16 = (value) => new Uint8Array([value >> 8, value & 0xff]);
+const u32 = (value) => {
+  const out = new Uint8Array(4);
+  new DataView(out.buffer).setUint32(0, value);
+  return out;
+};
 const u64 = (value) => {
   const out = new Uint8Array(8);
   new DataView(out.buffer).setBigUint64(0, BigInt(value));
   return out;
 };
-const field = (value) => {
-  const bytes = text.encode(value);
+const bytesField = (bytes) => {
   if (bytes.length > 0xffff) throw new ProtocolError("malformed");
   return concat(u16(bytes.length), bytes);
 };
+const field = (value) => bytesField(text.encode(value));
 const absent = (value) => value === undefined || value === null;
 const optional = (value) => (absent(value) ? new Uint8Array([0]) : concat(new Uint8Array([1]), field(value)));
 
 const prefixOf = (id) => {
   const match = typeof id === "string" ? ID.exec(id) : null;
-  return match ? (match[1] ?? match[2] ?? match[3]) : null;
+  return match ? (match[1] ?? match[2] ?? match[3] ?? match[4]) : null;
 };
 const isTime = (value) => Number.isSafeInteger(value) && value >= 0;
 const isPlainObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -111,7 +125,7 @@ const string = (value) => typeof value === "string";
 const bool = (value) => typeof value === "boolean";
 const uint = (max) => (value) => Number.isSafeInteger(value) && value >= 0 && value <= max;
 const u8 = uint(0xff);
-const u32 = uint(0xffff_ffff);
+const u32v = uint(0xffff_ffff);
 const u64v = uint(Number.MAX_SAFE_INTEGER);
 const id = (value) => prefixOf(value) !== null;
 const oneOf = (...values) => (value) => values.includes(value);
@@ -144,9 +158,9 @@ const item = shape({
     }),
   ),
   prompt: optionalField(shape({ id: string, question: string, options: list(shape({ label: string, takes_text: bool })) })),
-  git: optionalField(shape({ upstream: string, ahead: u32, behind: u32, uncommitted: u32, approved: bool })),
+  git: optionalField(shape({ upstream: string, ahead: u32v, behind: u32v, uncommitted: u32v, approved: bool })),
   head: optionalField(string),
-  verdict: optionalField(shape({ verdict: optionalField(oneOf("ok", "changes")), findings: optionalField(u32), sha: optionalField(string), stale: bool, running: bool })),
+  verdict: optionalField(shape({ verdict: optionalField(oneOf("ok", "changes")), findings: optionalField(u32v), sha: optionalField(string), stale: bool, running: bool })),
   push_permission: optionalField(oneOf("task", "repo")),
   push_waits: optionalField(string),
   follows_main: bool,
@@ -163,10 +177,10 @@ const PAYLOADS = {
     rev: u64v,
     kelpie: string,
     away_since: optionalField(u64v),
-    checkouts: list(shape({ repo: string, free_worktrees: u32, busy_worktrees: u32 })),
+    checkouts: list(shape({ repo: string, free_worktrees: u32v, busy_worktrees: u32v })),
     routines: list(shape({ id: string, title: string, repo: string, mode: string, next_run: optionalField(u64v), last_outcome: optionalField(string) })),
     items: list(item),
-    sessions_outside_tasks: u32,
+    sessions_outside_tasks: u32v,
   }),
   notice: typed({
     event: oneOf(...EVENTS),
@@ -324,3 +338,130 @@ export function parseConnectFragment(fragment) {
   }
   return { code, fingerprint };
 }
+
+export async function accountWrapKey(prfOutput, salt) {
+  const ikm = await subtle.importKey("raw", prfOutput, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info: WRAP_KEY_INFO }, ikm, 256));
+}
+
+export const wrapAssociatedData = (account, credential, version) => concat(WRAP_AD_DOMAIN, field(account), bytesField(credential), u32(version));
+
+async function wrapCipher(unlock, usage) {
+  return subtle.importKey("raw", await accountWrapKey(unlock.prfOutput, unlock.salt), "AES-GCM", false, [usage]);
+}
+
+export async function wrapAccountSecrets(unlock, secrets, nonce = random(WRAP_NONCE_LEN)) {
+  const plaintext = concat(secrets.signing, secrets.encryption);
+  try {
+    const sealed = await subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: wrapAssociatedData(unlock.account, unlock.credential, unlock.version) }, await wrapCipher(unlock, "encrypt"), plaintext);
+    return concat(nonce, new Uint8Array(sealed));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+export async function unwrapAccountSecrets(unlock, wrapped) {
+  if (wrapped.length !== WRAPPED_LEN) throw new ProtocolError("wrong-account-key");
+  let plaintext;
+  try {
+    plaintext = new Uint8Array(await subtle.decrypt({ name: "AES-GCM", iv: wrapped.slice(0, WRAP_NONCE_LEN), additionalData: wrapAssociatedData(unlock.account, unlock.credential, unlock.version) }, await wrapCipher(unlock, "decrypt"), wrapped.slice(WRAP_NONCE_LEN)));
+  } catch {
+    throw new ProtocolError("wrong-account-key");
+  }
+  return { signing: plaintext.slice(0, 32), encryption: plaintext.slice(32), wipe: () => plaintext.fill(0) };
+}
+
+const sameBytes = (a, b) => a.length === b.length && a.every((byte, index) => byte === b[index]);
+
+async function holdsPair(signing, verifying, privateKey, publicKey) {
+  const probe = random(32);
+  const signed = await subtle.verify({ name: "Ed25519" }, verifying, await subtle.sign({ name: "Ed25519" }, signing, probe), probe);
+  const other = await subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
+  try {
+    const mine = new Uint8Array(await subtle.deriveBits({ name: "X25519", public: other.publicKey }, privateKey, 256));
+    const theirs = new Uint8Array(await subtle.deriveBits({ name: "X25519", public: publicKey }, other.privateKey, 256));
+    return signed && sameBytes(mine, theirs);
+  } catch {
+    return false;
+  }
+}
+
+export async function accountIdentity(key, secrets, account) {
+  if (typeof account !== "string" || key?.account !== account) throw new ProtocolError("wrong-account");
+  const signingPkcs8 = concat(PKCS8_ED25519, secrets.signing);
+  const encryptionPkcs8 = concat(PKCS8_X25519, secrets.encryption);
+  try {
+    const signing = await subtle.importKey("pkcs8", signingPkcs8, { name: "Ed25519" }, false, ["sign"]);
+    const privateKey = await subtle.importKey("pkcs8", encryptionPkcs8, { name: "X25519" }, false, ["deriveBits"]);
+    const publicKey = await subtle.importKey("raw", fromB64(key.keys.encryption), { name: "X25519" }, true, []);
+    const verifying = await subtle.importKey("raw", fromB64(key.keys.signing), { name: "Ed25519" }, false, ["verify"]);
+    if (!(await holdsPair(signing, verifying, privateKey, publicKey))) throw new ProtocolError("key-mismatch");
+    return { id: key.account, key: structuredClone(key), signing, verifying, encryption: { privateKey, publicKey } };
+  } finally {
+    signingPkcs8.fill(0);
+    encryptionPkcs8.fill(0);
+  }
+}
+
+async function generated(algorithm, usages, prefix) {
+  const pair = await subtle.generateKey({ name: algorithm }, true, usages);
+  const pkcs8 = new Uint8Array(await subtle.exportKey("pkcs8", pair.privateKey));
+  try {
+    if (pkcs8.length !== prefix.length + 32 || !sameBytes(pkcs8.slice(0, prefix.length), prefix)) throw new ProtocolError("malformed");
+    return { secret: pkcs8.slice(prefix.length), public: toB64(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))) };
+  } finally {
+    pkcs8.fill(0);
+  }
+}
+
+export async function newAccountSecrets(account, version = 1) {
+  const signing = await generated("Ed25519", ["sign", "verify"], PKCS8_ED25519);
+  const encryption = await generated("X25519", ["deriveBits"], PKCS8_X25519);
+  const secrets = { signing: signing.secret, encryption: encryption.secret };
+  return { secrets, key: { account, version, keys: { signing: signing.public, encryption: encryption.public } }, wipe: () => (secrets.signing.fill(0), secrets.encryption.fill(0)) };
+}
+
+const accountKeyBytes = (key) => concat(fromB64(key.keys.signing), fromB64(key.keys.encryption));
+
+export const wrapperStatement = async (key, credential, wrapped) => concat(WRAPPER_SIGN_DOMAIN, field(key.account), bytesField(credential), u32(key.version), accountKeyBytes(key), await sha256(wrapped));
+
+const canonical = (list) => list.machines.every((listed, index) => prefixOf(listed.machine) === "mch" && (index === 0 || list.machines[index - 1].machine < listed.machine));
+
+export function machineListStatement(account, list) {
+  if (!Number.isSafeInteger(list?.counter) || list.counter < 0 || !Array.isArray(list.machines) || !canonical(list)) throw new ProtocolError("malformed");
+  return concat(MACHINE_LIST_DOMAIN, field(account), u64(list.counter), u32(list.machines.length), ...list.machines.map((listed) => concat(field(listed.machine), publicBytes(listed.keys))));
+}
+
+export const emptyMachineList = () => ({ counter: 0, machines: [] });
+
+export const machineListWithout = (list, machine) => ({ counter: list.counter + 1, machines: list.machines.filter((listed) => listed.machine !== machine) });
+
+export function machineListWith(list, machine, keys) {
+  const next = machineListWithout(list, machine);
+  next.machines = [...next.machines, { machine, keys: structuredClone(keys) }].sort((a, b) => (a.machine < b.machine ? -1 : 1));
+  return next;
+}
+
+export const machineListTrusts = (list, machine, keys) => list.machines.some((listed) => listed.machine === machine && listed.keys.signing === keys?.signing && listed.keys.encryption === keys?.encryption);
+
+export async function signMachineList(identity, list) {
+  return toB64(await signStatement(identity, machineListStatement(identity.id, list)));
+}
+
+export async function verifyMachineList(identity, signed) {
+  try {
+    const bytes = fromB64(signed?.signature ?? "");
+    return bytes.length === 64 && (await subtle.verify({ name: "Ed25519" }, identity.verifying, bytes, machineListStatement(identity.id, signed.list)));
+  } catch {
+    return false;
+  }
+}
+
+export const signStatement = async (identity, statement) => new Uint8Array(await subtle.sign({ name: "Ed25519" }, identity.signing, statement));
+
+export async function accountFingerprints(key) {
+  const print = async (domain, bytes) => toB64(await sha256(domain, field(key.account), u32(key.version), bytes));
+  return { signing: await print(SIGNING_FINGERPRINT_DOMAIN, fromB64(key.keys.signing)), encryption: await print(ENCRYPTION_FINGERPRINT_DOMAIN, fromB64(key.keys.encryption)) };
+}
+
+export const accountCommitment = async (key, nonce, code) => sha256(ACCOUNT_COMMIT_DOMAIN, field(key.account), u32(key.version), accountKeyBytes(key), nonce, text.encode(code));

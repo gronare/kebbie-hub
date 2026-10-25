@@ -22,7 +22,6 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/setup", "web/index.html", HTML),
     asset!("/signup", "web/index.html", HTML),
     asset!("/connect", "web/index.html", HTML),
-    asset!("/add", "web/index.html", HTML),
     asset!("/admin", "web/index.html", HTML),
     asset!("/app.css", "web/app.css", "text/css; charset=utf-8"),
     asset!("/app.js", "web/app.js", JS),
@@ -32,10 +31,9 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/signin.js", "web/signin.js", JS),
     asset!("/pages.js", "web/pages.js", JS),
     asset!("/hub.js", "web/hub.js", JS),
-    asset!("/keystore.js", "web/keystore.js", JS),
-    asset!("/pairing.js", "web/pairing.js", JS),
     asset!("/passkey.js", "web/passkey.js", JS),
-    asset!("/notice.js", "web/notice.js", JS),
+    asset!("/store.js", "web/store.js", JS),
+    asset!("/unlock.js", "web/unlock.js", JS),
     asset!("/sw.js", "web/sw.js", JS),
     asset!(
         "/manifest.webmanifest",
@@ -103,8 +101,9 @@ mod tests {
     fn scripts_and_pages_carry_their_types() {
         assert_eq!(find("/index.html").map(|(kind, _)| kind), Some(HTML));
         assert_eq!(find("/js/protocol.js").map(|(kind, _)| kind), Some(JS));
-        assert_eq!(find("/v1/d/boards"), None);
-        for page in ["/setup", "/signup", "/connect", "/add", "/admin"] {
+        assert_eq!(find("/v1/a/boards"), None);
+        assert_eq!(find("/add"), None);
+        for page in ["/setup", "/signup", "/connect", "/admin"] {
             assert_eq!(find(page), find("/"), "{page}");
         }
     }

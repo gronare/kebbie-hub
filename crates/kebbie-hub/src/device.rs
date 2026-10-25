@@ -3,10 +3,10 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use kebbie_hub_api::{
-    BoardEntry, Boards, CommitRequest, Committed, DeviceName, PairingFailure, PairingState, PairingView,
+    CommitRequest, Committed, DeviceName, PairingFailure, PairingState, PairingView,
     RevealRequest, normalize_code,
 };
-use kebbie_hub_protocol::{Envelope, Id, Prefix};
+use kebbie_hub_protocol::{Id, Prefix};
 
 use crate::auth::{Anonymous, DEVICE_TOKEN_PREFIX, DeviceAuth, device_for, digest, new_token};
 use crate::error::ApiError;
@@ -160,29 +160,6 @@ pub async fn reveal(
     drop(store);
     hub.wake_pairing(&pairing);
     Ok(Json(view(&pairing, Side::Device, at)))
-}
-
-pub async fn boards(
-    State(hub): State<Arc<Hub>>,
-    DeviceAuth(device): DeviceAuth,
-) -> Result<Json<Boards>, ApiError> {
-    let stored = hub.store().boards_for_device(&device)?;
-    let boards = stored
-        .into_iter()
-        .map(|board| {
-            let envelope =
-                Envelope::from_json(&board.envelope).map_err(|_| ApiError::internal())?;
-            Ok(BoardEntry {
-                machine: board.machine,
-                name: board.name,
-                last_seen: board.last_seen,
-                rev: board.rev,
-                stored_at: board.stored_at,
-                envelope: envelope.for_recipient(&device),
-            })
-        })
-        .collect::<Result<Vec<_>, ApiError>>()?;
-    Ok(Json(Boards { boards }))
 }
 
 pub async fn rename(

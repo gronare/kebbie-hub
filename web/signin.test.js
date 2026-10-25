@@ -7,11 +7,15 @@ import { autofillAvailable, NoPasskeyOffered, signInText, signInWith, signUpText
 const bytes = () => new Uint8Array([1, 2, 3]).buffer;
 const assertion = { id: "AQID", rawId: bytes(), type: "public-key", response: { authenticatorData: bytes(), clientDataJSON: bytes(), signature: bytes(), userHandle: bytes() } };
 
-function fakes({ refuse = null } = {}) {
+function fakes({ refuse = null, unknown = null } = {}) {
   const begun = [];
   const asked = [];
   const account = {
-    loginBegin: async (handle) => (begun.push(handle), { ceremony: "c1", options: { publicKey: { challenge: "AAAA", rpId: "localhost", userVerification: "required" } } }),
+    loginBegin: async (request) => {
+      begun.push(request);
+      if (unknown && request.credential === unknown) throw new HubError(401, "unauthorized");
+      return { ceremony: "c1", options: { publicKey: { challenge: "AAAA", rpId: "localhost", userVerification: "required" } }, prf_salts: request.credential ? { [request.credential]: "AQID" } : {} };
+    },
     loginFinish: async (ceremony, credential) => ({ ceremony, user: credential.response.userHandle }),
   };
   const credentials = {
@@ -27,11 +31,23 @@ function fakes({ refuse = null } = {}) {
 
 test("a passkey signs in naming no account, and the authenticator is asked without a list or mediation", async () => {
   const { begun, asked, signingIn } = fakes();
-  const me = await signingIn.withPasskey();
-  assert.deepEqual(begun, [null]);
+  const { signedIn, prf } = await signingIn.withPasskey();
+  assert.deepEqual(begun, [{}]);
   assert.deepEqual(asked[0].publicKey.allowCredentials, []);
   assert.equal(asked[0].mediation, undefined);
-  assert.equal(me.user, "AQID", "the user handle goes to the hub");
+  assert.equal(asked[0].publicKey.extensions, undefined);
+  assert.equal(signedIn.user, "AQID", "the user handle goes to the hub");
+  assert.equal(prf, null);
+});
+
+test("a remembered passkey is asked for by its id with its PRF salt, and one the hub forgot falls back to any passkey", async () => {
+  const { begun, asked, signingIn } = fakes();
+  await signingIn.withPasskey("Cg");
+  assert.deepEqual(begun, [{ credential: "Cg" }]);
+  assert.deepEqual([...asked[0].publicKey.extensions.prf.evalByCredential.Cg.first], [1, 2, 3]);
+  const forgotten = fakes({ unknown: "Cg" });
+  await forgotten.signingIn.withPasskey("Cg");
+  assert.deepEqual(forgotten.begun, [{ credential: "Cg" }, {}]);
 });
 
 test("a device that offers no passkey is told to use the account name, a refusal by name talks about that account", async () => {
@@ -40,7 +56,7 @@ test("a device that offers no passkey is told to use the account name, a refusal
   assert.match(said, /account name/);
   const byName = fakes({ refuse: "NotAllowedError" });
   const error = await byName.signingIn.byName("  Carl ").catch((error) => error);
-  assert.deepEqual(byName.begun, ["carl"]);
+  assert.deepEqual(byName.begun, [{ handle: "carl" }]);
   assert.equal(error.name, "NotAllowedError");
   assert.equal(signInText(error), "No passkey for this account on this device, or it was cancelled.");
 });

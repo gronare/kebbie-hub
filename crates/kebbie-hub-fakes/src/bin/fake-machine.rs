@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kebbie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, connect, join};
 use kebbie_hub_fakes::{load, save};
@@ -12,7 +14,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 #[derive(Parser)]
 #[command(
     name = "fake-machine",
-    about = "Stands in for kebbie on a machine: joins a hub, pairs devices, posts boards, applies commands"
+    about = "Stands in for kebbie on a machine: joins a hub, pins its account, pairs devices, posts boards, applies commands"
 )]
 struct Cli {
     #[arg(
@@ -44,19 +46,12 @@ enum Command {
         #[arg(long, default_value_t = 600)]
         timeout: u64,
     },
-    #[command(
-        about = "Add a phone: print a link to open on it, then confirm the six digits both show"
-    )]
-    AddDevice {
-        #[arg(long, default_value_t = 600)]
-        timeout: u64,
-    },
     #[command(about = "Pair one device: show a code, then confirm the six digits")]
     Pair {
         #[arg(long, default_value_t = 600)]
         timeout: u64,
     },
-    #[command(about = "Seal a board JSON file to every paired device and post it")]
+    #[command(about = "Seal a board JSON file to the account the machine pinned and post it")]
     PostBoard {
         file: PathBuf,
         #[arg(long, help = "Revision to post instead of the next one")]
@@ -216,33 +211,17 @@ async fn run(cli: Cli) -> Result<(), String> {
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("connected to {hub} as {} ({})", state.machine, state.name);
             if let Some(pairing) = pairing {
-                let device = state
+                let pinned = state
                     .finish_connect(&pairing, &secret, timeout)
                     .await
                     .map_err(|e| text(&e))?;
                 save(&cli.state, &state).map_err(|e| text(&e))?;
-                println!("paired the browser {device}; it receives the next board");
+                println!(
+                    "pinned the account's keys (signing {}, encryption {}); the next board is sealed to the account",
+                    URL_SAFE_NO_PAD.encode(pinned.signing),
+                    URL_SAFE_NO_PAD.encode(pinned.encryption)
+                );
             }
-        }
-        Command::AddDevice { timeout } => {
-            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
-            let outcome = state
-                .add_device(
-                    Duration::from_secs(timeout),
-                    |added| {
-                        println!(
-                            "Open this on the phone (or scan it as a QR code):\n\n    {}\n",
-                            added.url
-                        )
-                    },
-                    async |digits: String| {
-                        ask(&format!("Does the phone show {digits}? [y/N] ")).await
-                    },
-                )
-                .await;
-            save(&cli.state, &state).map_err(|e| text(&e))?;
-            let device = outcome.map_err(|e| text(&e))?;
-            println!("added {device}; it receives the next board");
         }
         Command::Pair { timeout } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
@@ -257,7 +236,7 @@ async fn run(cli: Cli) -> Result<(), String> {
                 .await;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             let device = outcome.map_err(|e| text(&e))?;
-            println!("paired {device}; it receives the next board");
+            println!("paired {device}; its commands are trusted");
         }
         Command::PostBoard { file, rev } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

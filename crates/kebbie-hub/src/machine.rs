@@ -101,9 +101,11 @@ pub async fn put_board(
         None,
         Some(&format!("rev={} bytes={}", upload.rev, text.len())),
     )?;
-    let readers = store.admitted_devices(&machine)?;
+    let owner = store.machine_owner(&machine)?;
     drop(store);
-    hub.wake_devices(&readers);
+    if let Some(owner) = owner {
+        hub.wake_account(&owner);
+    }
     Ok(Json(BoardStored { rev: upload.rev }))
 }
 
@@ -255,6 +257,12 @@ pub async fn admit(
         &id,
         PairingState::Revealed,
         |store, pairing| {
+            let at = now();
+            if let Some(account) = &pairing.account {
+                store.log(at, "account.pinned", Some(&machine), None, Some(account))?;
+                pairing.state = PairingState::Admitted;
+                return Ok(());
+            }
             let device = pairing
                 .device
                 .clone()
@@ -262,7 +270,6 @@ pub async fn admit(
             let keys = pairing
                 .device_keys
                 .ok_or_else(|| ApiError::conflict("wrong-state"))?;
-            let at = now();
             store.fix_device_keys(&device, &keys)?;
             store.admit(&machine, &device, at)?;
             store.log(at, "pairing.admitted", Some(&machine), Some(&device), None)?;

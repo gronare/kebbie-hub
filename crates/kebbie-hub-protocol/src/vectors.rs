@@ -6,6 +6,12 @@ use ed25519_dalek::{Signer, SigningKey};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::account::{
+    ACCOUNT_COMMIT_DOMAIN, AccountHandoff, AccountKey, ENCRYPTION_FINGERPRINT_DOMAIN,
+    MACHINE_LIST_DOMAIN, MachineList, SIGNING_FINGERPRINT_DOMAIN, Unlock, WRAP_AD_DOMAIN,
+    WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPER_SIGN_DOMAIN, pin_account, sign_wrapper,
+    wrap_associated_data, wrap_key as account_wrap_key, wrapper_statement,
+};
 use crate::authorize::{AppliedCommands, Machine, Refusal, Role, TrustedDevice, authorize};
 use crate::board::{
     Agent, AgentStatus, Board, Checkout, Git, Group, Item, Question, QuestionOption, Report,
@@ -38,12 +44,16 @@ struct Party {
 
 impl Party {
     fn new(name: &'static str, prefix: Prefix) -> Party {
-        let id = Id::ulid(
-            prefix,
-            AT * 1_000,
-            seed(&format!("{name}/id"))[..10].try_into().unwrap(),
-        )
-        .unwrap();
+        let id = if prefix == Prefix::Account {
+            Id::account(seed(&format!("{name}/id"))[..16].try_into().unwrap())
+        } else {
+            Id::ulid(
+                prefix,
+                AT * 1_000,
+                seed(&format!("{name}/id"))[..10].try_into().unwrap(),
+            )
+            .unwrap()
+        };
         let (signing, encryption) = SecretKeys::from_bytes(
             seed(&format!("{name}/sign")),
             seed(&format!("{name}/encrypt")),
@@ -72,6 +82,7 @@ struct Parties {
     phone: Party,
     tablet: Party,
     intruder: Party,
+    account: Party,
 }
 
 impl Parties {
@@ -82,16 +93,18 @@ impl Parties {
             phone: Party::new("phone", Prefix::Device),
             tablet: Party::new("tablet", Prefix::Device),
             intruder: Party::new("intruder", Prefix::Device),
+            account: Party::new("account", Prefix::Account),
         }
     }
 
-    fn all(&self) -> [&Party; 5] {
+    fn all(&self) -> [&Party; 6] {
         [
             &self.machine,
             &self.other_machine,
             &self.phone,
             &self.tablet,
             &self.intruder,
+            &self.account,
         ]
     }
 
@@ -386,6 +399,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         tablet,
         intruder,
         other_machine,
+        ..
     } = parties;
     let mut cases = Vec::new();
 
@@ -416,6 +430,41 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         machine,
         board(),
+    ));
+
+    let account = &parties.account;
+    let account_board = seal_case(
+        "account-board",
+        machine_header("account-board", Kind::Board, machine),
+        &board(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens(
+        "board-opened-by-the-account",
+        &account_board,
+        account,
+        machine,
+        board(),
+    ));
+    cases.push(fails(
+        "board-for-the-account-is-not-a-device-row",
+        account_board.envelope.clone(),
+        phone,
+        machine,
+        OpenError::NotARecipient,
+        Some(OpenError::NotARecipient),
+    ));
+    let mut moved_account = account_board.envelope.clone();
+    let account_row = moved_account.keys.remove(&account.id).unwrap();
+    moved_account.keys.insert(phone.id.clone(), account_row);
+    cases.push(fails(
+        "account-row-moved-to-a-device-does-not-open",
+        moved_account,
+        phone,
+        machine,
+        OpenError::Undecryptable,
+        Some(OpenError::Undecryptable),
     ));
 
     let answer_sealed = seal_case(
@@ -900,6 +949,7 @@ fn authorize_json(parties: &Parties) -> Value {
         tablet,
         intruder,
         other_machine,
+        ..
     } = parties;
     let trusted = parties.trusted();
     let all = vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine];
@@ -1229,6 +1279,7 @@ fn pairing_json(parties: &Parties) -> Value {
         tablet,
         intruder,
         other_machine,
+        ..
     } = parties;
     let flow = |name, machine, device, code| PairingCase {
         name,
@@ -1392,6 +1443,120 @@ fn reports_json() -> Value {
     })
 }
 
+fn accounts_json(parties: &Parties) -> Value {
+    let account = &parties.account;
+    let machine = &parties.machine;
+    let version = 1;
+    let key = AccountKey::new(account.id.clone(), version, account.public()).unwrap();
+    let credential = seed("account/credential")[..20].to_vec();
+    let salt = seed("account/salt");
+    let prf_output = seed("account/prf");
+    let nonce: [u8; WRAP_NONCE_LEN] = seed("account/wrap-nonce")[..WRAP_NONCE_LEN].try_into().unwrap();
+    let unlock = Unlock {
+        account: &account.id,
+        credential: &credential,
+        version,
+        prf_output: &prf_output,
+        salt: &salt,
+    };
+    let wrapped = unlock.wrap_with_nonce(&account.keys, nonce).unwrap();
+    assert_eq!(unlock.unwrap(&wrapped).unwrap().public(), account.public());
+    let other_credential = seed("account/other-credential")[..20].to_vec();
+    let other_salt = seed("account/other-salt");
+    let other_prf = seed("account/other-prf");
+    let intruder_account = Id::account(seed("account/intruder")[..16].try_into().unwrap());
+    let refusals: Vec<Value> = [
+        ("another-prf-output", Unlock { prf_output: &other_prf, ..unlock }),
+        ("another-salt", Unlock { salt: &other_salt, ..unlock }),
+        ("another-credential", Unlock { credential: &other_credential, ..unlock }),
+        ("another-account", Unlock { account: &intruder_account, ..unlock }),
+        ("another-key-version", Unlock { version: 2, ..unlock }),
+    ]
+    .into_iter()
+    .map(|(name, changed)| {
+        assert!(changed.unwrap(&wrapped).is_err(), "{name}");
+        json!({
+            "name": name,
+            "account": changed.account,
+            "credential": b64(changed.credential),
+            "key_version": changed.version,
+            "prf_output": b64(changed.prf_output),
+            "salt": b64(changed.salt),
+            "expect": "wrong-account-key",
+        })
+    })
+    .collect();
+    let fingerprints = key.fingerprints();
+    let wrapper_signature = sign_wrapper(&account.keys, &key, &credential, &wrapped).unwrap();
+    let list = MachineList::default()
+        .with(parties.other_machine.id.clone(), parties.other_machine.public())
+        .with(machine.id.clone(), machine.public());
+    let list_signature = list.sign(&account.keys, &account.id).unwrap();
+    let removed = list.without(&parties.other_machine.id);
+    let removed_signature = removed.sign(&account.keys, &account.id).unwrap();
+    let connect = ConnectSecret::with_secret(&machine.public(), seed("connect/secret"));
+    let code = connect.pairing_code();
+    let handoff_nonce = seed("account/handoff-nonce");
+    let handoff = AccountHandoff::with_nonce(key.clone(), handoff_nonce, &code);
+    let commitment = handoff.commitment();
+    let swapped = AccountKey::new(account.id.clone(), version, parties.intruder.public()).unwrap();
+    let reveals: Vec<Value> = [
+        ("pins-the-committed-keys", &key, code.as_str()),
+        ("swapped-keys-are-refused", &swapped, code.as_str()),
+        ("another-code-is-refused", &key, "guessed-code"),
+    ]
+    .into_iter()
+    .map(|(name, revealed, machine_code)| {
+        let expect = match pin_account(&commitment, revealed, &handoff_nonce, machine_code) {
+            Ok(pinned) => json!({ "pinned": pinned }),
+            Err(_) => json!({ "error": "commitment-mismatch" }),
+        };
+        json!({ "name": name, "revealed": revealed, "machine_code": machine_code, "expect": expect })
+    })
+    .collect();
+    json!({
+        "wrap_key_info": String::from_utf8_lossy(WRAP_KEY_INFO),
+        "wrap_ad_domain": String::from_utf8_lossy(WRAP_AD_DOMAIN),
+        "wrapper_sign_domain": String::from_utf8_lossy(WRAPPER_SIGN_DOMAIN),
+        "machine_list_domain": String::from_utf8_lossy(MACHINE_LIST_DOMAIN),
+        "signing_fingerprint_domain": String::from_utf8_lossy(SIGNING_FINGERPRINT_DOMAIN),
+        "encryption_fingerprint_domain": String::from_utf8_lossy(ENCRYPTION_FINGERPRINT_DOMAIN),
+        "commit_domain": String::from_utf8_lossy(ACCOUNT_COMMIT_DOMAIN),
+        "account": account.name,
+        "key": key,
+        "wrap": {
+            "credential": b64(&credential),
+            "salt": b64(&salt),
+            "prf_output": b64(&prf_output),
+            "wrap_key": b64(&account_wrap_key(&prf_output, &salt)),
+            "associated_data": b64(&wrap_associated_data(&account.id, &credential, version).unwrap()),
+            "nonce": b64(&nonce),
+            "wrapped": b64(&wrapped),
+            "refusals": refusals,
+        },
+        "fingerprints": fingerprints,
+        "wrapper": {
+            "statement": b64(&wrapper_statement(&key, &credential, &wrapped).unwrap()),
+            "signature": b64(&wrapper_signature),
+        },
+        "machines": {
+            "list": list,
+            "statement": b64(&list.statement(&account.id).unwrap()),
+            "signature": b64(&list_signature),
+            "removed": removed,
+            "removed_signature": b64(&removed_signature),
+            "trusted": machine.name,
+            "removed_machine": parties.other_machine.name,
+        },
+        "handoff": {
+            "code": code,
+            "nonce": b64(&handoff_nonce),
+            "commitment": b64(&commitment),
+            "reveals": reveals,
+        },
+    })
+}
+
 fn keys_json(parties: &Parties) -> Value {
     let all: BTreeMap<&str, Value> = parties
         .all()
@@ -1410,6 +1575,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("signatures.json", signatures_json(&parties)),
         ("pairing.json", pairing_json(&parties)),
         ("reports.json", reports_json()),
+        ("accounts.json", accounts_json(&parties)),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

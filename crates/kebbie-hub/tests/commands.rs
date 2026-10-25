@@ -289,12 +289,7 @@ async fn an_expired_command_is_refused_by_the_hub_or_by_the_machine() {
 async fn a_push_of_a_head_that_moved_is_refused_head_moved() {
     let test = start_hub(|_| {}).await;
     let (mut machine, phone) = paired(&test).await;
-    let boards = phone.boards().await.unwrap();
-    let seen = boards[0].board.as_ref().unwrap().items[0]
-        .head
-        .clone()
-        .unwrap();
-    assert_eq!(seen, HEAD);
+    let seen = HEAD.to_string();
 
     let mut moved = board(MARKER);
     moved.items[0].head = Some(MOVED_HEAD.to_string());

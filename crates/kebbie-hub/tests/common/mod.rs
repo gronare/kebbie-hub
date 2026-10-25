@@ -242,6 +242,7 @@ impl Person {
                 "/v1/a/login/begin",
                 &LoginBegin {
                     handle: Some(self.handle.clone()),
+                    credential: None,
                 },
             )
             .await,
@@ -250,7 +251,7 @@ impl Person {
     }
 
     pub async fn begin_discoverable_log_in(&self) -> RequestCeremony {
-        body(self.post("/v1/a/login/begin", &LoginBegin { handle: None }).await).await
+        body(self.post("/v1/a/login/begin", &LoginBegin::default()).await).await
     }
 
     pub async fn finish_log_in(&mut self, ceremony: RequestCeremony) -> Response {
@@ -386,6 +387,17 @@ impl EventStream {
         if let Some(last_event) = last_event {
             request = request.header("last-event-id", last_event.to_string());
         }
+        EventStream::opened(request).await
+    }
+
+    pub async fn of_account(person: &Browser) -> EventStream {
+        let request = reqwest::Client::new()
+            .get(format!("{}/v1/a/events", person.hub))
+            .header("cookie", person.cookie.clone().expect("signed in"));
+        EventStream::opened(request).await
+    }
+
+    async fn opened(request: RequestBuilder) -> EventStream {
         let response = request.send().await.unwrap();
         assert_eq!(response.status(), 200);
         assert_eq!(
@@ -469,6 +481,20 @@ pub async fn connected(test: &TestHub, person: &mut Browser) -> MachineState {
         .await
         .unwrap();
     pending.wait(WAIT).await.unwrap().0
+}
+
+pub async fn connected_with_board(test: &TestHub, person: &mut Browser) -> MachineState {
+    let pending = connect(&test.url, "mac").await.unwrap();
+    let approval = person.approve_connect(&pending.link(), true).await.unwrap();
+    let (mut machine, pairing, secret) = pending.wait(WAIT).await.unwrap();
+    let pairing = pairing.expect("the approval opened a handoff");
+    let (pinned, confirmed) = tokio::join!(
+        machine.finish_connect(&pairing, &secret, WAIT),
+        person.hand_off(approval, WAIT)
+    );
+    pinned.unwrap();
+    assert_eq!(confirmed.unwrap(), machine.machine);
+    machine
 }
 
 pub fn hub_code(error: HubError) -> (u16, String) {

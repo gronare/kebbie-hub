@@ -1,10 +1,13 @@
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const ACCOUNT_BODY_CHARS: usize = 22;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Prefix {
@@ -15,10 +18,11 @@ pub enum Prefix {
     Board,
     Alert,
     Blob,
+    Account,
 }
 
 impl Prefix {
-    const ALL: [Prefix; 7] = [
+    const ALL: [Prefix; 8] = [
         Prefix::Machine,
         Prefix::Device,
         Prefix::Command,
@@ -26,6 +30,7 @@ impl Prefix {
         Prefix::Board,
         Prefix::Alert,
         Prefix::Blob,
+        Prefix::Account,
     ];
 
     pub fn tag(self) -> &'static str {
@@ -37,6 +42,7 @@ impl Prefix {
             Prefix::Board => "brd",
             Prefix::Alert => "alr",
             Prefix::Blob => "blb",
+            Prefix::Account => "acc",
         }
     }
 
@@ -48,6 +54,12 @@ impl Prefix {
                     && body
                         .bytes()
                         .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+            }
+            Prefix::Account => {
+                body.len() == ACCOUNT_BODY_CHARS
+                    && body
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
             }
             _ => is_ulid(body),
         }
@@ -128,6 +140,10 @@ impl Id {
         ))
     }
 
+    pub fn account(random: [u8; 16]) -> Id {
+        Id(format!("acc_{}", URL_SAFE_NO_PAD.encode(random)))
+    }
+
     pub fn blob(ciphertext: &[u8]) -> Id {
         let hex: String = Sha256::digest(ciphertext)
             .iter()
@@ -145,6 +161,11 @@ impl Id {
         getrandom::fill(&mut random).expect("the system random source failed");
         match prefix {
             Prefix::Command => Ok(Id::command(millis, random)),
+            Prefix::Account => {
+                let mut bytes = [0u8; 16];
+                getrandom::fill(&mut bytes).expect("the system random source failed");
+                Ok(Id::account(bytes))
+            }
             _ => Id::ulid(prefix, millis, random),
         }
     }
@@ -215,6 +236,16 @@ mod tests {
         ] {
             assert!(Id::parse(text).is_err(), "{text}");
         }
+    }
+
+    #[test]
+    fn account_ids_are_sixteen_random_bytes_in_base64url() {
+        let id = Id::account([0xFB; 16]);
+        assert_eq!(id.as_str(), "acc_-_v7-_v7-_v7-_v7-_v7-w");
+        assert_eq!(Id::parse(id.as_str()), Ok(id.clone()));
+        assert_eq!(id.prefix(), Prefix::Account);
+        assert!(Id::parse("acc_short").is_err());
+        assert_eq!(Id::new(Prefix::Account).unwrap().prefix(), Prefix::Account);
     }
 
     #[test]

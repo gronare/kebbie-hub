@@ -45,6 +45,10 @@ pub fn device_key(device: &Id) -> String {
     format!("device:{device}")
 }
 
+pub fn account_key(account: &str) -> String {
+    format!("account:{account}")
+}
+
 pub fn pairing_key(pairing: &str) -> String {
     format!("pairing:{pairing}")
 }

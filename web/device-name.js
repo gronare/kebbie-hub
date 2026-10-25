@@ -26,12 +26,3 @@ export function proposedName(userAgent = "") {
   if (system && browser) return `${browser} on ${system}`;
   return system ?? browser ?? "Browser";
 }
-
-export async function keepDeviceName(client, device, typed, save) {
-  const name = typed?.trim();
-  if (!name || name === device.name) return device;
-  const renamed = await client.rename(name);
-  const kept = { ...device, name: renamed.name };
-  await save(kept);
-  return kept;
-}

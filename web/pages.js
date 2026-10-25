@@ -1,12 +1,13 @@
-import { CONNECT_TEXT, connectCommitment, connectText, finishConnect, parseConnectFragment, planLine, safeNext, withReauth } from "./connect.js";
-import { keepDeviceName, proposedName } from "./device-name.js";
-import { addPasskey, autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText } from "./signin.js";
-import { account, admin, connectCalls, deviceClient, HubError } from "./hub.js";
-import { get, loadDevice, loadMachines, newDeviceKeys, put, saveDevice, saveMachines } from "./keystore.js";
-import { failureText, pair, PairingFailed } from "./pairing.js";
-import { creationOptions, registrationJSON, supported as passkeysSupported } from "./passkey.js";
+import { CONNECT_TEXT, connectBlock, connectCommitment, connectText, finishConnect, forgetFragment, keptFragment, PairingFailed, planLine, safeNext, withReauth } from "./connect.js";
+import { emptyMarks, mergeMarks } from "./board.js";
+import { proposedName } from "./device-name.js";
+import { autofillAvailable, NoPasskeyOffered, OFFER_TEXT, signInText, signInWith, signUpText, signUpWith } from "./signin.js";
+import { account, admin, connectCalls, HubError } from "./hub.js";
+import { put, get } from "./store.js";
+import { addUnlockingPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "./unlock.js";
+import { supported as passkeysSupported } from "./passkey.js";
 
-export const PAGES = ["/setup", "/signup", "/connect", "/add", "/admin"];
+export const PAGES = ["/setup", "/signup", "/connect", "/admin"];
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const top = (title, aside = "") => `<header class="top"><b>${esc(title)}</b><span>${esc(aside)}</span></header>`;
@@ -25,7 +26,7 @@ const ERRORS = {
 };
 
 function message(error) {
-  if (error instanceof PairingFailed) return CONNECT_TEXT[error.reason] ? connectText(error.reason) : failureText(error.reason);
+  if (error instanceof PairingFailed) return connectText(error.reason);
   if (error instanceof HubError) return ERRORS[error.code] ?? `The hub answered ${error.status} (${error.code}).`;
   if (error?.name === "NotAllowedError") return "The passkey was cancelled.";
   return error?.message ?? String(error);
@@ -33,9 +34,17 @@ function message(error) {
 
 export function startPage(root) {
   const params = new URLSearchParams(location.search);
-  const fragment = parseConnectFragment(location.hash);
+  const sessionStore = (() => {
+    try {
+      return globalThis.sessionStorage ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  const fragment = location.pathname === "/connect" ? keptFragment(sessionStore, params.get("code") ?? "", location.hash) : null;
   if (location.hash && location.pathname === "/connect") history.replaceState(null, "", location.pathname + location.search);
-  const state = { info: null, me: null, notice: null, busy: false, phase: "start", view: null, tab: "overview", byName: false, offerPasskey: false };
+  const state = { info: null, me: null, session: null, notice: null, busy: false, phase: "start", view: null, tab: "overview", byName: false, offerPasskey: false };
+  const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const here = () => location.pathname + location.search;
 
@@ -49,11 +58,20 @@ export function startPage(root) {
     draw();
   };
 
-  const signingIn = signInWith({ account, credentials: navigator.credentials });
+  const signingIn = signInWith(hub);
 
-  async function signedIn(me, byName) {
+  async function settle(ceremony) {
+    if (path === "/admin") {
+      const { unlock, ...me } = ceremony.signedIn;
+      return { state: "locked", me };
+    }
+    return unlockAfter(hub, ceremony);
+  }
+
+  async function signedIn(ceremony, byName) {
     signingIn.stop();
-    state.me = me;
+    state.session = await settle(ceremony);
+    state.me = state.session.me;
     state.byName = false;
     state.offerPasskey = byName;
     state.notice = null;
@@ -81,30 +99,29 @@ export function startPage(root) {
   }
 
   async function signUp(ticket, handle) {
-    const begun = await account.registerBegin({ ...ticket, handle: handle.trim().toLowerCase() });
-    const credential = await navigator.credentials.create(creationOptions(begun.options));
-    state.me = await account.registerFinish(begun.ceremony, registrationJSON(credential), deviceName());
+    state.session = await unlockAfter(hub, await signUpWith(hub, ticket, handle, deviceName()));
+    state.me = state.session.me;
   }
 
   const reauth = async () => {
-    state.me = await signingIn.byName(state.me.handle);
+    state.session = await settle(await signingIn.byName(state.me.handle));
+    state.me = state.session.me;
   };
 
-  async function thisDevice() {
-    const known = await loadDevice();
-    if (known) return known;
-    const keys = await newDeviceKeys();
-    const name = deviceName();
-    const registered = await account.registerDevice(name);
-    const device = { id: registered.device, token: registered.token, name, keys, public: keys.public };
-    await saveDevice(device);
-    return device;
+  const marksKey = () => `marks:${state.me?.account}`;
+
+  async function storedMarks() {
+    try {
+      return (await get(marksKey())) ?? emptyMarks();
+    } catch {
+      return emptyMarks();
+    }
   }
 
-  async function keepMachine(machine) {
-    const machines = (await loadMachines()).filter((known) => known.id !== machine.id);
-    await saveMachines([...machines, { id: machine.id, keys: machine.keys, name: machine.name ?? null, pairedAt: Math.floor(Date.now() / 1000) }]);
-    await put("revs", { ...((await get("revs")) ?? {}), [machine.id]: 0 });
+  async function keepCounter(counter) {
+    try {
+      await put(marksKey(), mergeMarks(await storedMarks(), { list: counter }));
+    } catch {}
   }
 
   const signInForm = (purpose) => {
@@ -153,40 +170,25 @@ export function startPage(root) {
     const code = params.get("code") ?? "";
     const parts = [top("Connect a machine")];
     if (!passkeysSupported()) return parts.join("") + say("This browser cannot sign in with a passkey.");
-    if (!state.me) return parts.join("") + signInForm("Sign in to connect this machine.");
+    if (!state.me || (fragment && !state.session)) return parts.join("") + signInForm("Sign in to connect this machine.");
     parts.push(say(`You're signed in as <b>${esc(state.me.handle)}</b>.`));
-    if (state.phase === "connected") return parts.join("") + say(`Connected. kebbie on ${esc(state.view.name)} reaches this hub now. You can close this tab.`, "ok");
-    if (state.phase === "pairing") return parts.join("") + say(`Connected. Opening ${esc(state.view.name)}'s board in this browser …`, "ok");
+    if (state.phase === "connected") return parts.join("") + say(`Connected. kebbie on ${esc(state.view.name)} reaches this hub now, but its board can't be read until you connect it from the link kebbie opens on that computer, on a device that unlocks your account.`, "ok");
+    if (state.phase === "pairing") return parts.join("") + say(`Connected. Handing ${esc(state.view.name)} your account's key …`, "ok");
     if (state.phase === "paired") return parts.join("") + say("Done. Opening the board …", "ok");
     if (state.phase === "cancelled") return parts.join("") + say("Cancelled. The terminal shows it too.");
     if (!state.view) return parts.join("") + notice() + planBlock();
-    const board = fragment ? `<label class="task check"><input type="checkbox" id="show-board" checked> <span>Also show its board in this browser</span></label>` : "";
+    const blocked = connectBlock({ fragment, session: state.session });
+    const locked = blocked ? say(`${esc(STATE_TEXT[blocked] ?? STATE_TEXT.locked)} This link hands the machine your account's key, so it waits until this device unlocks it.`, "warn") : "";
+    const typed = fragment ? "" : say("You typed the code, so this page can't check which machine it is. It connects the machine, and its board stays unreadable until you connect it from the link kebbie opens.");
     return (
       parts.join("") +
       `<section class="task"><div class="name">Connect ${esc(state.view.name)}?</div><div class="meta">Check that your terminal shows this code:</div><div class="code" aria-live="polite">${esc(state.view.code || code)}</div></section>` +
-      board +
+      typed +
+      locked +
       planBlock() +
-      `<div class="pair-answer"><button type="button" class="btn" data-action="cancel" ${state.busy ? "disabled" : ""}>Cancel</button><button type="button" class="btn primary" data-action="connect" ${state.busy ? "disabled" : ""}>Connect</button></div>` +
+      `<div class="pair-answer"><button type="button" class="btn" data-action="cancel" ${state.busy ? "disabled" : ""}>Cancel</button><button type="button" class="btn primary" data-action="connect" ${state.busy || blocked ? "disabled" : ""}>Connect</button></div>` +
       notice()
     );
-  }
-
-  function addPage() {
-    const parts = [top("Add this phone")];
-    if (!passkeysSupported()) return parts.join("") + say("This browser cannot sign in with a passkey.");
-    if (!state.me) return parts.join("") + signInForm("Sign in to add this phone to your machine.");
-    if (state.phase === "done") return parts.join("") + say(`Added to ${esc(state.view.name)}. Opening the board …`, "ok");
-    if (state.phase === "compare") {
-      return (
-        parts.join("") +
-        `<section class="task"><div class="name">Check that your terminal shows:</div><div class="code" aria-live="polite">${esc(state.digits)}</div><div class="meta">Same digits on both? Answer y in the terminal and tap Same here. Different digits mean someone is in between: answer n there and tap Different.</div></section>` +
-        `<label class="task field"><span class="meta">Name of this device, as the machine lists it</span><input name="device-name" id="device-name" autocomplete="off" maxlength="64" value="${esc(state.deviceName ?? "")}"></label>` +
-        `<div class="pair-answer"><button type="button" class="btn" data-action="different">Different</button><button type="button" class="btn primary" data-action="same">Same digits</button></div>`
-      );
-    }
-    if (state.phase === "waiting") return parts.join("") + say("Waiting for the terminal …");
-    if (!state.view) return parts.join("") + notice();
-    return parts.join("") + `<section class="task"><div class="name">Add this phone to ${esc(state.view.name)}?</div><div class="meta">You're signed in as ${esc(state.me.handle)}. The phone gets its own keys and reads the board itself.</div></section><button type="button" class="btn primary" data-action="add" ${state.busy ? "disabled" : ""}>Add phone</button>` + notice();
   }
 
   const TABS = [
@@ -243,16 +245,15 @@ export function startPage(root) {
   }
 
   function draw() {
-    const html = { "/setup": setupPage, "/signup": signupPage, "/connect": connectPage, "/add": addPage, "/admin": adminPage }[path]();
+    const html = { "/setup": setupPage, "/signup": signupPage, "/connect": connectPage, "/admin": adminPage }[path]();
     render(html);
-    document.title = `${{ "/setup": "Set up", "/signup": "Sign up", "/connect": "Connect", "/add": "Add phone", "/admin": "Admin" }[path]} · kebbie`;
+    document.title = `${{ "/setup": "Set up", "/signup": "Sign up", "/connect": "Connect", "/admin": "Admin" }[path]} · kebbie`;
   }
 
   async function loadView() {
     state.notice = null;
     try {
       if (path === "/connect" && state.me) state.view = await connectCalls.view(params.get("code") ?? "");
-      if (path === "/add" && state.me) state.view = await connectCalls.addView(params.get("code") ?? "");
       if (path === "/signup" && params.get("verify")) state.view = await account.verification(params.get("verify"));
       if (path === "/admin" && state.me?.owner) await loadAdmin();
     } catch (error) {
@@ -277,24 +278,25 @@ export function startPage(root) {
     state.busy = true;
     state.notice = null;
     draw();
-    const showBoard = Boolean(fragment) && document.getElementById("show-board")?.checked;
+    if (connectBlock({ fragment, session: state.session })) {
+      state.busy = false;
+      return draw();
+    }
+    const handsOver = Boolean(fragment) && state.session?.state === "unlocked";
     try {
-      let device = null;
-      let sealed = null;
-      if (showBoard) {
-        device = await thisDevice();
-        sealed = await connectCommitment(device.public, fragment);
-      }
-      const approved = await withReauth(() => connectCalls.approve({ code: params.get("code"), device: device?.id ?? null, commitment: sealed?.commitment ?? null }), reauth);
+      const sealed = handsOver ? await connectCommitment(state.session.identity.key, fragment) : null;
+      const approved = await withReauth(() => connectCalls.approve({ code: params.get("code"), commitment: sealed?.commitment ?? null }), reauth);
       state.view = { ...state.view, name: approved.name };
-      if (!approved.pairing) {
+      forgetFragment(sessionStore, params.get("code") ?? "");
+      if (!approved.pairing || !sealed) {
         state.phase = "connected";
         return draw();
       }
       state.phase = "pairing";
       draw();
-      const machine = await finishConnect({ hub: deviceClient(device.token), pairing: approved.pairing, publicKeys: device.public, fragment, nonce: sealed.nonce });
-      await keepMachine({ ...machine, name: null });
+      const machine = await finishConnect({ hub: connectCalls, pairing: approved.pairing, identity: state.session.identity, fragment, nonce: sealed.nonce, marks: await storedMarks() });
+      await keepCounter(machine.counter);
+      forgetFragment(sessionStore, params.get("code") ?? "");
       state.phase = "paired";
       draw();
       setTimeout(() => location.assign("/#/board"), 800);
@@ -304,48 +306,6 @@ export function startPage(root) {
       fail(error);
     }
   }
-
-  let answer = null;
-
-  async function addPhone() {
-    state.busy = true;
-    state.notice = null;
-    draw();
-    try {
-      const device = await thisDevice();
-      state.deviceName = device.name ?? deviceName();
-      const machine = await pair({
-        hub: deviceClient(device.token),
-        publicKeys: device.public,
-        typed: params.get("code") ?? "",
-        confirm: (digits) =>
-          new Promise((resolve) => {
-            answer = (matches) => {
-              answer = null;
-              state.phase = "waiting";
-              draw();
-              resolve({ matches });
-            };
-            state.phase = "compare";
-            state.digits = digits;
-            draw();
-          }),
-      });
-      await keepMachine(machine);
-      await keepDeviceName(deviceClient(device.token), device, state.deviceName, saveDevice).catch(() => device);
-      state.phase = "done";
-      draw();
-      setTimeout(() => location.assign("/#/board"), 800);
-    } catch (error) {
-      answer = null;
-      state.phase = "start";
-      fail(error);
-    }
-  }
-
-  root.addEventListener("input", (event) => {
-    if (event.target.id === "device-name") state.deviceName = event.target.value;
-  });
 
   root.addEventListener("submit", async (event) => {
     const form = event.target.closest("form[data-form]");
@@ -390,7 +350,7 @@ export function startPage(root) {
     if (!target) return;
     const action = target.dataset.action;
     try {
-      if (action === "sign-in") return await signingIn.withPasskey().then((me) => signedIn(me, false), signInFailed);
+      if (action === "sign-in") return await signingIn.withPasskey(rememberedCredential()).then((me) => signedIn(me, false), signInFailed);
       if (action === "by-name") {
         state.byName = true;
         state.notice = null;
@@ -399,7 +359,7 @@ export function startPage(root) {
       }
       if (action === "passkey-add" || action === "passkey-later") {
         state.offerPasskey = false;
-        if (action === "passkey-add") await addPasskey({ account, credentials: navigator.credentials, name: deviceName() }).catch((error) => (state.notice = signUpText(error) ?? message(error)));
+        if (action === "passkey-add") await addUnlockingPasskey(hub, state.session, deviceName()).catch((error) => (state.notice = signUpText(error) ?? message(error)));
         return draw();
       }
       if (action === "connect") return await connect();
@@ -408,9 +368,6 @@ export function startPage(root) {
         state.phase = "cancelled";
         return draw();
       }
-      if (action === "add") return await addPhone();
-      if (action === "same") return answer?.(true);
-      if (action === "different") return answer?.(false);
       if (action === "invite") state.invite = await admin.invite();
       if (action === "activate") await admin.setActive(target.dataset.id, true);
       if (action === "deactivate") await withReauth(() => admin.setActive(target.dataset.id, false), reauth);

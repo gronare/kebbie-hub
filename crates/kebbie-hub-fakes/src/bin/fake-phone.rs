@@ -12,7 +12,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 #[derive(Parser)]
 #[command(
     name = "fake-phone",
-    about = "Stands in for the web app: pairs with machines, reads their boards, sends signed commands"
+    about = "Stands in for a device: pairs with machines, sends signed commands, receives notices"
 )]
 struct Cli {
     #[arg(
@@ -45,8 +45,6 @@ enum Command {
         #[arg(long, default_value_t = 600)]
         timeout: u64,
     },
-    #[command(about = "Fetch, verify and decrypt every paired machine's board")]
-    Boards,
     #[command(about = "List every pairing attempt, failed ones included")]
     Attempts,
     #[command(about = "Answer a task's question, then wait for the machine's result")]
@@ -60,11 +58,11 @@ enum Command {
         #[command(flatten)]
         target: Target,
     },
-    #[command(about = "Approve a push of exactly the head this phone saw on the board")]
+    #[command(about = "Approve a push of exactly this head; the board that shows it is read in the web app")]
     Push {
         address: String,
-        #[arg(long, help = "Head to approve instead of the one on the board")]
-        head: Option<String>,
+        #[arg(long)]
+        head: String,
         #[command(flatten)]
         target: Target,
     },
@@ -142,22 +140,6 @@ async fn send(
     Ok(())
 }
 
-async fn board_head(state: &PhoneState, machine: &Id, address: &str) -> Result<String, String> {
-    let boards = state.boards().await.map_err(|e| e.to_string())?;
-    let board = boards
-        .into_iter()
-        .find(|entry| &entry.machine == machine)
-        .ok_or_else(|| format!("{machine} has posted no board"))?
-        .board
-        .map_err(|problem| problem.to_string())?;
-    board
-        .items
-        .into_iter()
-        .find(|item| item.address == address)
-        .and_then(|item| item.head)
-        .ok_or_else(|| format!("{address} shows no head on the board"))
-}
-
 async fn run(cli: Cli) -> Result<(), String> {
     let text = |error: &dyn std::fmt::Display| error.to_string();
     match cli.command {
@@ -217,24 +199,6 @@ async fn run(cli: Cli) -> Result<(), String> {
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("unsubscribed from push");
         }
-        Command::Boards => {
-            let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
-            let boards = state.boards().await.map_err(|e| text(&e))?;
-            if boards.is_empty() {
-                println!("no boards");
-            }
-            for entry in boards {
-                match entry.board {
-                    Ok(board) => println!(
-                        "{} rev {}\n{}",
-                        entry.machine,
-                        entry.rev,
-                        serde_json::to_string_pretty(&board).expect("a board serializes")
-                    ),
-                    Err(problem) => println!("{} rev {}: {problem}", entry.machine, entry.rev),
-                }
-            }
-        }
         Command::Attempts => {
             let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
             for attempt in &state.attempts {
@@ -269,10 +233,6 @@ async fn run(cli: Cli) -> Result<(), String> {
         } => {
             let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
             let machine = target.machine(&state)?;
-            let head = match head {
-                Some(head) => head,
-                None => board_head(&state, &machine, &address).await?,
-            };
             let payload = Payload::Push(PushApproval {
                 address,
                 head,

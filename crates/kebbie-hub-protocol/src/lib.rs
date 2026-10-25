@@ -1,3 +1,4 @@
+mod account;
 mod alert;
 mod authorize;
 mod board;
@@ -12,6 +13,14 @@ mod pairing;
 #[cfg(any(test, feature = "test-vectors"))]
 pub mod vectors;
 
+pub use account::{
+    ACCOUNT_COMMIT_DOMAIN, AccountFingerprints, AccountHandoff, AccountKey,
+    ENCRYPTION_FINGERPRINT_DOMAIN, FieldTooLong, ListedMachine, MACHINE_LIST_DOMAIN, MachineList,
+    SIGNING_FINGERPRINT_DOMAIN, Unlock,
+    WRAP_AD_DOMAIN, WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPED_LEN, WRAPPER_SIGN_DOMAIN, WrongAccountKey,
+    account_commitment, pin_account, sign_wrapper,
+    wrap_associated_data, wrap_key, wrapper_statement,
+};
 pub use alert::{Alert, AlertKind, AlertState};
 pub use authorize::{
     Accepted, Applied, AppliedCommands, Dropped, Machine, Refusal, Role, TrustedDevice, authorize,

@@ -6,14 +6,14 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_api::{
     AdmittedDevices, BoardStored, BoardUpload, Bytes32, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING,
-    CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, DeviceAdd, Inbox,
+    CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, Inbox,
     JoinRequest, Joined, MachineName, NoticePosted, NoticeUpload, PairingFailure, PairingOpened,
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
 };
 use kebbie_hub_protocol::{
-    AppliedCommands, Board, CommandResult, ConnectSecret, Dropped, Envelope, Event, Header, Id,
+    AccountFingerprints, AccountKey, AppliedCommands, Board, CommandResult, ConnectSecret, Dropped, Envelope, Event, Header, Id,
     Kind, Machine, MachinePairing, Notice, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal,
-    Role, SecretKeys, TrustedDevice, Urgency, authorize, seal,
+    Role, SecretKeys, TrustedDevice, Urgency, authorize, pin_account, seal,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -100,6 +100,8 @@ pub struct MachineState {
     pub accepts: Vec<Kind>,
     #[serde(default)]
     pub applied: AppliedCommands,
+    #[serde(default)]
+    pub account: Option<AccountKey>,
 }
 
 pub async fn join(hub: &str, code: &str, name: &str) -> Result<MachineState, Error> {
@@ -257,6 +259,7 @@ impl MachineState {
             board: None,
             accepts: every_command(),
             applied: AppliedCommands::default(),
+            account: None,
         }
     }
 
@@ -287,34 +290,55 @@ impl MachineState {
             .await
     }
 
-    pub async fn add_device<C>(
-        &mut self,
-        timeout: Duration,
-        show_link: impl FnOnce(&DeviceAdd),
-        confirm: C,
-    ) -> Result<Id, PairError>
-    where
-        C: AsyncFnOnce(String) -> bool,
-    {
-        let added: DeviceAdd = self.client().post("/v1/m/devices/add", &()).await?;
-        show_link(&added);
-        self.run_pairing(&added.pairing, &added.code, timeout, confirm)
-            .await
-    }
-
     pub async fn finish_connect(
         &mut self,
-        pairing: &str,
+        pairing_id: &str,
         connect: &ConnectSecret,
         timeout: Duration,
-    ) -> Result<Id, PairError> {
-        self.run_pairing(
-            pairing,
-            &connect.pairing_code(),
-            timeout,
-            async |_: String| true,
-        )
-        .await
+    ) -> Result<AccountFingerprints, PairError> {
+        let client = self.client();
+        let path = format!("/v1/m/pairings/{pairing_id}");
+        let deadline = Instant::now() + timeout;
+        let committed = self
+            .next_state(&client, &path, PairingState::Open, deadline)
+            .await?;
+        let commitment = committed
+            .commitment
+            .ok_or(PairError::Incomplete("the commitment"))?;
+        let mut nonce = [0u8; 32];
+        getrandom::fill(&mut nonce).expect("the system random source failed");
+        let _: PairingView = client
+            .post(
+                &format!("{path}/reply"),
+                &PairingReply {
+                    keys: self.public(),
+                    nonce: Bytes32(nonce),
+                },
+            )
+            .await?;
+        let revealed = self
+            .next_state(&client, &path, PairingState::Replied, deadline)
+            .await?;
+        let key = revealed
+            .account_key
+            .ok_or(PairError::Incomplete("the account key"))?;
+        let account_nonce = revealed
+            .account_nonce
+            .ok_or(PairError::Incomplete("the account nonce"))?;
+        let Ok(pinned) = pin_account(&commitment.0, &key, &account_nonce.0, &connect.pairing_code())
+        else {
+            refuse(&client, &path, PairingFailure::Mismatch).await?;
+            return Err(PairError::Mismatch);
+        };
+        let admitted: PairingView = client.post(&format!("{path}/admit"), &()).await?;
+        if admitted.state != PairingState::Admitted {
+            return Err(PairError::Ended {
+                state: admitted.state,
+                reason: admitted.reason,
+            });
+        }
+        self.account = Some(key);
+        Ok(pinned)
     }
 
     async fn run_pairing<C>(
@@ -661,11 +685,7 @@ impl MachineState {
             at,
         );
         let mut recipients = vec![(self.machine.clone(), self.public())];
-        recipients.extend(
-            self.devices
-                .iter()
-                .map(|device| (device.id.clone(), device.keys)),
-        );
+        recipients.extend(self.account.as_ref().map(AccountKey::recipient));
         seal(header, &Payload::Board(board), &self.secret(), &recipients)
             .map_err(|error| Error::Protocol(error.to_string()))
     }

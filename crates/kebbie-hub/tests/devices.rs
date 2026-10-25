@@ -74,16 +74,9 @@ async fn a_machine_removing_a_device_keeps_it_on_the_machines_that_admitted_it_t
     let mut shared = phone(&test).await;
     let device = pair_both(&mut mac, &mut shared, true).await.0.unwrap();
     pair_both(&mut studio, &mut shared, true).await.0.unwrap();
-    mac.post_board(board(MARKER)).await.unwrap();
-    studio.post_board(board(MARKER)).await.unwrap();
-    assert_eq!(shared.boards().await.unwrap().len(), 2);
-
     mac.remove_device(&device).await.unwrap();
     assert!(mac.listed_devices().await.unwrap().is_empty());
     assert_eq!(studio.listed_devices().await.unwrap()[0].device, device);
-    let boards = shared.boards().await.unwrap();
-    assert_eq!(boards.len(), 1, "the device still reads the other machine's board");
-    assert_eq!(boards[0].machine, studio.machine);
     assert_eq!(
         status_of(
             mac.client()
@@ -123,10 +116,14 @@ async fn a_device_is_seen_at_most_once_a_minute() {
     assert_eq!(last_seen(&test, &machine.machine, &device), Some(first), "a read within the minute writes nothing");
     store().touch_device(&device, first + DEVICE_SEEN_EVERY).unwrap();
     assert_eq!(last_seen(&test, &machine.machine, &device), Some(first + DEVICE_SEEN_EVERY));
-    phone.boards().await.unwrap();
+    phone
+        .client()
+        .get::<serde_json::Value>("/v1/d/results", &[])
+        .await
+        .unwrap();
     assert_eq!(
         last_seen(&test, &machine.machine, &device),
         Some(first + DEVICE_SEEN_EVERY),
-        "a board read inside the minute leaves it"
+        "a read inside the minute leaves it"
     );
 }

@@ -21,6 +21,7 @@ clap = { version = "=4.6.7", features = ["derive"] }
 kebbie-hub-api = { path = "../kebbie-hub-api" }
 getrandom = "=0.4.3"
 hkdf = "=0.13.0"
+hmac = "=0.13.0"
 kebbie-hub-protocol = { path = "../kebbie-hub-protocol" }
 p256 = { version = "=0.14.0", default-features = false, features = ["ecdh", "ecdsa", "std"] }
 reqwest = { version = "=0.13.5", default-features = false, features = ["json", "query", "rustls"] }

@@ -451,7 +451,7 @@ impl rand_core::TryRng for OneShot {
 
 impl rand_core::TryCryptoRng for OneShot {}
 
-mod b64_32 {
+pub(crate) mod b64_32 {
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use serde::{Deserialize, Deserializer, Serializer, de::Error};
@@ -476,6 +476,20 @@ mod tests {
     use crate::envelope::Kind;
     use crate::ids::Prefix;
     use crate::message::RunRoutine;
+
+    #[test]
+    fn a_board_lives_at_most_a_day() {
+        let machine = Id::ulid(Prefix::Machine, 1, [1; 10]).unwrap();
+        let board = |ttl: u64| {
+            let mut header = Header::new(Id::new(Prefix::Board).unwrap(), Kind::Board, machine.clone(), machine.clone(), 1_000);
+            header.exp = header.at + ttl;
+            header.kc = key_commitment(&[0; 32]);
+            header.check_shape()
+        };
+        assert_eq!(Kind::Board.default_ttl(), 86_400);
+        assert!(board(86_400).is_ok());
+        assert!(board(86_401).is_err());
+    }
 
     #[test]
     fn seal_holds_the_ttl_cap_and_needs_distinct_recipients() {

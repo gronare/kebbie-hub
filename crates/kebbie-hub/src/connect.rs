@@ -1,25 +1,27 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_api::{
-    AddView, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING, CONNECT_SLOW_DOWN, CONNECT_UNKNOWN,
-    ConnectApproval, ConnectApproved, ConnectDenial, ConnectPoll, ConnectRequestView, ConnectStart,
-    ConnectStarted, ConnectState, Connected, DeviceAdd, PairingState, code_from_random,
-    normalize_code,
+    AccountReveal, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING, CONNECT_SLOW_DOWN,
+    CONNECT_UNKNOWN, ConnectApproval, ConnectApproved, ConnectDenial, ConnectPoll,
+    ConnectRequestView, ConnectStart, ConnectStarted, ConnectState, Connected, PairingState,
+    PairingView, code_from_random, normalize_code,
 };
 use kebbie_hub_protocol::{Id, Prefix};
 use serde::Deserialize;
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_CODE_PREFIX, FreshAccount, MACHINE_TOKEN_PREFIX, MachineAuth,
-    SameOrigin, digest, new_token, random,
+    AccountAuth, Anonymous, DEVICE_CODE_PREFIX, FreshAccount, MACHINE_TOKEN_PREFIX, SameOrigin,
+    digest, new_token, random,
 };
 use crate::error::ApiError;
-use crate::store::{self, Connect, ConnectPairing, NewConnect};
+use crate::pairing::{Side, Watch, view as pairing_view};
+use crate::store::{self, Connect, ConnectPairing, NewConnect, Pairing, Store};
+use crate::wake::pairing_key;
 use crate::{Hub, clean_name, now};
 
 const SLOW_DOWN_STEP: u64 = 5;
@@ -180,24 +182,16 @@ pub async fn approve(
     hub.limit_code(&account)?;
     hub.require_account_plan(&account)?;
     let at = now();
-    let browser = match (&request.device, &request.commitment) {
-        (Some(device), Some(commitment)) => {
-            if hub.store().device_account(device)?.as_deref() != Some(account.as_str()) {
-                return Err(ApiError::new(StatusCode::NOT_FOUND, "unknown-device"));
-            }
-            Some((device.clone(), commitment.0))
-        }
-        (None, None) => None,
-        _ => return Err(ApiError::bad_request("commitment-needs-device")),
-    };
+    if request.commitment.is_some() && hub.store().account_key(&account)?.is_none() {
+        return Err(ApiError::conflict("no-key"));
+    }
     let machine = Id::new(Prefix::Machine).expect("a fresh machine id is valid");
     let pairing_id = URL_SAFE_NO_PAD.encode(random::<16>());
     let unusable = digest(&new_token("unused_"));
-    let pairing = browser.as_ref().map(|(device, commitment)| ConnectPairing {
+    let pairing = request.commitment.map(|commitment| ConnectPairing {
         id: &pairing_id,
         code_hash: &unusable,
-        device,
-        commitment: *commitment,
+        commitment: commitment.0,
         expires_at: at + hub.config().pairing_ttl,
     });
     let mut store = hub.store();
@@ -217,7 +211,7 @@ pub async fn approve(
         at,
         "connect.approved",
         Some(&machine),
-        browser.as_ref().map(|(device, _)| device),
+        None,
         Some(&account),
     )?;
     Ok(Json(ConnectApproved {
@@ -242,45 +236,54 @@ pub async fn deny(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn add_device(
-    State(hub): State<Arc<Hub>>,
-    MachineAuth(machine): MachineAuth,
-) -> Result<Json<DeviceAdd>, ApiError> {
-    hub.require_machine_plan(&machine)?;
-    let opened = hub.open_pairing_for(&machine)?;
-    Ok(Json(DeviceAdd {
-        url: format!("{}/add?code={}", hub.origin(), opened.code),
-        pairing: opened.pairing,
-        code: opened.code,
-        expires_at: opened.expires_at,
-    }))
+fn account_pairing(store: &Store, account: &str, id: &str) -> Result<Pairing, ApiError> {
+    store
+        .pairing(id)?
+        .filter(|pairing| pairing.account.as_deref() == Some(account))
+        .ok_or_else(ApiError::not_found)
 }
 
-pub async fn add_view(
+pub async fn pairing(
     State(hub): State<Arc<Hub>>,
     AccountAuth(account): AccountAuth,
-    Query(query): Query<CodeQuery>,
-) -> Result<Json<AddView>, ApiError> {
-    hub.limit_code(&account)?;
-    let code = normalize_code(&query.code).ok_or_else(ApiError::not_found)?;
-    let at = now();
+    Path(id): Path<String>,
+    Query(watch): Query<Watch>,
+) -> Result<Json<PairingView>, ApiError> {
+    let pairing = hub
+        .wait_until(&pairing_key(&id), watch.wait, || {
+            let pairing = account_pairing(&hub.store(), &account, &id)?;
+            let changed = watch.changed(pairing.state_at(now()));
+            Ok((pairing, changed))
+        })
+        .await?;
+    let mut shown = pairing_view(&pairing, Side::Device, now());
+    shown.machine_name = hub.store().machine_name(&pairing.machine)?;
+    Ok(Json(shown))
+}
+
+pub async fn reveal(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    AccountAuth(account): AccountAuth,
+    Path(id): Path<String>,
+    Json(reveal): Json<AccountReveal>,
+) -> Result<Json<PairingView>, ApiError> {
     let store = hub.store();
-    let pairing = store
-        .pairing_by_code(&digest(&code))?
-        .filter(|pairing| pairing.state_at(at) == PairingState::Open)
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown-code"))?;
-    if store
-        .machine_owner(&pairing.machine)?
-        .is_some_and(|owner| owner != account)
-    {
-        return Err(ApiError::forbidden("not-your-machine"));
+    let mut pairing = account_pairing(&store, &account, &id)?;
+    let at = now();
+    if pairing.state_at(at) != PairingState::Replied {
+        return Err(ApiError::conflict("wrong-state"));
     }
-    let name = store
-        .machine_name(&pairing.machine)?
-        .ok_or_else(ApiError::not_found)?;
-    Ok(Json(AddView {
-        machine: pairing.machine,
-        name,
-        expires_at: pairing.expires_at,
-    }))
+    if store.account_key(&account)?.as_ref() != Some(&reveal.key) {
+        return Err(ApiError::conflict("keys-differ"));
+    }
+    pairing.device_keys = Some(reveal.key.keys);
+    pairing.account_key_version = Some(reveal.key.version);
+    pairing.device_nonce = Some(reveal.nonce.0);
+    pairing.state = PairingState::Revealed;
+    store.save_pairing(&pairing)?;
+    store.log(at, "pairing.revealed", Some(&pairing.machine), None, Some(&account))?;
+    drop(store);
+    hub.wake_pairing(&pairing);
+    Ok(Json(pairing_view(&pairing, Side::Device, at)))
 }

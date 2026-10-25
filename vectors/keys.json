@@ -1,5 +1,14 @@
 {
   "parties": {
+    "account": {
+      "encryption_secret": "RszofC1IxVjFtG3r0h-xLOvDq_kT-O3dEwMAKpSQv2k",
+      "id": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
+      "public": {
+        "encryption": "Fy9TWoRCCrV-COPVEsimPfuCwU2cBjs08dDqQHx9hSI",
+        "signing": "ovzOGg2_2CxX0FxHzMOuV137QeLFqdVj4eLfK3AF2Zs"
+      },
+      "signing_secret": "4oEkIXuWnfgOyoMxV2gVMCL8ICYNPRBWlnsGxT0Lxn0"
+    },
     "intruder": {
       "encryption_secret": "Lp_8jOC0OLJxP4hxGKFKDMK90KhRvcf4SuJ6UmJJfSo",
       "id": "dev_01K83YV380B68N2787R00EZ06Y",

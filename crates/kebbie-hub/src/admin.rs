@@ -167,16 +167,20 @@ pub async fn remove_machine(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let machine = Id::parse(&id).map_err(|_| ApiError::not_found())?;
-    let readers = {
+    let (readers, account) = {
         let store = hub.store();
         let readers = store.admitted_devices(&machine)?;
+        let account = store.machine_owner(&machine)?;
         if !store.remove_machine(&machine)? {
             return Err(ApiError::not_found());
         }
         store.log(now(), "machine.removed", Some(&machine), None, Some(&owner))?;
-        readers
+        (readers, account)
     };
     hub.wake_devices(&readers);
+    if let Some(account) = account {
+        hub.wake_account(&account);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

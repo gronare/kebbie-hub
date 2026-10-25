@@ -7,7 +7,7 @@ use common::*;
 use kebbie_hub::SESSION_COOKIE;
 use kebbie_hub_api::{
     AccountView, BoardChanged, Bytes32, CommitRequest, Committed, CreationCeremony, DeviceRequest,
-    Devices, EVENT_BOARD, EVENT_MACHINE_REMOVED, EVENT_PAIRING, MachineRemoved, PairingChanged,
+    Devices, EVENT_BOARD, EVENT_MACHINES, EVENT_MACHINE_REMOVED, EVENT_PAIRING, MachineRemoved, PairingChanged,
     PairingOpened, PairingState, Passkeys,
 };
 use kebbie_hub_api::{LoginFinish, RegisterFinish};
@@ -294,7 +294,7 @@ async fn an_account_adds_and_removes_passkeys_but_never_its_last() {
 }
 
 #[tokio::test]
-async fn the_device_feed_announces_boards_and_pairings_without_content() {
+async fn the_device_feed_announces_pairings_without_content_and_no_boards() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
     let registered = signed_up(&test).await.register_device().await;
@@ -311,6 +311,18 @@ async fn the_device_feed_announces_boards_and_pairings_without_content() {
     }
     assert!(states.iter().all(|state| *state != PairingState::Open));
 
+    machine.post_board(board(MARKER)).await.unwrap();
+    assert_eq!(events.next(QUIET).await, Next::Quiet);
+}
+
+#[tokio::test]
+async fn the_account_feed_announces_its_boards_without_content() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut person = member(&test).await;
+    let mut machine = connected_with_board(&test, &mut person).await;
+    let mut events = EventStream::of_account(&person).await;
+    events.until(EVENT_MACHINES, SOON).await;
+    assert_eq!(events.next(QUIET).await, Next::Quiet);
     let rev = machine.post_board(board(MARKER)).await.unwrap();
     let data = events.until(EVENT_BOARD, SOON).await;
     assert_eq!(data.as_object().unwrap().len(), 2, "{data}");
@@ -327,52 +339,46 @@ async fn the_device_feed_announces_boards_and_pairings_without_content() {
 }
 
 #[tokio::test]
-async fn a_board_wakes_only_the_devices_of_its_machine() {
-    let test = start_hub(|_| {}).await;
-    let mut first_machine = joined_machine(&test).await;
-    let mut second_machine = joined_machine(&test).await;
-    let first = signed_up(&test).await.register_device().await;
-    let second = signed_up(&test).await.register_device().await;
-    let mut first_phone = PhoneState::registered(&test.url, first.device.clone(), &first.token);
-    let mut second_phone = PhoneState::registered(&test.url, second.device.clone(), &second.token);
-    pair_both(&mut first_machine, &mut first_phone, true)
-        .await
-        .0
-        .unwrap();
-    pair_both(&mut second_machine, &mut second_phone, true)
-        .await
-        .0
-        .unwrap();
-    let mut first_events = EventStream::open(&test.url, &first.token).await;
-    let mut second_events = EventStream::open(&test.url, &second.token).await;
-    first_events.until(EVENT_PAIRING, SOON).await;
-    second_events.until(EVENT_PAIRING, SOON).await;
+async fn a_board_wakes_only_the_account_of_its_machine() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut first = member(&test).await;
+    let mut second = member(&test).await;
+    let mut first_machine = connected_with_board(&test, &mut first).await;
+    let mut second_machine = connected_with_board(&test, &mut second).await;
+    second_machine.post_board(board("second")).await.unwrap();
+    let mut first_events = EventStream::of_account(&first).await;
+    let mut second_events = EventStream::of_account(&second).await;
+    second_events.until(EVENT_BOARD, SOON).await;
+    second_events.until(EVENT_MACHINES, SOON).await;
+    first_events.until(EVENT_MACHINES, SOON).await;
+    assert_eq!(first_events.next(QUIET).await, Next::Quiet);
 
     first_machine.post_board(board(MARKER)).await.unwrap();
     first_events.until(EVENT_BOARD, SOON).await;
     assert_eq!(second_events.next(QUIET).await, Next::Quiet);
+    let boards = second.boards().await.unwrap();
+    assert_eq!(boards.len(), 1);
+    assert_eq!(boards[0].machine, second_machine.machine);
 }
 
 #[tokio::test]
-async fn a_machine_removing_a_device_stops_its_boards_and_board_events() {
+async fn a_machine_removing_a_device_announces_it_on_the_device_feed() {
     let test = start_hub(|_| {}).await;
     let mut machine = joined_machine(&test).await;
     let registered = signed_up(&test).await.register_device().await;
     let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
     let device = pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    machine.post_board(board(MARKER)).await.unwrap();
     let mut events = EventStream::open(&test.url, &registered.token).await;
-    events.until(EVENT_BOARD, SOON).await;
+    events.until(EVENT_PAIRING, SOON).await;
 
     machine.remove_device(&device).await.unwrap();
     let removed: MachineRemoved =
         serde_json::from_value(events.until(EVENT_MACHINE_REMOVED, SOON).await).unwrap();
     assert_eq!(removed.machine, machine.machine);
-    assert!(phone.boards().await.unwrap().is_empty());
+    assert!(machine.listed_devices().await.unwrap().is_empty());
 
     machine.post_board(board("after")).await.unwrap();
     assert_eq!(events.next(QUIET).await, Next::Quiet);
-    assert!(phone.boards().await.unwrap().is_empty());
     let again = machine
         .client()
         .delete(&format!("/v1/m/devices/{device}"))
@@ -392,8 +398,7 @@ async fn a_machine_cannot_remove_a_device_another_machine_admitted() {
         .delete(&format!("/v1/m/devices/{device}"))
         .await;
     assert_eq!(status_of(refused), 404);
-    owner.post_board(board(MARKER)).await.unwrap();
-    assert_eq!(phone.boards().await.unwrap().len(), 1);
+    assert_eq!(owner.listed_devices().await.unwrap()[0].device, device);
 }
 
 #[tokio::test]
@@ -415,7 +420,7 @@ async fn an_account_removing_its_device_ends_the_token_and_the_feed() {
     assert_eq!(
         status_of(
             device_client(&test, &registered)
-                .get::<Value>("/v1/d/boards", &[])
+                .get::<Value>("/v1/d/results", &[])
                 .await
         ),
         401
@@ -451,7 +456,6 @@ async fn the_admin_cli_mints_invites_and_removes_machines() {
     assert!(admin(&["machines"]).contains(machine.machine.as_str()));
 
     admin(&["remove-machine", machine.machine.as_str()]);
-    assert!(phone.boards().await.unwrap().is_empty());
     match machine.poll_once(0).await {
         Err(kebbie_hub_fakes::Error::Hub(error)) => assert_eq!(error.status(), Some(401)),
         other => panic!("the removed machine still polls: {other:?}"),
@@ -476,27 +480,27 @@ async fn the_sweep_drops_devices_no_account_holds_and_no_machine_admits() {
 
     assert_eq!(test.hub.sweep().unwrap().devices, 1);
     assert_eq!(
-        status_of(refused.client().get::<Value>("/v1/d/boards", &[]).await),
+        status_of(refused.client().get::<Value>("/v1/d/results", &[]).await),
         401
     );
     admitted
         .client()
-        .get::<Value>("/v1/d/boards", &[])
+        .get::<Value>("/v1/d/results", &[])
         .await
         .unwrap();
     device_client(&test, &held)
-        .get::<Value>("/v1/d/boards", &[])
+        .get::<Value>("/v1/d/results", &[])
         .await
         .unwrap();
 
     machine.remove_device(&device).await.unwrap();
     assert_eq!(test.hub.sweep().unwrap().devices, 1);
     assert_eq!(
-        status_of(admitted.client().get::<Value>("/v1/d/boards", &[]).await),
+        status_of(admitted.client().get::<Value>("/v1/d/results", &[]).await),
         401
     );
     device_client(&test, &held)
-        .get::<Value>("/v1/d/boards", &[])
+        .get::<Value>("/v1/d/results", &[])
         .await
         .unwrap();
 }
@@ -518,7 +522,7 @@ async fn a_device_mid_pairing_is_not_swept() {
         .unwrap();
     assert_eq!(test.hub.sweep().unwrap().devices, 0);
     let device = HubClient::new(&test.url, committed.token.as_deref());
-    device.get::<Value>("/v1/d/boards", &[]).await.unwrap();
+    device.get::<Value>("/v1/d/results", &[]).await.unwrap();
 }
 
 #[tokio::test]
@@ -527,7 +531,7 @@ async fn a_half_sent_request_is_dropped_after_the_header_timeout() {
     let address = test.url.trim_start_matches("http://");
     let mut stream = tokio::net::TcpStream::connect(address).await.unwrap();
     stream
-        .write_all(b"GET /v1/d/boards HTTP/1.1\r\nHost: hub\r\n")
+        .write_all(b"GET /v1/d/results HTTP/1.1\r\nHost: hub\r\n")
         .await
         .unwrap();
     let started = std::time::Instant::now();
@@ -541,7 +545,7 @@ async fn a_half_sent_request_is_dropped_after_the_header_timeout() {
 async fn the_session_cookie_opens_no_device_or_machine_call() {
     let test = start_hub(|_| {}).await;
     let person = signed_up(&test).await;
-    for path in ["/v1/d/boards", "/v1/d/events", "/v1/m/inbox"] {
+    for path in ["/v1/d/results", "/v1/d/events", "/v1/d/pairings/any", "/v1/m/inbox"] {
         assert_eq!(person.get(path).await.status(), 401, "{path}");
     }
 }
@@ -730,7 +734,7 @@ async fn the_hub_serves_no_more_connections_than_its_cap() {
     let waiting = tokio::spawn({
         let url = test.url.clone();
         async move {
-            reqwest::get(format!("{url}/v1/d/boards"))
+            reqwest::get(format!("{url}/v1/d/results"))
                 .await
                 .unwrap()
                 .status()

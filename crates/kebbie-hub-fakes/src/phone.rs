@@ -1,14 +1,12 @@
-use std::fmt;
 use std::time::Duration;
 
 use kebbie_hub_api::{
-    Boards, Bytes32, CommandQueued, CommandUpload, CommitRequest, Committed, DeviceName,
-    PairingState,
+    Bytes32, CommandQueued, CommandUpload, CommitRequest, Committed, DeviceName, PairingState,
     PairingView, ResultEntry, Results, RevealRequest, normalize_code,
 };
 use kebbie_hub_protocol::{
-    Board, CommandResult, ConnectSecret, DevicePairing, Envelope, Header, Id, Notice, OpenError,
-    Payload, Prefix, PublicKeys, SecretKeys, open, seal,
+    CommandResult, DevicePairing, Envelope, Header, Id, Notice, Payload, Prefix, PublicKeys,
+    SecretKeys, open, seal,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
@@ -42,49 +40,11 @@ pub struct PhoneState {
 }
 
 #[derive(Debug)]
-pub enum BoardProblem {
-    UnknownMachine,
-    NotSealedToThisDevice,
-    Unopenable(OpenError),
-    NotABoard,
-    RevisionDiffers { inside: u64 },
-}
-
-impl fmt::Display for BoardProblem {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BoardProblem::UnknownMachine => {
-                formatter.write_str("from a machine this phone never paired with")
-            }
-            BoardProblem::NotSealedToThisDevice => {
-                formatter.write_str("not sealed to this phone yet")
-            }
-            BoardProblem::Unopenable(error) => write!(formatter, "does not open: {error}"),
-            BoardProblem::NotABoard => formatter.write_str("is not a board"),
-            BoardProblem::RevisionDiffers { inside } => {
-                write!(
-                    formatter,
-                    "the hub's revision differs from the sealed one ({inside})"
-                )
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct ReceivedResult {
     pub seq: u64,
     pub machine: Id,
     pub command: Id,
     pub result: Result<CommandResult, String>,
-}
-
-#[derive(Debug)]
-pub struct MachineBoard {
-    pub machine: Id,
-    pub name: String,
-    pub rev: u64,
-    pub board: Result<Board, BoardProblem>,
 }
 
 impl PhoneState {
@@ -171,39 +131,8 @@ impl PhoneState {
             self.token = Some(token);
             self.device = Some(committed.device);
         }
-        self.follow(&committed.pairing, &pairing, deadline, None, confirm)
+        self.follow(&committed.pairing, &pairing, deadline, confirm)
             .await
-    }
-
-    pub fn connect_pairing(&self, connect: &ConnectSecret) -> DevicePairing {
-        DevicePairing::start(self.public(), &connect.pairing_code())
-    }
-
-    pub async fn complete_connect(
-        &mut self,
-        pairing_id: &str,
-        pairing: &DevicePairing,
-        connect: &ConnectSecret,
-        timeout: Duration,
-    ) -> Result<Id, PairError> {
-        let outcome = self
-            .follow(
-                pairing_id,
-                pairing,
-                Instant::now() + timeout,
-                Some(connect),
-                async |_: String| true,
-            )
-            .await;
-        self.attempts.push(Attempt {
-            at: now(),
-            machine: outcome.as_ref().ok().cloned(),
-            outcome: match &outcome {
-                Ok(_) => "admitted".to_string(),
-                Err(error) => error.to_string(),
-            },
-        });
-        outcome
     }
 
     async fn follow<C>(
@@ -211,7 +140,6 @@ impl PhoneState {
         pairing_id: &str,
         pairing: &DevicePairing,
         deadline: Instant,
-        connect: Option<&ConnectSecret>,
         confirm: C,
     ) -> Result<Id, PairError>
     where
@@ -229,9 +157,6 @@ impl PhoneState {
         let machine_nonce = replied
             .machine_nonce
             .ok_or(PairError::Incomplete("the machine nonce"))?;
-        if connect.is_some_and(|connect| !connect.names(&machine_keys)) {
-            return Err(PairError::WrongMachine);
-        }
         let (keys, nonce) = pairing.reveal();
         let _: PairingView = client
             .post(
@@ -255,23 +180,6 @@ impl PhoneState {
             keys: machine_keys,
         });
         Ok(settled.machine)
-    }
-
-    pub async fn boards(&self) -> Result<Vec<MachineBoard>, Error> {
-        let Some(device) = &self.device else {
-            return Ok(Vec::new());
-        };
-        let listing: Boards = self.client().get("/v1/d/boards", &[]).await?;
-        Ok(listing
-            .boards
-            .into_iter()
-            .map(|entry| MachineBoard {
-                board: self.open_board(device, &entry.machine, entry.rev, entry.envelope.as_ref()),
-                machine: entry.machine,
-                name: entry.name,
-                rev: entry.rev,
-            })
-            .collect())
     }
 
     pub fn machine_keys(&self, machine: &Id) -> Result<PublicKeys, Error> {
@@ -464,40 +372,6 @@ impl PhoneState {
             Payload::Notice(notice) => Ok((envelope, notice)),
             _ => Err("is not a notice".into()),
         }
-    }
-
-    fn open_board(
-        &self,
-        device: &Id,
-        machine: &Id,
-        rev: u64,
-        envelope: Option<&kebbie_hub_protocol::Envelope>,
-    ) -> Result<Board, BoardProblem> {
-        let paired = self
-            .machines
-            .iter()
-            .find(|paired| &paired.id == machine)
-            .ok_or(BoardProblem::UnknownMachine)?;
-        let envelope = envelope.ok_or(BoardProblem::NotSealedToThisDevice)?;
-        if &envelope.header.machine != machine {
-            return Err(BoardProblem::Unopenable(OpenError::WrongSender));
-        }
-        let payload = open(
-            envelope,
-            device,
-            &self.secret(),
-            machine,
-            &paired.keys,
-            now(),
-        )
-        .map_err(BoardProblem::Unopenable)?;
-        let Payload::Board(board) = payload else {
-            return Err(BoardProblem::NotABoard);
-        };
-        if board.rev != rev {
-            return Err(BoardProblem::RevisionDiffers { inside: board.rev });
-        }
-        Ok(board)
     }
 }
 

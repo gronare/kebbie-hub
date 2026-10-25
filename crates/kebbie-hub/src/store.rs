@@ -1,7 +1,9 @@
 use std::path::Path;
 
 use kebbie_hub_api::{AdmittedDevice, ConnectState, PairingFailure, PairingState, PlanStatus};
-use kebbie_hub_protocol::{BugReport, ErrorSignals, Header, Id, PublicKeys};
+use kebbie_hub_protocol::{
+    AccountKey, BugReport, ErrorSignals, Header, Id, MachineList, PublicKeys,
+};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 pub type Result<T> = rusqlite::Result<T>;
@@ -260,11 +262,47 @@ fn add_columns(connection: &Connection, columns: &[(&str, &str, &str)]) -> Resul
     Ok(added)
 }
 
-const SCHEMA_VERSION: i64 = 7;
+const ACCOUNT_KEY_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS account_keys (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    key_version INTEGER NOT NULL,
+    signing_key BLOB NOT NULL,
+    encryption_key BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (account_id, key_version)
+);
+CREATE TABLE IF NOT EXISTS key_wrappers (
+    credential_id BLOB PRIMARY KEY REFERENCES passkeys(credential_id) ON DELETE CASCADE,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    key_version INTEGER NOT NULL,
+    wrapped BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS machine_lists (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    counter INTEGER NOT NULL,
+    list TEXT NOT NULL,
+    signature BLOB NOT NULL
+);
+";
+
+const ACCOUNT_KEY_COLUMNS: &[(&str, &str, &str)] = &[
+    ("passkeys", "prf_salt", "BLOB"),
+    (
+        "pairings",
+        "account_id",
+        "TEXT REFERENCES accounts(id) ON DELETE CASCADE",
+    ),
+    ("pairings", "account_key_version", "INTEGER"),
+    ("ceremonies", "prf_salt", "BLOB"),
+];
+
+const SCHEMA_VERSION: i64 = 8;
 const UPGRADES: &[(i64, &str)] = &[
     (5, REPORTS_SCHEMA),
     (6, SIGNALS_SCHEMA),
     (7, CONNECT_SCHEMA),
+    (8, ACCOUNT_KEY_SCHEMA),
 ];
 pub const REPORT_KEEP_SECONDS: u64 = 30 * 86_400;
 pub const SIGNAL_KEEP_DAYS: u64 = 180;
@@ -289,6 +327,8 @@ pub struct Pairing {
     pub machine_nonce: Option<[u8; 32]>,
     pub device_keys: Option<PublicKeys>,
     pub device_nonce: Option<[u8; 32]>,
+    pub account: Option<String>,
+    pub account_key_version: Option<u32>,
     pub expires_at: u64,
 }
 
@@ -300,15 +340,6 @@ impl Pairing {
             self.state
         }
     }
-}
-
-pub struct StoredBoard {
-    pub machine: Id,
-    pub name: String,
-    pub last_seen: Option<u64>,
-    pub rev: u64,
-    pub stored_at: u64,
-    pub envelope: String,
 }
 
 pub enum BoardWrite {
@@ -427,6 +458,19 @@ impl Store {
                     tx.execute(
                         "UPDATE accounts SET role = 'owner' WHERE id = (SELECT id FROM accounts ORDER BY created_at, rowid LIMIT 1)",
                         [],
+                    )?;
+                }
+            }
+            if *to == 8 {
+                add_columns(&tx, ACCOUNT_KEY_COLUMNS)?;
+                let unsalted: Vec<Vec<u8>> = tx
+                    .prepare("SELECT credential_id FROM passkeys WHERE prf_salt IS NULL")?
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<_>>()?;
+                for credential in unsalted {
+                    tx.execute(
+                        "UPDATE passkeys SET prf_salt = ?2 WHERE credential_id = ?1",
+                        params![credential, crate::auth::random::<32>().as_slice()],
                     )?;
                 }
             }
@@ -869,7 +913,8 @@ impl Store {
         let mut statement = self.connection.prepare(&format!(
             "SELECT id, machine_id, state, reason, device_id, commitment,
                     machine_signing, machine_encryption, machine_nonce,
-                    device_signing, device_encryption, device_nonce, expires_at
+                    device_signing, device_encryption, device_nonce, expires_at,
+                    account_id, account_key_version
              FROM pairings WHERE {filter} ORDER BY opened_at, id"
         ))?;
         statement
@@ -890,6 +935,8 @@ impl Store {
                     device_keys: optional_keys_at(row, 9)?,
                     device_nonce: bytes32_at(row, 11)?,
                     expires_at: row.get(12)?,
+                    account: row.get(13)?,
+                    account_key_version: row.get(14)?,
                 })
             })?
             .collect()
@@ -899,7 +946,8 @@ impl Store {
         self.connection.execute(
             "UPDATE pairings SET state = ?2, reason = ?3, device_id = ?4, commitment = ?5,
                     machine_signing = ?6, machine_encryption = ?7, machine_nonce = ?8,
-                    device_signing = ?9, device_encryption = ?10, device_nonce = ?11
+                    device_signing = ?9, device_encryption = ?10, device_nonce = ?11,
+                    account_key_version = ?12
              WHERE id = ?1",
             params![
                 pairing.id,
@@ -913,6 +961,7 @@ impl Store {
                 pairing.device_keys.map(|keys| keys.signing),
                 pairing.device_keys.map(|keys| keys.encryption),
                 pairing.device_nonce,
+                pairing.account_key_version,
             ],
         )?;
         Ok(())
@@ -960,27 +1009,6 @@ impl Store {
             params![machine.as_str(), device.as_str(), now],
         )?;
         Ok(())
-    }
-
-    pub fn boards_for_device(&self, device: &Id) -> Result<Vec<StoredBoard>> {
-        let mut statement = self.connection.prepare(
-            "SELECT boards.machine_id, boards.rev, boards.stored_at, boards.envelope, machines.name, machines.last_seen
-             FROM admissions JOIN boards ON boards.machine_id = admissions.machine_id
-             JOIN machines ON machines.id = admissions.machine_id
-             WHERE admissions.device_id = ?1 ORDER BY boards.machine_id",
-        )?;
-        statement
-            .query_map([device.as_str()], |row| {
-                Ok(StoredBoard {
-                    machine: id_at(row, 0)?,
-                    name: row.get(4)?,
-                    last_seen: row.get(5)?,
-                    rev: row.get(1)?,
-                    stored_at: row.get(2)?,
-                    envelope: row.get(3)?,
-                })
-            })?
-            .collect()
     }
 
     pub fn log(
@@ -1057,14 +1085,25 @@ impl Store {
         )
     }
 
-    pub fn heads_for_device(&self, device: &Id) -> Result<Vec<BoardHead>> {
+    pub fn admitting_machines(&self, device: &Id) -> Result<Vec<Id>> {
         let mut statement = self.connection.prepare(
-            "SELECT admissions.machine_id, boards.envelope_id, boards.rev
-             FROM admissions LEFT JOIN boards ON boards.machine_id = admissions.machine_id
-             WHERE admissions.device_id = ?1 ORDER BY admissions.machine_id",
+            "SELECT machine_id FROM admissions WHERE device_id = ?1 ORDER BY machine_id",
         )?;
         statement
-            .query_map([device.as_str()], |row| {
+            .query_map([device.as_str()], |row| id_at(row, 0))?
+            .collect()
+    }
+
+    pub fn heads_for_account(&self, account: &str) -> Result<Vec<BoardHead>> {
+        let mut statement = self.connection.prepare(
+            "SELECT machines.id, boards.envelope_id, boards.rev
+             FROM machines LEFT JOIN boards ON boards.machine_id = machines.id
+             WHERE machines.account_id = ?1
+                 AND NOT EXISTS (SELECT 1 FROM connects WHERE connects.machine_id = machines.id)
+             ORDER BY machines.id",
+        )?;
+        statement
+            .query_map([account], |row| {
                 let envelope: Option<String> = row.get(1)?;
                 let rev: Option<u64> = row.get(2)?;
                 Ok(BoardHead {
@@ -1073,6 +1112,171 @@ impl Store {
                 })
             })?
             .collect()
+    }
+
+    pub fn boards_for_account(&self, account: &str) -> Result<Vec<AccountBoard>> {
+        let mut statement = self.connection.prepare(
+            "SELECT machines.id, machines.name, machines.last_seen, machines.signing_key,
+                    machines.encryption_key, boards.rev, boards.stored_at, boards.envelope
+             FROM machines LEFT JOIN boards ON boards.machine_id = machines.id
+             WHERE machines.account_id = ?1
+                 AND NOT EXISTS (SELECT 1 FROM connects WHERE connects.machine_id = machines.id)
+             ORDER BY machines.joined_at, machines.id",
+        )?;
+        statement
+            .query_map([account], |row| {
+                let rev: Option<u64> = row.get(5)?;
+                let stored_at: Option<u64> = row.get(6)?;
+                let envelope: Option<String> = row.get(7)?;
+                Ok(AccountBoard {
+                    machine: id_at(row, 0)?,
+                    name: row.get(1)?,
+                    last_seen: row.get(2)?,
+                    keys: keys_at(row, 3)?,
+                    board: rev.zip(stored_at).zip(envelope).map(|((rev, at), text)| (rev, at, text)),
+                })
+            })?
+            .collect()
+    }
+
+    pub fn machine_list(&self, account: &str) -> Result<Option<(MachineList, [u8; 64])>> {
+        self.connection
+            .query_row(
+                "SELECT list, signature FROM machine_lists WHERE account_id = ?1",
+                [account],
+                |row| {
+                    let list: MachineList = serde_json::from_str(&row.get::<_, String>(0)?)
+                        .map_err(|_| corrupt(0))?;
+                    let signature: [u8; 64] = row
+                        .get::<_, Vec<u8>>(1)?
+                        .try_into()
+                        .map_err(|_| corrupt(1))?;
+                    Ok((list, signature))
+                },
+            )
+            .optional()
+    }
+
+    pub fn set_machine_list(
+        &mut self,
+        account: &str,
+        list: &MachineList,
+        signature: &[u8; 64],
+    ) -> Result<ListWrite> {
+        let tx = self.connection.transaction()?;
+        let held: Option<u64> = tx
+            .query_row(
+                "SELECT counter FROM machine_lists WHERE account_id = ?1",
+                [account],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if held.is_some_and(|held| list.counter <= held) {
+            return Ok(ListWrite::Stale);
+        }
+        for listed in &list.machines {
+            let owned: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM machines WHERE id = ?1 AND account_id = ?2
+                     AND signing_key = ?3 AND encryption_key = ?4)",
+                params![listed.machine.as_str(), account, listed.keys.signing, listed.keys.encryption],
+                |row| row.get(0),
+            )?;
+            if !owned {
+                return Ok(ListWrite::UnknownMachine);
+            }
+        }
+        tx.execute(
+            "INSERT INTO machine_lists (account_id, counter, list, signature) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (account_id) DO UPDATE SET counter = ?2, list = ?3, signature = ?4",
+            params![
+                account,
+                list.counter,
+                serde_json::to_string(list).expect("a machine list serializes"),
+                signature.as_slice()
+            ],
+        )?;
+        tx.commit()?;
+        Ok(ListWrite::Stored)
+    }
+
+    pub fn account_key(&self, account: &str) -> Result<Option<AccountKey>> {
+        self.connection
+            .query_row(
+                "SELECT key_version, signing_key, encryption_key FROM account_keys
+                 WHERE account_id = ?1 ORDER BY key_version DESC LIMIT 1",
+                [account],
+                |row| Ok((row.get::<_, u32>(0)?, keys_at(row, 1)?)),
+            )
+            .optional()?
+            .map(|(version, keys)| {
+                let id = Id::parse(account).map_err(|_| corrupt(0))?;
+                AccountKey::new(id, version, keys).ok_or_else(|| corrupt(0))
+            })
+            .transpose()
+    }
+
+    pub fn set_account_key(
+        &mut self,
+        key: &AccountKey,
+        credential: &[u8],
+        wrapped: &[u8],
+        now: u64,
+    ) -> Result<KeySet> {
+        let tx = self.connection.transaction()?;
+        let account = key.account.as_str();
+        let held: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM account_keys WHERE account_id = ?1)",
+            [account],
+            |row| row.get(0),
+        )?;
+        if held {
+            return Ok(KeySet::KeyExists);
+        }
+        let owned: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM passkeys WHERE credential_id = ?1 AND account_id = ?2)",
+            params![credential, account],
+            |row| row.get(0),
+        )?;
+        if !owned {
+            return Ok(KeySet::UnknownPasskey);
+        }
+        tx.execute(
+            "INSERT INTO account_keys (account_id, key_version, signing_key, encryption_key, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![account, key.version, key.keys.signing, key.keys.encryption, now],
+        )?;
+        put_wrapper(&tx, account, credential, key.version, wrapped, now)?;
+        tx.commit()?;
+        Ok(KeySet::Set)
+    }
+
+    pub fn set_wrapper(
+        &self,
+        account: &str,
+        credential: &[u8],
+        version: u32,
+        wrapped: &[u8],
+        now: u64,
+    ) -> Result<bool> {
+        let owned: bool = self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM passkeys WHERE credential_id = ?1 AND account_id = ?2)",
+            params![credential, account],
+            |row| row.get(0),
+        )?;
+        if owned {
+            put_wrapper(&self.connection, account, credential, version, wrapped, now)?;
+        }
+        Ok(owned)
+    }
+
+    pub fn wrapper(&self, credential: &[u8]) -> Result<Option<(u32, Vec<u8>)>> {
+        self.connection
+            .query_row(
+                "SELECT key_version, wrapped FROM key_wrappers WHERE credential_id = ?1",
+                [credential],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
     }
 
     pub fn remove_admission(&self, machine: &Id, device: &Id) -> Result<bool> {
@@ -1346,13 +1550,13 @@ impl Store {
         )?;
         if let Some(pairing) = approval.pairing {
             tx.execute(
-                "INSERT INTO pairings (id, machine_id, code_hash, state, device_id, commitment, opened_at, expires_at)
+                "INSERT INTO pairings (id, machine_id, code_hash, state, account_id, commitment, opened_at, expires_at)
                  VALUES (?1, ?2, ?3, 'committed', ?4, ?5, ?6, ?7)",
                 params![
                     pairing.id,
                     approval.machine.as_str(),
                     pairing.code_hash,
-                    pairing.device.as_str(),
+                    approval.account,
                     pairing.commitment.as_slice(),
                     approval.now,
                     pairing.expires_at
@@ -1426,6 +1630,16 @@ impl Store {
             .optional()
     }
 
+    pub fn passkey_account(&self, credential: &[u8]) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT account_id FROM passkeys WHERE credential_id = ?1",
+                [credential],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
     pub fn account_by_user_handle(&self, user_handle: &[u8]) -> Result<Option<String>> {
         self.connection
             .query_row(
@@ -1448,8 +1662,8 @@ impl Store {
 
     pub fn save_ceremony(&self, ceremony: &Ceremony) -> Result<()> {
         self.connection.execute(
-            "INSERT INTO ceremonies (id_hash, purpose, account_id, handle, user_handle, invite_hash, state, expires_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO ceremonies (id_hash, purpose, account_id, handle, user_handle, invite_hash, state, expires_at, prf_salt)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 ceremony.id_hash,
                 ceremony.purpose.name(),
@@ -1459,6 +1673,7 @@ impl Store {
                 ceremony.invite_hash,
                 ceremony.state,
                 ceremony.expires_at,
+                ceremony.prf_salt.map(|salt| salt.to_vec()),
             ],
         )?;
         Ok(())
@@ -1474,7 +1689,7 @@ impl Store {
             .connection
             .query_row(
                 "DELETE FROM ceremonies WHERE id_hash = ?1
-                 RETURNING id_hash, purpose, account_id, handle, user_handle, invite_hash, state, expires_at",
+                 RETURNING id_hash, purpose, account_id, handle, user_handle, invite_hash, state, expires_at, prf_salt",
                 [id_hash],
                 |row| {
                     Ok(Ceremony {
@@ -1490,6 +1705,7 @@ impl Store {
                         invite_hash: row.get(5)?,
                         state: row.get(6)?,
                         expires_at: row.get(7)?,
+                        prf_salt: bytes32_at(row, 8)?,
                     })
                 },
             )
@@ -1561,14 +1777,15 @@ impl Store {
             ],
         )?;
         tx.execute(
-            "INSERT INTO passkeys (credential_id, account_id, name, passkey, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO passkeys (credential_id, account_id, name, passkey, created_at, prf_salt)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 signup.credential_id,
                 signup.account,
                 signup.name,
                 signup.passkey,
-                signup.now
+                signup.now,
+                signup.prf_salt.as_slice()
             ],
         )?;
         tx.execute(
@@ -1581,7 +1798,8 @@ impl Store {
 
     pub fn passkeys(&self, account: &str) -> Result<Vec<StoredPasskey>> {
         let mut statement = self.connection.prepare(
-            "SELECT credential_id, name, passkey, created_at, last_used_at, counter
+            "SELECT credential_id, name, passkey, created_at, last_used_at, counter, prf_salt,
+                    EXISTS (SELECT 1 FROM key_wrappers WHERE key_wrappers.credential_id = passkeys.credential_id)
              FROM passkeys WHERE account_id = ?1 ORDER BY created_at, credential_id",
         )?;
         statement
@@ -1593,6 +1811,8 @@ impl Store {
                     created_at: row.get(3)?,
                     last_used_at: row.get(4)?,
                     counter: row.get(5)?,
+                    prf_salt: bytes32_at(row, 6)?.ok_or_else(|| corrupt(6))?,
+                    unlocks: row.get(7)?,
                 })
             })?
             .collect()
@@ -1604,12 +1824,13 @@ impl Store {
         credential_id: &[u8],
         name: Option<&str>,
         passkey: &str,
+        prf_salt: &[u8; 32],
         now: u64,
     ) -> Result<bool> {
         Ok(self.connection.execute(
-            "INSERT INTO passkeys (credential_id, account_id, name, passkey, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (credential_id) DO NOTHING",
-            params![credential_id, account, name, passkey, now],
+            "INSERT INTO passkeys (credential_id, account_id, name, passkey, created_at, prf_salt)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (credential_id) DO NOTHING",
+            params![credential_id, account, name, passkey, now, prf_salt.as_slice()],
         )? > 0)
     }
 
@@ -1645,6 +1866,14 @@ impl Store {
         }
         if count <= 1 {
             return Ok(Removal::Last);
+        }
+        let (wrappers, this_wraps): (u64, bool) = tx.query_row(
+            "SELECT count(*), coalesce(sum(credential_id = ?2), 0) > 0 FROM key_wrappers WHERE account_id = ?1",
+            params![account, credential_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if this_wraps && wrappers <= 1 {
+            return Ok(Removal::LastUnlocking);
         }
         tx.execute(
             "DELETE FROM passkeys WHERE account_id = ?1 AND credential_id = ?2",
@@ -2265,6 +2494,7 @@ pub struct Sweep {
     pub devices: usize,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BoardHead {
     pub machine: Id,
     pub board: Option<(String, u64)>,
@@ -2404,7 +2634,6 @@ pub struct NewConnect<'a> {
 pub struct ConnectPairing<'a> {
     pub id: &'a str,
     pub code_hash: &'a [u8],
-    pub device: &'a Id,
     pub commitment: [u8; 32],
     pub expires_at: u64,
 }
@@ -2433,6 +2662,8 @@ pub struct StoredPasskey {
     pub created_at: u64,
     pub last_used_at: Option<u64>,
     pub counter: u32,
+    pub prf_salt: [u8; 32],
+    pub unlocks: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2467,6 +2698,7 @@ pub struct Ceremony {
     pub invite_hash: Option<Vec<u8>>,
     pub state: String,
     pub expires_at: u64,
+    pub prf_salt: Option<[u8; 32]>,
 }
 
 pub struct SignUp<'a> {
@@ -2477,6 +2709,7 @@ pub struct SignUp<'a> {
     pub credential_id: &'a [u8],
     pub name: Option<&'a str>,
     pub passkey: &'a str,
+    pub prf_salt: [u8; 32],
     pub session_hash: &'a [u8],
     pub session_expires_at: u64,
     pub now: u64,
@@ -2493,7 +2726,47 @@ pub enum SignUpOutcome {
 pub enum Removal {
     Removed,
     Last,
+    LastUnlocking,
     Missing,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum KeySet {
+    Set,
+    KeyExists,
+    UnknownPasskey,
+}
+
+pub struct AccountBoard {
+    pub machine: Id,
+    pub name: String,
+    pub last_seen: Option<u64>,
+    pub keys: PublicKeys,
+    pub board: Option<(u64, u64, String)>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ListWrite {
+    Stored,
+    Stale,
+    UnknownMachine,
+}
+
+fn put_wrapper(
+    connection: &Connection,
+    account: &str,
+    credential: &[u8],
+    version: u32,
+    wrapped: &[u8],
+    now: u64,
+) -> Result<()> {
+    connection.execute(
+        "INSERT INTO key_wrappers (credential_id, account_id, key_version, wrapped, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT (credential_id) DO UPDATE SET key_version = ?3, wrapped = ?4, created_at = ?5",
+        params![credential, account, version, wrapped, now],
+    )?;
+    Ok(())
 }
 
 fn drop_undelivered(connection: &Connection, device: &Id, machine: Option<&Id>) -> Result<()> {

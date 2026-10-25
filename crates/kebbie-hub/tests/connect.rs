@@ -7,11 +7,13 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use common::*;
 use kebbie_hub_api::{
-    CONNECT_UNKNOWN, ConnectApproval, ConnectApproved, ConnectPoll, ConnectState, Connected,
+    AccountReveal, Bytes32, Bytes64, CONNECT_UNKNOWN, ConnectApproval, ConnectApproved,
+    ConnectPoll, ConnectState, Connected, PairingState, PairingView, SignedMachineList,
 };
+use kebbie_hub_fakes::browser::Lock;
 use kebbie_hub_fakes::machine::{ConnectError, ConnectPolled, PendingConnect, connect};
 use kebbie_hub_fakes::{HubClient, PairError};
-use kebbie_hub_protocol::{SecretKeys, machine_fingerprint};
+use kebbie_hub_protocol::{MachineList, SecretKeys, machine_fingerprint};
 
 async fn poll(pending: &mut PendingConnect) -> Result<&'static str, ConnectError> {
     Ok(match pending.poll().await? {
@@ -217,7 +219,6 @@ async fn approving_needs_a_fresh_passkey_session_from_the_hub_origin() {
     let mut person = member(&test).await;
     let approval = ConnectApproval {
         code: code.clone(),
-        device: None,
         commitment: None,
     };
     let mut anonymous = browser(&test);
@@ -262,29 +263,31 @@ async fn approving_needs_a_fresh_passkey_session_from_the_hub_origin() {
 }
 
 #[tokio::test]
-async fn the_browser_that_connects_also_reads_the_board_without_a_digit_compare() {
+async fn the_browser_that_connects_hands_over_the_account_key_and_reads_the_board() {
     let test = start_hub(|config| config.connect_interval = 0).await;
     let pending = connect(&test.url, "mac").await.unwrap();
     let link = pending.link();
     let mut person = member(&test).await;
+    assert_eq!(person.lock, Lock::Unlocked);
     let approval = person.approve_connect(&link, true).await.unwrap();
     assert!(approval.approved.pairing.is_some());
     let (mut machine, pairing, secret) = pending.wait(WAIT).await.unwrap();
-    let pairing = pairing.expect("the machine learns the browser's pairing");
-    let (admitted, paired) = tokio::join!(
+    let pairing = pairing.expect("the machine learns the handoff");
+    let (pinned, confirmed) = tokio::join!(
         machine.finish_connect(&pairing, &secret, WAIT),
-        person.show_board(approval, WAIT)
+        person.hand_off(approval, WAIT)
     );
-    let device = admitted.unwrap();
-    assert_eq!(paired.unwrap(), machine.machine);
-    assert_eq!(
-        Some(&device),
-        person.device.as_ref().unwrap().device.as_ref()
-    );
+    let key = person.account_key().unwrap().clone();
+    assert_eq!(pinned.unwrap(), key.fingerprints());
+    assert_eq!(confirmed.unwrap(), machine.machine);
+    assert_eq!(machine.account.as_ref(), Some(&key));
     machine.post_board(board(MARKER)).await.unwrap();
-    let boards = person.device.as_ref().unwrap().boards().await.unwrap();
+    let boards = person.boards().await.unwrap();
     let opened = boards[0].board.as_ref().unwrap();
     assert_eq!(opened.items[0].summary, format!("{MARKER} summary"));
+    let sealed = test.hub.store().events().unwrap();
+    assert!(sealed.iter().any(|(kind, _)| kind == "account.pinned"));
+    assert!(machine.devices.is_empty());
 }
 
 #[tokio::test]
@@ -304,13 +307,13 @@ async fn a_link_that_names_another_machine_is_refused_before_the_reveal() {
     let (mut machine, pairing, secret) = pending.wait(WAIT).await.unwrap();
     let pairing = pairing.unwrap();
     let short = Duration::from_secs(2);
-    let (admitted, paired) = tokio::join!(
+    let (pinned, confirmed) = tokio::join!(
         machine.finish_connect(&pairing, &secret, short),
-        person.show_board(approval, short)
+        person.hand_off(approval, short)
     );
-    assert!(matches!(paired, Err(PairError::WrongMachine)), "{paired:?}");
-    assert!(admitted.is_err());
-    assert!(machine.devices.is_empty());
+    assert!(matches!(confirmed, Err(PairError::WrongMachine)), "{confirmed:?}");
+    assert!(pinned.is_err());
+    assert_eq!(machine.account, None);
 }
 
 #[tokio::test]
@@ -328,12 +331,81 @@ async fn a_browser_without_the_machines_secret_is_refused_by_the_machine() {
         .unwrap();
     let (mut machine, pairing, secret) = pending.wait(WAIT).await.unwrap();
     let pairing = pairing.unwrap();
-    let (admitted, paired) = tokio::join!(
+    let (pinned, confirmed) = tokio::join!(
         machine.finish_connect(&pairing, &secret, WAIT),
-        person.show_board(approval, WAIT)
+        person.hand_off(approval, WAIT)
     );
-    assert!(matches!(admitted, Err(PairError::Mismatch)), "{admitted:?}");
-    assert!(paired.is_err());
+    assert!(matches!(pinned, Err(PairError::Mismatch)), "{pinned:?}");
+    assert!(confirmed.is_err());
+    assert_eq!(machine.account, None);
+}
+
+#[tokio::test]
+async fn the_hub_cannot_reveal_another_key_than_the_accounts() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let pending = connect(&test.url, "mac").await.unwrap();
+    let mut person = member(&test).await;
+    let approval = person.approve_connect(&pending.link(), true).await.unwrap();
+    let pairing = approval.approved.pairing.clone().unwrap();
+    let (mut machine, _, secret) = pending.wait(WAIT).await.unwrap();
+    let reveal_swapped = async {
+        let replied: PairingView = loop {
+            let view: PairingView = person
+                .get(&format!("/v1/a/pairings/{pairing}?seen=committed&wait=5"))
+                .await
+                .unwrap();
+            if view.state != PairingState::Committed {
+                break view;
+            }
+        };
+        assert_eq!(replied.state, PairingState::Replied);
+        let mut key = person.account_key().unwrap().clone();
+        key.keys = SecretKeys::generate().public();
+        person
+            .post::<_, PairingView>(
+                &format!("/v1/a/pairings/{pairing}/reveal"),
+                &AccountReveal {
+                    key,
+                    nonce: Bytes32([1; 32]),
+                },
+            )
+            .await
+    };
+    let short = Duration::from_secs(2);
+    let (pinned, swapped) = tokio::join!(machine.finish_connect(&pairing, &secret, short), reveal_swapped);
+    assert_eq!(hub_code(swapped.unwrap_err()), (409, "keys-differ".to_string()));
+    assert!(pinned.is_err());
+}
+
+#[tokio::test]
+async fn a_handoff_and_a_machine_list_need_an_account_key() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut person = browser(&test);
+    person.prf_capable = false;
+    person
+        .sign_up_with_invite(&test.hub.mint_invite().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(person.lock, Lock::NoPrf);
+    let pending = connect(&test.url, "mac").await.unwrap();
+    let code = pending.started.user_code.clone();
+    let refused = person
+        .post::<_, ConnectApproved>(
+            "/v1/a/connect/approve",
+            &ConnectApproval {
+                code,
+                commitment: Some(Bytes32([3; 32])),
+            },
+        )
+        .await;
+    assert_eq!(hub_code(refused.unwrap_err()), (409, "no-key".to_string()));
+
+    let empty = SignedMachineList {
+        list: MachineList::default(),
+        signature: Bytes64([0; 64]),
+    };
+    let forged = person.put::<_, Option<()>>("/v1/a/machines", &empty).await;
+    assert_eq!(hub_code(forged.unwrap_err()), (409, "no-key".to_string()));
 }
 
 #[tokio::test]

@@ -7,9 +7,8 @@ export class HubError extends Error {
   }
 }
 
-async function call(method, path, { token, body } = {}) {
+async function call(method, path, { body } = {}) {
   const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: "same-origin" });
   if (!response.ok) {
@@ -28,18 +27,24 @@ export const account = {
   emailSignup: (email) => call("POST", "/v1/a/signup/email", { body: { email } }),
   verification: (token) => call("GET", `/v1/a/signup/verify?token=${query(token)}`),
   registerFinish: (ceremony, credential, name) => call("POST", "/v1/a/register/finish", { body: { ceremony, credential, name } }),
-  loginBegin: (handle) => call("POST", "/v1/a/login/begin", { body: handle ? { handle } : {} }),
+  loginBegin: (request = {}) => call("POST", "/v1/a/login/begin", { body: request }),
   loginFinish: (ceremony, credential) => call("POST", "/v1/a/login/finish", { body: { ceremony, credential } }),
   passkeyBegin: () => call("POST", "/v1/a/passkeys/begin", { body: {} }),
   passkeyFinish: (ceremony, credential, name) => call("POST", "/v1/a/passkeys/finish", { body: { ceremony, credential, name } }),
-  registerDevice: (name) => call("POST", "/v1/a/devices", { body: { name } }),
+  setKey: (setup) => call("POST", "/v1/a/key", { body: setup }),
+  putWrapper: (passkey, wrapper) => call("PUT", `/v1/a/passkeys/${query(passkey)}/wrapper`, { body: wrapper }),
+  boards: () => call("GET", "/v1/a/boards"),
 };
 
 export const connectCalls = {
   view: (code) => call("GET", `/v1/a/connect?code=${query(code)}`),
   approve: (approval) => call("POST", "/v1/a/connect/approve", { body: approval }),
   deny: (code) => call("POST", "/v1/a/connect/deny", { body: { code } }),
-  addView: (code) => call("GET", `/v1/a/add?code=${query(code)}`),
+  watch: (pairing, seen, wait) => call("GET", `/v1/a/pairings/${query(pairing)}?seen=${seen}&wait=${wait}`),
+  reveal: (pairing, key, nonce) => call("POST", `/v1/a/pairings/${query(pairing)}/reveal`, { body: { key, nonce } }),
+  boards: () => call("GET", "/v1/a/boards"),
+  putMachines: (signed) => call("PUT", "/v1/a/machines", { body: signed }),
+  removeMachine: (machine) => call("DELETE", `/v1/a/machines/${query(machine)}`),
 };
 
 export const admin = {
@@ -54,19 +59,6 @@ export const admin = {
   decideKey: (key, decision) => call("POST", `/v1/a/admin/reports/keys/${query(key)}/${decision}`, { body: {} }),
   ack: (id) => call("POST", `/v1/a/admin/reports/${query(id)}/ack`, { body: {} }),
 };
-
-export function deviceClient(token) {
-  return {
-    boards: () => call("GET", "/v1/d/boards", { token }),
-    commit: (code, commitment) => call("POST", "/v1/d/pairings", { token, body: { code, commitment } }),
-    watch: (pairing, seen, wait) => call("GET", `/v1/d/pairings/${encodeURIComponent(pairing)}?seen=${seen}&wait=${wait}`, { token }),
-    reveal: (pairing, keys, nonce) => call("POST", `/v1/d/pairings/${encodeURIComponent(pairing)}/reveal`, { token, body: { keys, nonce } }),
-    rename: (name) => call("PUT", "/v1/d/name", { token, body: { name } }),
-    subscribePush: (subscription) => call("PUT", "/v1/d/push", { token, body: subscription }),
-    unsubscribePush: () => call("DELETE", "/v1/d/push", { token }),
-    vapid: () => call("GET", "/v1/push/vapid"),
-  };
-}
 
 export function parseEvents(buffer) {
   const events = [];
@@ -88,8 +80,8 @@ export function parseEvents(buffer) {
   return { events, rest };
 }
 
-export async function follow(token, onEvent, signal) {
-  const response = await fetch("/v1/d/events", { headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" }, signal });
+export async function follow(onEvent, signal) {
+  const response = await fetch("/v1/a/events", { headers: { Accept: "text/event-stream" }, credentials: "same-origin", signal });
   if (!response.ok) throw new HubError(response.status, (await response.json().catch(() => ({}))).error ?? "unknown");
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";

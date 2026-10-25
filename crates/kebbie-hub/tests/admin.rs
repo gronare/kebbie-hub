@@ -6,7 +6,7 @@ use std::time::Duration;
 use common::*;
 use kebbie_hub::store::{KeyStatus, NewReport, Store};
 use kebbie_hub_api::{
-    AdminAccounts, AdminMachines, AdminOverview, AdminReports, AdminSignals, DeviceAdd, InviteLink,
+    AdminAccounts, AdminMachines, AdminOverview, AdminReports, AdminSignals, InviteLink,
 };
 use kebbie_hub_fakes::PairError;
 use kebbie_hub_protocol::BugReport;
@@ -109,7 +109,14 @@ async fn a_deactivated_account_loses_its_session_login_devices_and_machines() {
         .unwrap();
     assert_eq!(hub_code(person.account().await.unwrap_err()).0, 401);
     assert_eq!(hub_code(person.log_in().await.unwrap_err()).0, 401);
-    assert!(phone.boards().await.is_err());
+    assert!(person.boards().await.is_err());
+    assert!(
+        phone
+            .client()
+            .get::<serde_json::Value>("/v1/d/results", &[])
+            .await
+            .is_err()
+    );
     assert!(machine.post_board(board(MARKER)).await.is_err());
     let own = owner.account().await.unwrap().account;
     let refused = owner
@@ -218,75 +225,21 @@ async fn the_owner_decides_on_reports_from_the_web() {
 }
 
 #[tokio::test]
-async fn a_phone_added_from_the_machine_pairs_after_both_show_the_same_digits() {
-    let test = start_hub(|config| config.connect_interval = 0).await;
-    let mut person = member(&test).await;
-    let mut machine = connected(&test, &mut person).await;
-    let mut phone = browser(&test);
-    phone.handle = person.handle.clone();
-    phone.passkey = std::mem::replace(&mut person.passkey, soft_passkey());
-    phone.log_in().await.unwrap();
-    let (link_out, link_in) = oneshot::channel::<DeviceAdd>();
-    let (digits_out, digits_in) = oneshot::channel::<String>();
-    let machine_side = machine.add_device(
-        WAIT,
-        move |added| {
-            let _ = link_out.send(added.clone());
-        },
-        async move |digits: String| digits_in.await.is_ok_and(|phone| phone == digits),
-    );
-    let phone_side = async {
-        let added = link_in.await.unwrap();
-        assert_eq!(
-            added.url,
-            format!("http://localhost:8470/add?code={}", added.code)
-        );
-        let shown = phone.add_view(&added.url).await.unwrap();
-        assert_eq!(shown.name, "mac");
-        phone
-            .add_this_phone(&added.url, WAIT, async move |digits: String| {
-                let _ = digits_out.send(digits);
-                true
-            })
-            .await
-    };
-    let (admitted, paired) = tokio::join!(machine_side, phone_side);
-    let device = admitted.unwrap();
-    assert_eq!(paired.unwrap(), machine.machine);
-    assert_eq!(
-        phone.device.as_ref().unwrap().device.as_ref(),
-        Some(&device)
-    );
-    machine.post_board(board(MARKER)).await.unwrap();
-    assert!(
-        phone.device.as_ref().unwrap().boards().await.unwrap()[0]
-            .board
-            .is_ok()
-    );
-}
-
-#[tokio::test]
-async fn another_account_cannot_add_a_phone_to_my_machine() {
+async fn another_account_cannot_pair_a_device_with_my_machine() {
     let test = start_hub(|config| config.connect_interval = 0).await;
     let mut person = member(&test).await;
     let mut machine = connected(&test, &mut person).await;
     let mut stranger = member(&test).await;
-    let (link_out, link_in) = oneshot::channel::<DeviceAdd>();
-    let machine_side = machine.add_device(
+    let (code_out, code_in) = oneshot::channel::<String>();
+    let machine_side = machine.pair(
         Duration::from_secs(2),
-        move |added| {
-            let _ = link_out.send(added.clone());
+        move |code| {
+            let _ = code_out.send(code.to_string());
         },
         async |_: String| true,
     );
     let stranger_side = async {
-        let added = link_in.await.unwrap();
-        let viewed = stranger.add_view(&added.url).await;
-        assert_eq!(
-            hub_code(viewed.unwrap_err()),
-            (403, "not-your-machine".to_string())
-        );
-        let code = added.code.clone();
+        let code = code_in.await.unwrap();
         let device = stranger.ensure_device().await.unwrap();
         device
             .pair(&code, Duration::from_secs(2), async |_: String| true)
@@ -317,7 +270,9 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
              INSERT INTO machines (id, name, signing_key, encryption_key, token_hash, joined_at)
                  VALUES ('mch_00000000000000000000000000', 'mac', zeroblob(32), zeroblob(32), x'01', 1);
              INSERT INTO invites (code_hash, expires_at) VALUES (x'02', 9999999999);
-             INSERT INTO admin_tokens (token_hash, name, created_at) VALUES (x'03', 'laptop', 1);",
+             INSERT INTO admin_tokens (token_hash, name, created_at) VALUES (x'03', 'laptop', 1);
+             INSERT INTO passkeys (credential_id, account_id, passkey, created_at) VALUES (x'0a', 'acc_kept', '{}', 1);
+             INSERT INTO passkeys (credential_id, account_id, passkey, created_at) VALUES (x'0b', 'acc_kept', '{}', 2);",
         )
         .unwrap();
     drop(connection);
@@ -335,6 +290,15 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
         "an account from before plans keeps working"
     );
     assert!(store.ticket(b"\x02", 1).unwrap().is_some());
+    let salts: Vec<[u8; 32]> = store
+        .passkeys("acc_kept")
+        .unwrap()
+        .iter()
+        .map(|passkey| passkey.prf_salt)
+        .collect();
+    assert_eq!(salts.len(), 2);
+    assert!(salts[0] != [0; 32] && salts[0] != salts[1], "every older passkey gets a salt of its own");
+    assert_eq!(store.account_key("acc_kept").unwrap(), None);
     let mut store = store;
     let outcome = store
         .sign_up(&kebbie_hub::store::SignUp {
@@ -345,6 +309,7 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
             credential_id: b"cred",
             name: None,
             passkey: "{}",
+            prf_salt: [5; 32],
             session_hash: b"session",
             session_expires_at: u64::MAX >> 2,
             now: 2,
@@ -366,7 +331,7 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
         .unwrap()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 7);
+    assert_eq!(version, 8);
     assert!(!store_account_is_owner(&path, "acc_new"));
     rusqlite::Connection::open(&path)
         .unwrap()

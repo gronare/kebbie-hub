@@ -127,7 +127,7 @@ async fn a_lapsed_plan_stops_every_machine_post_but_not_the_account_page() {
     assert!(plan_inactive(machine.poll_once(0).await.unwrap_err()).is_some());
     let add = machine
         .client()
-        .post::<_, kebbie_hub_api::DeviceAdd>("/v1/m/devices/add", &())
+        .post::<_, kebbie_hub_api::PairingOpened>("/v1/m/pairings", &())
         .await;
     assert_eq!(add.unwrap_err().status(), Some(402));
     let page = person.account().await.unwrap();

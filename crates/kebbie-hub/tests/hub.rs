@@ -13,8 +13,8 @@ use kebbie_hub::RateLimit;
 use kebbie_hub_api::{
     Bytes32, CommitRequest, Committed, PairingFailure, PairingOpened, PairingState, PairingView,
 };
-use kebbie_hub_fakes::machine::join;
-use kebbie_hub_fakes::phone::PhoneState;
+use kebbie_hub_fakes::browser::Browser;
+use kebbie_hub_fakes::machine::{MachineState, join};
 use kebbie_hub_fakes::{HubClient, HubError, PairError};
 use kebbie_hub_protocol::{
     Header, Id, Kind, Payload, Prefix, PublicKeys, RunRoutine, SecretKeys, seal,
@@ -108,12 +108,23 @@ async fn a_paired_phone_opens_the_board_its_machine_posted() {
     assert_eq!(phone.device.as_ref(), Some(&device));
     assert_eq!(machine.devices[0].keys, phone.public());
     assert_eq!(phone.machines[0].keys, machine.public());
+}
 
+async fn reader(test: &TestHub) -> (Browser, MachineState) {
+    let mut person = member(test).await;
+    let machine = connected_with_board(test, &mut person).await;
+    (person, machine)
+}
+
+#[tokio::test]
+async fn the_account_opens_the_board_its_machine_posted() {
+    let test = start_hub(|_| {}).await;
+    let (mut person, mut machine) = reader(&test).await;
     let rev = machine.post_board(board(MARKER)).await.unwrap();
-    let boards = phone.boards().await.unwrap();
+    let boards = person.boards().await.unwrap();
     assert_eq!(boards.len(), 1);
     assert_eq!(boards[0].machine, machine.machine);
-    assert_eq!(boards[0].rev, rev);
+    assert_eq!(boards[0].rev, Some(rev));
     let opened = boards[0].board.as_ref().unwrap();
     let mut expected = board(MARKER);
     expected.rev = rev;
@@ -137,8 +148,6 @@ async fn a_relay_that_swaps_the_machine_key_shows_different_digits_and_the_machi
     assert!(machine.devices.is_empty());
     assert!(phone.machines.is_empty());
     assert_eq!(phone.attempts.len(), 1);
-    machine.post_board(board(MARKER)).await.unwrap();
-    assert!(phone.boards().await.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -167,10 +176,7 @@ async fn a_relay_that_swaps_the_device_key_breaks_the_commitment_and_the_machine
 #[tokio::test]
 async fn the_hub_refuses_a_board_older_than_the_one_it_holds() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    let (admitted, _) = pair_both(&mut machine, &mut phone, true).await;
-    admitted.unwrap();
+    let (mut phone, mut machine) = reader(&test).await;
 
     let at = kebbie_hub::now();
     let five = machine.seal_board(board("five"), 5, at).unwrap();
@@ -190,7 +196,7 @@ async fn the_hub_refuses_a_board_older_than_the_one_it_holds() {
     let six = machine.seal_board(board("six"), 6, at).unwrap();
     assert_eq!(machine.upload_board(6, six).await.unwrap(), 6);
     let boards = phone.boards().await.unwrap();
-    assert_eq!(boards[0].rev, 6);
+    assert_eq!(boards[0].rev, Some(6));
     assert_eq!(
         boards[0].board.as_ref().unwrap().items[0].summary,
         "six summary"
@@ -207,9 +213,7 @@ fn hub_refusal<T: std::fmt::Debug>(result: Result<T, kebbie_hub_fakes::Error>) -
 #[tokio::test]
 async fn a_replayed_board_with_a_huge_rev_is_refused_and_the_machine_carries_on() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
+    let (mut phone, mut machine) = reader(&test).await;
     let at = kebbie_hub::now();
     let older = machine.seal_board(board("older"), 1, at - 60).unwrap();
     machine.upload_board(1, older.clone()).await.unwrap();
@@ -228,23 +232,21 @@ async fn a_replayed_board_with_a_huge_rev_is_refused_and_the_machine_carries_on(
     let boards = phone.boards().await.unwrap();
     assert_eq!(
         (boards[0].rev, boards[0].board.as_ref().unwrap().rev),
-        (3, 3)
+        (Some(3), 3)
     );
 }
 
 #[tokio::test]
 async fn an_envelope_posted_ahead_of_the_machine_with_a_huge_rev_does_not_freeze_it() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
+    let (mut phone, mut machine) = reader(&test).await;
     let at = kebbie_hub::now();
     let caught = machine.seal_board(board("caught"), 1, at - 5).unwrap();
     machine.upload_board(i64::MAX as u64, caught).await.unwrap();
     let next = machine.seal_board(board("next"), 2, at).unwrap();
     assert_eq!(machine.upload_board(2, next).await.unwrap(), 2);
     let boards = phone.boards().await.unwrap();
-    assert_eq!(boards[0].rev, 2);
+    assert_eq!(boards[0].rev, Some(2));
     assert_eq!(
         boards[0].board.as_ref().unwrap().items[0].summary,
         "next summary"
@@ -290,8 +292,7 @@ async fn a_refused_reveal_leaves_the_device_free_to_pair_with_its_real_keys() {
     let (admitted, paired) = pair_both(&mut machine, &mut phone, true).await;
     assert_eq!(admitted.unwrap(), device);
     assert_eq!(paired.unwrap(), machine.machine);
-    machine.post_board(board(MARKER)).await.unwrap();
-    assert!(phone.boards().await.unwrap()[0].board.is_ok());
+    assert_eq!(machine.devices[0].keys, phone.public());
 }
 
 #[tokio::test]
@@ -382,38 +383,30 @@ async fn without_a_trusted_proxy_the_cloudflare_header_is_ignored() {
 }
 
 #[tokio::test]
-async fn a_phone_the_machine_did_not_admit_sees_no_board() {
+async fn another_account_sees_no_board_of_my_machine() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let mut admitted_phone = phone(&test).await;
-    pair_both(&mut machine, &mut admitted_phone, true)
-        .await
-        .0
-        .unwrap();
-    let mut other_phone = phone(&test).await;
-    let (refused, _) = pair_both(&mut machine, &mut other_phone, false).await;
-    assert!(matches!(refused, Err(PairError::Declined)));
-    assert!(other_phone.device.is_some());
-
+    let (mut person, mut machine) = reader(&test).await;
     machine.post_board(board(MARKER)).await.unwrap();
-    assert_eq!(admitted_phone.boards().await.unwrap().len(), 1);
-    assert!(other_phone.boards().await.unwrap().is_empty());
-    let raw: Value = other_phone.client().get("/v1/d/boards", &[]).await.unwrap();
-    assert_eq!(raw, serde_json::json!({ "boards": [] }));
+    assert_eq!(person.boards().await.unwrap().len(), 1);
+    let mut stranger = member(&test).await;
+    let raw: Value = stranger.get("/v1/a/boards").await.unwrap();
+    assert_eq!(raw, serde_json::json!({ "boards": [], "list": null }));
 }
 
 #[tokio::test]
-async fn a_board_sealed_before_a_phone_paired_is_listed_but_not_readable_by_it() {
+async fn a_board_sealed_before_the_account_was_pinned_is_listed_but_not_readable() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
+    let (mut person, mut machine) = reader(&test).await;
+    let pinned = machine.account.take();
     machine.post_board(board(MARKER)).await.unwrap();
-    let mut phone = phone(&test).await;
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    let boards = phone.boards().await.unwrap();
+    let boards = person.boards().await.unwrap();
     assert!(matches!(
         boards[0].board,
-        Err(kebbie_hub_fakes::phone::BoardProblem::NotSealedToThisDevice)
+        Err(kebbie_hub_fakes::browser::BoardProblem::NotSealedToTheAccount)
     ));
+    machine.account = pinned;
+    machine.post_board(board(MARKER)).await.unwrap();
+    assert!(person.boards().await.unwrap()[0].board.is_ok());
 }
 
 #[tokio::test]
@@ -430,7 +423,7 @@ async fn requests_without_a_valid_token_get_401_and_no_cors_grant() {
     );
     for client in [&anonymous, &forged] {
         assert_eq!(
-            status_of(client.get::<Value>("/v1/d/boards", &[]).await),
+            status_of(client.get::<Value>("/v1/d/results", &[]).await),
             401
         );
         assert_eq!(
@@ -443,7 +436,7 @@ async fn requests_without_a_valid_token_get_401_and_no_cors_grant() {
         );
     }
     assert_eq!(
-        status_of(machine.client().get::<Value>("/v1/d/boards", &[]).await),
+        status_of(machine.client().get::<Value>("/v1/d/results", &[]).await),
         401
     );
     assert_eq!(
@@ -459,7 +452,7 @@ async fn requests_without_a_valid_token_get_401_and_no_cors_grant() {
     );
 
     let response = reqwest::Client::new()
-        .get(format!("{}/v1/d/boards", test.url))
+        .get(format!("{}/v1/d/results", test.url))
         .header("origin", "https://evil.example")
         .send()
         .await
@@ -541,11 +534,7 @@ async fn a_board_not_signed_by_the_machine_is_refused() {
 #[tokio::test]
 async fn the_database_never_holds_board_text() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let person = signed_up(&test).await;
-    let registered = person.register_device().await;
-    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
+    let (mut phone, mut machine) = reader(&test).await;
     machine.post_board(board(MARKER)).await.unwrap();
     let boards = phone.boards().await.unwrap();
     assert!(
@@ -559,13 +548,13 @@ async fn the_database_never_holds_board_text() {
         holds(&stored, machine.machine.as_str().as_bytes()),
         "the scan did not read the database"
     );
-    let session = person.cookie.as_deref().unwrap().split_once('=').unwrap().1;
+    let session = phone.cookie.clone().unwrap();
+    let session = session.split_once('=').unwrap().1;
     for leak in [
         MARKER,
         "refunds@greenhouse",
         "Keep the old endpoint",
         "Nightly deps",
-        &registered.token,
         session,
     ] {
         assert!(
@@ -573,6 +562,9 @@ async fn the_database_never_holds_board_text() {
             "the database holds {leak:?}"
         );
     }
+    let (signing, encryption) = phone.account_secret().unwrap();
+    assert!(!holds(&stored, &signing) && !holds(&stored, &encryption), "the account's private keys stay out of the database");
+    assert!(holds(&stored, &phone.account_key().unwrap().keys.encryption), "the account's public key is kept");
 }
 
 #[tokio::test]
@@ -796,10 +788,8 @@ async fn the_inbox_hands_over_queued_envelopes_until_they_are_acknowledged() {
 #[tokio::test]
 async fn a_machine_renames_itself_and_only_itself() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
+    let (mut phone, mut machine) = reader(&test).await;
     let other = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
     machine.post_board(board(MARKER)).await.unwrap();
     assert_eq!(phone.boards().await.unwrap()[0].name, "mac");
 

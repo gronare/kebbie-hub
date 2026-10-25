@@ -1,8 +1,11 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kebbie_hub_protocol::{BugReport, Envelope, ErrorSignals, Id, PublicKeys};
+use kebbie_hub_protocol::{
+    AccountKey, BugReport, Envelope, ErrorSignals, Id, MachineList, PublicKeys,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 pub use webauthn_rs_proto::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
@@ -247,6 +250,12 @@ pub struct PairingView {
     pub device_nonce: Option<Bytes32>,
     #[serde(default)]
     pub machine_name: Option<String>,
+    #[serde(default)]
+    pub account: Option<Id>,
+    #[serde(default)]
+    pub account_key: Option<AccountKey>,
+    #[serde(default)]
+    pub account_nonce: Option<Bytes32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -281,20 +290,32 @@ pub struct RevealRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AccountReveal {
+    pub key: AccountKey,
+    pub nonce: Bytes32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoardEntry {
     pub machine: Id,
-    #[serde(default)]
     pub name: String,
-    #[serde(default)]
     pub last_seen: Option<u64>,
-    pub rev: u64,
-    pub stored_at: u64,
+    pub machine_keys: PublicKeys,
+    pub rev: Option<u64>,
+    pub stored_at: Option<u64>,
     pub envelope: Option<Envelope>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignedMachineList {
+    pub list: MachineList,
+    pub signature: Bytes64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Boards {
     pub boards: Vec<BoardEntry>,
+    pub list: Option<SignedMachineList>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -308,22 +329,56 @@ pub struct RegisterBegin {
     pub verification: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct LoginBegin {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handle: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreationCeremony {
     pub ceremony: String,
     pub options: CreationChallengeResponse,
+    pub prf_salt: Bytes32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RequestCeremony {
     pub ceremony: String,
     pub options: RequestChallengeResponse,
+    #[serde(default)]
+    pub prf_salts: BTreeMap<String, Bytes32>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Unlocking {
+    pub credential: String,
+    pub prf_salt: Bytes32,
+    pub wrapped: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignedIn {
+    #[serde(flatten)]
+    pub account: AccountView,
+    pub unlock: Unlocking,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AccountKeySetup {
+    pub key: AccountKey,
+    pub credential: String,
+    pub wrapped: String,
+    pub signature: Bytes64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WrapperUpload {
+    pub key_version: u32,
+    pub wrapped: String,
+    pub signature: Bytes64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -353,6 +408,8 @@ pub struct AccountView {
     pub plan: PlanView,
     #[serde(default)]
     pub billing_url: Option<String>,
+    #[serde(default)]
+    pub key: Option<AccountKey>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -441,6 +498,8 @@ pub struct PasskeyView {
     pub name: Option<String>,
     pub created_at: u64,
     pub last_used_at: Option<u64>,
+    #[serde(default)]
+    pub unlocks: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -685,8 +744,6 @@ pub struct ConnectRequestView {
 pub struct ConnectApproval {
     pub code: String,
     #[serde(default)]
-    pub device: Option<Id>,
-    #[serde(default)]
     pub commitment: Option<Bytes32>,
 }
 
@@ -700,21 +757,6 @@ pub struct ConnectApproved {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConnectDenial {
     pub code: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DeviceAdd {
-    pub pairing: String,
-    pub code: String,
-    pub url: String,
-    pub expires_at: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AddView {
-    pub machine: Id,
-    pub name: String,
-    pub expires_at: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -805,6 +847,13 @@ pub const EVENT_BOARD: &str = "board";
 pub const EVENT_PAIRING: &str = "pairing";
 pub const EVENT_MACHINE_REMOVED: &str = "machine-removed";
 pub const EVENT_RESULT: &str = "result";
+pub const EVENT_MACHINES: &str = "machines";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MachinesChanged {
+    pub counter: u64,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

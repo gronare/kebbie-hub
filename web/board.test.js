@@ -2,44 +2,56 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { importIdentity } from "../js/protocol.js";
-import { arrange, findTask, followHubNames, highestRevs, isAsleep, openBoards, SLEEP_AFTER, splitAddress } from "./board.js";
+import { accountIdentity, fromB64 } from "../js/protocol.js";
+import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, SLEEP_AFTER, splitAddress } from "./board.js";
+import { get } from "./store.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
 const envelopes = load("envelopes.json");
-const vector = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-a-device");
+const accounts = load("accounts.json");
+const vector = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-the-account");
 const now = envelopes.now;
-const machine = { id: parties.machine.id, keys: parties.machine.public, name: "Office" };
-const entry = (changes = {}) => ({ machine: machine.id, name: "devbox", last_seen: now - 5, rev: vector.expect.payload.rev, stored_at: now - 60, envelope: vector.envelope, ...changes });
-const phone = () => importIdentity(parties.phone);
+const machine = parties.machine;
+const entry = (changes = {}) => ({ machine: machine.id, name: "devbox", last_seen: now - 5, machine_keys: machine.public, rev: vector.expect.payload.rev, stored_at: now - 60, envelope: vector.envelope, ...changes });
+const signed = { list: accounts.machines.list, signature: accounts.machines.signature };
+const removed = { list: accounts.machines.removed, signature: accounts.machines.removed_signature };
+const listing = (boards, list = signed) => ({ boards, list });
+const open = async (boards, marks, list) => (await openBoards(listing(boards, list), await account(), now, marks)).opened;
+const account = () => accountIdentity(accounts.key, { signing: fromB64(parties.account.signing_secret), encryption: fromB64(parties.account.encryption_secret) }, accounts.key.account);
 
-test("a board sealed to this phone opens to the machine's payload", async () => {
-  const [opened] = await openBoards([entry()], await phone(), [machine], now);
+test("a board sealed to the account opens to the machine's payload once the account vouches for the machine", async () => {
+  const [opened] = await open([entry()]);
   assert.equal(opened.problem, null);
-  assert.equal(opened.name, "Office");
+  assert.equal(opened.name, "devbox");
   assert.deepEqual(opened.board, vector.expect.payload);
 });
 
 test("a board that fails to verify or decrypt is kept out with a reason", async () => {
   const flipped = vector.envelope.ct.startsWith("A") ? `B${vector.envelope.ct.slice(1)}` : `A${vector.envelope.ct.slice(1)}`;
   const cases = [
-    [entry({ envelope: { ...vector.envelope, ct: flipped } }), [machine], "bad-signature"],
-    [entry({ envelope: { ...vector.envelope, at: vector.envelope.at + 1 } }), [machine], "bad-signature"],
-    [entry(), [{ id: machine.id, keys: parties["other-machine"].public }], "bad-signature"],
-    [entry(), [], "unknown-machine"],
-    [entry({ envelope: null }), [machine], "not-sealed-to-this-device"],
-    [entry({ rev: vector.expect.payload.rev + 1 }), [machine], "revision-differs"],
+    [entry({ envelope: { ...vector.envelope, ct: flipped } }), "bad-signature"],
+    [entry({ envelope: { ...vector.envelope, at: vector.envelope.at + 1 } }), "bad-signature"],
+    [entry({ machine_keys: parties["other-machine"].public }), "unknown-machine"],
+    [entry({ machine: parties.intruder.id, machine_keys: parties.intruder.public }), "unknown-machine"],
+    [entry({ envelope: null }), "not-sealed-to-this-account"],
+    [entry({ rev: vector.expect.payload.rev + 1 }), "revision-differs"],
   ];
-  for (const [given, machines, problem] of cases) {
-    const [opened] = await openBoards([given], await phone(), machines, now);
+  for (const [given, problem] of cases) {
+    const [opened] = await open([given]);
     assert.equal(opened.board, null, problem);
     assert.equal(opened.problem, problem);
   }
 });
 
-test("a board is not opened by a device it was not sealed to", async () => {
-  const [opened] = await openBoards([entry()], await importIdentity(parties.intruder), [machine], now);
+test("a connected machine without a board yet shows with no problem", async () => {
+  const [waiting] = await open([entry({ rev: null, stored_at: null, envelope: null })]);
+  assert.deepEqual([waiting.board, waiting.problem, waiting.rev], [null, null, null]);
+});
+
+test("a board sealed only to devices does not open with the account key", async () => {
+  const deviceBoard = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-a-device");
+  const [opened] = await open([entry({ envelope: deviceBoard.envelope })]);
   assert.equal(opened.problem, "not-a-recipient");
 });
 
@@ -88,31 +100,45 @@ test("a task is found by machine and address", () => {
   assert.deepEqual(splitAddress("loose"), { task: "loose", repo: "" });
 });
 
-test("the phone's own name for a machine wins over the hub's", async () => {
-  const [named] = await openBoards([entry()], await phone(), [machine], now);
-  assert.equal(named.name, "Office");
-  const [unnamed] = await openBoards([entry()], await phone(), [{ ...machine, name: null }], now);
-  assert.equal(unnamed.name, "devbox");
-  const [renamed] = await openBoards([entry({ name: "studio" })], await phone(), [{ ...machine, name: null }], now);
-  assert.equal(renamed.name, "studio");
-});
-
-test("a board older than the newest one read from that machine is refused as a rollback", async () => {
+test("a board older than the newest one read from that machine, by rev or by signed time, is refused", async () => {
   const rev = vector.expect.payload.rev;
-  const [older] = await openBoards([entry()], await phone(), [machine], now, { [machine.id]: rev + 1 });
-  assert.equal(older.board, null);
-  assert.equal(older.problem, "rolled-back");
-  const [same] = await openBoards([entry()], await phone(), [machine], now, { [machine.id]: rev });
-  assert.equal(same.problem, null);
-  assert.deepEqual(highestRevs([same, older], { other: 3, [machine.id]: rev - 1 }), { other: 3, [machine.id]: rev });
-  assert.deepEqual(highestRevs([older], { [machine.id]: rev + 1 }), { [machine.id]: rev + 1 });
+  const at = vector.envelope.at;
+  const marks = (mark) => ({ list: 0, machines: { [machine.id]: mark } });
+  assert.equal((await open([entry()], marks({ rev: rev + 1, at: 0 })))[0].problem, "rolled-back");
+  assert.equal((await open([entry()], marks({ rev: 0, at: at + 1 })))[0].problem, "rolled-back");
+  const read = await openBoards(listing([entry()]), await account(), now, marks({ rev, at }));
+  assert.equal(read.opened[0].problem, null);
+  assert.deepEqual(read.marks.machines[machine.id], { rev, at });
+  assert.equal(read.marks.list, signed.list.counter);
 });
 
-test("a phone paired before names followed the hub drops a stored name that is the hub's, and then follows its renames", async () => {
-  const stored = [{ ...machine, name: "devbox" }, { ...machine, id: "mch_other", name: "Office" }];
-  const followed = followHubNames(stored, [entry(), entry({ machine: "mch_other", name: "devbox" })]);
-  assert.deepEqual(followed.map((known) => known.name), [null, "Office"]);
-  assert.equal(followHubNames(followed, [entry()]), null, "nothing left to drop changes nothing");
-  const [renamed] = await openBoards([entry({ name: "studio" })], await phone(), followed, now);
-  assert.equal(renamed.name, "studio");
+test("only machines on a list the account signed, no older than the newest seen, are trusted", async () => {
+  const other = parties["other-machine"];
+  const theirs = entry({ machine: other.id, machine_keys: other.public, envelope: null, rev: null });
+  const fresh = await open([entry(), theirs], emptyMarks(), signed);
+  assert.deepEqual(fresh.map((opened) => opened.problem), [null, null]);
+  const after = await open([entry(), theirs], emptyMarks(), removed);
+  assert.deepEqual(after.map((opened) => opened.problem), [null, "unknown-machine"], "a removed machine is not trusted");
+  const replayed = await open([entry(), theirs], { list: removed.list.counter, machines: {} }, signed);
+  assert.deepEqual(replayed.map((opened) => opened.problem), ["rolled-back-list", "rolled-back-list"]);
+  const dropped = await open([entry()], { list: 1, machines: {} }, null);
+  assert.equal(dropped[0].problem, "rolled-back-list", "a list the hub withholds after one was seen is a rollback");
+  assert.equal((await open([entry()], emptyMarks(), { ...signed, signature: removed.signature }))[0].problem, "unknown-machine");
+  assert.equal((await open([entry()], emptyMarks(), null))[0].problem, "unknown-machine");
+});
+
+test("a listed machine the hub no longer reports is named for the browser to drop", async () => {
+  const result = await openBoards(listing([entry()]), await account(), now, emptyMarks());
+  assert.deepEqual(result.gone, [parties["other-machine"].id]);
+});
+
+test("marks merge to the highest of each, so a store that failed loses nothing this visit", () => {
+  const merged = mergeMarks({ list: 3, machines: { a: { rev: 5, at: 10 } } }, undefined, { list: 2, machines: { a: { rev: 4, at: 12 }, b: { rev: 1, at: 1 } } });
+  assert.deepEqual(merged, { list: 3, machines: { a: { rev: 5, at: 12 }, b: { rev: 1, at: 1 } } });
+});
+
+test("a store that cannot be read says so instead of passing for an empty one", async () => {
+  await assert.rejects(get("marks:acc_x"), "the store does not swallow its failures");
+  assert.deepEqual(await readMarks(get, "marks:acc_x"), { marks: emptyMarks(), failed: true });
+  assert.deepEqual(await readMarks(async () => undefined, "marks:acc_x"), { marks: emptyMarks(), failed: false });
 });

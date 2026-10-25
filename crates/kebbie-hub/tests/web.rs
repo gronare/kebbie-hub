@@ -115,18 +115,32 @@ async fn every_shipped_file_is_served_byte_for_byte_and_nothing_else() {
 }
 
 #[tokio::test]
-async fn a_board_entry_names_its_machine_and_when_it_was_last_heard() {
-    let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    let (admitted, _) = pair_both(&mut machine, &mut phone, true).await;
-    admitted.unwrap();
+async fn a_board_entry_names_its_machine_its_keys_and_when_it_was_last_heard() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut person = member(&test).await;
+    let mut machine = connected_with_board(&test, &mut person).await;
+    let quiet = connected(&test, &mut person).await;
     machine.post_board(board(MARKER)).await.unwrap();
-    let listing: Boards = phone.client().get("/v1/d/boards", &[]).await.unwrap();
-    assert_eq!(listing.boards.len(), 1);
-    assert_eq!(listing.boards[0].name, "mac");
-    let heard = listing.boards[0].last_seen.unwrap();
+    let listing: Boards = person.get("/v1/a/boards").await.unwrap();
+    assert_eq!(listing.boards.len(), 2);
+    let entry = &listing.boards[0];
+    assert_eq!((entry.name.as_str(), entry.machine_keys), ("mac", machine.public()));
+    assert!(entry.rev.is_some());
+    let list = listing.list.as_ref().unwrap();
+    assert!(list.list.trusts(&machine.machine, &machine.public()));
+    assert!(!list.list.trusts(&quiet.machine, &quiet.public()), "a machine connected without the handoff is not listed");
+    let heard = entry.last_seen.unwrap();
     assert!(heard.abs_diff(kebbie_hub::now()) <= 5, "{heard}");
+    let envelope = entry.envelope.as_ref().unwrap();
+    let account = person.account_key().unwrap().account.clone();
+    assert_eq!(envelope.keys.keys().collect::<Vec<_>>(), [&account], "only the account's row");
+    let unread = &listing.boards[1];
+    assert_eq!(unread.machine, quiet.machine);
+    assert!(unread.rev.is_none() && unread.envelope.is_none());
+    let mut stranger = member(&test).await;
+    let theirs: Boards = stranger.get("/v1/a/boards").await.unwrap();
+    assert!(theirs.boards.is_empty());
+    assert_eq!(status_of(browser(&test).get::<Boards>("/v1/a/boards").await), 401);
 }
 
 #[tokio::test]
@@ -160,13 +174,13 @@ async fn a_removed_device_is_told_it_is_unknown_and_a_missing_token_is_not() {
     let person = signed_up(&test).await;
     let registered = person.register_device().await;
     let client = device_client(&test, &registered);
-    let _: Boards = client.get("/v1/d/boards", &[]).await.unwrap();
+    let _: serde_json::Value = client.get("/v1/d/results", &[]).await.unwrap();
     let removed = person
         .delete(&format!("/v1/a/devices/{}", registered.device))
         .await;
     assert!(removed.status().is_success(), "{}", removed.status());
     assert_eq!(
-        client.get::<Boards>("/v1/d/boards", &[]).await.unwrap_err(),
+        client.get::<serde_json::Value>("/v1/d/results", &[]).await.unwrap_err(),
         HubError::Status {
             status: 401,
             code: "unknown-device".to_string()
@@ -174,7 +188,7 @@ async fn a_removed_device_is_told_it_is_unknown_and_a_missing_token_is_not() {
     );
     assert_eq!(
         HubClient::new(&test.url, None)
-            .get::<Boards>("/v1/d/boards", &[])
+            .get::<serde_json::Value>("/v1/d/results", &[])
             .await
             .unwrap_err(),
         HubError::Status {

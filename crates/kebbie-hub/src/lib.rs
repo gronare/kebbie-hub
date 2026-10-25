@@ -1,6 +1,7 @@
 mod account;
 mod admin;
 mod auth;
+mod boards;
 mod command;
 mod connect;
 mod device;
@@ -40,7 +41,7 @@ use mail::{LogMailer, MailSettings, Mailer, SmtpMailer};
 use push::Pusher;
 pub use server::serve;
 use store::{AccountRow, AdminScope, Pairing, Store};
-use wake::{Wakeups, device_key, machine_key, pairing_key};
+use wake::{Wakeups, account_key, device_key, machine_key, pairing_key};
 use webpush::{Vapid, check_subject};
 
 pub const DATABASE_FILE: &str = "hub.sqlite3";
@@ -320,13 +321,13 @@ pub struct Hub {
     closing: watch::Sender<bool>,
     webauthn: Webauthn,
     origin: String,
-    feeds: Mutex<HashMap<Id, usize>>,
+    feeds: Mutex<HashMap<String, usize>>,
     config: Config,
 }
 
 pub struct FeedPermit {
     hub: Arc<Hub>,
-    device: Id,
+    key: String,
 }
 
 impl Drop for FeedPermit {
@@ -336,10 +337,10 @@ impl Drop for FeedPermit {
             .feeds
             .lock()
             .expect("the feeds lock is never poisoned");
-        if let Some(count) = feeds.get_mut(&self.device) {
+        if let Some(count) = feeds.get_mut(&self.key) {
             *count -= 1;
             if *count == 0 {
-                feeds.remove(&self.device);
+                feeds.remove(&self.key);
             }
         }
     }
@@ -413,16 +414,16 @@ impl Hub {
         }))
     }
 
-    pub fn open_feed(self: &Arc<Hub>, device: &Id) -> Option<FeedPermit> {
+    pub fn open_feed(self: &Arc<Hub>, key: &str) -> Option<FeedPermit> {
         let mut feeds = self.feeds.lock().expect("the feeds lock is never poisoned");
-        let count = feeds.entry(device.clone()).or_insert(0);
+        let count = feeds.entry(key.to_string()).or_insert(0);
         if *count >= self.config.max_feeds_per_device {
             return None;
         }
         *count += 1;
         Some(FeedPermit {
             hub: Arc::clone(self),
-            device: device.clone(),
+            key: key.to_string(),
         })
     }
 
@@ -430,7 +431,7 @@ impl Hub {
         self.feeds
             .lock()
             .expect("the feeds lock is never poisoned")
-            .get(device)
+            .get(&device_key(device))
             .copied()
             .unwrap_or(0)
     }
@@ -548,6 +549,10 @@ impl Hub {
         if let Some(device) = &pairing.device {
             self.wake_device(device);
         }
+    }
+
+    fn wake_account(&self, account: &str) {
+        self.wakeups.wake(&account_key(account));
     }
 
     fn wake_devices(&self, devices: &[Id]) {
@@ -681,11 +686,16 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/m/join", post(machine::join))
         .route("/v1/m/connect", post(connect::start))
         .route("/v1/m/connect/token", post(connect::token))
-        .route("/v1/m/devices/add", post(connect::add_device))
         .route("/v1/a/connect", get(connect::view))
         .route("/v1/a/connect/approve", post(connect::approve))
         .route("/v1/a/connect/deny", post(connect::deny))
-        .route("/v1/a/add", get(connect::add_view))
+        .route("/v1/a/pairings/{id}", get(connect::pairing))
+        .route("/v1/a/pairings/{id}/reveal", post(connect::reveal))
+        .route("/v1/a/boards", get(boards::boards))
+        .route("/v1/a/machines", put(boards::put_machines))
+        .route("/v1/a/machines/{id}", delete(boards::remove_machine))
+        .route("/v1/a/events", get(events::account_events))
+        .route("/v1/a/key", post(account::set_key))
         .route("/v1/a/signup/email", post(account::email_signup))
         .route("/v1/a/signup/verify", get(account::verification))
         .route("/v1/a/admin/overview", get(admin::overview))
@@ -733,7 +743,6 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/m/devices", get(machine::devices))
         .route("/v1/m/devices/{id}", delete(machine::remove_device))
         .route("/v1/d/name", put(device::rename))
-        .route("/v1/d/boards", get(device::boards))
         .route("/v1/d/events", get(events::events))
         .route("/v1/a/register/begin", post(account::register_begin))
         .route("/v1/a/register/finish", post(account::register_finish))
@@ -745,6 +754,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/a/passkeys/begin", post(account::passkey_begin))
         .route("/v1/a/passkeys/finish", post(account::passkey_finish))
         .route("/v1/a/passkeys/{id}", delete(account::remove_passkey))
+        .route("/v1/a/passkeys/{id}/wrapper", put(account::set_wrapper))
         .route(
             "/v1/a/devices",
             get(account::devices).post(account::register_device),

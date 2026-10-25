@@ -8,12 +8,15 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::AppendHeaders;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use std::collections::BTreeMap;
+
 use kebbie_hub_api::{
-    AccountView, CreationCeremony, DeviceRegistered, DeviceRequest, DeviceView, Devices,
-    EmailSignup, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys, RegisterBegin,
-    RegisterFinish, RequestCeremony, SignupMode, VerifiedEmail, normalize_code,
+    AccountKeySetup, AccountView, Bytes32, CreationCeremony, DeviceRegistered, DeviceRequest,
+    DeviceView, Devices, EmailSignup, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys,
+    RegisterBegin, RegisterFinish, RequestCeremony, SignedIn, SignupMode, Unlocking,
+    VerifiedEmail, WrapperUpload, normalize_code,
 };
-use kebbie_hub_protocol::{Id, Prefix};
+use kebbie_hub_protocol::{Id, Prefix, WRAPPED_LEN};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use webauthn_rs::prelude::{
@@ -26,12 +29,14 @@ use webauthn_rs_proto::{
 };
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, SESSION_COOKIE, SESSION_TOKEN_PREFIX,
+    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, SESSION_COOKIE, SESSION_TOKEN_PREFIX,
     SETUP_TOKEN_PREFIX, SameOrigin, VERIFY_TOKEN_PREFIX, digest, new_token, random, session_cookie,
 };
 use crate::error::ApiError;
 use crate::mail::{Mail, plausible_address};
-use crate::store::{Ceremony, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey, Ticket};
+use crate::store::{
+    Ceremony, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey, Ticket,
+};
 use crate::{Hub, clean_name, now};
 
 const MAX_HANDLE_CHARS: usize = 32;
@@ -117,7 +122,39 @@ fn passkey_view(stored: &StoredPasskey) -> PasskeyView {
         name: stored.name.clone(),
         created_at: stored.created_at,
         last_used_at: stored.last_used_at,
+        unlocks: stored.unlocks,
     }
+}
+
+fn unlocking(hub: &Hub, credential: &[u8], prf_salt: [u8; 32]) -> Result<Unlocking, ApiError> {
+    let wrapped = hub.store().wrapper(credential)?;
+    Ok(Unlocking {
+        credential: URL_SAFE_NO_PAD.encode(credential),
+        prf_salt: Bytes32(prf_salt),
+        wrapped: wrapped.map(|(_, wrapped)| URL_SAFE_NO_PAD.encode(wrapped)),
+    })
+}
+
+fn signed_in(hub: &Hub, account: &str, credential: &[u8], prf_salt: [u8; 32]) -> Result<SignedIn, ApiError> {
+    Ok(SignedIn {
+        account: account_view(hub, account)?,
+        unlock: unlocking(hub, credential, prf_salt)?,
+    })
+}
+
+fn salts_of(stored: &[StoredPasskey]) -> BTreeMap<String, Bytes32> {
+    stored
+        .iter()
+        .map(|stored| (URL_SAFE_NO_PAD.encode(&stored.credential_id), Bytes32(stored.prf_salt)))
+        .collect()
+}
+
+fn wrapped_of(text: &str) -> Result<Vec<u8>, ApiError> {
+    URL_SAFE_NO_PAD
+        .decode(text)
+        .ok()
+        .filter(|wrapped| wrapped.len() == WRAPPED_LEN)
+        .ok_or(ApiError::bad_request("bad-wrapped"))
 }
 
 pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
@@ -126,7 +163,9 @@ pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
         .account(account)?
         .ok_or_else(ApiError::unauthorized)?;
     let plan = hub.plan_view(&row, now());
+    let key = hub.store().account_key(account)?;
     Ok(AccountView {
+        key,
         account: row.id,
         handle: row.handle,
         created_at: row.created_at,
@@ -160,6 +199,7 @@ fn save_ceremony(
     account: Option<String>,
     state: String,
     signup: Option<(String, [u8; 16], Vec<u8>)>,
+    prf_salt: Option<[u8; 32]>,
 ) -> Result<String, ApiError> {
     let id = new_id();
     let (handle, user_handle, invite_hash) = match signup {
@@ -175,6 +215,7 @@ fn save_ceremony(
         invite_hash,
         state,
         expires_at: now() + hub.config().ceremony_ttl,
+        prf_salt,
     })?;
     Ok(id)
 }
@@ -223,14 +264,20 @@ pub async fn register_begin(
         .start_passkey_registration(user, &handle, &handle, None)
         .map_err(refused)?;
     let options = discoverable(options);
+    let prf_salt = random::<32>();
     let ceremony = save_ceremony(
         &hub,
         Purpose::SignUp,
         None,
         to_json(&state)?,
         Some((handle, *user.as_bytes(), invite_hash)),
+        Some(prf_salt),
     )?;
-    Ok(Json(CreationCeremony { ceremony, options }))
+    Ok(Json(CreationCeremony {
+        ceremony,
+        options,
+        prf_salt: Bytes32(prf_salt),
+    }))
 }
 
 pub async fn register_finish(
@@ -238,7 +285,7 @@ pub async fn register_finish(
     _: SameOrigin,
     client: Anonymous,
     Json(request): Json<RegisterFinish>,
-) -> Result<WithCookie<AccountView>, ApiError> {
+) -> Result<WithCookie<SignedIn>, ApiError> {
     hub.limit_anonymous(&client.address)?;
     let name = optional_name(request.name.as_deref())?;
     let ceremony = take_ceremony(&hub, &request.ceremony, Purpose::SignUp)?;
@@ -247,9 +294,12 @@ pub async fn register_finish(
         .webauthn()
         .finish_passkey_registration(&request.credential, &state)
         .map_err(refused)?;
-    let (Some(handle), Some(user_handle), Some(invite_hash)) =
-        (ceremony.handle, ceremony.user_handle, ceremony.invite_hash)
-    else {
+    let (Some(handle), Some(user_handle), Some(invite_hash), Some(prf_salt)) = (
+        ceremony.handle,
+        ceremony.user_handle,
+        ceremony.invite_hash,
+        ceremony.prf_salt,
+    ) else {
         return Err(ApiError::internal());
     };
     let account = format!("{ACCOUNT_PREFIX}{}", new_id());
@@ -264,6 +314,7 @@ pub async fn register_finish(
         credential_id: passkey.cred_id().as_ref(),
         name: name.as_deref(),
         passkey: &to_json(&passkey)?,
+        prf_salt,
         session_hash: &digest(&session),
         session_expires_at: at + hub.config().session_ttl,
         now: at,
@@ -286,7 +337,7 @@ pub async fn register_finish(
     if kind == Ticket::Owner {
         hub.forget_setup();
     }
-    let view = account_view(&hub, &account)?;
+    let view = signed_in(&hub, &account, passkey.cred_id().as_ref(), prf_salt)?;
     Ok(with_session(&hub, &session, view))
 }
 
@@ -297,30 +348,56 @@ pub async fn login_begin(
     Json(request): Json<LoginBegin>,
 ) -> Result<Json<RequestCeremony>, ApiError> {
     hub.limit_anonymous(&client.address)?;
-    let Some(typed) = request.handle.filter(|typed| !typed.trim().is_empty()) else {
-        let (mut options, state) = hub
-            .webauthn()
-            .start_discoverable_authentication()
-            .map_err(refused)?;
-        options.mediation = None;
-        let ceremony = save_ceremony(&hub, Purpose::LogIn, None, to_json(&state)?, None)?;
-        return Ok(Json(RequestCeremony { ceremony, options }));
-    };
-    let handle = normalize_handle(&typed).ok_or_else(ApiError::unauthorized)?;
-    let (account, stored) = {
-        let store = hub.store();
-        let account = store
-            .account_by_handle(&handle)?
-            .ok_or_else(ApiError::unauthorized)?;
-        if store
-            .account(&account)?
-            .is_none_or(|row| row.deactivated_at.is_some())
-        {
-            return Err(ApiError::unauthorized());
+    let handle = request.handle.filter(|typed| !typed.trim().is_empty());
+    let credential = request.credential.filter(|typed| !typed.trim().is_empty());
+    let (account, stored) = match (handle, credential) {
+        (None, None) => {
+            let (mut options, state) = hub
+                .webauthn()
+                .start_discoverable_authentication()
+                .map_err(refused)?;
+            options.mediation = None;
+            let ceremony =
+                save_ceremony(&hub, Purpose::LogIn, None, to_json(&state)?, None, None)?;
+            return Ok(Json(RequestCeremony {
+                ceremony,
+                options,
+                prf_salts: BTreeMap::new(),
+            }));
         }
-        let stored = store.passkeys(&account)?;
-        (account, stored)
+        (Some(typed), None) => {
+            let handle = normalize_handle(&typed).ok_or_else(ApiError::unauthorized)?;
+            let store = hub.store();
+            let account = store
+                .account_by_handle(&handle)?
+                .ok_or_else(ApiError::unauthorized)?;
+            let stored = store.passkeys(&account)?;
+            (account, stored)
+        }
+        (None, Some(typed)) => {
+            let credential = URL_SAFE_NO_PAD
+                .decode(typed.trim())
+                .map_err(|_| ApiError::unauthorized())?;
+            let store = hub.store();
+            let account = store
+                .passkey_account(&credential)?
+                .ok_or_else(ApiError::unauthorized)?;
+            let stored = store
+                .passkeys(&account)?
+                .into_iter()
+                .filter(|stored| stored.credential_id == credential)
+                .collect();
+            (account, stored)
+        }
+        (Some(_), Some(_)) => return Err(ApiError::bad_request("handle-or-credential")),
     };
+    if hub
+        .store()
+        .account(&account)?
+        .is_none_or(|row| row.deactivated_at.is_some())
+    {
+        return Err(ApiError::unauthorized());
+    }
     let passkeys = stored
         .iter()
         .map(|stored| from_json::<Passkey>(&stored.passkey))
@@ -332,8 +409,19 @@ pub async fn login_begin(
         .webauthn()
         .start_passkey_authentication(&passkeys)
         .map_err(refused)?;
-    let ceremony = save_ceremony(&hub, Purpose::LogIn, Some(account), to_json(&state)?, None)?;
-    Ok(Json(RequestCeremony { ceremony, options }))
+    let ceremony = save_ceremony(
+        &hub,
+        Purpose::LogIn,
+        Some(account),
+        to_json(&state)?,
+        None,
+        None,
+    )?;
+    Ok(Json(RequestCeremony {
+        ceremony,
+        options,
+        prf_salts: salts_of(&stored),
+    }))
 }
 
 fn unknown_passkey() -> ApiError {
@@ -385,7 +473,7 @@ pub async fn login_finish(
     _: SameOrigin,
     client: Anonymous,
     Json(request): Json<LoginFinish>,
-) -> Result<WithCookie<AccountView>, ApiError> {
+) -> Result<WithCookie<SignedIn>, ApiError> {
     hub.limit_anonymous(&client.address)?;
     let ceremony = take_ceremony(&hub, &request.ceremony, Purpose::LogIn)?;
     let (account, result) = match ceremony.account {
@@ -402,7 +490,7 @@ pub async fn login_finish(
     let used: &[u8] = result.cred_id().as_ref();
     let at = now();
     let session = new_token(SESSION_TOKEN_PREFIX);
-    {
+    let prf_salt = {
         let store = hub.store();
         let stored = store
             .passkeys(&account)?
@@ -426,8 +514,9 @@ pub async fn login_finish(
             at + hub.config().session_ttl,
         )?;
         store.log(at, "account.logged-in", None, None, Some(&account))?;
-    }
-    let view = account_view(&hub, &account)?;
+        stored.prf_salt
+    };
+    let view = signed_in(&hub, &account, used, prf_salt)?;
     Ok(with_session(&hub, &session, view))
 }
 
@@ -576,14 +665,20 @@ pub async fn passkey_begin(
         )
         .map_err(refused)?;
     let options = discoverable(options);
+    let prf_salt = random::<32>();
     let ceremony = save_ceremony(
         &hub,
         Purpose::AddPasskey,
         Some(account),
         to_json(&state)?,
         None,
+        Some(prf_salt),
     )?;
-    Ok(Json(CreationCeremony { ceremony, options }))
+    Ok(Json(CreationCeremony {
+        ceremony,
+        options,
+        prf_salt: Bytes32(prf_salt),
+    }))
 }
 
 pub async fn passkey_finish(
@@ -598,6 +693,7 @@ pub async fn passkey_finish(
         return Err(ApiError::unauthorized());
     }
     let state: PasskeyRegistration = from_json(&ceremony.state)?;
+    let prf_salt = ceremony.prf_salt.ok_or_else(ApiError::internal)?;
     let passkey = hub
         .webauthn()
         .finish_passkey_registration(&request.credential, &state)
@@ -610,6 +706,7 @@ pub async fn passkey_finish(
         credential_id,
         name.as_deref(),
         &to_json(&passkey)?,
+        &prf_salt,
         at,
     )? {
         return Err(ApiError::conflict("passkey-taken"));
@@ -620,6 +717,7 @@ pub async fn passkey_finish(
         name,
         created_at: at,
         last_used_at: None,
+        unlocks: false,
     }))
 }
 
@@ -648,8 +746,72 @@ pub async fn remove_passkey(
     match hub.store().remove_passkey(&account, &credential_id)? {
         Removal::Removed => Ok(StatusCode::NO_CONTENT),
         Removal::Last => Err(ApiError::conflict("last-passkey")),
+        Removal::LastUnlocking => Err(ApiError::conflict("last-unlocking-passkey")),
         Removal::Missing => Err(ApiError::not_found()),
     }
+}
+
+pub async fn set_key(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    FreshAccount(account): FreshAccount,
+    Json(request): Json<AccountKeySetup>,
+) -> Result<StatusCode, ApiError> {
+    if request.key.account.as_str() != account || request.key.version != 1 {
+        return Err(ApiError::bad_request("bad-key"));
+    }
+    let credential = URL_SAFE_NO_PAD
+        .decode(&request.credential)
+        .map_err(|_| unknown_passkey_here())?;
+    let wrapped = wrapped_of(&request.wrapped)?;
+    if !request
+        .key
+        .verifies_wrapper(&credential, &wrapped, &request.signature.0)
+    {
+        return Err(ApiError::bad_request("bad-signature"));
+    }
+    let at = now();
+    let mut store = hub.store();
+    match store.set_account_key(&request.key, &credential, &wrapped, at)? {
+        KeySet::Set => {}
+        KeySet::KeyExists => return Err(ApiError::conflict("key-exists")),
+        KeySet::UnknownPasskey => return Err(unknown_passkey_here()),
+    }
+    store.log(at, "account.key-set", None, None, Some(&account))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn unknown_passkey_here() -> ApiError {
+    ApiError::new(StatusCode::NOT_FOUND, "unknown-passkey")
+}
+
+pub async fn set_wrapper(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    FreshAccount(account): FreshAccount,
+    Path(id): Path<String>,
+    Json(request): Json<WrapperUpload>,
+) -> Result<StatusCode, ApiError> {
+    let credential = URL_SAFE_NO_PAD
+        .decode(&id)
+        .map_err(|_| unknown_passkey_here())?;
+    let wrapped = wrapped_of(&request.wrapped)?;
+    let at = now();
+    let store = hub.store();
+    let key = store
+        .account_key(&account)?
+        .ok_or(ApiError::conflict("no-key"))?;
+    if key.version != request.key_version {
+        return Err(ApiError::conflict("key-version"));
+    }
+    if !key.verifies_wrapper(&credential, &wrapped, &request.signature.0) {
+        return Err(ApiError::bad_request("bad-signature"));
+    }
+    if !store.set_wrapper(&account, &credential, key.version, &wrapped, at)? {
+        return Err(unknown_passkey_here());
+    }
+    store.log(at, "passkey.wrapper-set", None, None, Some(&account))?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn register_device(

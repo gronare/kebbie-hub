@@ -1,8 +1,6 @@
-import { identity, loadDevice, loadMachines } from "./keystore.js";
-import { FALLBACK, openNotice } from "./notice.js";
-
-const SHELL = "kebbie-shell-v2";
-const FILES = ["/", "/app.css", "/app.js", "/board.js", "/connect.js", "/device-name.js", "/pages.js", "/hub.js", "/keystore.js", "/pairing.js", "/passkey.js", "/signin.js", "/notice.js", "/js/protocol.js", "/js/hpke.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
+const SHELL = "kebbie-shell-v3";
+const FILES = ["/", "/app.css", "/app.js", "/board.js", "/connect.js", "/device-name.js", "/pages.js", "/hub.js", "/store.js", "/passkey.js", "/signin.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
+const FALLBACK = { title: "kebbie", body: "Something on the board changed.", tag: "kebbie", url: "/#/board" };
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));
@@ -30,24 +28,8 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-async function show(data) {
-  let notice = FALLBACK;
-  try {
-    const device = await loadDevice();
-    if (device) notice = await openNotice(data, identity(device), await loadMachines(), Math.floor(Date.now() / 1000));
-  } catch {}
-  if (notice.retract) {
-    for (const shown of await self.registration.getNotifications({ tag: notice.retract })) shown.close();
-  }
-  await self.registration.showNotification(notice.title, { body: notice.body, tag: notice.tag, data: { url: notice.url }, icon: "/icon-192.png" });
-}
-
 self.addEventListener("push", (event) => {
-  let data = null;
-  try {
-    data = event.data?.json() ?? null;
-  } catch {}
-  event.waitUntil(show(data));
+  event.waitUntil(self.registration.showNotification(FALLBACK.title, { body: FALLBACK.body, tag: FALLBACK.tag, data: { url: FALLBACK.url }, icon: "/icon-192.png" }));
 });
 
 self.addEventListener("notificationclick", (event) => {

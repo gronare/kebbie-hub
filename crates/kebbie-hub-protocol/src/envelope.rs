@@ -51,7 +51,7 @@ impl Kind {
 
     pub fn default_ttl(self) -> u64 {
         match self {
-            Kind::Board => 30 * 86_400,
+            Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push => 3_600,
@@ -61,7 +61,7 @@ impl Kind {
 
     pub fn max_ttl(self) -> u64 {
         match self {
-            Kind::Board => 30 * 86_400,
+            Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Start | Kind::Routine => 86_400,

@@ -1,5 +1,5 @@
 import { HubError } from "./hub.js";
-import { assertionJSON, creationOptions, registrationJSON, requestOptions } from "./passkey.js";
+import { assertionJSON, creationOptions, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
 export class NoPasskeyOffered extends Error {
   constructor() {
@@ -10,28 +10,34 @@ export class NoPasskeyOffered extends Error {
 // A conditional request left pending blocks the next get(), so a new sign-in aborts the one before it.
 export function signInWith({ account, credentials }) {
   let pending = null;
-  const run = async (name, mediation) => {
+  const run = async (request, mediation) => {
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
-    const begun = await account.loginBegin(name?.trim().toLowerCase() || null);
-    const options = { ...requestOptions(begun.options), signal: controller.signal, ...(mediation ? { mediation } : {}) };
+    const begun = await account.loginBegin(request);
+    const options = { ...requestOptions(begun.options, begun.prf_salts), signal: controller.signal, ...(mediation ? { mediation } : {}) };
     let credential;
     try {
       credential = await credentials.get(options);
     } catch (error) {
-      if (error?.name === "NotAllowedError" && !name && !mediation) throw new NoPasskeyOffered();
+      if (error?.name === "NotAllowedError" && !request.handle && !request.credential && !mediation) throw new NoPasskeyOffered();
       throw error;
     }
     if (pending === controller) pending = null;
-    return account.loginFinish(begun.ceremony, assertionJSON(credential));
+    return { signedIn: await account.loginFinish(begun.ceremony, assertionJSON(credential)), prf: prfOutput(credential) };
   };
   return {
-    withPasskey: () => run(null, null),
-    byName: (name) => run(name, null),
-    autofill: () => run(null, "conditional"),
+    withPasskey: (remembered = null) => (remembered ? run({ credential: remembered }, null).catch((error) => (error instanceof HubError ? run({}, null) : Promise.reject(error))) : run({}, null)),
+    byName: (name) => run({ handle: name?.trim().toLowerCase() }, null),
+    autofill: () => run({}, "conditional"),
     stop: () => pending?.abort(),
   };
+}
+
+export async function signUpWith({ account, credentials }, ticket, handle, name) {
+  const begun = await account.registerBegin({ ...ticket, handle: handle.trim().toLowerCase() });
+  const created = await credentials.create(creationOptions(begun.options, begun.prf_salt));
+  return { signedIn: await account.registerFinish(begun.ceremony, registrationJSON(created), name), prf: prfOutput(created) };
 }
 
 export async function autofillAvailable(credential = globalThis.PublicKeyCredential) {
@@ -40,12 +46,6 @@ export async function autofillAvailable(credential = globalThis.PublicKeyCredent
   } catch {
     return false;
   }
-}
-
-export async function addPasskey({ account, credentials, name }) {
-  const begun = await account.passkeyBegin();
-  const created = await credentials.create(creationOptions(begun.options));
-  return account.passkeyFinish(begun.ceremony, registrationJSON(created), name);
 }
 
 const SIGN_IN = {
@@ -67,6 +67,7 @@ export const OFFER_TEXT = "Add a passkey this device offers by itself, so next t
 export function signInText(error) {
   if (error instanceof NoPasskeyOffered) return "This device offered no passkey for this hub. If you made yours before, sign in with your account name.";
   if (error instanceof HubError) return SIGN_IN[error.code] ?? `The hub answered ${error.status} (${error.code}).`;
+  if (error?.code === "wrong-account-key" || error?.code === "key-mismatch") return "This passkey did not open your account's key. Nothing was read.";
   if (error?.name === "NotAllowedError") return "No passkey for this account on this device, or it was cancelled.";
   if (error?.name === "AbortError") return null;
   return error?.message ?? String(error);
