@@ -4,7 +4,7 @@ mod common;
 use std::time::Duration;
 
 use common::*;
-use kebbie_hub::SESSION_COOKIE;
+use kebbie_hub::{DEV_SESSION_COOKIE, SESSION_COOKIE};
 use kebbie_hub_api::{
     AccountView, BoardChanged, Bytes32, CommitRequest, Committed, CreationCeremony, DeviceRequest,
     Devices, EVENT_BOARD, EVENT_MACHINES, EVENT_MACHINE_REMOVED, EVENT_PAIRING, MachineRemoved, PairingChanged,
@@ -17,10 +17,17 @@ use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use webauthn_authenticator_rs::WebauthnAuthenticator;
 use kebbie_hub_fakes::passkey::DiscoverablePasskey;
+use webauthn_rs::prelude::Url;
 use webauthn_rs_proto::UserVerificationPolicy;
 
 const SOON: Duration = Duration::from_secs(5);
 const QUIET: Duration = Duration::from_millis(600);
+
+const HTTPS_ORIGIN: &str = "https://localhost:8470";
+
+fn attributes(set_cookie: &str) -> Vec<&str> {
+    set_cookie.split(';').map(str::trim).collect()
+}
 
 #[tokio::test]
 async fn a_passkey_signs_up_and_logs_in_with_a_strict_http_only_cookie() {
@@ -45,21 +52,28 @@ async fn a_passkey_signs_up_and_logs_in_with_a_strict_http_only_cookie() {
     let set_cookie = person.keep_cookie(&response);
     let created: AccountView = body(response).await;
     assert!(created.handle.starts_with('k'), "{}", created.handle);
-    let attributes: Vec<&str> = set_cookie.split(';').map(str::trim).collect();
-    assert!(attributes[0].starts_with(&format!("{SESSION_COOKIE}=khs_")));
-    for flag in ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"] {
-        assert!(attributes.contains(&flag), "{set_cookie}");
+    let parts = attributes(&set_cookie);
+    assert!(parts[0].starts_with(&format!("{DEV_SESSION_COOKIE}=khs_")), "{set_cookie}");
+    for flag in ["HttpOnly", "SameSite=Strict", "Path=/"] {
+        assert!(parts.contains(&flag), "{set_cookie}");
     }
-    assert!(SESSION_COOKIE.starts_with("__Host-"));
-    assert!(!attributes.iter().any(|part| part.starts_with("Domain")));
+    assert!(!parts.contains(&"Secure"), "{set_cookie}");
+    assert!(!parts.iter().any(|part| part.starts_with("Domain")));
 
     let me: AccountView = body(person.get("/v1/a/account").await).await;
     assert_eq!(me, created);
+    let token = person.cookie.clone().unwrap();
+    let token = token.split_once('=').unwrap().1.to_string();
+    let mut wrong_name = Person::new(&test.url);
+    wrong_name.cookie = Some(format!("{SESSION_COOKIE}={token}"));
+    assert_eq!(wrong_name.get("/v1/a/account").await.status(), 401);
 
     let logout = person.post("/v1/a/logout", &()).await;
     assert_eq!(logout.status(), 204);
     let cleared = logout.headers()["set-cookie"].to_str().unwrap().to_string();
+    assert!(cleared.starts_with(&format!("{DEV_SESSION_COOKIE}=;")), "{cleared}");
     assert!(cleared.contains("Max-Age=0"), "{cleared}");
+    assert!(!attributes(&cleared).contains(&"Secure"), "{cleared}");
     assert_eq!(person.get("/v1/a/account").await.status(), 401);
 
     person.cookie = None;
@@ -68,6 +82,67 @@ async fn a_passkey_signs_up_and_logs_in_with_a_strict_http_only_cookie() {
     assert_eq!(person.get("/v1/a/account").await.status(), 200);
     let passkeys: Passkeys = body(person.get("/v1/a/passkeys").await).await;
     assert!(passkeys.passkeys[0].last_used_at.is_some());
+}
+
+#[tokio::test]
+async fn an_https_hub_sets_and_reads_only_the_secure_host_cookie() {
+    let test = start_hub(|config| config.origin = HTTPS_ORIGIN.to_string()).await;
+    let mut person = Person::new(&test.url);
+    person.origin = Some(HTTPS_ORIGIN.to_string());
+    let invite = test.hub.mint_invite().unwrap();
+    let ceremony: CreationCeremony = body(person.begin_sign_up(&invite).await).await;
+    let credential = person
+        .passkey
+        .do_registration(Url::parse(HTTPS_ORIGIN).unwrap(), ceremony.options)
+        .unwrap();
+    let response = person
+        .post(
+            "/v1/a/register/finish",
+            &kebbie_hub_api::RegisterFinish {
+                ceremony: ceremony.ceremony,
+                credential,
+                name: None,
+            },
+        )
+        .await;
+    let set_cookie = person.keep_cookie(&response);
+    assert_eq!(response.status(), 200);
+    let parts = attributes(&set_cookie);
+    assert!(parts[0].starts_with(&format!("{SESSION_COOKIE}=khs_")), "{set_cookie}");
+    for flag in ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"] {
+        assert!(parts.contains(&flag), "{set_cookie}");
+    }
+    assert!(SESSION_COOKIE.starts_with("__Host-"));
+    assert!(!parts.iter().any(|part| part.starts_with("Domain")));
+    assert_eq!(person.get("/v1/a/account").await.status(), 200);
+
+    let token = person.cookie.clone().unwrap();
+    let token = token.split_once('=').unwrap().1.to_string();
+    let mut plain = Person::new(&test.url);
+    plain.origin = Some(HTTPS_ORIGIN.to_string());
+    plain.cookie = Some(format!("{DEV_SESSION_COOKIE}={token}"));
+    assert_eq!(plain.get("/v1/a/account").await.status(), 401);
+    assert_eq!(plain.post("/v1/a/logout", &()).await.status(), 204);
+    assert_eq!(person.get("/v1/a/account").await.status(), 200);
+
+    let logout = person.post("/v1/a/logout", &()).await;
+    assert_eq!(logout.status(), 204);
+    let cleared = logout.headers()["set-cookie"].to_str().unwrap().to_string();
+    assert!(cleared.starts_with(&format!("{SESSION_COOKIE}=;")), "{cleared}");
+    assert!(attributes(&cleared).contains(&"Secure"), "{cleared}");
+    assert_eq!(person.get("/v1/a/account").await.status(), 401);
+}
+
+#[test]
+fn a_plain_http_origin_is_refused_off_loopback() {
+    for (rp_id, origin) in [("hub.example.com", "http://hub.example.com"), ("10.0.0.5", "http://10.0.0.5:8470")] {
+        let refused = kebbie_hub::relying_party(rp_id, origin).err().map(|error| error.to_string());
+        assert!(refused.as_deref().is_some_and(|text| text.contains("must be https")), "{origin}: {refused:?}");
+    }
+    for (rp_id, origin) in [("localhost", "http://localhost:8470"), ("127.0.0.1", "http://127.0.0.1:8470"), ("::1", "http://[::1]:8470")] {
+        let accepted = kebbie_hub::relying_party(rp_id, origin).err().map(|error| error.to_string());
+        assert!(!accepted.as_deref().is_some_and(|text| text.contains("must be https")), "{origin}: {accepted:?}");
+    }
 }
 
 #[tokio::test]
@@ -751,4 +826,17 @@ fn a_dev_hub_refuses_to_listen_beyond_loopback() {
         .unwrap();
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("loopback"));
+}
+
+#[test]
+fn a_hub_without_dev_refuses_a_plain_http_origin() {
+    let data = tempfile::tempdir().unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_kebbie-hub"))
+        .args(["--listen", "127.0.0.1:0", "--rp-id", "localhost", "--origin", "http://localhost:8470"])
+        .args(["--vapid-subject", "mailto:hub@example.com", "--data"])
+        .arg(data.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("must be https://"));
 }

@@ -28,7 +28,7 @@ use webauthn_rs_proto::{
 };
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, SESSION_COOKIE, SESSION_TOKEN_PREFIX,
+    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, SESSION_TOKEN_PREFIX,
     SETUP_TOKEN_PREFIX, SameOrigin, digest, new_token, random, session_cookie,
 };
 use crate::error::ApiError;
@@ -86,17 +86,17 @@ fn optional_name(name: Option<&str>) -> Result<Option<String>, ApiError> {
     .transpose()
 }
 
-fn session_set_cookie(token: &str, max_age: u64) -> String {
-    format!(
-        "{SESSION_COOKIE}={token}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Strict"
-    )
+fn session_set_cookie(hub: &Hub, token: &str, max_age: u64) -> String {
+    let name = hub.session_cookie_name();
+    let secure = if hub.plain_http() { "" } else { " Secure;" };
+    format!("{name}={token}; Path=/; Max-Age={max_age}; HttpOnly;{secure} SameSite=Strict")
 }
 
 fn with_session<T>(hub: &Hub, token: &str, body: T) -> WithCookie<T> {
     (
         AppendHeaders([(
             SET_COOKIE,
-            session_set_cookie(token, hub.config().session_ttl),
+            session_set_cookie(hub, token, hub.config().session_ttl),
         )]),
         Json(body),
     )
@@ -521,11 +521,11 @@ pub async fn logout(
     ApiError,
 > {
     hub.limit_anonymous(&client.address)?;
-    if let Some(token) = session_cookie(&headers) {
+    if let Some(token) = session_cookie(&hub, &headers) {
         hub.store().end_session(&digest(token))?;
     }
     Ok((
-        AppendHeaders([(SET_COOKIE, session_set_cookie("", 0))]),
+        AppendHeaders([(SET_COOKIE, session_set_cookie(&hub, "", 0))]),
         StatusCode::NO_CONTENT,
     ))
 }

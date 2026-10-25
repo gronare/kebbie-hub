@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+data="${XDG_STATE_HOME:-$HOME/.local/state}/kebbie-hub-dev"
+port="${PORT:-8470}"
+
+case "${1:-}" in
+  "")
+    ;;
+  reset)
+    rm -rf "$data"
+    echo "wiped $data"
+    exit 0
+    ;;
+  *)
+    echo "usage: bin/dev [reset]" >&2
+    exit 64
+    ;;
+esac
+
+cargo build --manifest-path "$root/Cargo.toml" -p kebbie-hub --bin kebbie-hub
+mkdir -p "$data"
+chmod 700 "$data"
+echo "kebbie hub dev: http://localhost:$port (data in $data, Ctrl-C stops it)"
+exec "${CARGO_TARGET_DIR:-$root/target}/debug/kebbie-hub" --dev --signup open --data "$data" \
+  --listen "127.0.0.1:$port" --rp-id localhost --origin "http://localhost:$port"

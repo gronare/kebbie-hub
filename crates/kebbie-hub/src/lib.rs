@@ -32,7 +32,7 @@ use kebbie_hub_protocol::{Envelope, Id, Kind};
 use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
 
-pub use auth::SESSION_COOKIE;
+pub use auth::{DEV_SESSION_COOKIE, SESSION_COOKIE};
 pub use error::ApiError;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
@@ -282,10 +282,25 @@ pub fn relying_party(rp_id: &str, origin: &str) -> Result<(Webauthn, String), Op
             "the origin must be scheme, host and port only, like {serialized}"
         )));
     }
+    if url.scheme() != "https" && !(url.scheme() == "http" && is_loopback(&url)) {
+        return Err(refuse(
+            "the origin must be https, or plain http on localhost or a loopback address".to_string(),
+        ));
+    }
     let webauthn = WebauthnBuilder::new(rp_id, &url)
         .and_then(|builder| builder.rp_name("kebbie hub").build())
         .map_err(|error| refuse(format!("not a valid relying party: {error}")))?;
     Ok((webauthn, serialized))
+}
+
+fn is_loopback(url: &Url) -> bool {
+    let host = url.host_str().unwrap_or_default();
+    host == "localhost"
+        || host
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
 }
 
 pub struct Hub {
@@ -411,6 +426,18 @@ impl Hub {
 
     pub fn origin(&self) -> &str {
         &self.origin
+    }
+
+    pub fn plain_http(&self) -> bool {
+        self.origin.starts_with("http://")
+    }
+
+    pub fn session_cookie_name(&self) -> &'static str {
+        if self.plain_http() {
+            auth::DEV_SESSION_COOKIE
+        } else {
+            auth::SESSION_COOKIE
+        }
     }
 
     pub fn store(&self) -> MutexGuard<'_, Store> {

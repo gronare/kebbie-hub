@@ -22,6 +22,7 @@ pub const ADMIN_TOKEN_PREFIX: &str = "kha_";
 pub const SETUP_TOKEN_PREFIX: &str = "kho_";
 pub const DEVICE_CODE_PREFIX: &str = "khc_";
 pub const SESSION_COOKIE: &str = "__Host-kebbie_session";
+pub const DEV_SESSION_COOKIE: &str = "kebbie_session";
 
 pub fn random<const N: usize>() -> [u8; N] {
     let mut bytes = [0u8; N];
@@ -47,14 +48,15 @@ pub fn bearer(headers: &HeaderMap) -> Option<&str> {
         .filter(|token| !token.is_empty())
 }
 
-pub fn session_cookie(headers: &HeaderMap) -> Option<&str> {
+pub fn session_cookie<'a>(hub: &Hub, headers: &'a HeaderMap) -> Option<&'a str> {
+    let wanted = hub.session_cookie_name();
     headers
         .get_all(COOKIE)
         .iter()
         .filter_map(|value| value.to_str().ok())
         .flat_map(|value| value.split(';'))
         .filter_map(|pair| pair.trim().split_once('='))
-        .find(|(name, _)| *name == SESSION_COOKIE)
+        .find(|(name, _)| *name == wanted)
         .map(|(_, value)| value.trim())
         .filter(|token| token.starts_with(SESSION_TOKEN_PREFIX))
 }
@@ -170,7 +172,7 @@ impl FromRequestParts<Arc<Hub>> for AccountAuth {
     ) -> Result<AccountAuth, ApiError> {
         let address = client_address(parts, hub);
         hub.check_anonymous(&address)?;
-        let account = match session_cookie(&parts.headers) {
+        let account = match session_cookie(hub, &parts.headers) {
             Some(token) => hub.store().session_account(&digest(token), crate::now())?,
             None => None,
         };
@@ -192,7 +194,7 @@ impl FromRequestParts<Arc<Hub>> for FreshAccount {
         let address = client_address(parts, hub);
         hub.check_anonymous(&address)?;
         let at = crate::now();
-        let session = match session_cookie(&parts.headers) {
+        let session = match session_cookie(hub, &parts.headers) {
             Some(token) => hub.store().session(&digest(token), at)?,
             None => None,
         };
@@ -214,7 +216,7 @@ pub struct FreshOwner(pub String);
 
 pub fn require_fresh(hub: &Hub, headers: &HeaderMap) -> Result<(), ApiError> {
     let at = crate::now();
-    let signed_in_at = match session_cookie(headers) {
+    let signed_in_at = match session_cookie(hub, headers) {
         Some(token) => hub.store().session(&digest(token), at)?.map(|(_, at)| at),
         None => None,
     };

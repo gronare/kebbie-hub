@@ -479,6 +479,9 @@ fn listen_address(cli: &Cli) -> Result<SocketAddr, String> {
 
 fn relying_party_config(cli: &Cli) -> Result<(String, String), String> {
     match (&cli.rp_id, &cli.origin, cli.dev) {
+        (Some(_), Some(origin), false) if !origin.starts_with("https://") => Err(format!(
+            "--origin must be https:// unless --dev, not {origin}"
+        )),
         (Some(rp_id), Some(origin), _) => Ok((rp_id.clone(), origin.clone())),
         (None, None, true) => Ok((DEV_RP_ID.to_string(), DEV_ORIGIN.to_string())),
         _ => Err("pass --rp-id <domain> and --origin <url>, or --dev for a local hub".to_string()),

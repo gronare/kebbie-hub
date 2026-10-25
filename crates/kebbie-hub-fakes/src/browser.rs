@@ -27,7 +27,7 @@ use crate::passkey::DiscoverablePasskey;
 use crate::phone::PhoneState;
 use crate::{HubError, PairError, now};
 
-const SESSION_COOKIE: &str = "__Host-kebbie_session";
+const SESSION_COOKIES: [&str; 2] = ["__Host-kebbie_session=", "kebbie_session="];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lock {
@@ -182,7 +182,7 @@ impl Browser {
             .get_all("set-cookie")
             .iter()
             .filter_map(|value| value.to_str().ok())
-            .find(|value| value.starts_with(SESSION_COOKIE));
+            .find(|value| SESSION_COOKIES.iter().any(|name| value.starts_with(name)));
         if let Some(set) = set {
             let pair = set.split(';').next().unwrap_or_default().trim().to_string();
             self.cookie = Some(pair).filter(|pair| !pair.ends_with('='));
