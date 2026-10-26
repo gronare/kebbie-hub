@@ -734,8 +734,17 @@ pub fn router(hub: Arc<Hub>) -> Router {
             post(admin::decide_key),
         )
         .route("/v1/a/admin/signals", get(admin::signals))
-        .route("/v1/admin/accounts", get(admin::billing_lookup))
+        .route("/v1/admin/accounts", get(admin::billing_accounts))
+        .route("/v1/admin/accounts/{id}", get(admin::billing_account))
         .route("/v1/admin/accounts/{id}/plan", put(admin::set_plan))
+        .route(
+            "/v1/admin/accounts/{id}/deactivate",
+            post(admin::billing_deactivate),
+        )
+        .route(
+            "/v1/admin/accounts/{id}/activate",
+            post(admin::billing_activate),
+        )
         .route(
             "/v1/m/board",
             put(machine::put_board).layer(DefaultBodyLimit::max(BOARD_BODY_LIMIT)),

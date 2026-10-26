@@ -2364,21 +2364,102 @@ impl Store {
             "SELECT {ACCOUNT_COLUMNS},
                     (SELECT count(*) FROM machines WHERE machines.account_id = accounts.id),
                     (SELECT count(*) FROM devices WHERE devices.account_id = accounts.id),
-                    max(coalesce((SELECT max(last_seen) FROM machines WHERE machines.account_id = accounts.id), 0),
-                        coalesce((SELECT max(last_seen) FROM devices WHERE devices.account_id = accounts.id), 0))
+                    {LAST_SEEN}
              FROM accounts ORDER BY created_at, id"
         ))?;
         statement
             .query_map([], |row| {
-                let last_seen: u64 = row.get(ACCOUNT_COLUMN_COUNT + 2)?;
                 Ok(AdminAccountRow {
                     account: account_row(row)?,
                     machines: row.get(ACCOUNT_COLUMN_COUNT)?,
                     devices: row.get(ACCOUNT_COLUMN_COUNT + 1)?,
-                    last_seen: (last_seen > 0).then_some(last_seen),
+                    last_seen: seen_at(row.get(ACCOUNT_COLUMN_COUNT + 2)?),
                 })
             })?
             .collect()
+    }
+
+    pub fn account_page(
+        &self,
+        after: Option<&str>,
+        limit: u64,
+        active_since: u64,
+    ) -> Result<Option<Vec<AccountPageRow>>> {
+        if let Some(after) = after
+            && self.account(after)?.is_none()
+        {
+            return Ok(None);
+        }
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT {ACCOUNT_COLUMNS},
+                    (SELECT count(*) FROM machines WHERE machines.account_id = accounts.id),
+                    (SELECT count(*) FROM machines WHERE machines.account_id = accounts.id AND machines.last_seen > ?3),
+                    {LAST_SEEN}
+             FROM accounts
+             WHERE ?1 IS NULL OR (accounts.created_at, accounts.id) > (SELECT created_at, id FROM accounts WHERE id = ?1)
+             ORDER BY accounts.created_at, accounts.id
+             LIMIT ?2"
+        ))?;
+        statement
+            .query_map(params![after, limit, active_since], |row| {
+                Ok(AccountPageRow {
+                    account: account_row(row)?,
+                    machines: row.get(ACCOUNT_COLUMN_COUNT)?,
+                    active_machines: row.get(ACCOUNT_COLUMN_COUNT + 1)?,
+                    last_seen: seen_at(row.get(ACCOUNT_COLUMN_COUNT + 2)?),
+                })
+            })?
+            .collect::<Result<_>>()
+            .map(Some)
+    }
+
+    pub fn account_detail(&self, account: &str) -> Result<Option<AccountDetailRow>> {
+        let found = self
+            .connection
+            .query_row(
+                &format!(
+                    "SELECT {ACCOUNT_COLUMNS},
+                            (SELECT count(*) FROM passkeys WHERE passkeys.account_id = accounts.id),
+                            {LAST_SEEN}
+                     FROM accounts WHERE accounts.id = ?1"
+                ),
+                [account],
+                |row| {
+                    Ok((
+                        account_row(row)?,
+                        row.get(ACCOUNT_COLUMN_COUNT)?,
+                        seen_at(row.get(ACCOUNT_COLUMN_COUNT + 1)?),
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((account, passkeys, last_seen)) = found else {
+            return Ok(None);
+        };
+        let machines = self
+            .connection
+            .prepare(
+                "SELECT machines.id, machines.name, machines.joined_at, machines.last_seen, boards.stored_at
+                 FROM machines LEFT JOIN boards ON boards.machine_id = machines.id
+                 WHERE machines.account_id = ?1
+                 ORDER BY machines.joined_at, machines.id",
+            )?
+            .query_map([&account.id], |row| {
+                Ok(AccountMachineRow {
+                    id: id_at(row, 0)?,
+                    name: row.get(1)?,
+                    joined_at: row.get(2)?,
+                    last_seen: row.get(3)?,
+                    last_board_at: row.get(4)?,
+                })
+            })?
+            .collect::<Result<_>>()?;
+        Ok(Some(AccountDetailRow {
+            account,
+            passkeys,
+            last_seen,
+            machines,
+        }))
     }
 
     pub fn admitted_count(&self, machine: &Id) -> Result<u64> {
@@ -2586,6 +2667,28 @@ pub enum MadeOwner {
     NoAccount,
 }
 
+pub struct AccountPageRow {
+    pub account: AccountRow,
+    pub machines: u64,
+    pub active_machines: u64,
+    pub last_seen: Option<u64>,
+}
+
+pub struct AccountDetailRow {
+    pub account: AccountRow,
+    pub passkeys: u64,
+    pub last_seen: Option<u64>,
+    pub machines: Vec<AccountMachineRow>,
+}
+
+pub struct AccountMachineRow {
+    pub id: Id,
+    pub name: String,
+    pub joined_at: u64,
+    pub last_seen: Option<u64>,
+    pub last_board_at: Option<u64>,
+}
+
 pub struct AdminAccountRow {
     pub account: AccountRow,
     pub machines: u64,
@@ -2595,6 +2698,12 @@ pub struct AdminAccountRow {
 
 const ACCOUNT_COLUMNS: &str = "accounts.id, accounts.handle, accounts.user_handle, accounts.created_at, accounts.role, accounts.email, accounts.plan, accounts.plan_until, accounts.deactivated_at, accounts.github_id, accounts.github_login, accounts.created_via";
 const ACCOUNT_COLUMN_COUNT: usize = 12;
+const LAST_SEEN: &str = "max(coalesce((SELECT max(last_seen) FROM machines WHERE machines.account_id = accounts.id), 0),
+        coalesce((SELECT max(last_seen) FROM devices WHERE devices.account_id = accounts.id), 0))";
+
+fn seen_at(at: u64) -> Option<u64> {
+    (at > 0).then_some(at)
+}
 
 fn account_row(row: &Row<'_>) -> Result<AccountRow> {
     Ok(AccountRow {

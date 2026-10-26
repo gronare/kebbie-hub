@@ -787,6 +787,48 @@ pub struct AdminAccounts {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BillingAccount {
+    pub account: String,
+    pub handle: String,
+    pub github: Option<String>,
+    pub created_at: u64,
+    pub deactivated_at: Option<u64>,
+    pub plan: PlanView,
+    pub machines: u64,
+    pub active_machines: u64,
+    pub last_seen: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BillingAccounts {
+    pub accounts: Vec<BillingAccount>,
+    pub next: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BillingAccountDetail {
+    pub account: String,
+    pub handle: String,
+    pub github: Option<String>,
+    pub created_at: u64,
+    pub created_via: Option<String>,
+    pub deactivated_at: Option<u64>,
+    pub plan: PlanView,
+    pub passkeys: u64,
+    pub last_seen: Option<u64>,
+    pub machines: Vec<BillingMachine>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BillingMachine {
+    pub machine: Id,
+    pub name: String,
+    pub joined_at: u64,
+    pub last_seen: Option<u64>,
+    pub last_board_at: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdminMachine {
     pub machine: Id,
     pub name: String,
