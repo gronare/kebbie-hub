@@ -1,11 +1,15 @@
 #[allow(dead_code)]
 mod common;
 
+use std::time::Duration;
+
 use common::*;
 use kebbie_hub::store::AdminScope;
 use kebbie_hub_api::{BillingAccountDetail, BillingAccounts, PlanStatus, PlanUpdate};
 use kebbie_hub_fakes::HubClient;
 use serde_json::Value;
+
+const SOON: Duration = Duration::from_secs(5);
 
 fn admin(test: &TestHub, scope: AdminScope) -> HubClient {
     let token = test
@@ -258,12 +262,16 @@ async fn the_billing_token_deactivates_and_activates_as_the_owner_does() {
     let mut machine = connected(&test, &mut person).await;
     let phone = person.ensure_device().await.unwrap().clone();
     let account = person.account().await.unwrap().account;
+    let mut feed = EventStream::open(&test.url, phone.token().unwrap()).await;
+    let mut account_feed = EventStream::of_account(&person).await;
     let billing = admin(&test, AdminScope::Billing);
 
     billing
         .post_empty(&format!("/v1/admin/accounts/{account}/deactivate"), &())
         .await
         .unwrap();
+    assert_eq!(feed.next(SOON).await, Next::Ended, "the device's feed ends");
+    assert_eq!(account_feed.next(SOON).await, Next::Ended, "the account's feed ends");
     assert_eq!(hub_code(person.account().await.unwrap_err()).0, 401);
     assert_eq!(hub_code(person.log_in().await.unwrap_err()).0, 401);
     assert!(

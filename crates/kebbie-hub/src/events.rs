@@ -57,7 +57,7 @@ fn removed(machine: &Id) -> Event {
 
 fn snapshot(hub: &Hub, device: &Id, at: u64) -> Result<Option<Snapshot>, ApiError> {
     let store = hub.store();
-    if !store.device_exists(device)? {
+    if !store.device_serves(device)? {
         return Ok(None);
     }
     let machines = store.admitting_machines(device)?.into_iter().collect();
@@ -250,6 +250,12 @@ impl AccountFeed {
             }
             self.started = true;
             self.subscription.mark_seen();
+            let Ok(Some(row)) = self.hub.store().account(&self.account) else {
+                return None;
+            };
+            if row.deactivated_at.is_some() {
+                return None;
+            }
             let Ok(heads) = self.hub.store().heads_for_account(&self.account) else {
                 return None;
             };

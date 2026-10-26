@@ -1091,6 +1091,16 @@ impl Store {
         )? == 1)
     }
 
+    pub fn device_serves(&self, device: &Id) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM devices WHERE id = ?1 AND NOT EXISTS (
+                 SELECT 1 FROM accounts WHERE accounts.id = devices.account_id
+                     AND accounts.deactivated_at IS NOT NULL))",
+            [device.as_str()],
+            |row| row.get(0),
+        )
+    }
+
     pub fn device_exists(&self, device: &Id) -> Result<bool> {
         self.connection.query_row(
             "SELECT EXISTS (SELECT 1 FROM devices WHERE id = ?1)",

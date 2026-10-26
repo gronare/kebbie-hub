@@ -104,10 +104,14 @@ async fn a_deactivated_account_loses_its_session_login_devices_and_machines() {
     let mut machine = connected(&test, &mut person).await;
     let phone = person.ensure_device().await.unwrap().clone();
     let account = person.account().await.unwrap().account;
+    let mut feed = EventStream::open(&test.url, phone.token().unwrap()).await;
+    let mut account_feed = EventStream::of_account(&person).await;
     owner
         .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
         .await
         .unwrap();
+    assert_eq!(feed.next(Duration::from_secs(5)).await, Next::Ended);
+    assert_eq!(account_feed.next(Duration::from_secs(5)).await, Next::Ended);
     assert_eq!(hub_code(person.account().await.unwrap_err()).0, 401);
     assert_eq!(hub_code(person.log_in().await.unwrap_err()).0, 401);
     assert!(person.boards().await.is_err());

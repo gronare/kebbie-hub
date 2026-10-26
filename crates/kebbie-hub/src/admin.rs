@@ -109,6 +109,7 @@ fn deactivate_account(hub: &Hub, by: &str, account: &str) -> Result<StatusCode, 
         .map(|row| row.id)
         .collect::<Vec<_>>();
     hub.wake_devices(&devices);
+    hub.wake_account(account);
     Ok(status)
 }
 
