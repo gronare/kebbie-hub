@@ -91,8 +91,8 @@ export function connectCancelled() {
   return brand + `<div class="center">Cancelled. The terminal shows it too.</div>`;
 }
 
-export function signInScreen({ github, notice = null }) {
-  const gh = github ? `<a class="btn" href="${esc(githubHref())}">Sign in with GitHub</a>` : "";
+export function signInScreen({ github, notice = null, next = null }) {
+  const gh = github ? `<a class="btn" href="${esc(githubHref({ next }))}">Sign in with GitHub</a>` : "";
   return (
     brand +
     heading("See your boards", "Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie.") +

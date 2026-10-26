@@ -478,6 +478,7 @@ mod tests {
     #[test]
     fn only_a_path_on_this_hub_is_a_place_to_return_to() {
         assert_eq!(safe_next(Some("/connect?code=K7QF-M2XD")), "/connect?code=K7QF-M2XD");
+        assert_eq!(safe_next(Some("/v1/a/billing/checkout")), "/v1/a/billing/checkout");
         for outside in ["//evil.example", "/\\evil.example", "https://evil.example", "connect", "/a#b", "/a b", ""] {
             assert_eq!(safe_next(Some(outside)), "/", "{outside}");
         }

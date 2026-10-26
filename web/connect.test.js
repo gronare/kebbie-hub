@@ -125,6 +125,7 @@ test("a link without a whole secret and fingerprint offers no board", () => {
 
 test("only a path on this hub is followed after signing up", () => {
   assert.equal(safeNext("/connect?code=K7QF-M2XD"), "/connect?code=K7QF-M2XD");
+  assert.equal(safeNext("/v1/a/billing/portal"), "/v1/a/billing/portal");
   for (const refused of ["//evil.example/x", "https://evil.example", "/\\evil.example", "javascript:alert(1)", null, ""]) assert.equal(safeNext(refused), null, String(refused));
 });
 

@@ -1,5 +1,5 @@
 import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
-import { connectText, listWithout, PairingFailed, publishList, withReauth } from "./connect.js";
+import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
@@ -11,6 +11,7 @@ import { addPasskeyScreen, cantUnlockScreen, connectDone, githubErrorText, insta
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
+const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, selected: {}, hint: false, unlocking: false, connected: null };
 const hub = { account, credentials: globalThis.navigator?.credentials };
@@ -201,7 +202,7 @@ function render() {
   let html;
   if (!cryptoReady()) html = unsupportedScreen();
   else if (state.unlocking) html = unlockingScreen();
-  else if (!state.me) html = signInScreen({ github: Boolean(state.info?.github), notice: state.notice });
+  else if (!state.me) html = signInScreen({ github: Boolean(state.info?.github), notice: state.notice, next: onward });
   else if (state.session?.state !== "unlocked") html = lockedScreen();
   else if (name === "questions") html = questionsScreen();
   else if (name === "machines") html = machinesScreen();
@@ -349,6 +350,7 @@ async function entered(unlock) {
     state.unlocking = false;
   }
   state.me = state.session.me;
+  if (onward) return location.assign(onward);
   if (previous !== state.me.account) state.marks = emptyMarks();
   state.notice = null;
   if (state.session.state !== "unlocked") return render();
@@ -465,6 +467,7 @@ async function start() {
   if (params.has("github_error")) history.replaceState(null, "", location.pathname + location.hash);
   state.info = await account.hub().catch(() => null);
   state.me = await account.me().catch(() => null);
+  if (state.me && onward) return location.assign(onward);
   state.session = state.me ? { state: "locked", me: state.me } : null;
   render();
   if (!state.me) return startAutofill();

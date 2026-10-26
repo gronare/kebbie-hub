@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
+use kebbie_hub::billing::{HANDOFF_SECRET_ENV, HandoffSecret};
 use kebbie_hub::store::{AdminScope, KeyStatus, MadeOwner, SignalRow, Store, StoredReport};
 use kebbie_hub::{
     Config, DEFAULT_REPORT_DIFFICULTY, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, GITHUB_API_URL,
@@ -90,7 +91,7 @@ struct Cli {
     #[arg(
         long,
         value_name = "URL",
-        help = "Where people start a subscription, shown when their plan is inactive"
+        help = "Where people start a subscription, shown when their plan is inactive; with KEBBIE_HUB_BILLING_HANDOFF_SECRET set, the billing app the hub sends signed checkout and portal links to"
     )]
     billing_url: Option<String>,
     #[arg(
@@ -533,6 +534,15 @@ fn github_secret(cli: &Cli) -> Result<Option<Secret>, String> {
     }
 }
 
+fn handoff_secret() -> Result<Option<HandoffSecret>, String> {
+    match std::env::var(HANDOFF_SECRET_ENV) {
+        Ok(text) if !text.trim().is_empty() => HandoffSecret::parse(&text)
+            .map(Some)
+            .map_err(|error| format!("{HANDOFF_SECRET_ENV}: {error}")),
+        _ => Ok(None),
+    }
+}
+
 fn open_store(data: &std::path::Path) -> Result<Store, String> {
     Store::open(&database_path(data)).map_err(|error| error.to_string())
 }
@@ -660,6 +670,7 @@ async fn run(cli: Cli) -> Result<(), String> {
             };
             config.plans = matches!(cli.plans, Plans::On);
             config.billing_url = cli.billing_url.clone();
+            config.billing_handoff_secret = handoff_secret()?;
             config.github_client_secret = github_secret(&cli)?;
             config.github_client_id = cli.github_client_id.clone();
             config.github_api_url = cli.github_api_url.clone();

@@ -1,0 +1,18 @@
+{
+  "domain": "kebbie-billing-handoff-v1",
+  "secret": "aGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGg",
+  "account": "acc_onexxxxxxxxxxxxxxxxxxx",
+  "expires": 1761471000,
+  "cases": [
+    {
+      "purpose": "checkout",
+      "path": "checkout",
+      "signature": "9LxkSrg_5eB2niUJwUsk01CQ_DFfYcQeqSMZbqYDotU"
+    },
+    {
+      "purpose": "portal",
+      "path": "billing_portal",
+      "signature": "rE1pvKwyedjZGvF3N_OKihW1SdU3rpjV4itAhOl55e0"
+    }
+  ]
+}

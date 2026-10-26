@@ -159,7 +159,7 @@ pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
         owner: row.owner,
         email: row.email,
         github: row.github_login,
-        billing_url: hub.config().billing_url.clone().filter(|_| !plan.entitled),
+        billing_url: hub.billing_entry().filter(|_| !plan.entitled),
         plan,
     })
 }

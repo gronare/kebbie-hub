@@ -1,6 +1,7 @@
 mod account;
 mod admin;
 mod auth;
+pub mod billing;
 mod boards;
 mod command;
 mod connect;
@@ -28,6 +29,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
+use billing::HandoffSecret;
 use kebbie_hub_api::{MAX_WAIT_SECONDS, PlanStatus, PlanView, SignupMode, code_from_random};
 use kebbie_hub_protocol::{Envelope, Id, Kind};
 use tokio::sync::watch;
@@ -110,6 +112,7 @@ pub struct Config {
     pub signup: SignupMode,
     pub plans: bool,
     pub billing_url: Option<String>,
+    pub billing_handoff_secret: Option<HandoffSecret>,
     pub github_client_id: Option<String>,
     pub github_client_secret: Option<Secret>,
     pub github_api_url: String,
@@ -187,6 +190,7 @@ impl Config {
             signup: SignupMode::Invite,
             plans: false,
             billing_url: None,
+            billing_handoff_secret: None,
             github_client_id: None,
             github_client_secret: None,
             github_api_url: GITHUB_API_URL.to_string(),
@@ -531,7 +535,7 @@ impl Hub {
         if self.plan_view(&row, now()).entitled {
             Ok(())
         } else {
-            Err(ApiError::plan_inactive(self.config.billing_url.clone()))
+            Err(ApiError::plan_inactive(self.billing_entry()))
         }
     }
 
@@ -543,6 +547,21 @@ impl Hub {
         match owner {
             Some(account) => self.require_account_plan(&account),
             None => Ok(()),
+        }
+    }
+
+    fn billing_handoff(&self) -> Option<(&str, &HandoffSecret)> {
+        self.config
+            .billing_url
+            .as_deref()
+            .zip(self.config.billing_handoff_secret.as_ref())
+    }
+
+    pub fn billing_entry(&self) -> Option<String> {
+        if self.billing_handoff().is_some() {
+            Some(format!("{}/v1/a/billing/checkout", self.origin))
+        } else {
+            self.config.billing_url.clone()
         }
     }
 
@@ -717,6 +736,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/a/machines/{id}", delete(boards::remove_machine))
         .route("/v1/a/events", get(events::account_events))
         .route("/v1/a/key", post(account::set_key))
+        .route("/v1/a/billing/{purpose}", get(billing::handoff))
         .route("/v1/a/admin/overview", get(admin::overview))
         .route("/v1/a/admin/accounts", get(admin::accounts))
         .route(
