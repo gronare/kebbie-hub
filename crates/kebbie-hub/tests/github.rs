@@ -302,6 +302,7 @@ async fn github_signs_up_from_a_pending_connect_and_a_passkey_then_makes_the_key
     let created = person.account().await.unwrap();
     assert!(!created.owner);
     assert_eq!(created.github.as_deref(), Some("newcomer"));
+    assert_eq!(created_via(&test, &created.account).as_deref(), Some("connect"));
     assert_eq!(created.key, None, "GitHub alone cannot make the account key");
     assert_eq!(created.email, None);
 
@@ -405,7 +406,9 @@ async fn an_invite_hub_makes_no_github_account_without_a_ticket() {
         .through_github(&github, &format!("?invite={invite}"), 901, "invited")
         .await;
     assert_eq!(welcomed.location, "/");
-    assert!(!invited.browser(&test).account().await.unwrap().owner);
+    let made = invited.browser(&test).account().await.unwrap();
+    assert!(!made.owner);
+    assert_eq!(created_via(&test, &made.account).as_deref(), Some("invite"));
     let mut again = GitHubBrowser::new(&test);
     let spent = again
         .through_github(&github, &format!("?invite={invite}"), 902, "again")
@@ -443,7 +446,9 @@ async fn the_setup_link_makes_the_owner_through_github_once() {
     let token = setup.split_once("token=").unwrap().1.to_string();
     let mut first = GitHubBrowser::new(&test);
     first.through_github(&github, &format!("?setup={token}"), 1, "owner").await;
-    assert!(first.browser(&test).account().await.unwrap().owner);
+    let made = first.browser(&test).account().await.unwrap();
+    assert!(made.owner);
+    assert_eq!(created_via(&test, &made.account).as_deref(), Some("setup"));
     assert_eq!(test.hub.setup_url(), None);
     let mut second = GitHubBrowser::new(&test);
     let refused = second.through_github(&github, &format!("?setup={token}"), 2, "second").await;

@@ -202,3 +202,20 @@ async fn an_invite_signs_up_without_an_account_name() {
         .unwrap();
     assert!(created.handle.starts_with('k'), "{}", created.handle);
 }
+
+#[tokio::test]
+async fn an_account_keeps_the_ticket_it_was_made_with() {
+    let test = start_hub(|config| config.signup = SignupMode::Open).await;
+    let owner = owner(&test).await;
+    let invited = member(&test).await;
+    let pending = kebbie_hub_fakes::machine::connect(&test.url, "mac")
+        .await
+        .unwrap();
+    let mut connecting = browser(&test);
+    let connected = connecting.sign_up_from_connect(&pending.link()).await.unwrap();
+    for (mut person, via) in [(owner, "setup"), (invited, "invite")] {
+        let account = person.account().await.unwrap().account;
+        assert_eq!(created_via(&test, &account).as_deref(), Some(via));
+    }
+    assert_eq!(created_via(&test, &connected.account).as_deref(), Some("connect"));
+}

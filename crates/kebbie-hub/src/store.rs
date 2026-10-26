@@ -300,13 +300,16 @@ const ACCOUNT_KEY_COLUMNS: &[(&str, &str, &str)] = &[
 
 const GITHUB_COLUMNS: &[(&str, &str, &str)] = &[("accounts", "github_login", "TEXT")];
 
-const SCHEMA_VERSION: i64 = 9;
+const CREATED_VIA_COLUMNS: &[(&str, &str, &str)] = &[("accounts", "created_via", "TEXT")];
+
+const SCHEMA_VERSION: i64 = 10;
 const UPGRADES: &[(i64, &str)] = &[
     (5, REPORTS_SCHEMA),
     (6, SIGNALS_SCHEMA),
     (7, CONNECT_SCHEMA),
     (8, ACCOUNT_KEY_SCHEMA),
     (9, ""),
+    (10, ""),
 ];
 pub const REPORT_KEEP_SECONDS: u64 = 30 * 86_400;
 pub const SIGNAL_KEEP_DAYS: u64 = 180;
@@ -481,6 +484,9 @@ impl Store {
             }
             if *to == 9 {
                 add_columns(&tx, GITHUB_COLUMNS)?;
+            }
+            if *to == 10 {
+                add_columns(&tx, CREATED_VIA_COLUMNS)?;
             }
         }
         tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -1708,14 +1714,15 @@ impl Store {
             return Ok(SignUpOutcome::CredentialTaken);
         }
         tx.execute(
-            "INSERT INTO accounts (id, handle, user_handle, created_at, role)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO accounts (id, handle, user_handle, created_at, role, created_via)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 signup.account,
                 signup.handle,
                 signup.user_handle.to_vec(),
                 signup.now,
-                role_of(kind)
+                role_of(kind),
+                kind.created_via()
             ],
         )?;
         tx.execute(
@@ -1755,8 +1762,8 @@ impl Store {
             return Ok(SignUpOutcome::GitHubTaken);
         }
         tx.execute(
-            "INSERT INTO accounts (id, handle, user_handle, created_at, role, github_id, github_login)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO accounts (id, handle, user_handle, created_at, role, github_id, github_login, created_via)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 signup.account,
                 signup.handle,
@@ -1764,7 +1771,8 @@ impl Store {
                 signup.now,
                 role_of(kind),
                 signup.github_id,
-                signup.github_login
+                signup.github_login,
+                kind.created_via()
             ],
         )?;
         tx.execute(
@@ -2566,6 +2574,7 @@ pub struct AccountRow {
     pub deactivated_at: Option<u64>,
     pub github_id: Option<u64>,
     pub github_login: Option<String>,
+    pub created_via: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -2584,8 +2593,8 @@ pub struct AdminAccountRow {
     pub last_seen: Option<u64>,
 }
 
-const ACCOUNT_COLUMNS: &str = "accounts.id, accounts.handle, accounts.user_handle, accounts.created_at, accounts.role, accounts.email, accounts.plan, accounts.plan_until, accounts.deactivated_at, accounts.github_id, accounts.github_login";
-const ACCOUNT_COLUMN_COUNT: usize = 11;
+const ACCOUNT_COLUMNS: &str = "accounts.id, accounts.handle, accounts.user_handle, accounts.created_at, accounts.role, accounts.email, accounts.plan, accounts.plan_until, accounts.deactivated_at, accounts.github_id, accounts.github_login, accounts.created_via";
+const ACCOUNT_COLUMN_COUNT: usize = 12;
 
 fn account_row(row: &Row<'_>) -> Result<AccountRow> {
     Ok(AccountRow {
@@ -2603,6 +2612,7 @@ fn account_row(row: &Row<'_>) -> Result<AccountRow> {
         deactivated_at: row.get(8)?,
         github_id: row.get(9)?,
         github_login: row.get(10)?,
+        created_via: row.get(11)?,
     })
 }
 
@@ -2668,6 +2678,14 @@ impl Ticket {
         match self {
             Ticket::Invite => "invite",
             Ticket::Owner => "owner",
+            Ticket::Connect => "connect",
+        }
+    }
+
+    pub fn created_via(self) -> &'static str {
+        match self {
+            Ticket::Invite => "invite",
+            Ticket::Owner => "setup",
             Ticket::Connect => "connect",
         }
     }

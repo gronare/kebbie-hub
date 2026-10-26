@@ -480,6 +480,10 @@ pub async fn connected_with_board(test: &TestHub, person: &mut Browser) -> Machi
     machine
 }
 
+pub fn created_via(test: &TestHub, account: &str) -> Option<String> {
+    test.hub.store().account(account).unwrap().unwrap().created_via
+}
+
 pub fn hub_code(error: HubError) -> (u16, String) {
     (
         error.status().unwrap_or_default(),

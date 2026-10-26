@@ -333,7 +333,9 @@ fn a_schema_6_database_is_upgraded_in_place_and_keeps_its_data() {
         .unwrap()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 9);
+    assert_eq!(version, 10);
+    assert_eq!(store_created_via(&path, "acc_kept"), None, "an account from before keeps no origin");
+    assert_eq!(store_created_via(&path, "acc_new").as_deref(), Some("invite"));
     assert!(!store_account_is_owner(&path, "acc_new"));
     rusqlite::Connection::open(&path)
         .unwrap()
@@ -442,6 +444,10 @@ async fn the_admin_cli_makes_an_account_the_one_owner() {
         )
         .unwrap();
     assert_eq!(logged, 1);
+}
+
+fn store_created_via(path: &std::path::Path, account: &str) -> Option<String> {
+    Store::open(path).unwrap().account(account).unwrap().unwrap().created_via
 }
 
 #[test]
