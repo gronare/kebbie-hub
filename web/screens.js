@@ -2,7 +2,7 @@ import { connectBlock, connectBlockText } from "./connect.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
-const brand = `<header class="brand"><span class="brand-mark" aria-hidden="true">k</span><b>kebbie hub</b></header>`;
+const brand = `<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#a8501f"/><g transform="translate(16 16) scale(0.66) translate(-16 -16)"><path d="M23 18V12.5A7.5 7.5 0 0 0 8 12.5A4.6 4.6 0 0 0 17.2 12.5" fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.41 22.55L17.30 25.20L14.41 27.85" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="20.5" y="20.8" width="5" height="8.8" fill="#ffffff"/></g></svg><b>kebbie hub</b></header>`;
 const heading = (title, lead) => `<h1 class="title">${esc(title)}</h1><p class="lead">${esc(lead)}</p>`;
 const warn = (text) => (text ? `<div class="center warn" role="alert">${esc(text)}</div>` : "");
 const disabled = (off) => (off ? " disabled" : "");

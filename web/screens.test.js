@@ -123,8 +123,8 @@ test("setup and invite pages ask only for a passkey, never an account name", () 
   for (const said of [setup, invited, bare]) assert.doesNotMatch(said, /account name|email/i);
 });
 
-test("every hub screen opens with the k mark before kebbie hub", () => {
-  const mark = '<header class="brand"><span class="brand-mark" aria-hidden="true">k</span><b>kebbie hub</b></header>';
+test("every hub screen opens with the kebbie mark before kebbie hub", () => {
+  const mark = /^<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">.*<\/svg><b>kebbie hub<\/b><\/header>/;
   const screens = [
     connectScreen({ view, signupOpen: true }),
     connectScreen({ view, me, session: { state: "locked", me }, fragment }),
@@ -136,7 +136,7 @@ test("every hub screen opens with the k mark before kebbie hub", () => {
     addPasskeyScreen({ login: "octocat" }),
     accountScreen({ me: { ...me, github: "octocat" }, github: true }),
   ];
-  for (const html of screens) assert.ok(html.startsWith(mark), html);
+  for (const html of screens) assert.match(html, mark);
 });
 
 const hrefs = (html) => [...html.matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([^<]*)</g)].map(([, href, label]) => ({ label: label.trim(), href: href.replace(/&#38;/g, "&") }));
