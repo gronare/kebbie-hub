@@ -5,9 +5,9 @@ export const SLEEP_AFTER = 180;
 export const GROUPS = [
   { key: "NEEDS YOU", title: "Needs you", tone: "peach" },
   { key: "WORKING", title: "Working", tone: "blue" },
-  { key: "TO REVIEW", title: "In review", tone: "blue" },
+  { key: "TO REVIEW", title: "In review", tone: "teal" },
   { key: "READY TO PUSH", title: "Ready to push", tone: "green" },
-  { key: "CI RUNNING", title: "CI running", tone: "blue" },
+  { key: "CI RUNNING", title: "CI running", tone: "yellow" },
   { key: "WAITING FOR WORK", title: "Waiting for work", tone: "muted" },
 ];
 
