@@ -93,8 +93,6 @@ pub struct SameOrigin;
 
 pub struct FreshAccount(pub String);
 
-pub struct OwnerAuth(pub String);
-
 pub struct AdminAuth(pub AdminScope);
 
 impl AdminAuth {
@@ -209,49 +207,6 @@ impl FromRequestParts<Arc<Hub>> for FreshAccount {
             ));
         }
         Ok(FreshAccount(account))
-    }
-}
-
-pub struct FreshOwner(pub String);
-
-pub fn require_fresh(hub: &Hub, headers: &HeaderMap) -> Result<(), ApiError> {
-    let at = crate::now();
-    let signed_in_at = match session_cookie(hub, headers) {
-        Some(token) => hub.store().session(&digest(token), at)?.map(|(_, at)| at),
-        None => None,
-    };
-    match signed_in_at {
-        Some(signed_in_at) if at.saturating_sub(signed_in_at) <= hub.config().fresh_session_ttl => {
-            Ok(())
-        }
-        Some(_) => Err(ApiError::new(
-            axum::http::StatusCode::UNAUTHORIZED,
-            "reauth-required",
-        )),
-        None => Err(ApiError::unauthorized()),
-    }
-}
-
-impl FromRequestParts<Arc<Hub>> for FreshOwner {
-    type Rejection = ApiError;
-
-    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<FreshOwner, ApiError> {
-        let OwnerAuth(owner) = OwnerAuth::from_request_parts(parts, hub).await?;
-        require_fresh(hub, &parts.headers)?;
-        Ok(FreshOwner(owner))
-    }
-}
-
-impl FromRequestParts<Arc<Hub>> for OwnerAuth {
-    type Rejection = ApiError;
-
-    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<OwnerAuth, ApiError> {
-        let AccountAuth(account) = AccountAuth::from_request_parts(parts, hub).await?;
-        let owner = hub.store().account(&account)?.is_some_and(|row| row.owner);
-        if !owner {
-            return Err(ApiError::forbidden("not-owner"));
-        }
-        Ok(OwnerAuth(account))
     }
 }
 

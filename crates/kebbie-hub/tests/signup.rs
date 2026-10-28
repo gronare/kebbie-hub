@@ -3,7 +3,7 @@ mod common;
 
 use common::*;
 use kebbie_hub::{Config, Hub};
-use kebbie_hub_api::{HubInfo, InviteLink, RegisterBegin, SignupMode};
+use kebbie_hub_api::{HubInfo, RegisterBegin, SignupMode};
 
 #[tokio::test]
 async fn a_fresh_hub_is_claimed_only_with_its_setup_link() {
@@ -80,29 +80,16 @@ async fn a_hub_mints_a_new_setup_link_at_each_start_until_it_has_an_account() {
 }
 
 #[tokio::test]
-async fn the_owner_hands_out_invite_links() {
+async fn an_invite_signs_up_one_account_once() {
     let test = start_hub(|_| {}).await;
-    let mut owner = owner(&test).await;
-    let link: InviteLink = owner.post("/v1/a/admin/invites", &()).await.unwrap();
-    assert_eq!(
-        link.url,
-        format!("http://localhost:8470/signup?invite={}", link.code)
-    );
+    let code = test.hub.mint_invite().unwrap();
     let mut invited = browser(&test);
-    let created = invited.sign_up_with_invite(&link.code).await.unwrap();
+    let created = invited.sign_up_with_invite(&code).await.unwrap();
     assert!(!created.owner);
     let mut again = browser(&test);
     assert_eq!(
-        hub_code(again.sign_up_with_invite(&link.code).await.unwrap_err()).0,
+        hub_code(again.sign_up_with_invite(&code).await.unwrap_err()).0,
         401
-    );
-    let mut member = invited;
-    let refused = member
-        .post::<_, InviteLink>("/v1/a/admin/invites", &())
-        .await;
-    assert_eq!(
-        hub_code(refused.unwrap_err()),
-        (403, "not-owner".to_string())
     );
 }
 

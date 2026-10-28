@@ -737,23 +737,6 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/v1/a/events", get(events::account_events))
         .route("/v1/a/key", post(account::set_key))
         .route("/v1/a/billing/{purpose}", get(billing::handoff))
-        .route("/v1/a/admin/overview", get(admin::overview))
-        .route("/v1/a/admin/accounts", get(admin::accounts))
-        .route(
-            "/v1/a/admin/accounts/{id}/deactivate",
-            post(admin::deactivate),
-        )
-        .route("/v1/a/admin/accounts/{id}/activate", post(admin::activate))
-        .route("/v1/a/admin/invites", post(admin::invite))
-        .route("/v1/a/admin/machines", get(admin::machines))
-        .route("/v1/a/admin/machines/{id}", delete(admin::remove_machine))
-        .route("/v1/a/admin/reports", get(admin::reports))
-        .route("/v1/a/admin/reports/{id}/ack", post(admin::ack_report))
-        .route(
-            "/v1/a/admin/reports/keys/{key}/{decision}",
-            post(admin::decide_key),
-        )
-        .route("/v1/a/admin/signals", get(admin::signals))
         .route("/v1/admin/accounts", get(admin::billing_accounts))
         .route("/v1/admin/accounts/{id}", get(admin::billing_account))
         .route("/v1/admin/accounts/{id}/plan", put(admin::set_plan))

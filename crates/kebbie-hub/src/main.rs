@@ -159,7 +159,7 @@ enum Admin {
     RemoveMachine { machine: String },
     #[command(about = "List the accounts by id, with role, machines and when they were last seen")]
     Accounts,
-    #[command(about = "Make an account the hub's owner, the one account that opens the admin page")]
+    #[command(about = "Make an account the hub's owner, whose plan is always entitled and who cannot be deactivated")]
     Owner {
         #[arg(help = "The account's id (acc_…), as admin accounts lists it")]
         account: String,

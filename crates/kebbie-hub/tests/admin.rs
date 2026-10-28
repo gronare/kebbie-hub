@@ -4,229 +4,38 @@ mod common;
 use std::time::Duration;
 
 use common::*;
-use kebbie_hub::store::{KeyStatus, NewReport, Store};
-use kebbie_hub_api::{
-    AdminAccounts, AdminMachines, AdminOverview, AdminReports, AdminSignals, InviteLink,
-};
+use kebbie_hub::store::Store;
 use kebbie_hub_fakes::PairError;
-use kebbie_hub_protocol::BugReport;
 use tokio::sync::oneshot;
 
-const OWNER_READS: [&str; 5] = [
+const WEB_ADMIN: [&str; 11] = [
     "/v1/a/admin/overview",
     "/v1/a/admin/accounts",
+    "/v1/a/admin/accounts/acc_x/deactivate",
+    "/v1/a/admin/accounts/acc_x/activate",
+    "/v1/a/admin/invites",
     "/v1/a/admin/machines",
+    "/v1/a/admin/machines/mch_x",
     "/v1/a/admin/reports",
+    "/v1/a/admin/reports/1/ack",
+    "/v1/a/admin/reports/keys/AwMD/block",
     "/v1/a/admin/signals",
 ];
 
 #[tokio::test]
-async fn the_admin_endpoints_answer_only_the_owner() {
+async fn the_hub_has_no_web_admin_for_its_owner() {
     let test = start_hub(|_| {}).await;
     let mut owner = owner(&test).await;
-    let mut member = member(&test).await;
-    let mut anonymous = browser(&test);
-    for path in OWNER_READS {
-        let refused = member.get::<serde_json::Value>(path).await;
-        assert_eq!(
-            hub_code(refused.unwrap_err()),
-            (403, "not-owner".to_string()),
-            "{path}"
-        );
-        let refused = anonymous.get::<serde_json::Value>(path).await;
-        assert_eq!(hub_code(refused.unwrap_err()).0, 401, "{path}");
-        owner.get::<serde_json::Value>(path).await.unwrap();
+    for path in WEB_ADMIN {
+        let read = owner.get::<serde_json::Value>(path).await;
+        assert_eq!(hub_code(read.unwrap_err()).0, 404, "GET {path}");
+        let act = owner.post::<_, serde_json::Value>(path, &()).await;
+        assert_eq!(hub_code(act.unwrap_err()).0, 404, "POST {path}");
     }
-    for path in [
-        "/v1/a/admin/invites",
-        "/v1/a/admin/accounts/acc_x/deactivate",
-        "/v1/a/admin/reports/1/ack",
-    ] {
-        let refused = member.post::<_, serde_json::Value>(path, &()).await;
-        assert_eq!(hub_code(refused.unwrap_err()).0, 403, "{path}");
-    }
-    assert_eq!(
-        hub_code(
-            member
-                .delete("/v1/a/admin/machines/mch_x")
-                .await
-                .unwrap_err()
-        )
-        .0,
-        403
-    );
-    owner.origin = "https://evil.example".to_string();
-    let cross = owner
-        .post::<_, serde_json::Value>("/v1/a/admin/invites", &())
-        .await;
-    assert_eq!(
-        hub_code(cross.unwrap_err()),
-        (403, "cross-origin".to_string())
-    );
-}
-
-#[tokio::test]
-async fn the_owner_sees_accounts_with_their_machines_devices_and_plans() {
-    let test = start_hub(|config| config.connect_interval = 0).await;
-    let mut owner = owner(&test).await;
-    let mut person = member(&test).await;
-    let mut machine = connected(&test, &mut person).await;
-    person.ensure_device().await.unwrap();
-    machine.post_board(board(MARKER)).await.unwrap();
-    let overview: AdminOverview = owner.get("/v1/a/admin/overview").await.unwrap();
-    assert_eq!(
-        (overview.accounts, overview.machines, overview.devices),
-        (2, 1, 1)
-    );
-    let listed: AdminAccounts = owner.get("/v1/a/admin/accounts").await.unwrap();
-    let id = person.account().await.unwrap().account;
-    let row = listed
-        .accounts
-        .iter()
-        .find(|row| row.account == id)
-        .unwrap();
-    assert_eq!((row.machines, row.devices, row.owner), (1, 1, false));
-    assert!(row.last_seen.is_some());
-    assert!(row.plan.entitled);
-    assert!(listed.accounts.iter().any(|row| row.owner));
-    let machines: AdminMachines = owner.get("/v1/a/admin/machines").await.unwrap();
-    assert_eq!(
-        machines.machines[0].owner.as_deref(),
-        Some(id.as_str())
-    );
-}
-
-#[tokio::test]
-async fn a_deactivated_account_loses_its_session_login_devices_and_machines() {
-    let test = start_hub(|config| config.connect_interval = 0).await;
-    let mut owner = owner(&test).await;
-    let mut person = member(&test).await;
-    let mut machine = connected(&test, &mut person).await;
-    let phone = person.ensure_device().await.unwrap().clone();
-    let account = person.account().await.unwrap().account;
-    let mut feed = EventStream::open(&test.url, phone.token().unwrap()).await;
-    let mut account_feed = EventStream::of_account(&person).await;
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
-        .await
-        .unwrap();
-    assert_eq!(feed.next(Duration::from_secs(5)).await, Next::Ended);
-    assert_eq!(account_feed.next(Duration::from_secs(5)).await, Next::Ended);
-    assert_eq!(hub_code(person.account().await.unwrap_err()).0, 401);
-    assert_eq!(hub_code(person.log_in().await.unwrap_err()).0, 401);
-    assert!(person.boards().await.is_err());
-    assert!(
-        phone
-            .client()
-            .get::<serde_json::Value>("/v1/d/results", &[])
-            .await
-            .is_err()
-    );
-    assert!(machine.post_board(board(MARKER)).await.is_err());
-    let own = owner.account().await.unwrap().account;
-    let refused = owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{own}/deactivate"), &())
-        .await;
-    assert_eq!(
-        hub_code(refused.unwrap_err()),
-        (409, "owner-stays".to_string())
-    );
-
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/activate"), &())
-        .await
-        .unwrap();
-    person.log_in().await.unwrap();
-    machine.post_board(board(MARKER)).await.unwrap();
-}
-
-#[tokio::test]
-async fn the_owner_removes_a_machine_and_its_token_stops() {
-    let test = start_hub(|config| config.connect_interval = 0).await;
-    let mut owner = owner(&test).await;
-    let mut person = member(&test).await;
-    let mut machine = connected(&test, &mut person).await;
-    owner
-        .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
-        .await
-        .unwrap();
-    assert_eq!(
-        machine
-            .post_board(board(MARKER))
-            .await
-            .err()
-            .map(|e| e.to_string().contains("401")),
-        Some(true)
-    );
-    let gone = owner
-        .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
-        .await;
-    assert_eq!(hub_code(gone.unwrap_err()).0, 404);
-}
-
-fn report(title: &str) -> BugReport {
-    BugReport {
-        title: title.to_string(),
-        text: "the text".to_string(),
-        version: "0.27.0".to_string(),
-        os: "macos aarch64".to_string(),
-    }
-}
-
-#[tokio::test]
-async fn the_owner_decides_on_reports_from_the_web() {
-    let test = start_hub(|_| {}).await;
-    let mut owner = owner(&test).await;
-    {
-        let mut store = Store::open(&test.hub.config().database()).unwrap();
-        store
-            .store_report(&NewReport {
-                key: &[3; 32],
-                report: &report("waiting"),
-                now: kebbie_hub::now(),
-                max_quarantined: 10,
-                max_quarantined_per_key: 10,
-            })
-            .unwrap();
-    }
-    let waiting: AdminReports = owner
-        .get("/v1/a/admin/reports?quarantine=true")
-        .await
-        .unwrap();
-    assert_eq!(waiting.reports.len(), 1);
-    let key = serde_json::to_value(waiting.reports[0].key).unwrap();
-    let key = key.as_str().unwrap();
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/allow"), &())
-        .await
-        .unwrap();
-    let allowed: AdminReports = owner.get("/v1/a/admin/reports").await.unwrap();
-    assert_eq!(allowed.reports[0].status, "allowed");
-    let overview: AdminOverview = owner.get("/v1/a/admin/overview").await.unwrap();
-    assert_eq!((overview.reports, overview.quarantined), (1, 0));
-    owner
-        .post::<_, Option<()>>(
-            &format!("/v1/a/admin/reports/{}/ack", allowed.reports[0].id),
-            &(),
-        )
-        .await
-        .unwrap();
-    let handled: AdminReports = owner.get("/v1/a/admin/reports").await.unwrap();
-    assert!(handled.reports.is_empty());
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/block"), &())
-        .await
-        .unwrap();
-    assert_eq!(
-        test.hub
-            .store()
-            .reports(KeyStatus::Blocked, 0, false, 10)
-            .unwrap()
-            .len(),
-        0
-    );
-    let signals: AdminSignals = owner.get("/v1/a/admin/signals?days=30").await.unwrap();
-    assert!(signals.signals.is_empty());
+    let removed = owner.delete("/v1/a/admin/machines/mch_x").await;
+    assert_eq!(hub_code(removed.unwrap_err()).0, 404);
+    let page = reqwest::get(format!("{}/admin", test.url)).await.unwrap();
+    assert_eq!(page.status(), 404, "no /admin page");
 }
 
 #[tokio::test]
@@ -401,10 +210,7 @@ async fn the_admin_cli_makes_an_account_the_one_owner() {
         String::from_utf8_lossy(&refused.stderr).contains("--replace"),
         "{refused:?}"
     );
-    first
-        .get::<AdminOverview>("/v1/a/admin/overview")
-        .await
-        .unwrap();
+    assert!(first.account().await.unwrap().owner);
 
     let replaced = admin(&[&second_id, "--replace"]);
     assert!(replaced.status.success(), "{replaced:?}");
@@ -412,19 +218,8 @@ async fn the_admin_cli_makes_an_account_the_one_owner() {
         String::from_utf8_lossy(&replaced.stdout).trim(),
         format!("{second_id} is the owner; {first_id} is a member now")
     );
-    second
-        .get::<AdminOverview>("/v1/a/admin/overview")
-        .await
-        .unwrap();
-    assert_eq!(
-        hub_code(
-            first
-                .get::<AdminOverview>("/v1/a/admin/overview")
-                .await
-                .unwrap_err()
-        ),
-        (403, "not-owner".to_string())
-    );
+    assert!(second.account().await.unwrap().owner);
+    assert!(!first.account().await.unwrap().owner);
     let again = admin(&[&second_id]);
     assert!(again.status.success());
     assert!(String::from_utf8_lossy(&again.stdout).contains("already"));
@@ -479,59 +274,3 @@ fn an_owner_made_without_another_owner_needs_no_replace() {
     assert!(store.account("acc_a").unwrap().unwrap().owner);
 }
 
-#[tokio::test]
-async fn destructive_owner_actions_need_a_fresh_passkey_session() {
-    let test = start_hub(|config| {
-        config.fresh_session_ttl = 1;
-        config.connect_interval = 0;
-    })
-    .await;
-    let mut owner = owner(&test).await;
-    let mut person = member(&test).await;
-    let machine = connected(&test, &mut person).await;
-    let account = person.account().await.unwrap().account;
-    tokio::time::sleep(Duration::from_millis(2100)).await;
-    let key = "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM";
-    let stale = [
-        owner
-            .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
-            .await,
-        owner
-            .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
-            .await
-            .map(|()| None),
-        owner
-            .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/block"), &())
-            .await,
-    ];
-    for refused in stale {
-        assert_eq!(
-            hub_code(refused.unwrap_err()),
-            (401, "reauth-required".to_string())
-        );
-    }
-    for path in OWNER_READS {
-        owner.get::<serde_json::Value>(path).await.unwrap();
-    }
-    owner
-        .post::<_, InviteLink>("/v1/a/admin/invites", &())
-        .await
-        .unwrap();
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/allow"), &())
-        .await
-        .unwrap();
-    owner.log_in().await.unwrap();
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/reports/keys/{key}/block"), &())
-        .await
-        .unwrap();
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
-        .await
-        .unwrap();
-    owner
-        .delete(&format!("/v1/a/admin/machines/{}", machine.machine))
-        .await
-        .unwrap();
-}

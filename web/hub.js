@@ -47,19 +47,6 @@ export const connectCalls = {
   removeMachine: (machine) => call("DELETE", `/v1/a/machines/${query(machine)}`),
 };
 
-export const admin = {
-  overview: () => call("GET", "/v1/a/admin/overview"),
-  accounts: () => call("GET", "/v1/a/admin/accounts"),
-  machines: () => call("GET", "/v1/a/admin/machines"),
-  reports: (quarantine) => call("GET", `/v1/a/admin/reports${quarantine ? "?quarantine=true" : ""}`),
-  signals: () => call("GET", "/v1/a/admin/signals"),
-  invite: () => call("POST", "/v1/a/admin/invites", { body: {} }),
-  setActive: (id, active) => call("POST", `/v1/a/admin/accounts/${query(id)}/${active ? "activate" : "deactivate"}`, { body: {} }),
-  removeMachine: (id) => call("DELETE", `/v1/a/admin/machines/${query(id)}`),
-  decideKey: (key, decision) => call("POST", `/v1/a/admin/reports/keys/${query(key)}/${decision}`, { body: {} }),
-  ack: (id) => call("POST", `/v1/a/admin/reports/${query(id)}/ack`, { body: {} }),
-};
-
 export function parseEvents(buffer) {
   const events = [];
   const blocks = buffer.split(/\r?\n\r?\n/);

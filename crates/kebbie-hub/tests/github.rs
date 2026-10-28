@@ -421,13 +421,17 @@ async fn an_invite_hub_makes_no_github_account_without_a_ticket() {
 async fn a_deactivated_github_account_is_refused_at_sign_in_and_gets_no_session() {
     let github = fake_github().await;
     let test = github_hub(&github, |_| {}).await;
-    let mut owner = owner(&test).await;
     let invite = test.hub.mint_invite().unwrap();
     let mut invited = GitHubBrowser::new(&test);
     invited.through_github(&github, &format!("?invite={invite}"), 903, "leaver").await;
     let account = invited.browser(&test).account().await.unwrap().account;
-    owner
-        .post::<_, Option<()>>(&format!("/v1/a/admin/accounts/{account}/deactivate"), &())
+    let token = test
+        .hub
+        .mint_admin_token("billing", kebbie_hub::store::AdminScope::Billing)
+        .unwrap()
+        .unwrap();
+    kebbie_hub_fakes::HubClient::new(&test.url, Some(&token))
+        .post_empty(&format!("/v1/admin/accounts/{account}/deactivate"), &())
         .await
         .unwrap();
     let sessions = rows(&test, "sessions");

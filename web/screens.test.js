@@ -115,7 +115,7 @@ test("a machine whose board expired shows as asleep with when it was last seen",
 test("setup and invite pages ask only for a passkey, never an account name", () => {
   const setup = text(setupScreen({ phase: "start", needsSetup: true, token: "kho_x" }));
   assert.equal(setup, "kebbie hub Set up this hub Create a passkey to become this hub's owner. It signs you in; there is no password. Create passkey");
-  assert.equal(text(setupScreen({ phase: "done" })), "kebbie hub Set up this hub You own this hub. Open admin Open kebbie");
+  assert.equal(text(setupScreen({ phase: "done" })), "kebbie hub Set up this hub You own this hub. Open kebbie");
   const invited = text(signupScreen({ invite: "K7QF-M2XD" }));
   assert.equal(invited, "kebbie hub Sign up You're invited to this hub. Create a passkey to start: it signs you in and unlocks your boards. Create passkey");
   const bare = text(signupScreen({}));

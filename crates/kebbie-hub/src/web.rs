@@ -24,7 +24,6 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/setup", "web/index.html", HTML),
     asset!("/signup", "web/index.html", HTML),
     asset!("/connect", "web/index.html", HTML),
-    asset!("/admin", "web/index.html", HTML),
     asset!("/account", "web/index.html", HTML),
     asset!("/app.css", "web/app.css", "text/css; charset=utf-8"),
     asset!("/app.js", "web/app.js", JS),
@@ -151,7 +150,8 @@ mod tests {
         );
         assert_eq!(find("/v1/a/boards"), None);
         assert_eq!(find("/add"), None);
-        for page in ["/setup", "/signup", "/connect", "/admin", "/account"] {
+        assert_eq!(find("/admin"), None);
+        for page in ["/setup", "/signup", "/connect", "/account"] {
             assert_eq!(find(page), find("/"), "{page}");
         }
     }

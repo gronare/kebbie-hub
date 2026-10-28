@@ -751,42 +751,6 @@ pub struct ConnectDenial {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct InviteLink {
-    pub code: String,
-    pub url: String,
-    pub expires_at: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdminOverview {
-    pub accounts: u64,
-    pub machines: u64,
-    pub devices: u64,
-    pub reports: u64,
-    pub quarantined: u64,
-    pub signals_this_week: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdminAccount {
-    pub account: String,
-    pub handle: String,
-    pub email: Option<String>,
-    pub owner: bool,
-    pub created_at: u64,
-    pub deactivated_at: Option<u64>,
-    pub plan: PlanView,
-    pub machines: u64,
-    pub devices: u64,
-    pub last_seen: Option<u64>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AdminAccounts {
-    pub accounts: Vec<AdminAccount>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BillingAccount {
     pub account: String,
     pub handle: String,
@@ -826,54 +790,6 @@ pub struct BillingMachine {
     pub joined_at: u64,
     pub last_seen: Option<u64>,
     pub last_board_at: Option<u64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdminMachine {
-    pub machine: Id,
-    pub name: String,
-    pub owner: Option<String>,
-    pub joined_at: u64,
-    pub last_seen: Option<u64>,
-    pub devices: u64,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AdminMachines {
-    pub machines: Vec<AdminMachine>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdminReport {
-    pub id: u64,
-    pub key: Bytes32,
-    pub status: String,
-    pub received_at: u64,
-    pub acked_at: Option<u64>,
-    pub report: BugReport,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AdminReports {
-    pub reports: Vec<AdminReport>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdminSignal {
-    pub day: u64,
-    pub version: String,
-    pub commit: String,
-    pub os: String,
-    pub arch: String,
-    pub component: String,
-    pub kind: String,
-    pub vetted: bool,
-    pub count: u64,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AdminSignals {
-    pub signals: Vec<AdminSignal>,
 }
 
 pub const EVENT_BOARD: &str = "board";

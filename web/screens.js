@@ -206,7 +206,7 @@ export function installHint(show) {
 
 export function setupScreen({ phase, needsSetup, token, github = false, notice = null }) {
   const top = brand + `<h1 class="title">Set up this hub</h1>`;
-  if (phase === "done") return top + `<div class="center ok">You own this hub.</div><a class="btn primary" href="/admin">Open admin</a><a class="btn" href="/">Open kebbie</a>`;
+  if (phase === "done") return top + `<div class="center ok">You own this hub.</div><a class="btn primary" href="/">Open kebbie</a>`;
   if (!needsSetup) return top + `<div class="center">This hub has an owner already.</div><a class="btn" href="/">Sign in</a>`;
   if (!token) return top + `<div class="center">Open the setup link the hub printed in its log when it started.</div>`;
   return top + `<p class="lead">Create a passkey to become this hub's owner. It signs you in; there is no password.</p><button type="button" class="btn primary" data-action="create-passkey">Create passkey</button>${github ? githubButton("Continue with GitHub", githubHref({ setup: token })) : ""}${warn(notice)}`;
