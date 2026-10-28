@@ -83,6 +83,8 @@ export async function openBoards(listing, identity, now, marks = emptyMarks()) {
 
 export const isAsleep = (machine, now) => machine.lastSeen === null || now - machine.lastSeen > SLEEP_AFTER;
 
+export const toAccept = (item) => (item.steps?.items ?? []).filter((step) => step.state === "committed").length;
+
 const byUrgency = (a, b) => b.item.urgency - a.item.urgency || a.item.address.localeCompare(b.item.address) || a.name.localeCompare(b.name);
 
 export function arrange(opened, now) {
@@ -94,7 +96,8 @@ export function arrange(opened, now) {
     .map((machine) => ({ machine: machine.machine, name: machine.name, lastSeen: machine.lastSeen ?? machine.storedAt, working: machine.board ? machine.board.items.filter((item) => item.group === "WORKING").length : null }));
   const problems = opened.filter((machine) => machine.problem).map(({ machine, name, problem }) => ({ machine, name, problem }));
   const questions = rows.filter((row) => row.item.question || row.item.prompt).sort(byUrgency);
-  return { groups, sleeping, problems, questions, machines: opened.length };
+  const waiting = rows.reduce((sum, row) => sum + toAccept(row.item), 0);
+  return { groups, sleeping, problems, questions, toAccept: waiting, machines: opened.length };
 }
 
 export function findTask(opened, machine, address) {

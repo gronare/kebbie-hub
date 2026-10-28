@@ -1,3 +1,4 @@
+import { toAccept } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -21,6 +22,33 @@ export function lastSeenText(seconds, now = Date.now() / 1000) {
 export function sleepingRow(machine, now) {
   const working = machine.working ? ` · ${machine.working} ${machine.working === 1 ? "task was" : "tasks were"} working then` : "";
   return `<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">asleep · last seen ${esc(lastSeenText(machine.lastSeen, now))}${working}</div></div>`;
+}
+
+const STEP_MARKS = { planned: "○", "in-progress": "◐", committed: "●", accepted: "✓" };
+const STEP_LABELS = { planned: "", "in-progress": "in progress", committed: "committed", accepted: "accepted" };
+
+export function stepLines(item) {
+  const steps = item.steps;
+  if (!steps || (steps.pushed === 0 && steps.items.length === 0)) return "";
+  const pushed = steps.pushed ? `<div class="pushed">↑ ${esc(steps.pushed)} pushed</div>` : "";
+  const rules = item.git?.approved ? " · rules ✓" : "";
+  const lines = steps.items.map((step) => {
+    const label = step.state === "committed" ? `committed${rules}` : STEP_LABELS[step.state];
+    return `<div class="step s-${esc(step.state)}"><span class="what"><span class="mark">${STEP_MARKS[step.state]}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>`;
+  });
+  return `<div class="steps">${pushed}${lines.join("")}</div>`;
+}
+
+export const acceptCount = (count) => (count ? `<span class="accept">◆ ${esc(count)} to accept</span>` : "");
+
+export function taskRow(row) {
+  const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
+  const waiting = toAccept(row.item);
+  const meta = [row.repo && esc(row.repo), waiting ? `<span class="accept">${waiting} to accept</span>` : "", esc(row.item.summary)].filter(Boolean).join(" · ");
+  const next = row.item.steps?.items.find((step) => step.state === "committed");
+  const wanted = row.item.next_for_you ?? (next ? `accept ${next.number} on ${row.name}` : null);
+  const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
+  return `<a class="task" href="${href}"><div class="name">${esc(row.task)} <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepLines(row.item)}${you}</a>`;
 }
 
 export function githubHref({ next = null, connect = null, invite = null, setup = null, link = false } = {}) {

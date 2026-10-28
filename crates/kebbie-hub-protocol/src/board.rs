@@ -57,6 +57,33 @@ pub struct Item {
     pub recover: Option<Recover>,
     pub routine: Option<String>,
     pub card: Option<CardRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steps: Option<Steps>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Steps {
+    pub pushed: u32,
+    pub items: Vec<Step>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Step {
+    pub number: u32,
+    pub title: String,
+    pub state: StepState,
+    pub sha: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StepState {
+    Planned,
+    InProgress,
+    Committed,
+    Accepted,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,5 +246,42 @@ mod tests {
         let mut leaked = item;
         leaked["path"] = serde_json::json!("/Users/someone/projects/greenhouse");
         assert!(serde_json::from_value::<Item>(leaked).is_err());
+    }
+
+    fn plain() -> serde_json::Value {
+        serde_json::json!({
+            "address": "stripe@billing", "group": "WORKING", "urgency": 0, "summary": "2 commits", "next_for_you": null,
+            "agent": null, "report": null, "question": null, "prompt": null, "git": null, "head": null, "verdict": null,
+            "push_permission": null, "push_waits": null, "follows_main": false, "ci": null, "recover": null, "routine": null, "card": null,
+        })
+    }
+
+    #[test]
+    fn an_item_from_a_kebbie_without_steps_parses_and_is_written_back_without_the_field() {
+        let item: Item = serde_json::from_value(plain()).unwrap();
+        assert_eq!(item.steps, None);
+        assert_eq!(serde_json::to_value(&item).unwrap(), plain());
+    }
+
+    #[test]
+    fn an_item_carries_its_steps_in_order_with_the_sha_of_each_commit() {
+        let mut stepped = plain();
+        stepped["steps"] = serde_json::json!({ "pushed": 1, "items": [
+            { "number": 2, "title": "Charge through a PaymentGateway", "state": "committed", "sha": "2222222bbbb" },
+            { "number": 3, "title": "Add Stripe as the gateway", "state": "in-progress", "sha": null },
+            { "number": 4, "title": "Remove the old payment client", "state": "planned", "sha": null },
+            { "number": 5, "title": "Docs", "state": "accepted", "sha": "5555555eeee" },
+        ] });
+        let item: Item = serde_json::from_value(stepped.clone()).unwrap();
+        let steps = item.steps.as_ref().unwrap();
+        assert_eq!(steps.pushed, 1);
+        assert_eq!(steps.items.iter().map(|step| (step.number, step.state)).collect::<Vec<_>>(), [(2, StepState::Committed), (3, StepState::InProgress), (4, StepState::Planned), (5, StepState::Accepted)]);
+        assert_eq!(serde_json::to_value(&item).unwrap(), stepped);
+        let mut subject = stepped.clone();
+        subject["steps"]["items"][0]["subject"] = serde_json::json!("Charge through a PaymentGateway");
+        assert!(serde_json::from_value::<Item>(subject).is_err(), "a step carries only its allow-listed fields");
+        let mut unknown = stepped;
+        unknown["steps"]["items"][0]["state"] = serde_json::json!("pushed");
+        assert!(serde_json::from_value::<Item>(unknown).is_err());
     }
 }

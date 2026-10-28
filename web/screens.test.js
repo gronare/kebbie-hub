@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { accountScreen, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, installHint, lastSeenText, signInScreen, signupScreen, setupScreen, sleepingRow, unlockingScreen } from "./screens.js";
+import { acceptCount, accountScreen, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, installHint, lastSeenText, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskRow, unlockingScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -190,4 +190,48 @@ test("every way GitHub sign-in comes back refused reads as one line", () => {
   assert.equal(githubErrorText("github-taken"), "That GitHub account already belongs to another kebbie account.");
   assert.equal(githubErrorText("something-new"), githubErrorText("failed"));
   for (const code of ["expired", "denied", "signup-closed", "unauthorized", "signed-out", "deactivated"]) assert.ok(githubErrorText(code) && githubErrorText(code) !== githubErrorText("failed"), code);
+});
+
+const stripe = {
+  address: "stripe@billing",
+  group: "WORKING",
+  summary: "2 commits",
+  next_for_you: null,
+  git: { upstream: "main", ahead: 2, behind: 0, uncommitted: 0, approved: true },
+  steps: {
+    pushed: 1,
+    items: [
+      { number: 2, title: "Charge through a PaymentGateway", state: "committed", sha: "2222222bbbb" },
+      { number: 3, title: "Add Stripe as the gateway", state: "in-progress", sha: null },
+      { number: 4, title: "Remove the old <payment> client", state: "planned", sha: null },
+    ],
+  },
+};
+const rowOf = (item) => ({ machine: "mch_a", name: "devbox", item, task: "stripe", repo: "billing" });
+
+test("a task with steps lists them under its row, says how many wait to be accepted and which one is next", () => {
+  const html = taskRow(rowOf(stripe));
+  assert.equal(
+    text(html),
+    "stripe devbox billing · 1 to accept · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed · rules ✓ ◐ 3 Add Stripe as the gateway in progress ○ 4 Remove the old <payment> client you: accept 2 on devbox",
+  );
+  assert.match(html, /<span class="accept">1 to accept<\/span>/);
+  assert.match(html, /class="step s-committed"/);
+  assert.match(html, /class="step s-in-progress"/);
+  assert.doesNotMatch(html, /<payment>/, "a step title is escaped");
+});
+
+test("a step's label follows its state, and rules show only when the rules passed", () => {
+  const steps = { pushed: 0, items: [{ number: 1, title: "Docs", state: "accepted", sha: "aaa" }, { number: 2, title: "Tests", state: "committed", sha: "bbb" }] };
+  assert.equal(text(stepLines({ ...stripe, git: { ...stripe.git, approved: false }, steps })), "✓ 1 Docs accepted ● 2 Tests committed");
+  assert.equal(text(taskRow(rowOf({ ...stripe, next_for_you: "answer: Keep it?", steps }))).endsWith("you: answer: Keep it?"), true, "what kebbie asks of you comes before an accept");
+});
+
+test("a task without steps shows its row as before, and the board's count only when something waits", () => {
+  const plain = { ...stripe, steps: undefined };
+  assert.equal(text(taskRow(rowOf(plain))), "stripe devbox billing · 2 commits");
+  assert.equal(stepLines(plain), "");
+  assert.equal(stepLines({ ...stripe, steps: { pushed: 0, items: [] } }), "");
+  assert.equal(text(acceptCount(3)), "◆ 3 to accept");
+  assert.equal(acceptCount(0), "");
 });

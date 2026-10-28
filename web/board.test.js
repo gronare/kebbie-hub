@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, fromB64 } from "../js/protocol.js";
-import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, SLEEP_AFTER, splitAddress } from "./board.js";
+import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, SLEEP_AFTER, splitAddress, toAccept } from "./board.js";
 import { get } from "./store.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
@@ -71,6 +71,25 @@ test("tasks from awake machines group in the terminal's order, most urgent first
   ]);
   assert.deepEqual(view.questions.map((row) => row.item.address), ["refunds@billing"]);
   assert.deepEqual(view.sleeping, []);
+});
+
+test("a board with steps opens with them, and the board counts the commits waiting to be accepted on awake machines", async () => {
+  const stepped = envelopes.cases.find((candidate) => candidate.name === "board-with-steps-opened-by-the-account");
+  const [opened] = await open([entry({ rev: stepped.expect.payload.rev, envelope: stepped.envelope })]);
+  assert.equal(opened.problem, null);
+  const [task] = opened.board.items;
+  assert.deepEqual(task.steps.items.map((step) => [step.number, step.state]), [[2, "committed"], [3, "in-progress"], [4, "planned"]]);
+  assert.equal(toAccept(task), 1);
+  const two = structuredClone(task.steps);
+  two.items[1] = { ...two.items[1], state: "committed", sha: "3333333cccc" };
+  two.items.push({ number: 5, title: "Docs", state: "accepted", sha: "5555555eeee" });
+  const view = arrange([
+    machineWith("mch_a", "devbox", now - 10, [task, item("other@web", "WORKING", 0, { steps: two }), item("search@web", "WORKING")]),
+    machineWith("mch_vm", "VM:en", now - SLEEP_AFTER - 1, [item("deps@infra", "WORKING", 0, { steps: two })]),
+  ], now);
+  assert.equal(view.toAccept, 3);
+  assert.equal(toAccept(item("search@web", "WORKING")), 0, "a task without steps has nothing to accept");
+  assert.equal(arrange([machineWith("mch_a", "devbox", now - 10, [item("search@web", "WORKING")])], now).toAccept, 0);
 });
 
 test("a machine not heard from shows as sleeping with what was working, not as tasks", () => {

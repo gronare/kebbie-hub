@@ -28,7 +28,7 @@ pub use authorize::{
 pub use board::{
     Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Git, Group, Item, Prompt,
     PromptOption, PushPermission, Question, QuestionOption, Recover, Report, RoutineSummary,
-    Verdict, VerdictOutcome,
+    Step, StepState, Steps, Verdict, VerdictOutcome,
 };
 pub use bug_report::{
     BugReport, BugReportError, InstallKey, MAX_DIFFICULTY, MAX_FIELD_CHARS, MAX_TEXT_BYTES,

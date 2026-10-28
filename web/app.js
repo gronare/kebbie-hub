@@ -7,7 +7,7 @@ import { addFirstPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage } from "./pages.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { addPasskeyScreen, cantUnlockScreen, connectDone, githubErrorText, installHint, lastSeenText, needsFirstPasskey, signInScreen, sleepingRow, unlockingScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, cantUnlockScreen, connectDone, githubErrorText, installHint, lastSeenText, needsFirstPasskey, signInScreen, sleepingRow, taskRow, unlockingScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -56,13 +56,6 @@ function top(title, aside = "") {
   return `<header class="top"><b>${esc(title)}</b><span>${aside}</span></header>`;
 }
 
-function taskRow(row) {
-  const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
-  const meta = [row.repo, row.item.summary].filter(Boolean).join(" · ");
-  const you = row.item.next_for_you ? `<div class="you"><b>you:</b> ${esc(row.item.next_for_you)}</div>` : "";
-  return `<a class="task" href="${href}"><div class="name">${esc(row.task)} <span class="machine">${esc(row.name)}</span></div><div class="meta">${esc(meta)}</div>${you}</a>`;
-}
-
 const PROBLEMS = {
   "unknown-machine": "not confirmed by your account; connect it again",
   "not-sealed-to-this-account": "the board is not sealed to your account yet",
@@ -83,7 +76,7 @@ function freshness() {
 
 function boardScreen() {
   const view = arrange(state.opened, nowSeconds());
-  const parts = [top("kebbie", esc(freshness())), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning()];
+  const parts = [top("kebbie", [acceptCount(view.toAccept), esc(freshness())].filter(Boolean).join(" · ")), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning()];
   if (state.opened.length === 0) {
     parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div>`);
   } else if (!state.opened.some((machine) => machine.board || machine.problem || machine.expired)) {

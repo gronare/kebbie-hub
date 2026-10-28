@@ -101,6 +101,19 @@ a.task:active { background: var(--sel); }
 .you b { color: var(--peach); font-weight: 600; }
 .machine { display: inline-block; font-size: 12px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; margin-left: 6px; }
 .asleep { opacity: 0.55; }
+.top .accept, .meta .accept { color: var(--peach); }
+.steps { display: grid; gap: 2px; font-size: 14px; }
+.steps .pushed { color: var(--muted); font-size: 13px; }
+.step { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+.step .what { flex: 1 0 10em; min-width: 0; display: flex; align-items: baseline; gap: 6px; }
+.step .mark { flex: none; width: 1em; text-align: center; }
+.step .number { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.step-title { min-width: 0; }
+.step .label { margin-left: auto; font-size: 13px; white-space: nowrap; }
+.s-planned { color: var(--muted); }
+.s-in-progress .mark, .s-in-progress .label { color: var(--blue); }
+.s-committed .mark, .s-committed .label { color: var(--peach); }
+.s-accepted .mark, .s-accepted .label { color: var(--green); }
 
 .btn {
   display: block;

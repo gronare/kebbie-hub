@@ -145,6 +145,23 @@ test("decrypted payloads with unknown fields or wrong types are refused", () => 
   }
 });
 
+test("a board item's steps carry only their own fields and known states, and a board without them still passes", () => {
+  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account").expect.payload;
+  checkPayload(stepped);
+  const plain = envelopes.cases.find((vector) => vector.name === "board-opened-by-a-device").expect.payload;
+  assert.equal(Object.hasOwn(plain.items[0], "steps"), false);
+  checkPayload(plain);
+  const subject = structuredClone(stepped);
+  subject.items[0].steps.items[0].subject = "Charge through a PaymentGateway";
+  const state = structuredClone(stepped);
+  state.items[0].steps.items[0].state = "pushed";
+  const pushed = structuredClone(stepped);
+  pushed.items[0].steps.pushed = -1;
+  for (const payload of [subject, state, pushed]) {
+    assert.throws(() => checkPayload(payload), (error) => error.code === "malformed");
+  }
+});
+
 test("a key row under a string that is not an id is refused", () => {
   const good = envelopes.cases.find((vector) => vector.name === "answer-opened-by-the-machine").envelope;
   assert.throws(() => checkShape({ ...good, keys: { ...good.keys, __proto__x: "AAAA" } }), (error) => error.code === "malformed");

@@ -453,6 +453,118 @@
     {
       "envelope": {
         "at": 1761069600,
+        "ct": "RErpqMd9uRn1SJy_ZGZsAMVb-sBx0ONZBvAbMdlTpXKVnJeW2qc97EXH2G4B7kaohJ1oUkrYsbZYYaBXpNfWX8VtYdZDkCObHMcRNQncMq7jW0aYp1JyEHkVw_3cqLAMTOIo0e4Vs62N_ylImyDyDNt7zIG_Q8BrF_Rwqe1_AjgOB-X1R_mHi92wT_NDw9OBl9Xy7UWwA3yuKlDkiiV18S42FLZSrMShj9FmCG5f7AiuW4eultpanlOJ1PHvJFDCku_N1nVFi6_P0LIB1I52n3fx9es9Gpbz8oMZy41Ca1HT7KZK9WMatX888xQt_M3kEeyPBHcEEPnpGDYGnzMs_jmEpPwIGIZyIFdCmuCZZg0BH_VHGIoEIglctqEcePau9bDzzxCl4eJ_UBII67Q2uPNPQ0K40jGv5FRnxgeetEuTOjrmJWbeNO4_DAskHzD9LhQC0DwgwNmSi_8q9TyuHdtvtMbooFMZnoLr1AgM0YtrtiZdAZSfc9dlNO30DX3NX9Hl0dx6L3O3doiurLHJI_y2lXWF7406JfsXQUNnIy9471SH1wvF6HxcWcRvvELVBVgPCvYr5W0SVcBbL9SloQw6vTLudDz_1604KKX773PAG_2aydG0ZKZL_0r03YiQhesBMgyhLNby1QSe6FzR63JwRv3jY7b3VDfHZO-3gqD-nyVSJ5KRAhZ6TpTfBdjl3oTJUwDjkNSw93KRtO7w8zbCSFG76dUZHSVI-YjHAWFfKmvlsbvI8IvAdpRm3bO_rS5KvMm8rSCuYZ6J_6n8Vxrtcj5su_k4Ozteu-aN1-KHeUtZ_8hme3QtBNhiI7E_A0RuMXGt-rzRfoaE47XMQDHhayg4iD_U6rIIPmR3buEJSLJQigH9MjT2-XBOCjEw5qchjTot5uVhmxC6OuvjTY-zp8DH2HGKQp4Knehqoi8-yhc4vI_55lYj6VXFRtVezNRNtlPrUZ6mZKWMy0rAitXzypYKhLg1Ga_T3L1WBkdBSdkzGsi4w4_oq7H7idfFBrKTBt6AjmvMV9MxeNnJk3YN0gvFGAy9bOoUs93RMPw0k9xujtZFuFsOk0K85rCGGMkVFD3Bvlyy835rlNv6owbTN6mrvV4uyyTP94m_D-4UJjLInplmzcTHPWOhSFfDJmftRMwO81DrXwEA-XSmv8UlozkUjPQU6fOD7Obdgzzi8Kcs_s9WZRFqKVJv9l_W5AeBKdBGpe-u9tOerqDNhkV1dx2938e0JiFdW2clTqnnQ_1GnQSgi-rA24oUWzfFMhIKMZvQhFf-VHjOfBvVSCAg44Vd7m8RPXm10tjaO1IN2yfTfovEwePNuSeWtMk_vjYIAPOVDi1aPI5QGvlhAQhLkj_yjeoY-9VhxhrsXIld7YV3PszZSchHIPqvYpkVG227KkMdoXvIIRP1OvQtV5PYzg9IigB7HzBnJRbH",
+        "exp": 1761156000,
+        "from": "mch_01K83YV380C22K88V6NF4RVHXX",
+        "id": "brd_01K83YV380T0TKKCM66YDYFTS0",
+        "kc": "vzntwpOldjXTTzeqkZzn3Gqjg-1t4eqEcnCdzKOoA9s",
+        "keys": {
+          "acc_5gWa4eCpKJzZKDW6oH8fBQ": "SEsWrA5IRW-5QDoYD-S4bILBmtP6AWc6N4wz3nIXDkiCtSWmCPZyXi5q7Fp3-m5t6xE06-9eK7taXB3P8CI6BZAe7WGgG4vuknzsfDT40x4",
+          "mch_01K83YV380C22K88V6NF4RVHXX": "vpgzWeeUQ-p0Pqwy8-JGOe2EFJI5CLbe4UbplkG6GmepfoC1vKxCgPV8DqKa7J6-r_ERzOGehQTL8IeiyuvS1xstx7YRfEre4-dvrfpBjZw"
+        },
+        "kind": "board",
+        "machine": "mch_01K83YV380C22K88V6NF4RVHXX",
+        "schema": 1,
+        "sig": "mkKoCs7TD1J_h6c__l23N94eK-eA2cLZG9HaHM4E4JEByOXotIMMElLQcDqlf8nzRY1aNbWJhjZKk6-dTwnZBQ",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "away_since": null,
+          "checkouts": [
+            {
+              "busy_worktrees": 4,
+              "free_worktrees": 2,
+              "repo": "greenhouse"
+            }
+          ],
+          "items": [
+            {
+              "address": "stripe@billing",
+              "agent": {
+                "status": "working"
+              },
+              "card": null,
+              "ci": null,
+              "follows_main": false,
+              "git": {
+                "ahead": 2,
+                "approved": true,
+                "behind": 0,
+                "uncommitted": 0,
+                "upstream": "main"
+              },
+              "group": "WORKING",
+              "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "next_for_you": null,
+              "prompt": null,
+              "push_permission": null,
+              "push_waits": null,
+              "question": null,
+              "recover": null,
+              "report": null,
+              "routine": null,
+              "steps": {
+                "items": [
+                  {
+                    "number": 2,
+                    "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+                    "state": "committed",
+                    "title": "Charge through a PaymentGateway"
+                  },
+                  {
+                    "number": 3,
+                    "sha": null,
+                    "state": "in-progress",
+                    "title": "Add Stripe as the gateway"
+                  },
+                  {
+                    "number": 4,
+                    "sha": null,
+                    "state": "planned",
+                    "title": "Remove the old payment client"
+                  }
+                ],
+                "pushed": 1
+              },
+              "summary": "2 commits",
+              "urgency": 0,
+              "verdict": null
+            }
+          ],
+          "kelpie": "0.24.0",
+          "rev": 1842,
+          "routines": [
+            {
+              "id": "nightly-deps",
+              "last_outcome": "ok",
+              "mode": "fix",
+              "next_run": 1761100200,
+              "repo": "greenhouse",
+              "title": "Nightly deps"
+            }
+          ],
+          "sessions_outside_tasks": 1,
+          "type": "board"
+        }
+      },
+      "header_bytes": "a2VscGllLWh1YiBlbnZlbG9wZQAAAQAeYnJkXzAxSzgzWVYzODBUMFRLS0NNNjZZRFlGVFMwAAVib2FyZAAebWNoXzAxSzgzWVYzODBDMjJLODhWNk5GNFJWSFhYAB5tY2hfMDFLODNZVjM4MEMyMks4OFY2TkY0UlZIWFgAAAAAaPfKIAAAAABo-RugAAEAK3Z6bnR3cE9sZGpYVFR6ZXFrWnpuM0dxamctMXQ0ZXFFY25DZHpLT29BOXMAAA",
+      "name": "board-with-steps-opened-by-the-account",
+      "recipient": "account",
+      "seal": {
+        "content_key": "n36FbnJq0WKrDqp9swOzfUnTyrIS_BSA1MsdMklVmUY",
+        "ephemeral": {
+          "acc_5gWa4eCpKJzZKDW6oH8fBQ": "xPHNmrkJg2Yi9WeuxL3TRb5_p3VWxH14gAsh6suN1bU",
+          "mch_01K83YV380C22K88V6NF4RVHXX": "cM-bljt4_wGLtwoHPNcxyAWsG_zp4QX0NlZgo29L8lI"
+        },
+        "nonce": "RErpqMd9uRn1SJy_",
+        "plaintext": "eyJ0eXBlIjoiYm9hcmQiLCJyZXYiOjE4NDIsImtlbHBpZSI6IjAuMjQuMCIsImF3YXlfc2luY2UiOm51bGwsImNoZWNrb3V0cyI6W3sicmVwbyI6ImdyZWVuaG91c2UiLCJmcmVlX3dvcmt0cmVlcyI6MiwiYnVzeV93b3JrdHJlZXMiOjR9XSwicm91dGluZXMiOlt7ImlkIjoibmlnaHRseS1kZXBzIiwidGl0bGUiOiJOaWdodGx5IGRlcHMiLCJyZXBvIjoiZ3JlZW5ob3VzZSIsIm1vZGUiOiJmaXgiLCJuZXh0X3J1biI6MTc2MTEwMDIwMCwibGFzdF9vdXRjb21lIjoib2sifV0sIml0ZW1zIjpbeyJhZGRyZXNzIjoic3RyaXBlQGJpbGxpbmciLCJncm91cCI6IldPUktJTkciLCJ1cmdlbmN5IjowLCJzdW1tYXJ5IjoiMiBjb21taXRzIiwibmV4dF9mb3JfeW91IjpudWxsLCJhZ2VudCI6eyJzdGF0dXMiOiJ3b3JraW5nIn0sInJlcG9ydCI6bnVsbCwicXVlc3Rpb24iOm51bGwsInByb21wdCI6bnVsbCwiZ2l0Ijp7InVwc3RyZWFtIjoibWFpbiIsImFoZWFkIjoyLCJiZWhpbmQiOjAsInVuY29tbWl0dGVkIjowLCJhcHByb3ZlZCI6dHJ1ZX0sImhlYWQiOiI5ZjNjMmExZTViN2Q0YzZhOGIwZTJmNGQ2YzhhMGIyZTRmNmQ4YzBhIiwidmVyZGljdCI6bnVsbCwicHVzaF9wZXJtaXNzaW9uIjpudWxsLCJwdXNoX3dhaXRzIjpudWxsLCJmb2xsb3dzX21haW4iOmZhbHNlLCJjaSI6bnVsbCwicmVjb3ZlciI6bnVsbCwicm91dGluZSI6bnVsbCwiY2FyZCI6bnVsbCwic3RlcHMiOnsicHVzaGVkIjoxLCJpdGVtcyI6W3sibnVtYmVyIjoyLCJ0aXRsZSI6IkNoYXJnZSB0aHJvdWdoIGEgUGF5bWVudEdhdGV3YXkiLCJzdGF0ZSI6ImNvbW1pdHRlZCIsInNoYSI6IjlmM2MyYTFlNWI3ZDRjNmE4YjBlMmY0ZDZjOGEwYjJlNGY2ZDhjMGEifSx7Im51bWJlciI6MywidGl0bGUiOiJBZGQgU3RyaXBlIGFzIHRoZSBnYXRld2F5Iiwic3RhdGUiOiJpbi1wcm9ncmVzcyIsInNoYSI6bnVsbH0seyJudW1iZXIiOjQsInRpdGxlIjoiUmVtb3ZlIHRoZSBvbGQgcGF5bWVudCBjbGllbnQiLCJzdGF0ZSI6InBsYW5uZWQiLCJzaGEiOm51bGx9XX19XSwic2Vzc2lvbnNfb3V0c2lkZV90YXNrcyI6MX0"
+      },
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
         "ct": "SqLAACsxBjUD5ygpHXCLLS5HV100c1kwblvZZucDPCQkLNVoBGbHrBwZtuB_7A0OBlOCOL4u6RvGf0txmcHmT_DPFUrMUKO76QC6mW7zNVwxYRtaIzy03ODnaB_g5p66eCEMiq0KvjGYOmuBMEp1ywZHfOb18u-2vXpa5uAdjONyYBcthuXXXxASFSH8wYqTMvF-7Z-CmBSmIgQSPhbj2wGNavoZGe2XNHm7XlFKjf0znY7fBcZPb6qTiz3CAC4p23GOIEK2mHsDOqeDGdZUhh3MZ2Xfa9VaJo8Ia0SJ0QMbWpjsFTHkbb_GRGjhSIah5cf0uGf8GM-bcTG6N3Gb442GrkfeF7MhX3zaQRkgCEGvyr5qq5D8-bK0imfU6E-YFeyjTiTtyjOnQZfkcrrmtzOYSPPCZ3OKR9Aeg7UjJZcs7C336MF76lXbLBML4FGmH2HJblg5nucXJKxhJ9JVQNHm00cEq5FY4kC7RXbPjKeq1h73iJ4xyuNuPSP2oV2zx9Uj_OWoYPk2TU_kK2unpQ62SptGAihkfsmDTBZn8GeP4i9Ar7XdraIE10q2PAg9lpcfWETDshIHM0QOZrG-x0MXxsbu5ZOOvtV68Ro_8IM6Keaa4KnklsFBKo3x6pgFuVM4pHZYQdqjseMYiHzS2I63dOEKP-QWj1yOrpRK-tAZfUxN2kpqceNqq3zbSAESkGYI2QIq000f8QqJlm34m3Z9q1TN3fbFPAAetbt5lGmQDuWaYETXuHt574iEW2PTpRaVQ75Zrx2WutteMmCPmfNctmlSyjMv-MTs9HlZKFLdMBQKePlHYGkNzmg2dOClJk4WbN0DmXvjaGivlwc6atc2IupVq2cvi1LPvwBTx7XosH20qyVCmxUQzD88m_U45pJuP2mTTzu7MXNCIlwhk6m4rWFFAbzJYTAc4-_Hio0PIpO_7upInGqAZRMhvNy3iCvltYoU7ft7WFO6TVTZkkm5I_KsR5Sa53XUa54kmgU6Hi6RRjcnAMSI2O9-dxdXY8DU554lHXlSq1YWCjtDkjMeIZrDyeDjmfaSBVWKcrPg4nDwqDbmRMiMypM3FToVf4Xp5_0wlT8-ZU2QhwFFZkkO_iTeJrqBatWyLiWYXBEc6swGtbL01GcJh74oS7hBE6y9fB7Ghbdu30PrdSkYhiuyCVBpC0PUCB2ZlkhI0B4y58S2g_zh9v5fI3DH5vzTi-t-_UV03C_9tu76RLXZq9XwJIQ4a472UCnxmKE6Lke-tEbh8Q60VWc1x1NmcD1H2Iz1mcsY2OaYMY92qnWZ5Hf60ZyrmT15ON_euTFdvQG0gDp1mgySNQeoT-FenYqdF-B3eXUlP8Bw8qq9mvKxZCpTEa2SSS3Z42Ch_mqB7Z39AmjfX6TuhRQkr0Gse7x-gvkEuLKEVExsBVztFmGNt6X-U_7X5cKbg6VW11npIiTKQaQuA_iK76Yb_sozeHIDENd34GmPSZYc9vdu6HWhSXZUxyz5gIJYIeZOook33seGnMvM5muTVX09S3OxUjMfqrfSiDSZAlHnZyi6ghr3POMn-axOxKy1qFqKde0zPprCqU2D2tmCQhwdzl3FkZfPNbU4LESCzRoz96GeDqVxO-srAlCQoVyIW2Lo2EEyUiURqbebTtoUgy6dXLCWv1pc1RWbxmgsWUEGSat_0sLYsg",
         "exp": 1761156000,
         "from": "mch_01K83YV380C22K88V6NF4RVHXX",

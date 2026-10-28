@@ -15,7 +15,7 @@ use crate::account::{
 use crate::authorize::{AppliedCommands, Machine, Refusal, Role, TrustedDevice, authorize};
 use crate::board::{
     Agent, AgentStatus, Board, Checkout, Git, Group, Item, Question, QuestionOption, Report,
-    RoutineSummary,
+    RoutineSummary, Step, StepState, Steps,
 };
 use crate::bug_report::{BugReport, InstallKey, leading_zero_bits, meets, pow_hash, solve};
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
@@ -229,9 +229,60 @@ fn board() -> Payload {
             recover: None,
             routine: None,
             card: None,
+            steps: None,
         }],
         sessions_outside_tasks: 1,
     })
+}
+
+fn stepped_board() -> Payload {
+    let Payload::Board(mut board) = board() else {
+        unreachable!()
+    };
+    let step = |number: u32, title: &str, state: StepState, sha: Option<&str>| Step {
+        number,
+        title: title.into(),
+        state,
+        sha: sha.map(Into::into),
+    };
+    board.items = vec![Item {
+        address: "stripe@billing".into(),
+        group: Group::Working,
+        urgency: 0,
+        summary: "2 commits".into(),
+        next_for_you: None,
+        agent: Some(Agent {
+            status: AgentStatus::Working,
+        }),
+        report: None,
+        question: None,
+        prompt: None,
+        git: Some(Git {
+            upstream: "main".into(),
+            ahead: 2,
+            behind: 0,
+            uncommitted: 0,
+            approved: true,
+        }),
+        head: Some(HEAD.into()),
+        verdict: None,
+        push_permission: None,
+        push_waits: None,
+        follows_main: false,
+        ci: None,
+        recover: None,
+        routine: None,
+        card: None,
+        steps: Some(Steps {
+            pushed: 1,
+            items: vec![
+                step(2, "Charge through a PaymentGateway", StepState::Committed, Some(HEAD)),
+                step(3, "Add Stripe as the gateway", StepState::InProgress, None),
+                step(4, "Remove the old payment client", StepState::Planned, None),
+            ],
+        }),
+    }];
+    Payload::Board(board)
 }
 
 fn answer_to(address: &str) -> Payload {
@@ -446,6 +497,20 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         account,
         machine,
         board(),
+    ));
+    let stepped = seal_case(
+        "stepped-board",
+        machine_header("stepped-board", Kind::Board, machine),
+        &stepped_board(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens(
+        "board-with-steps-opened-by-the-account",
+        &stepped,
+        account,
+        machine,
+        stepped_board(),
     ));
     cases.push(fails(
         "board-for-the-account-is-not-a-device-row",

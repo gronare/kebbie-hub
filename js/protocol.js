@@ -168,6 +168,7 @@ const item = shape({
   recover: optionalField(shape({ note: string })),
   routine: optionalField(string),
   card: optionalField(shape({ sha: string, current: bool, blob: blobRef })),
+  steps: optionalField(shape({ pushed: u32v, items: list(shape({ number: u32v, title: string, state: oneOf("planned", "in-progress", "committed", "accepted"), sha: optionalField(string) })) })),
 });
 const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request"];
 const EVENTS = ["needs-you", "ready", "question", "summary", "ci-failed", "ci-green", "api-error", "routine-findings", "routine-failed"];
