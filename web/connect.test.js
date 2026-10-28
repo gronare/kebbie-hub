@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, fromB64, machineListTrusts, verifyMachineList } from "../js/protocol.js";
-import { approveFromLink, connectBlock, connectCommitment, finishConnect, forgetFragment, keptFragment, PairingFailed, parseConnectFragment, planLine, safeNext, unlockFailedText, withReauth } from "./connect.js";
+import { approveFromLink, connectBlock, connectCommitment, finishConnect, forgetFragment, keptFragment, PairingFailed, parseConnectFragment, planLine, safeNext, signedInDestination, unlockFailedText, withReauth } from "./connect.js";
 import { HubError } from "./hub.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
@@ -168,4 +168,12 @@ test("Connect on a cookie-only session unlocks first, and a cancelled unlock app
   const done = await approveFromLink({ fragment, session: { state: "locked" }, unlock: async () => ({ state: "unlocked", identity }), approve, commit: async () => ({ commitment: "c1", nonce: nonce }) });
   assert.equal(done.blocked, null);
   assert.deepEqual(approvals, ["c1"]);
+});
+
+test("a signed-in visitor of the sign-up page goes on to where they came from, keeping a pending code", () => {
+  const at = (query) => new URLSearchParams(query);
+  assert.equal(signedInDestination("/signup", at(`next=${encodeURIComponent("/connect?code=ABCD-EFGH")}`)), "/connect?code=ABCD-EFGH");
+  assert.equal(signedInDestination("/signup", at("")), "/", "no next goes to the board");
+  assert.equal(signedInDestination("/signup", at("next=//evil.example")), "/", "never off the hub");
+  for (const path of ["/connect", "/account", "/setup"]) assert.equal(signedInDestination(path, at("code=ABCD-EFGH")), null, `${path} stays where it is`);
 });

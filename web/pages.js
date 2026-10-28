@@ -1,4 +1,4 @@
-import { approveFromLink, CONNECT_TEXT, connectText, finishConnect, forgetFragment, keptFragment, PairingFailed, planLine, safeNext, unlockFailedText, withReauth } from "./connect.js";
+import { approveFromLink, CONNECT_TEXT, connectText, finishConnect, forgetFragment, keptFragment, PairingFailed, planLine, safeNext, signedInDestination, unlockFailedText, withReauth } from "./connect.js";
 import { emptyMarks, mergeMarks } from "./board.js";
 import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
@@ -383,6 +383,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     render(top("kebbie hub"));
     state.info = await account.hub().catch(() => null);
     state.me = await account.me().catch(() => null);
+    const onward = state.me ? signedInDestination(path, params) : null;
+    if (onward) return location.assign(onward);
     state.session = state.me ? { state: "locked", me: state.me } : null;
     await loadView();
     draw();

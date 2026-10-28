@@ -32,6 +32,10 @@ export function safeNext(value) {
   return typeof value === "string" && /^\/(?![/\\])/.test(value) ? value : null;
 }
 
+export function signedInDestination(path, params) {
+  return path === "/signup" ? (safeNext(params.get("next")) ?? "/") : null;
+}
+
 export async function withReauth(act, reauth) {
   try {
     return await act();
