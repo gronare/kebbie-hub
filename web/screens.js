@@ -3,7 +3,7 @@ import { connectBlock, connectBlockText } from "./connect.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
-const brand = `<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="mark-bg" width="32" height="32" rx="9" fill="#a8501f"/><g transform="translate(16 16) scale(0.66) translate(-16 -16)"><path d="M23 18V12.5A7.5 7.5 0 0 0 8 12.5A4.6 4.6 0 0 0 17.2 12.5" fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.41 22.55L17.30 25.20L14.41 27.85" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect class="mark-dot" x="20.5" y="20.8" width="5" height="8.8" fill="#ffffff"/></g></svg><b>kebbie hub</b></header>`;
+export const brand = `<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="mark-bg" width="32" height="32" rx="9" fill="#a8501f"/><g transform="translate(16 16) scale(0.66) translate(-16 -16)"><path d="M23 18V12.5A7.5 7.5 0 0 0 8 12.5A4.6 4.6 0 0 0 17.2 12.5" fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.41 22.55L17.30 25.20L14.41 27.85" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect class="mark-dot" x="20.5" y="20.8" width="5" height="8.8" fill="#ffffff"/></g></svg><b>kebbie hub</b></header>`;
 const heading = (title, lead) => `<h1 class="title">${esc(title)}</h1><p class="lead">${esc(lead)}</p>`;
 const warn = (text) => (text ? `<div class="center warn" role="alert">${esc(text)}</div>` : "");
 const disabled = (off) => (off ? " disabled" : "");
@@ -41,14 +41,44 @@ export function stepLines(item) {
 
 export const acceptCount = (count) => (count ? `<span class="accept">◆ ${esc(count)} to accept</span>` : "");
 
-export function taskRow(row) {
+export const taskKey = (machine, address) => `${machine}|${address}`;
+
+export function taskRow(row, selected = null) {
   const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
+  const on = selected === taskKey(row.machine, row.item.address);
   const waiting = toAccept(row.item);
   const meta = [row.repo && esc(row.repo), waiting ? `<span class="accept">${waiting} to accept</span>` : "", esc(row.item.summary)].filter(Boolean).join(" · ");
   const next = row.item.steps?.items.find((step) => step.state === "committed");
   const wanted = row.item.next_for_you ?? (next ? `accept ${next.number} on ${row.name}` : null);
   const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
-  return `<a class="task" href="${href}"><div class="name">${esc(row.task)} <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepLines(row.item)}${you}</a>`;
+  return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(row.task)}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepLines(row.item)}${you}</a>`;
+}
+
+export function nav({ active, questions = 0, deskOnly = false }) {
+  const tab = (href, label, key) => `<a href="${href}" class="${active === key ? "on" : ""}"${active === key ? ' aria-current="page"' : ""}>${label}</a>`;
+  const badge = questions ? ` <em class="badge">${esc(questions)}</em>` : "";
+  const account = `<a href="/account" class="account${active === "account" ? " on" : ""}"${active === "account" ? ' aria-current="page"' : ""}>Account</a>`;
+  return `<nav class="tabbar${deskOnly ? " desk-nav" : ""}"><div class="side-brand brand">${brand.replace(/^<header class="brand">|<\/header>$/g, "")}</div>${tab("/#/board", "Board", "board")}${tab("/#/questions", `Questions${badge}`, "questions")}${tab("/#/machines", "Machines", "machines")}${account}</nav>`;
+}
+
+export function optionCards(options, recommend = null) {
+  const cards = options.map((option, index) => {
+    const recommended = Boolean(recommend) && index === recommend - 1;
+    return `<div class="opt${recommended ? " rec" : ""}">${recommended ? `<span class="tag">Recommended</span>` : ""}<b>${esc(option.label)}</b>${option.meaning ? `<small>${esc(option.meaning)}</small>` : ""}</div>`;
+  });
+  return `<div class="options">${cards.join("")}</div>`;
+}
+
+export const hubProNote = () => `<div class="pro"><b>Coming soon · Hub Pro</b><span class="phone-only">Answer from your phone.</span><span class="desk-only">Answer here.</span> Today you answer at the machine with i on the board.</div>`;
+
+export function machineRow({ machine, name, awake, facts }) {
+  const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(machine)}" data-name="${esc(name)}">Remove</button>`;
+  return `<div class="mrow${awake ? "" : " asleep"}"><span class="dot${awake ? " awake" : ""}" aria-hidden="true"></span><div class="about"><b>${esc(name)}</b><small>${esc([awake ? "awake" : "asleep", ...facts].join(" · "))}</small></div>${remove}</div>`;
+}
+
+export function machineDots(machines) {
+  const dots = machines.map(({ name, awake, lastSeen }) => `<span><i class="dot${awake ? " awake" : ""}" aria-hidden="true"></i>${esc(name)}${!awake && lastSeen ? ` · last seen ${esc(lastSeen)}` : ""}</span>`);
+  return `<span class="dmach desk-only">${dots.join("")}</span>`;
 }
 
 export function githubHref({ next = null, connect = null, invite = null, setup = null, link = false } = {}) {

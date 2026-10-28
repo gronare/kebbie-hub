@@ -281,3 +281,46 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 
+@media (min-width: 1024px) {
+  .phone-only { display: none; }
+  .desk-only { display: revert; }
+  .dmach.desk-only { display: flex; }
+
+  main.screen:not(.in-app) { padding-top: 12vh; }
+
+  .app { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 100dvh; }
+  .app.with-panel { grid-template-columns: 200px minmax(0, 1fr) clamp(300px, 22vw, 380px); }
+
+  .tabbar, .tabbar.desk-nav {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    padding: 18px 14px;
+    font-size: 15px;
+  }
+  .tabbar .side-brand { display: flex; padding: 0; margin: 0 0 16px; }
+  .tabbar a { flex: none; max-width: none; min-height: 0; flex-direction: row; justify-content: space-between; padding: 8px 10px; border-radius: 8px; font-weight: 500; }
+  .tabbar a::before { content: none; }
+  .tabbar a.on { background: var(--sel); }
+  .tabbar .account { display: flex; margin-top: auto; font-size: 13px; }
+
+  .app .screen { max-width: none; margin: 0; padding: 20px 22px 32px; gap: 14px; }
+  .app .screen > .brand { display: none; }
+  .app .narrow { max-width: 720px; width: 100%; display: grid; gap: 12px; }
+  .app .screen.page { max-width: 620px; }
+
+  .cols { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; align-items: start; }
+  .col { gap: 10px; }
+  .col .group { margin: 0 0 2px; }
+
+  .panel { position: sticky; top: 0; height: 100dvh; overflow-y: auto; border-left: 1px solid var(--line); background: var(--card); padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .panel > .machine { align-self: flex-start; }
+  .panel h2 { font: 700 20px/1.15 var(--display); margin: 0; overflow-wrap: anywhere; }
+  .panel .opt, .panel .task { box-shadow: none; }
+}

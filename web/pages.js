@@ -6,7 +6,7 @@ import { account, admin, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
 import { addFirstPasskey, rememberedCredential, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { accountScreen, connectScreen, esc, githubErrorText, setupScreen, signupScreen } from "./screens.js";
+import { accountScreen, connectScreen, esc, githubErrorText, nav, setupScreen, signupScreen } from "./screens.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/admin", "/account"];
 
@@ -51,7 +51,9 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   const code = params.get("code") ?? "";
 
   const render = (html) => {
-    root.innerHTML = `<main class="screen page">${html}</main>`;
+    const inApp = path === "/account" && state.me;
+    const main = `<main class="screen page${inApp ? " in-app" : ""}">${html}</main>`;
+    root.innerHTML = inApp ? `<div class="app">${nav({ active: "account", deskOnly: true })}${main}</div>` : main;
   };
 
   const fail = (error) => {

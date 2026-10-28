@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { acceptCount, accountScreen, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, installHint, lastSeenText, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskRow, unlockingScreen } from "./screens.js";
+import { acceptCount, accountScreen, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, hubProNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -234,4 +234,35 @@ test("a task without steps shows its row as before, and the board's count only w
   assert.equal(stepLines({ ...stripe, steps: { pushed: 0, items: [] } }), "");
   assert.equal(text(acceptCount(3)), "◆ 3 to accept");
   assert.equal(acceptCount(0), "");
+});
+
+test("a question's options show as cards with only the recommended one marked, and answering is promised for Hub Pro", () => {
+  const options = [{ label: "Keep it", meaning: "deprecate now" }, { label: "Remove <it>", meaning: "drop it in this task" }];
+  const html = optionCards(options, 2);
+  assert.equal(text(html), "Keep it deprecate now Recommended Remove <it> drop it in this task");
+  assert.equal(html.match(/class="opt rec"/g).length, 1);
+  assert.match(html, /class="opt rec"><span class="tag">Recommended<\/span><b>Remove &#60;it&#62;/);
+  assert.doesNotMatch(optionCards(options, null), /opt rec|Recommended/);
+  assert.doesNotMatch(html, /<button/, "nothing to press until answering ships");
+  assert.match(text(hubProNote()), /^Coming soon · Hub Pro .* Today you answer at the machine with i on the board\.$/);
+});
+
+test("the nav names the tabs, counts waiting questions in a badge, marks the open tab and links the account", () => {
+  const html = nav({ active: "questions", questions: 2 });
+  assert.deepEqual(hrefs(html), [{ label: "Board", href: "/#/board" }, { label: "Questions", href: "/#/questions" }, { label: "Machines", href: "/#/machines" }, { label: "Account", href: "/account" }]);
+  assert.match(html, /class="on" aria-current="page">Questions <em class="badge">2<\/em>/);
+  assert.doesNotMatch(nav({ active: "board" }), /badge|Admin/);
+  assert.match(nav({ active: "account", deskOnly: true }), /^<nav class="tabbar desk-nav">/);
+});
+
+test("the selected task is outlined on the board, and only that one", () => {
+  const selected = taskKey("mch_a", "stripe@billing");
+  assert.match(taskRow(rowOf(stripe), selected), /^<a class="task sel" href="#\/task\/mch_a\/stripe%40billing" aria-current="true">/);
+  assert.match(taskRow(rowOf(stripe), taskKey("mch_b", "stripe@billing")), /^<a class="task" href=/);
+});
+
+test("a machine reads awake or asleep beside its dot, and the board's header lists every machine", () => {
+  assert.equal(text(machineRow({ machine: "mch_a", name: "mac", awake: true, facts: ["kebbie 0.24.0"] })), "mac awake · kebbie 0.24.0 Remove");
+  assert.match(machineRow({ machine: "mch_a", name: "studio", awake: false, facts: [] }), /class="mrow asleep"><span class="dot"/);
+  assert.equal(text(machineDots([{ name: "mac", awake: true, lastSeen: "12:00" }, { name: "studio", awake: false, lastSeen: "Fri 17:40" }])), "mac studio · last seen Fri 17:40");
 });

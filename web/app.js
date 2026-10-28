@@ -7,13 +7,14 @@ import { addFirstPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage } from "./pages.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { acceptCount, addPasskeyScreen, cantUnlockScreen, connectDone, githubErrorText, installHint, lastSeenText, needsFirstPasskey, signInScreen, sleepingRow, taskRow, unlockingScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, brand, cantUnlockScreen, connectDone, githubErrorText, hubProNote, installHint, lastSeenText, machineDots, machineRow, nav, needsFirstPasskey, optionCards, signInScreen, sleepingRow, taskKey, taskRow, unlockingScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, selected: {}, hint: false, unlocking: false, connected: null };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board" };
+const wide = globalThis.matchMedia?.("(min-width: 1024px)") ?? { matches: false, addEventListener() {} };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 const lists = { boards: account.boards, putMachines: connectCalls.putMachines };
 
@@ -46,15 +47,18 @@ const go = (hash) => {
   else location.hash = hash;
 };
 
-function tabbar(active) {
+function shell(active, main, panel = "") {
   const questions = arrange(state.opened, nowSeconds()).questions.length;
-  const tab = (hash, label, key) => `<a href="${hash}" class="${active === key ? "on" : ""}" ${active === key ? 'aria-current="page"' : ""}>${label}</a>`;
-  return `<nav class="tabbar">${tab("#/board", "Board", "board")}${tab("#/questions", `Questions${questions ? ` ${questions}` : ""}`, "questions")}${tab("#/machines", "Machines", "machines")}</nav>`;
+  const side = panel ? `<aside class="panel" aria-label="Selected task">${panel}</aside>` : "";
+  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions })}<main class="screen in-app">${brand}${main}</main>${side}</div>`;
 }
 
 function top(title, aside = "") {
-  return `<header class="top"><b>${esc(title)}</b><span>${aside}</span></header>`;
+  return `<header class="top"><h1>${esc(title)}</h1><span>${aside}</span></header>`;
 }
+
+const awakeNow = (opened, now) => Boolean(opened.board) && !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
+const awakeFirst = (opened, now) => [...opened].sort((a, b) => Number(awakeNow(b, now)) - Number(awakeNow(a, now)));
 
 const PROBLEMS = {
   "unknown-machine": "not confirmed by your account; connect it again",
@@ -74,55 +78,50 @@ function freshness() {
   return state.offline ? "can't reach the hub right now" : machines;
 }
 
-function boardScreen() {
+function boardHeader(view) {
+  const now = nowSeconds();
+  const phone = `<span class="phone-only">${[acceptCount(view.toAccept), esc(freshness())].filter(Boolean).join(" · ")}</span>`;
+  const dots = state.offline ? `<span class="desk-only">${esc(freshness())}</span>` : machineDots(awakeFirst(state.opened, now).map((opened) => ({ name: opened.name, awake: awakeNow(opened, now), lastSeen: opened.lastSeen || opened.storedAt ? lastSeenText(opened.lastSeen ?? opened.storedAt, now) : null })));
+  const accept = view.toAccept ? `<span class="desk-only">${acceptCount(view.toAccept)}</span>` : "";
+  return top("Board", phone + dots + accept);
+}
+
+function boardScreen(selected = null) {
   const view = arrange(state.opened, nowSeconds());
-  const parts = [top("kebbie", [acceptCount(view.toAccept), esc(freshness())].filter(Boolean).join(" · ")), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning()];
+  const parts = [boardHeader(view), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning()];
   if (state.opened.length === 0) {
     parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div>`);
   } else if (!state.opened.some((machine) => machine.board || machine.problem || machine.expired)) {
     parts.push(`<div class="center">No connected machine has sent a board yet.</div>`);
   }
-  for (const group of view.groups) {
-    parts.push(`<h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>`, ...group.rows.map(taskRow));
-  }
+  const columns = view.groups.map((group) => `<section class="col"><h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>${group.rows.map((row) => taskRow(row, selected)).join("")}</section>`);
   if (view.sleeping.length > 0) {
-    parts.push(`<h2 class="group g-muted">Asleep</h2>`, ...view.sleeping.map((machine) => sleepingRow(machine, nowSeconds())));
+    columns.push(`<section class="col phone-only"><h2 class="group g-muted">Asleep</h2>${view.sleeping.map((machine) => sleepingRow(machine, nowSeconds())).join("")}</section>`);
   }
+  if (columns.length) parts.push(`<div class="cols">${columns.join("")}</div>`);
   if (view.problems.length > 0) {
     parts.push(`<h2 class="group g-muted">Can't be read</h2>`);
     for (const machine of view.problems) parts.push(`<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">${esc(problemText(machine.problem))}</div></div>`);
   }
-  return parts.join("") + installHint(state.hint) + tabbar("board");
+  return parts.join("") + installHint(state.hint);
 }
 
-function questionsScreen() {
+function questionsScreen(selected = null) {
   const { questions } = arrange(state.opened, nowSeconds());
-  const list = questions.length ? questions.map(taskRow).join("") : `<div class="center">No questions wait for you.</div>`;
-  return top("Questions", questions.length ? `${questions.length} waiting` : "") + list + tabbar("questions");
-}
-
-function chips(key, options, recommend) {
-  const selected = state.selected[key] ?? (recommend ? recommend - 1 : 0);
-  const row = options.map((option, index) => `<button type="button" class="chip${index === selected ? " on" : ""}" data-action="choose" data-key="${esc(key)}" data-index="${index}" aria-pressed="${index === selected}">${esc(option.label)}</button>`).join("");
-  const chosen = options[selected];
-  const meaning = chosen ? `${esc(chosen.meaning ?? "")}${recommend && selected === recommend - 1 ? " · recommended" : ""}` : "";
-  return `<div class="chips pad">${row}</div><div class="center">${meaning}</div>`;
+  const list = questions.length ? questions.map((row) => taskRow(row, selected)).join("") : `<div class="center">No questions wait for you.</div>`;
+  return `<div class="narrow">${top("Questions", questions.length ? `${questions.length} waiting` : "")}${list}</div>`;
 }
 
 function questionBlock(found) {
   const { item } = found;
   if (item.question) {
     const question = item.question;
-    const plan = question.plan ? `<h3 class="sec">Plan</h3><div class="plan"><div>The plan (${kb(question.plan.bytes)}) shows here in a later version. It stays encrypted on the machine.</div></div>` : "";
+    const plan = question.plan ? `<section class="task"><h3 class="sec">Plan</h3><div class="plan"><div>The plan (${kb(question.plan.bytes)}) shows here in a later version. It stays encrypted on the machine.</div></div></section>` : "";
     const context = [found.repo, item.summary].filter(Boolean).join(" · ");
-    return `<section class="task"><div class="name">${esc(question.text)}</div><div class="meta">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}</section>
-      <h3 class="sec pad">Answer</h3>${chips(`${found.machine}|${item.address}|${question.id}`, question.options, question.recommend)}
-      <button type="button" class="btn primary off" disabled>Answer · coming in a later version</button>`;
+    return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}${optionCards(question.options, question.recommend)}${hubProNote()}`;
   }
   const prompt = item.prompt;
-  return `<section class="task"><div class="name">${esc(prompt.question)}</div></section>
-    <h3 class="sec pad">Answer</h3>${chips(`${found.machine}|${item.address}|${prompt.id}`, prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })), null)}
-    <button type="button" class="btn primary off" disabled>Answer · coming in a later version</button>`;
+  return `<p class="q">${esc(prompt.question)}</p>${optionCards(prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })))}${hubProNote()}`;
 }
 
 function cardBlock(found) {
@@ -153,11 +152,27 @@ function cardBlock(found) {
   return card + push;
 }
 
+function taskBody(found) {
+  return found.item.question || found.item.prompt ? questionBlock(found) : cardBlock(found);
+}
+
 function taskScreen([machine, address]) {
   const found = findTask(state.opened, machine, address);
-  if (!found) return top("Task") + `<div class="center">This task is no longer on the board.</div>` + tabbar("board");
+  if (!found) return shell("board", top("Task") + `<div class="center">This task is no longer on the board.</div>`);
   const asks = found.item.question || found.item.prompt;
-  return top(found.task, esc(found.name)) + (asks ? questionBlock(found) : cardBlock(found)) + tabbar(asks ? "questions" : "board");
+  return shell(asks ? "questions" : "board", top(found.task, esc(found.name)) + taskBody(found));
+}
+
+function taskPanel([machine, address]) {
+  const found = findTask(state.opened, machine, address);
+  if (!found) return `<h2>Task</h2><div class="center left">This task is no longer on the board.</div>`;
+  return `<span class="machine">${esc(found.name)}</span><h2>${esc(found.task)}</h2>${taskBody(found)}`;
+}
+
+function wideTaskScreen(params) {
+  const selected = taskKey(params[0], params[1]);
+  const list = state.from === "questions" ? questionsScreen(selected) : boardScreen(selected);
+  return shell(state.from, list, taskPanel(params));
 }
 
 function storeWarning() {
@@ -166,14 +181,13 @@ function storeWarning() {
 
 function machinesScreen() {
   const now = nowSeconds();
-  const rows = state.opened.map((opened) => {
+  const rows = awakeFirst(state.opened, now).map((opened) => {
     const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
-    const facts = opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : opened.problem ? [problemText(opened.problem)] : ["no board yet"];
-    const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(opened.machine)}" data-name="${esc(opened.name)}">Remove</button>`;
-    return `<div class="task${awake ? "" : " asleep"}"><div class="row"><div class="name">${esc(opened.name)} <span class="machine">${awake ? "awake" : "asleep"}</span></div>${remove}</div><div class="meta">${esc(facts.join(" · "))}</div></div>`;
+    const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
+    return machineRow({ machine: opened.machine, name: opened.name, awake, facts });
   });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  return top("Machines", esc(`${state.opened.length} connected`)) + storeWarning() + message + rows.join("") + `<p class="foot"><a class="link" href="/account">Account</a></p>` + tabbar("machines");
+  return `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}${rows.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
 }
 
 function lockedScreen() {
@@ -197,11 +211,11 @@ function render() {
   else if (state.unlocking) html = unlockingScreen();
   else if (!state.me) html = signInScreen({ github: Boolean(state.info?.github), notice: state.notice, next: onward });
   else if (state.session?.state !== "unlocked") html = lockedScreen();
-  else if (name === "questions") html = questionsScreen();
-  else if (name === "machines") html = machinesScreen();
-  else if (name === "task") html = taskScreen(params);
-  else html = boardScreen();
-  root.innerHTML = `<main class="screen">${html}</main>`;
+  else if (name === "questions") html = shell("questions", questionsScreen());
+  else if (name === "machines") html = shell("machines", machinesScreen());
+  else if (name === "task") html = wide.matches ? wideTaskScreen(params) : taskScreen(params);
+  else html = shell("board", boardScreen());
+  root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen">${html}</main>`;
   document.title = name === "task" && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
 }
 
@@ -411,10 +425,7 @@ root.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
-  if (action === "choose") {
-    state.selected[target.dataset.key] = Number(target.dataset.index);
-    render();
-  } else if (action === "dismiss-hint") {
+  if (action === "dismiss-hint") {
     state.hint = false;
     try {
       localStorage.setItem("kebbie-hint-dismissed", "1");
@@ -432,9 +443,17 @@ root.addEventListener("click", (event) => {
 
 addEventListener("hashchange", () => {
   if (pageMode) return;
-  if (route().name !== "board") state.connected = null;
+  const { name } = route();
+  if (name !== "board") state.connected = null;
+  if (name === "board" || name === "questions") state.from = name;
   render();
-  window.scrollTo(0, 0);
+  if (!(wide.matches && name === "task")) window.scrollTo(0, 0);
+});
+
+wide.addEventListener("change", () => !pageMode && render());
+
+addEventListener("keydown", (event) => {
+  if (!pageMode && event.key === "Escape" && wide.matches && route().name === "task") go(`#/${state.from}`);
 });
 
 document.addEventListener("visibilitychange", () => {
