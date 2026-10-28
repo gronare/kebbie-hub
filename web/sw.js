@@ -1,5 +1,5 @@
-const SHELL = "kebbie-shell-v5";
-const FILES = ["/", "/app.css", "/app.js", "/board.js", "/connect.js", "/device-name.js", "/pages.js", "/screens.js", "/hub.js", "/store.js", "/passkey.js", "/signin.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
+const SHELL = "kebbie-shell-v6";
+const FILES = ["/", "/app.css", "/app.js", "/board.js", "/connect.js", "/device-name.js", "/pages.js", "/screens.js", "/hub.js", "/store.js", "/passkey.js", "/signin.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
 const FALLBACK = { title: "kebbie", body: "Something on the board changed.", tag: "kebbie", url: "/#/board" };
 
 self.addEventListener("install", (event) => {

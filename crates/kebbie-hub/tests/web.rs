@@ -15,10 +15,11 @@ fn repository() -> &'static Path {
 
 fn shipped_files() -> Vec<String> {
     let mut files = Vec::new();
-    for dir in ["web", "js"] {
+    for dir in ["web", "web/fonts", "js"] {
         for entry in std::fs::read_dir(repository().join(dir)).unwrap() {
-            let name = entry.unwrap().file_name().into_string().unwrap();
-            if !name.ends_with(".test.js") && !name.starts_with('.') {
+            let entry = entry.unwrap();
+            let name = entry.file_name().into_string().unwrap();
+            if !entry.file_type().unwrap().is_dir() && !name.ends_with(".test.js") && !name.starts_with('.') {
                 files.push(format!("{dir}/{name}"));
             }
         }
@@ -41,6 +42,7 @@ async fn the_hub_serves_the_web_app_from_its_own_origin() {
     assert!(policy.contains("script-src 'self'"), "{policy}");
     assert!(policy.contains("connect-src 'self'"), "{policy}");
     assert!(policy.contains("frame-ancestors 'none'"), "{policy}");
+    assert!(policy.contains("font-src 'self'") && policy.contains("style-src 'self';"), "the hub's own fonts and no inline styles: {policy}");
     assert_eq!(page.headers()["x-content-type-options"], "nosniff");
     let html = page.text().await.unwrap();
     assert!(html.contains(r#"<script type="module" src="/app.js">"#));

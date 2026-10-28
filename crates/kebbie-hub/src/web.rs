@@ -16,6 +16,8 @@ macro_rules! asset {
 
 const HTML: &str = "text/html; charset=utf-8";
 const JS: &str = "text/javascript; charset=utf-8";
+const WOFF2: &str = "font/woff2";
+const TEXT: &str = "text/plain; charset=utf-8";
 
 pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/", "web/index.html", HTML),
@@ -50,11 +52,51 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
         "web/apple-touch-icon.png",
         "image/png"
     ),
+    asset!(
+        "/fonts/bricolage-grotesque-latin-opsz.woff2",
+        "web/fonts/bricolage-grotesque-latin-opsz.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-sans-latin-400.woff2",
+        "web/fonts/ibm-plex-sans-latin-400.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-sans-latin-500.woff2",
+        "web/fonts/ibm-plex-sans-latin-500.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-sans-latin-600.woff2",
+        "web/fonts/ibm-plex-sans-latin-600.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-mono-latin-500.woff2",
+        "web/fonts/ibm-plex-mono-latin-500.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/OFL-bricolage-grotesque.txt",
+        "web/fonts/OFL-bricolage-grotesque.txt",
+        TEXT
+    ),
+    asset!(
+        "/fonts/OFL-ibm-plex-sans.txt",
+        "web/fonts/OFL-ibm-plex-sans.txt",
+        TEXT
+    ),
+    asset!(
+        "/fonts/OFL-ibm-plex-mono.txt",
+        "web/fonts/OFL-ibm-plex-mono.txt",
+        TEXT
+    ),
     asset!("/js/protocol.js", "js/protocol.js", JS),
     asset!("/js/hpke.js", "js/hpke.js", JS),
 ];
 
-const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 pub fn find(path: &str) -> Option<(&'static str, &'static [u8])> {
     let path = if path == "/index.html" { "/" } else { path };
@@ -103,6 +145,10 @@ mod tests {
     fn scripts_and_pages_carry_their_types() {
         assert_eq!(find("/index.html").map(|(kind, _)| kind), Some(HTML));
         assert_eq!(find("/js/protocol.js").map(|(kind, _)| kind), Some(JS));
+        assert_eq!(
+            find("/fonts/ibm-plex-sans-latin-400.woff2").map(|(kind, _)| kind),
+            Some(WOFF2)
+        );
         assert_eq!(find("/v1/a/boards"), None);
         assert_eq!(find("/add"), None);
         for page in ["/setup", "/signup", "/connect", "/admin", "/account"] {
