@@ -457,6 +457,11 @@ impl MachineState {
         Ok(renamed.name)
     }
 
+    pub async fn leave(&self) -> Result<(), Error> {
+        self.client().post_empty("/v1/m/leave", &()).await?;
+        Ok(())
+    }
+
     pub async fn post_board(&mut self, board: Board) -> Result<u64, Error> {
         let rev = self.last_rev + 1;
         self.post_board_at(board, rev).await

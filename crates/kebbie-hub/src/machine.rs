@@ -66,6 +66,27 @@ pub async fn rename(
     }))
 }
 
+pub async fn leave(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+) -> Result<StatusCode, ApiError> {
+    let (readers, account) = {
+        let store = hub.store();
+        let readers = store.admitted_devices(&machine)?;
+        let account = store.machine_owner(&machine)?;
+        if !store.remove_machine(&machine)? {
+            return Err(ApiError::unauthorized());
+        }
+        store.log(now(), "machine.left", Some(&machine), None, account.as_deref())?;
+        (readers, account)
+    };
+    hub.wake_devices(&readers);
+    if let Some(account) = account {
+        hub.wake_account(&account);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub async fn put_board(
     State(hub): State<Arc<Hub>>,
     MachineAuth(machine): MachineAuth,

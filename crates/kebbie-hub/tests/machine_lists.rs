@@ -237,3 +237,54 @@ async fn a_machine_is_removed_from_the_web_only_once_the_list_dropped_it() {
     person.remove_machine(&machine.machine).await.unwrap();
     assert!(person.boards().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn a_machine_leaves_with_its_own_token_and_the_next_browser_drops_it_from_the_list() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let mut person = member(&test).await;
+    let mut kept = connected_with_board(&test, &mut person).await;
+    let mut leaving = connected_with_board(&test, &mut person).await;
+    kept.post_board(board(MARKER)).await.unwrap();
+    leaving.post_board(board(MARKER)).await.unwrap();
+
+    leaving.leave().await.unwrap();
+    let refused = leaving.post_board(board(MARKER)).await.unwrap_err();
+    assert!(refused.to_string().contains("401"), "{refused}");
+    let again = leaving.client().post_empty("/v1/m/leave", &()).await;
+    assert_eq!(hub_code(again.unwrap_err()).0, 401, "the token went with the machine");
+    let left: Vec<_> = test
+        .hub
+        .store()
+        .events()
+        .unwrap()
+        .into_iter()
+        .filter(|(kind, _)| kind == "machine.left")
+        .collect();
+    assert_eq!(left.len(), 1);
+
+    person.forget_keys();
+    person.log_in().await.unwrap();
+    let boards = person.boards().await.unwrap();
+    assert!(problem(&boards, &leaving.machine).is_none());
+    assert_eq!(problem(&boards, &kept.machine).as_deref(), Some("readable"));
+    let list = person
+        .get::<Boards>("/v1/a/boards")
+        .await
+        .unwrap()
+        .list
+        .unwrap()
+        .list;
+    assert!(list.trusts(&kept.machine, &kept.public()));
+    assert!(!list.machines.iter().any(|listed| listed.machine == leaving.machine));
+}
+
+#[tokio::test]
+async fn a_machine_that_joined_with_a_code_leaves_too() {
+    let test = start_hub(|_| {}).await;
+    let machine = joined_machine(&test).await;
+    machine.leave().await.unwrap();
+    let anonymous = kebbie_hub_fakes::HubClient::new(&test.url, None)
+        .post_empty("/v1/m/leave", &())
+        .await;
+    assert_eq!(hub_code(anonymous.unwrap_err()).0, 401);
+}

@@ -727,6 +727,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
             put(machine::put_board).layer(DefaultBodyLimit::max(BOARD_BODY_LIMIT)),
         )
         .route("/v1/m/name", put(machine::rename))
+        .route("/v1/m/leave", post(machine::leave))
         .route("/v1/m/inbox", get(machine::inbox))
         .route("/v1/m/results", post(command::post_result))
         .route("/v1/m/notices", post(push::post_notice))
