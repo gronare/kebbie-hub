@@ -5,7 +5,7 @@ use common::*;
 use kebbie_hub::store::AdminScope;
 use kebbie_hub_api::{AccountPlan, PlanStatus, PlanUpdate, PlanView};
 use kebbie_hub_fakes::machine::{AdmittedDevice, connect};
-use kebbie_hub_fakes::{Error, HubClient, HubError};
+use kebbie_hub_fakes::HubClient;
 use kebbie_hub_protocol::{Event, Id, Notice, Prefix, Role, SecretKeys, Urgency};
 
 const BILLING: &str = "https://billing.example.com/start";
@@ -40,13 +40,6 @@ async fn set_plan(
         .unwrap()
 }
 
-fn plan_inactive(error: Error) -> Option<String> {
-    match error {
-        Error::Hub(HubError::PlanInactive { url }) => url,
-        other => panic!("expected plan-inactive, got {other:?}"),
-    }
-}
-
 fn notice() -> Notice {
     Notice {
         event: Event::NeedsYou,
@@ -73,7 +66,7 @@ async fn with_plans_off_every_account_is_entitled() {
 }
 
 #[tokio::test]
-async fn an_inactive_plan_refuses_the_connect_with_the_billing_link() {
+async fn an_inactive_plan_shows_the_billing_link_and_gates_nothing() {
     let test = start_hub(on).await;
     let mut person = member(&test).await;
     let account = person.account().await.unwrap();
@@ -81,12 +74,6 @@ async fn an_inactive_plan_refuses_the_connect_with_the_billing_link() {
     assert!(!account.plan.entitled);
     assert_eq!(account.billing_url.as_deref(), Some(BILLING));
     let pending = connect(&test.url, "mac").await.unwrap();
-    match person.approve_connect(&pending.link(), false).await {
-        Err(HubError::PlanInactive { url }) => assert_eq!(url.as_deref(), Some(BILLING)),
-        other => panic!("an inactive account connected: {:?}", other.map(|_| ())),
-    }
-    let plan = set_plan(&test, &account.account, PlanStatus::Active, None).await;
-    assert!(plan.plan.entitled);
     person
         .approve_connect(&pending.link(), false)
         .await
@@ -95,14 +82,12 @@ async fn an_inactive_plan_refuses_the_connect_with_the_billing_link() {
 }
 
 #[tokio::test]
-async fn a_lapsed_plan_stops_every_machine_post_but_not_the_account_page() {
+async fn a_lapsed_plan_still_posts_and_reads_every_machine_call() {
     let test = start_hub(on).await;
     let mut person = member(&test).await;
     let account = person.account().await.unwrap().account;
     set_plan(&test, &account, PlanStatus::Active, None).await;
-    let mut machine = connected(&test, &mut person).await;
-    machine.post_board(board(MARKER)).await.unwrap();
-
+    let mut machine = connected_with_board(&test, &mut person).await;
     set_plan(
         &test,
         &account,
@@ -110,38 +95,27 @@ async fn a_lapsed_plan_stops_every_machine_post_but_not_the_account_page() {
         Some(kebbie_hub::now() - 1),
     )
     .await;
-    assert_eq!(
-        plan_inactive(machine.post_board(board(MARKER)).await.unwrap_err()).as_deref(),
-        Some(BILLING)
-    );
+    let page = person.account().await.unwrap();
+    assert!(!page.plan.entitled);
+    assert_eq!(page.billing_url.as_deref(), Some(BILLING));
+
+    machine.post_board(board(MARKER)).await.unwrap();
+    assert!(person.boards().await.unwrap().iter().any(|entry| entry.board.is_ok()), "the browser reads the board");
     machine.devices.push(AdmittedDevice {
         id: Id::new(Prefix::Device).unwrap(),
         keys: SecretKeys::generate().public(),
         role: Role::Control,
     });
-    let refused = machine
+    machine
         .notice(&notice(), Urgency::Normal, None)
         .await
-        .unwrap_err();
-    assert!(plan_inactive(refused).is_some());
-    assert!(plan_inactive(machine.poll_once(0).await.unwrap_err()).is_some());
-    let add = machine
+        .unwrap();
+    machine.poll_once(0).await.unwrap();
+    machine
         .client()
         .post::<_, kebbie_hub_api::PairingOpened>("/v1/m/pairings", &())
-        .await;
-    assert_eq!(add.unwrap_err().status(), Some(402));
-    let page = person.account().await.unwrap();
-    assert!(!page.plan.entitled);
-    assert!(person.log_in().await.is_ok());
-
-    set_plan(
-        &test,
-        &account,
-        PlanStatus::Active,
-        Some(kebbie_hub::now() + 3600),
-    )
-    .await;
-    machine.post_board(board(MARKER)).await.unwrap();
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

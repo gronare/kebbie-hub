@@ -85,7 +85,7 @@ struct Cli {
         long,
         value_enum,
         default_value_t = Plans::Off,
-        help = "With on, a machine works only while its account's plan is active"
+        help = "With on, the hub tracks whether each account's plan is active and links an inactive one to --billing-url; reading stays free"
     )]
     plans: Plans,
     #[arg(

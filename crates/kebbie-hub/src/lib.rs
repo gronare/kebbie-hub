@@ -524,32 +524,6 @@ impl Hub {
         }
     }
 
-    fn require_account_plan(&self, account: &str) -> Result<(), ApiError> {
-        if !self.config.plans {
-            return Ok(());
-        }
-        let row = self
-            .store()
-            .account(account)?
-            .ok_or_else(ApiError::unauthorized)?;
-        if self.plan_view(&row, now()).entitled {
-            Ok(())
-        } else {
-            Err(ApiError::plan_inactive(self.billing_entry()))
-        }
-    }
-
-    fn require_machine_plan(&self, machine: &Id) -> Result<(), ApiError> {
-        if !self.config.plans {
-            return Ok(());
-        }
-        let owner = self.store().machine_owner(machine)?;
-        match owner {
-            Some(account) => self.require_account_plan(&account),
-            None => Ok(()),
-        }
-    }
-
     fn billing_handoff(&self) -> Option<(&str, &HandoffSecret)> {
         self.config
             .billing_url

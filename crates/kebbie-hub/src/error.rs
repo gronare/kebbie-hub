@@ -19,13 +19,6 @@ impl ApiError {
         }
     }
 
-    pub fn plan_inactive(billing_url: Option<String>) -> ApiError {
-        ApiError {
-            url: billing_url,
-            ..ApiError::new(StatusCode::PAYMENT_REQUIRED, kebbie_hub_api::PLAN_INACTIVE)
-        }
-    }
-
     pub fn code(&self) -> &'static str {
         self.code
     }

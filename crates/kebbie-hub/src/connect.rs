@@ -197,7 +197,6 @@ pub async fn approve(
     Json(request): Json<ConnectApproval>,
 ) -> Result<Json<ConnectApproved>, ApiError> {
     hub.limit_code(&account)?;
-    hub.require_account_plan(&account)?;
     let at = now();
     if request.commitment.is_some() && hub.store().account_key(&account)?.is_none() {
         return Err(ApiError::conflict("no-key"));

@@ -148,7 +148,6 @@ pub async fn post_notice(
     MachineAuth(machine): MachineAuth,
     Json(upload): Json<NoticeUpload>,
 ) -> Result<(StatusCode, Json<NoticePosted>), ApiError> {
-    hub.require_machine_plan(&machine)?;
     let envelope = &upload.envelope;
     let header = &envelope.header;
     if header.kind != Kind::Notice {

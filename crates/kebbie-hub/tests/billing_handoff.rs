@@ -160,11 +160,6 @@ async fn an_inactive_plan_points_at_the_hubs_handoff_when_it_signs_links() {
     let mut person = member(&test).await;
     let entry = "http://localhost:8470/v1/a/billing/checkout";
     assert_eq!(person.account().await.unwrap().billing_url.as_deref(), Some(entry));
-    let pending = kebbie_hub_fakes::machine::connect(&test.url, "mac").await.unwrap();
-    match person.approve_connect(&pending.link(), false).await {
-        Err(kebbie_hub_fakes::HubError::PlanInactive { url }) => assert_eq!(url.as_deref(), Some(entry)),
-        other => panic!("an inactive account connected: {:?}", other.map(|_| ())),
-    }
 }
 
 #[test]

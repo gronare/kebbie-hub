@@ -71,7 +71,6 @@ pub async fn put_board(
     MachineAuth(machine): MachineAuth,
     Json(upload): Json<BoardUpload>,
 ) -> Result<Json<BoardStored>, ApiError> {
-    hub.require_machine_plan(&machine)?;
     if upload.rev > MAX_STORED_INTEGER {
         return Err(ApiError::bad_request("rev-out-of-range"));
     }
@@ -122,7 +121,6 @@ pub async fn inbox(
     MachineAuth(machine): MachineAuth,
     Query(query): Query<InboxQuery>,
 ) -> Result<Json<Inbox>, ApiError> {
-    hub.require_machine_plan(&machine)?;
     if query.after > MAX_STORED_INTEGER {
         return Err(ApiError::bad_request("after-out-of-range"));
     }
@@ -175,7 +173,6 @@ pub async fn open_pairing(
     State(hub): State<Arc<Hub>>,
     MachineAuth(machine): MachineAuth,
 ) -> Result<Json<PairingOpened>, ApiError> {
-    hub.require_machine_plan(&machine)?;
     Ok(Json(hub.open_pairing_for(&machine)?))
 }
 
