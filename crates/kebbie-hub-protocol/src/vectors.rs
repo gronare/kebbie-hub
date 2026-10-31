@@ -14,8 +14,9 @@ use crate::account::{
 };
 use crate::authorize::{AppliedCommands, Machine, Refusal, Role, TrustedDevice, authorize};
 use crate::board::{
-    Agent, AgentStatus, Board, Checkout, Git, Group, Item, Question, QuestionOption, Report,
-    RoutineSummary, Step, StepState, Steps,
+    Agent, AgentStatus, Board, Checkout, Counts, Git, Group, Item, Later, LaterState, NextPart,
+    NextRow, Prompt, PromptOption, Question, QuestionOption, Report, RoutineSummary,
+    SecondOpinion, Step, StepState, Steps, Verdict, VerdictOutcome,
 };
 use crate::bug_report::{BugReport, InstallKey, leading_zero_bits, meets, pow_hash, solve};
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
@@ -187,6 +188,8 @@ fn board() -> Payload {
             next_for_you: Some("answer: Keep the old endpoint for a release?".into()),
             agent: Some(Agent {
                 status: AgentStatus::Idle,
+                kind: None,
+                model: None,
             }),
             report: Some(Report {
                 state: "needs-you".into(),
@@ -230,8 +233,16 @@ fn board() -> Payload {
             routine: None,
             card: None,
             steps: None,
+            title: None,
+            profile: None,
+            recipe: None,
+            assessment: None,
+            second_opinion: None,
         }],
         sessions_outside_tasks: 1,
+        next: None,
+        counts: None,
+        later: None,
     })
 }
 
@@ -253,6 +264,8 @@ fn stepped_board() -> Payload {
         next_for_you: None,
         agent: Some(Agent {
             status: AgentStatus::Working,
+            kind: None,
+            model: None,
         }),
         report: None,
         question: None,
@@ -280,8 +293,119 @@ fn stepped_board() -> Payload {
                 step(3, "Add Stripe as the gateway", StepState::InProgress, None),
                 step(4, "Remove the old payment client", StepState::Planned, None),
             ],
+            required: None,
         }),
+        title: None,
+        profile: None,
+        recipe: None,
+        assessment: None,
+        second_opinion: None,
     }];
+    Payload::Board(board)
+}
+
+fn next_board() -> Payload {
+    let Payload::Board(mut board) = stepped_board() else {
+        unreachable!()
+    };
+    board.away_since = Some(1_761_060_000);
+    let stepped = &mut board.items[0];
+    stepped.title = Some("Charge through Stripe".into());
+    stepped.profile = Some("task".into());
+    stepped.recipe = Some("small fix".into());
+    stepped.assessment = Some("review suggested: touches money and its tests".into());
+    stepped.agent = Some(Agent {
+        status: AgentStatus::Working,
+        kind: Some("claude".into()),
+        model: Some("opus".into()),
+    });
+    stepped.verdict = Some(Verdict {
+        verdict: Some(VerdictOutcome::Ok),
+        findings: Some(0),
+        sha: Some(HEAD.into()),
+        stale: false,
+        running: false,
+        held: Some(true),
+    });
+    stepped.second_opinion = Some(SecondOpinion {
+        by: "codex-review".into(),
+        points: Some(2),
+        running: false,
+    });
+    if let Some(steps) = stepped.steps.as_mut() {
+        steps.required = Some(false);
+    }
+    let mut prompted = stepped.clone();
+    prompted.address = "hub@kebbie".into();
+    prompted.group = Group::NeedsYou;
+    prompted.title = Some("Clarify machine removal".into());
+    prompted.agent = Some(Agent {
+        status: AgentStatus::Blocked,
+        kind: Some("codex".into()),
+        model: None,
+    });
+    prompted.next_for_you = Some("answer Codex's prompt in its Space or through the lead".into());
+    prompted.prompt = Some(Prompt {
+        id: "3f2a9c1d".into(),
+        question: "Would you like to run the following command?\nReason: May I record that this task is waiting on the lead?\n$ kebbie report --state blocked".into(),
+        options: vec![
+            PromptOption {
+                label: "Yes, proceed (y)".into(),
+                takes_text: false,
+                key: Some("y".into()),
+            },
+            PromptOption {
+                label: "No, and tell Codex what to do differently (esc)".into(),
+                takes_text: false,
+                key: Some("esc".into()),
+            },
+        ],
+    });
+    prompted.steps = None;
+    prompted.verdict = None;
+    prompted.second_opinion = None;
+    board.items.insert(0, prompted);
+    board.next = Some(vec![
+        NextRow {
+            part: NextPart::Stopped,
+            address: "hub@kebbie".into(),
+            rank: 1,
+            line: "answer Codex's prompt".into(),
+            since: Some(1_761_069_000),
+            waits_behind: 0,
+        },
+        NextRow {
+            part: NextPart::Push,
+            address: "stripe@billing".into(),
+            rank: 2,
+            line: "2 commits · mail-dns waits on it".into(),
+            since: Some(1_761_066_000),
+            waits_behind: 1,
+        },
+    ]);
+    board.counts = Some(Counts {
+        working: 1,
+        queued: 1,
+        parked: 1,
+    });
+    board.later = Some(vec![
+        Later {
+            address: "mail-dns@greenhouse".into(),
+            title: Some("Mail DNS to Migadu".into()),
+            state: LaterState::Queued,
+            line: "waits for stripe@billing to push".into(),
+            until: None,
+            question: false,
+        },
+        Later {
+            address: "herdr-app@kebbie".into(),
+            title: None,
+            state: LaterState::Parked,
+            line: "nothing yet".into(),
+            until: Some(1_761_100_000),
+            question: true,
+        },
+    ]);
     Payload::Board(board)
 }
 
@@ -511,6 +635,20 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         account,
         machine,
         stepped_board(),
+    ));
+    let next = seal_case(
+        "next-board",
+        machine_header("next-board", Kind::Board, machine),
+        &next_board(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens(
+        "board-with-next-opened-by-the-account",
+        &next,
+        account,
+        machine,
+        next_board(),
     ));
     cases.push(fails(
         "board-for-the-account-is-not-a-device-row",

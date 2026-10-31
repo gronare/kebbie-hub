@@ -144,7 +144,7 @@ const item = shape({
   urgency: u8,
   summary: string,
   next_for_you: optionalField(string),
-  agent: optionalField(shape({ status: oneOf("working", "blocked", "idle", "done") })),
+  agent: optionalField(shape({ status: oneOf("working", "blocked", "idle", "done"), kind: optionalField(string), model: optionalField(string) })),
   report: optionalField(shape({ state: string, next: optionalField(string), summary: string, at: u64v })),
   question: optionalField(
     shape({
@@ -157,10 +157,10 @@ const item = shape({
       at: u64v,
     }),
   ),
-  prompt: optionalField(shape({ id: string, question: string, options: list(shape({ label: string, takes_text: bool })) })),
+  prompt: optionalField(shape({ id: string, question: string, options: list(shape({ label: string, takes_text: bool, key: optionalField(string) })) })),
   git: optionalField(shape({ upstream: string, ahead: u32v, behind: u32v, uncommitted: u32v, approved: bool })),
   head: optionalField(string),
-  verdict: optionalField(shape({ verdict: optionalField(oneOf("ok", "changes")), findings: optionalField(u32v), sha: optionalField(string), stale: bool, running: bool })),
+  verdict: optionalField(shape({ verdict: optionalField(oneOf("ok", "changes")), findings: optionalField(u32v), sha: optionalField(string), stale: bool, running: bool, held: optionalField(bool) })),
   push_permission: optionalField(oneOf("task", "repo")),
   push_waits: optionalField(string),
   follows_main: bool,
@@ -168,8 +168,15 @@ const item = shape({
   recover: optionalField(shape({ note: string })),
   routine: optionalField(string),
   card: optionalField(shape({ sha: string, current: bool, blob: blobRef })),
-  steps: optionalField(shape({ pushed: u32v, items: list(shape({ number: u32v, title: string, state: oneOf("planned", "in-progress", "committed", "accepted"), sha: optionalField(string) })) })),
+  steps: optionalField(shape({ pushed: u32v, items: list(shape({ number: u32v, title: string, state: oneOf("planned", "in-progress", "committed", "accepted"), sha: optionalField(string) })), required: optionalField(bool) })),
+  title: optionalField(string),
+  profile: optionalField(string),
+  recipe: optionalField(string),
+  assessment: optionalField(string),
+  second_opinion: optionalField(shape({ by: string, points: optionalField(u32v), running: bool })),
 });
+const nextRow = shape({ part: oneOf("stopped", "push", "read"), address: string, rank: u32v, line: string, since: optionalField(u64v), waits_behind: u32v });
+const later = shape({ address: string, title: optionalField(string), state: oneOf("queued", "parked"), line: string, until: optionalField(u64v), question: bool });
 const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request"];
 const EVENTS = ["needs-you", "ready", "question", "summary", "ci-failed", "ci-green", "api-error", "routine-findings", "routine-failed"];
 const typed = (fields) => shape({ type: string, ...fields });
@@ -182,6 +189,9 @@ const PAYLOADS = {
     routines: list(shape({ id: string, title: string, repo: string, mode: string, next_run: optionalField(u64v), last_outcome: optionalField(string) })),
     items: list(item),
     sessions_outside_tasks: u32v,
+    next: optionalField(list(nextRow)),
+    counts: optionalField(shape({ working: u32v, queued: u32v, parked: u32v })),
+    later: optionalField(list(later)),
   }),
   notice: typed({
     event: oneOf(...EVENTS),

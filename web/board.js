@@ -83,9 +83,22 @@ export async function openBoards(listing, identity, now, marks = emptyMarks()) {
 
 export const isAsleep = (machine, now) => machine.lastSeen === null || now - machine.lastSeen > SLEEP_AFTER;
 
-export const toAccept = (item) => (item.steps?.items ?? []).filter((step) => step.state === "committed").length;
+export const acceptRequired = (item) => item.steps?.required === true;
 
-const byUrgency = (a, b) => b.item.urgency - a.item.urgency || a.item.address.localeCompare(b.item.address) || a.name.localeCompare(b.name);
+export const toAccept = (item) => (acceptRequired(item) ? item.steps.items.filter((step) => step.state === "committed").length : 0);
+
+const byUrgency = (a, b) => a.item.urgency - b.item.urgency || a.item.address.localeCompare(b.item.address) || a.name.localeCompare(b.name);
+
+export const LATER = [
+  { key: "queued", title: "Queued" },
+  { key: "parked", title: "Parked" },
+];
+
+function nextOf(machine) {
+  const items = new Map(machine.board.items.map((item) => [item.address, item]));
+  const rows = machine.board.next.map((row) => ({ ...row, machine: machine.machine, name: machine.name, item: items.get(row.address) ?? null, ...splitAddress(row.address) }));
+  return { machine: machine.machine, name: machine.name, rows, counts: machine.board.counts ?? null };
+}
 
 export function arrange(opened, now) {
   const awake = opened.filter((machine) => machine.board && !isAsleep(machine, now));
@@ -97,7 +110,12 @@ export function arrange(opened, now) {
   const problems = opened.filter((machine) => machine.problem).map(({ machine, name, problem }) => ({ machine, name, problem }));
   const questions = rows.filter((row) => row.item.question || row.item.prompt).sort(byUrgency);
   const waiting = rows.reduce((sum, row) => sum + toAccept(row.item), 0);
-  return { groups, sleeping, problems, questions, toAccept: waiting, machines: opened.length };
+  const next = awake.filter((machine) => Array.isArray(machine.board.next)).map(nextOf);
+  const set = awake.flatMap((machine) => (machine.board.later ?? []).map((later) => ({ machine: machine.machine, name: machine.name, later, ...splitAddress(later.address) })));
+  const later = LATER.map((group) => ({ ...group, rows: set.filter((row) => row.later.state === group.key) })).filter((group) => group.rows.length > 0);
+  const routines = awake.flatMap((machine) => machine.board.routines.map((routine) => ({ machine: machine.machine, name: machine.name, routine })));
+  const away = awake.filter((machine) => machine.board.away_since).map((machine) => ({ machine: machine.machine, name: machine.name, since: machine.board.away_since }));
+  return { groups, sleeping, problems, questions, toAccept: waiting, machines: opened.length, next, later, routines, away };
 }
 
 export function findTask(opened, machine, address) {

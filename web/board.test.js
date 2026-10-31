@@ -58,14 +58,14 @@ test("a board sealed only to devices does not open with the account key", async 
 const item = (address, group, urgency = 0, extra = {}) => ({ ...vector.expect.payload.items[0], address, group, urgency, question: null, ...extra });
 const machineWith = (id, name, lastSeen, items) => ({ machine: id, name, lastSeen, rev: 1, storedAt: lastSeen ?? 0, board: { ...vector.expect.payload, items }, problem: null });
 
-test("tasks from awake machines group in the terminal's order, most urgent first", () => {
+test("tasks from awake machines group in the terminal's order, most urgent first, as kebbie ranks a prompt on screen before the rest", () => {
   const opened = [
     machineWith("mch_a", "devbox", now - 10, [item("search@web", "WORKING"), item("refunds@billing", "NEEDS YOU", 1, { question: vector.expect.payload.items[0].question })]),
     machineWith("mch_b", "Macen", now - 30, [item("skeleton@ios", "NEEDS YOU", 3), item("dates@billing", "READY TO PUSH")]),
   ];
   const view = arrange(opened, now);
   assert.deepEqual(view.groups.map((group) => [group.title, group.rows.map((row) => `${row.task}/${row.name}`)]), [
-    ["Needs you", ["skeleton/Macen", "refunds/devbox"]],
+    ["Needs you", ["refunds/devbox", "skeleton/Macen"]],
     ["Working", ["search/devbox"]],
     ["Ready to push", ["dates/Macen"]],
   ]);
@@ -79,6 +79,8 @@ test("a board with steps opens with them, and the board counts the commits waiti
   assert.equal(opened.problem, null);
   const [task] = opened.board.items;
   assert.deepEqual(task.steps.items.map((step) => [step.number, step.state]), [[2, "committed"], [3, "in-progress"], [4, "planned"]]);
+  assert.equal(toAccept(task), 0, "a board that does not say accepting is required counts nothing to accept");
+  task.steps.required = true;
   assert.equal(toAccept(task), 1);
   const two = structuredClone(task.steps);
   two.items[1] = { ...two.items[1], state: "committed", sha: "3333333cccc" };
@@ -171,4 +173,27 @@ test("a store that cannot be read says so instead of passing for an empty one", 
   await assert.rejects(get("marks:acc_x"), "the store does not swallow its failures");
   assert.deepEqual(await readMarks(get, "marks:acc_x"), { marks: emptyMarks(), failed: true });
   assert.deepEqual(await readMarks(async () => undefined, "marks:acc_x"), { marks: emptyMarks(), failed: false });
+});
+
+test("a prompt on an agent's screen comes first among the questions and counts in the badge", () => {
+  const prompted = item("hub@kebbie", "NEEDS YOU", 0, { prompt: { id: "3f2a9c1d", question: "Run it?", options: [] } });
+  const asked = item("refunds@billing", "NEEDS YOU", 1, { question: vector.expect.payload.items[0].question });
+  const view = arrange([machineWith("mch_a", "devbox", now - 10, [asked, prompted])], now);
+  assert.deepEqual(view.questions.map((row) => row.item.address), ["hub@kebbie", "refunds@billing"]);
+  assert.deepEqual(view.groups[0].rows.map((row) => row.item.address), ["hub@kebbie", "refunds@billing"]);
+});
+
+test("a board with Next opens with its rows matched to their tasks, the tasks set aside by group, routines and away mode", async () => {
+  const full = envelopes.cases.find((candidate) => candidate.name === "board-with-next-opened-by-the-account");
+  const [opened] = await open([entry({ rev: full.expect.payload.rev, envelope: full.envelope })]);
+  assert.equal(opened.problem, null);
+  const view = arrange([opened], now);
+  assert.deepEqual(view.next.map((list) => [list.name, list.rows.map((row) => [row.rank, row.part, row.item?.title])]), [["devbox", [[1, "stopped", "Clarify machine removal"], [2, "push", "Charge through Stripe"]]]]);
+  assert.deepEqual(view.next[0].counts, { working: 1, queued: 1, parked: 1 });
+  assert.deepEqual(view.later.map((group) => [group.title, group.rows.map((row) => row.later.address)]), [["Queued", ["mail-dns@greenhouse"]], ["Parked", ["herdr-app@kebbie"]]]);
+  assert.deepEqual(view.away.map((machine) => [machine.name, machine.since]), [["devbox", 1_761_060_000]]);
+  assert.deepEqual(view.routines.map((row) => row.routine.id), ["nightly-deps"]);
+  assert.deepEqual(view.questions.map((row) => row.item.address), ["hub@kebbie"]);
+  const old = arrange([machineWith("mch_a", "devbox", now - 10, [item("search@web", "WORKING")])], now);
+  assert.deepEqual([old.next, old.later, old.away], [[], [], []], "a board from an older kebbie has no Next to show");
 });

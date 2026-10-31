@@ -26,9 +26,10 @@ pub use authorize::{
     Accepted, Applied, AppliedCommands, Dropped, Machine, Refusal, Role, TrustedDevice, authorize,
 };
 pub use board::{
-    Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Git, Group, Item, Prompt,
-    PromptOption, PushPermission, Question, QuestionOption, Recover, Report, RoutineSummary,
-    Step, StepState, Steps, Verdict, VerdictOutcome,
+    Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, Git, Group, Item,
+    Later, LaterState, NextPart, NextRow, Prompt, PromptOption, PushPermission, Question,
+    QuestionOption, Recover, Report, RoutineSummary, SecondOpinion, Step, StepState, Steps,
+    Verdict, VerdictOutcome,
 };
 pub use bug_report::{
     BugReport, BugReportError, InstallKey, MAX_DIFFICULTY, MAX_FIELD_CHARS, MAX_TEXT_BYTES,

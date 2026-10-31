@@ -1,4 +1,4 @@
-import { toAccept } from "./board.js";
+import { acceptRequired, toAccept } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -27,6 +27,119 @@ export function sleepingRow(machine, now) {
 const STEP_MARKS = { planned: "○", "in-progress": "◐", committed: "●", accepted: "✓" };
 const STEP_LABELS = { planned: "", "in-progress": "in progress", committed: "committed", accepted: "accepted" };
 
+export function waited(seconds) {
+  if (seconds < 60) return "now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h`;
+  return `${Math.floor(seconds / 86_400)} d`;
+}
+
+export const taskName = (item, task) => item?.title || task;
+
+export function agentChip(agent, withModel = false) {
+  if (!agent?.kind) return "";
+  const said = withModel && agent.model ? `${agent.kind} · ${agent.model}` : agent.kind;
+  return `<span class="chip ${esc(agent.kind)}">${esc(said)}</span>`;
+}
+
+const recipeText = (item) => (item.recipe ? `recipe: ${item.recipe}` : "");
+
+const NEXT_PARTS = [
+  { key: "stopped", title: "Stopped on you" },
+  { key: "push", title: "Push, in this order" },
+  { key: "read", title: "To read" },
+];
+const NEXT_ICONS = { push: "↑", read: "◆" };
+const nextIcon = (row) => NEXT_ICONS[row.part] ?? (row.item?.question || row.item?.prompt ? "?" : "!");
+
+export function countsLine(counts) {
+  if (!counts) return "";
+  return [counts.working && `${counts.working} working`, counts.queued && `${counts.queued} queued`, counts.parked && `${counts.parked} parked`].filter(Boolean).join(" · ");
+}
+
+function nextRows(list, now) {
+  const parts = NEXT_PARTS.map((part) => ({ ...part, rows: list.rows.filter((row) => row.part === part.key) })).filter((part) => part.rows.length > 0);
+  return parts
+    .map((part) => {
+      const rows = part.rows.map((row) => {
+        const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.address)}`;
+        const age = row.since ? waited(Math.max(0, now - row.since)) : "";
+        return `<a class="nrow" href="${href}"><span class="n">${esc(row.rank)}</span><span aria-hidden="true">${nextIcon(row)}</span><span class="t"><b>${esc(taskName(row.item, row.task))}</b> ${agentChip(row.item?.agent)}<small>${esc(row.line)}</small></span><span class="w">${esc(age)}</span></a>`;
+      });
+      return `<div class="nsub">${esc(part.title)}</div>${rows.join("")}`;
+    })
+    .join("");
+}
+
+export function nextList(lists, now) {
+  if (lists.length === 0) return "";
+  const many = lists.length > 1;
+  const blocks = lists.map((list) => {
+    const name = many ? `<div class="nmachine">${esc(list.name)}</div>` : "";
+    const body = list.rows.length ? nextRows(list, now) : `<div class="meta">Nothing needs you.</div>`;
+    const foot = [countsLine(list.counts), list.rows.length ? "same order as N on the board" : ""].filter(Boolean).join(" · ");
+    return `${name}${body}${foot ? `<div class="meta nfoot">${esc(foot)}</div>` : ""}`;
+  });
+  return `<section class="next" aria-label="Next">${blocks.join("")}</section>`;
+}
+
+export function laterGroups(groups, now) {
+  return groups
+    .map((group) => {
+      const rows = group.rows.map((row) => {
+        const { later } = row;
+        const until = later.until ? `until ${lastSeenText(later.until, now)}` : "";
+        const meta = [row.repo, later.line, until, later.question ? "a question waits" : ""].filter(Boolean).map(esc).join(" · ");
+        return `<div class="task"><div class="head"><span class="name">${esc(later.title || row.task)}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div></div>`;
+      });
+      return `<section class="col"><h2 class="group g-muted">${esc(group.title)} · ${group.rows.length}</h2>${rows.join("")}</section>`;
+    })
+    .join("");
+}
+
+export function routinesBlock(routines, now) {
+  if (routines.length === 0) return "";
+  const lines = routines.map(({ name, routine }) => {
+    const parts = [routine.title, routine.repo, routine.next_run ? `next ${lastSeenText(routine.next_run, now)}` : "not scheduled", routine.last_outcome ? `last run ${routine.last_outcome}` : "", name];
+    return `<div class="meta">${parts.filter(Boolean).map(esc).join(" · ")}</div>`;
+  });
+  return `<section class="col"><h2 class="group g-muted">Routines · ${routines.length}</h2><div class="task">${lines.join("")}</div></section>`;
+}
+
+export function awayLine(away, now) {
+  if (away.length === 0) return "";
+  const said = away.map((machine) => `${machine.name} is away since ${lastSeenText(machine.since, now)}`).join(" · ");
+  return `<div class="center warn">${esc(said)}</div>`;
+}
+
+export function taskFacts(item) {
+  const agent = agentChip(item.agent, true);
+  const profile = item.profile ? `profile ${esc(item.profile)}` : "";
+  const parts = [agent, profile, esc(recipeText(item))].filter(Boolean);
+  return parts.length ? `<div class="meta">${parts.join(" · ")}</div>` : "";
+}
+
+export function reviewLines(item) {
+  const lines = [];
+  if (item.assessment) lines.push(`<div>${esc(item.assessment)}</div>`);
+  const verdict = item.verdict;
+  const said = [];
+  if (verdict) {
+    const text = verdict.running ? "reviewer running" : verdict.verdict === "ok" ? `reviewer <span class="ok">✓ ok</span>` : verdict.verdict === "changes" ? `reviewer: ${esc(plural(verdict.findings ?? 0, "finding", "findings"))}` : "reviewer gave no verdict";
+    said.push(`${text}${verdict.stale ? " · stale" : ""}`);
+  }
+  const second = item.second_opinion;
+  if (second) said.push(`second opinion ${esc(second.by)}: ${second.running ? "running" : esc(plural(second.points ?? 0, "point", "points"))}`);
+  if (said.length) lines.push(`<div>${said.join(" · ")}</div>`);
+  const held = verdict?.held;
+  const holds = held === true ? "the push waits for the reviewer's pass" : held === false ? "the push does not wait for the reviewer" : "";
+  const note = [holds, second ? "the second opinion never holds it" : ""].filter(Boolean).join("; ");
+  if (note) lines.push(`<div class="meta">${esc(note)}</div>`);
+  return lines.length ? `<h3 class="sec">Review</h3><div class="plan">${lines.join("")}</div>` : "";
+}
+
+const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+
 export function stepLines(item) {
   const steps = item.steps;
   if (!steps || (steps.pushed === 0 && steps.items.length === 0)) return "";
@@ -36,7 +149,8 @@ export function stepLines(item) {
     const label = step.state === "committed" ? `committed${rules}` : STEP_LABELS[step.state];
     return `<div class="step s-${esc(step.state)}"><span class="what"><span class="mark">${STEP_MARKS[step.state]}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>`;
   });
-  return `<div class="steps">${pushed}${lines.join("")}</div>`;
+  const optional = acceptRequired(item) || steps.items.length === 0 ? "" : `<div class="meta">accepting each step is optional: push takes what is committed</div>`;
+  return `<div class="steps">${pushed}${lines.join("")}${optional}</div>`;
 }
 
 export const acceptCount = (count) => (count ? `<span class="accept">◆ ${esc(count)} to accept</span>` : "");
@@ -47,11 +161,11 @@ export function taskRow(row, selected = null) {
   const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
   const on = selected === taskKey(row.machine, row.item.address);
   const waiting = toAccept(row.item);
-  const meta = [row.repo && esc(row.repo), waiting ? `<span class="accept">${waiting} to accept</span>` : "", esc(row.item.summary)].filter(Boolean).join(" · ");
-  const next = row.item.steps?.items.find((step) => step.state === "committed");
+  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(row.item.assessment ?? ""), waiting ? `<span class="accept">${waiting} to accept</span>` : "", esc(row.item.summary)].filter(Boolean).join(" · ");
+  const next = acceptRequired(row.item) ? row.item.steps.items.find((step) => step.state === "committed") : null;
   const wanted = row.item.next_for_you ?? (next ? `accept ${next.number} on ${row.name}` : null);
   const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
-  return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(row.task)}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepLines(row.item)}${you}</a>`;
+  return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepLines(row.item)}${you}</a>`;
 }
 
 export function nav({ active, questions = 0, deskOnly = false }) {
@@ -69,7 +183,33 @@ export function optionCards(options, recommend = null) {
   return `<div class="options">${cards.join("")}</div>`;
 }
 
-export const hubProNote = () => `<div class="pro"><b>Coming soon · Hub Pro</b><span class="phone-only">Answer from your phone.</span><span class="desk-only">Answer here.</span> Today you answer at the machine with i on the board.</div>`;
+export const hubProNote = () => `<div class="pro"><b>Coming soon · Hub Pro</b><span class="phone-only">Answer from your phone.</span><span class="desk-only">Answer here.</span> Today you answer at the machine: N on the board, or ask the lead.</div>`;
+
+export function promptParts(text) {
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const question = lines.find((line) => line.endsWith("?")) ?? lines[0] ?? "";
+  const command = [];
+  const details = [];
+  let inCommand = false;
+  for (const line of lines) {
+    if (line === question) inCommand = false;
+    else if (line.startsWith("$ ")) {
+      inCommand = true;
+      command.push(line.slice(2));
+    } else if (inCommand) command.push(line);
+    else details.push(line.replace(/^Reason:\s*/, ""));
+  }
+  return { question, command: command.join(" "), details };
+}
+
+export function promptBlock({ item, repo }) {
+  const { question, command, details } = promptParts(item.prompt.question);
+  const context = [esc(repo), agentChip(item.agent)].filter(Boolean).join(" · ");
+  const detail = details.map((line) => `<div class="meta pad">${esc(line)}</div>`).join("");
+  const cmd = command ? `<div class="cmd">${esc(command)}</div>` : "";
+  const options = optionCards(item.prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })));
+  return `<p class="q">${esc(question)}</p>${context ? `<div class="meta pad">${context}</div>` : ""}${detail}${cmd}${options}${hubProNote()}`;
+}
 
 export function machineRow({ machine, name, awake, facts }) {
   const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(machine)}" data-name="${esc(name)}">Remove</button>`;

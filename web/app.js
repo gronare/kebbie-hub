@@ -7,7 +7,7 @@ import { addFirstPasskey, rememberedCredential, STATE_TEXT, unlockAfter } from "
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage } from "./pages.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { acceptCount, addPasskeyScreen, brand, cantUnlockScreen, connectDone, githubErrorText, hubProNote, installHint, lastSeenText, machineDots, machineRow, nav, needsFirstPasskey, optionCards, signInScreen, sleepingRow, taskKey, taskRow, unlockingScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, hubProNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, reviewLines, routinesBlock, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -80,7 +80,8 @@ function freshness() {
 
 function boardHeader(view) {
   const now = nowSeconds();
-  const phone = `<span class="phone-only">${[acceptCount(view.toAccept), esc(freshness())].filter(Boolean).join(" · ")}</span>`;
+  const needs = view.next.length ? view.next.reduce((sum, list) => sum + list.rows.length, 0) : 0;
+  const phone = `<span class="phone-only">${[needs ? `${needs} need you` : "", acceptCount(view.toAccept), esc(freshness())].filter(Boolean).join(" · ")}</span>`;
   const dots = state.offline ? `<span class="desk-only">${esc(freshness())}</span>` : machineDots(awakeFirst(state.opened, now).map((opened) => ({ name: opened.name, awake: awakeNow(opened, now), lastSeen: opened.lastSeen || opened.storedAt ? lastSeenText(opened.lastSeen ?? opened.storedAt, now) : null })));
   const accept = view.toAccept ? `<span class="desk-only">${acceptCount(view.toAccept)}</span>` : "";
   return top("Board", phone + dots + accept);
@@ -88,13 +89,18 @@ function boardHeader(view) {
 
 function boardScreen(selected = null) {
   const view = arrange(state.opened, nowSeconds());
-  const parts = [boardHeader(view), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning()];
+  const now = nowSeconds();
+  const parts = [boardHeader(view), state.connected ? connectDone({ name: state.connected, host: location.host }) : "", storeWarning(), awayLine(view.away, now), nextList(view.next, now)];
   if (state.opened.length === 0) {
     parts.push(`<div class="center">No machine is connected yet. Run <b>kebbie hub connect</b> on your computer.</div>`);
   } else if (!state.opened.some((machine) => machine.board || machine.problem || machine.expired)) {
     parts.push(`<div class="center">No connected machine has sent a board yet.</div>`);
   }
   const columns = view.groups.map((group) => `<section class="col"><h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>${group.rows.map((row) => taskRow(row, selected)).join("")}</section>`);
+  const later = laterGroups(view.later, now);
+  if (later) columns.push(later);
+  const routines = routinesBlock(view.routines, now);
+  if (routines) columns.push(routines);
   if (view.sleeping.length > 0) {
     columns.push(`<section class="col phone-only"><h2 class="group g-muted">Asleep</h2>${view.sleeping.map((machine) => sleepingRow(machine, nowSeconds())).join("")}</section>`);
   }
@@ -120,8 +126,7 @@ function questionBlock(found) {
     const context = [found.repo, item.summary].filter(Boolean).join(" · ");
     return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}${optionCards(question.options, question.recommend)}${hubProNote()}`;
   }
-  const prompt = item.prompt;
-  return `<p class="q">${esc(prompt.question)}</p>${optionCards(prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })))}${hubProNote()}`;
+  return promptBlock(found);
 }
 
 function cardBlock(found) {
@@ -131,7 +136,11 @@ function cardBlock(found) {
     lines.push(item.card.current ? `<div class="meta ok">✓ current at ${esc(short(item.card.sha))}</div>` : `<div class="meta warn">the card is for ${esc(short(item.card.sha))}; HEAD has moved on</div>`);
     lines.push(`<h3 class="sec">Card</h3><div class="plan"><div>The card (${kb(item.card.blob.bytes)}) shows here in a later version. It stays encrypted on the machine.</div></div>`);
   }
+  lines.push(taskFacts(item));
   if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
+  const steps = stepLines(item);
+  if (steps) lines.push(`<h3 class="sec">Steps</h3>${steps}`);
+  lines.push(reviewLines(item));
   const progress = [item.summary, item.report?.summary].filter(Boolean);
   if (progress.length) lines.push(`<h3 class="sec">Progress</h3><div class="plan">${progress.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`);
   if (item.git) {
@@ -139,14 +148,9 @@ function cardBlock(found) {
     const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null, git.approved ? "approved for push" : null].filter(Boolean);
     lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}</div>`);
   }
-  if (item.verdict) {
-    const verdict = item.verdict;
-    const text = verdict.running ? "review running" : verdict.verdict === "ok" ? `reviewed, ok${verdict.sha ? ` at ${short(verdict.sha)}` : ""}` : verdict.verdict === "changes" ? `reviewed, ${plural(verdict.findings ?? 0, "finding", "findings")}` : "not reviewed";
-    lines.push(`<h3 class="sec">Review</h3><div class="plan"><div>${esc(text)}${verdict.stale ? " · stale" : ""}</div></div>`);
-  }
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
   if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
-  const card = lines.length ? `<section class="task">${lines.join("")}</section>` : "";
+  const card = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
   const pushable = item.group === "READY TO PUSH" || item.card;
   const push = pushable && item.head ? `<button type="button" class="btn primary off" disabled>Push ${esc(short(item.head))} · coming in a later version</button>` : "";
   return card + push;
@@ -160,13 +164,13 @@ function taskScreen([machine, address]) {
   const found = findTask(state.opened, machine, address);
   if (!found) return shell("board", top("Task") + `<div class="center">This task is no longer on the board.</div>`);
   const asks = found.item.question || found.item.prompt;
-  return shell(asks ? "questions" : "board", top(found.task, esc(found.name)) + taskBody(found));
+  return shell(asks ? "questions" : "board", top(taskName(found.item, found.task), esc(found.name)) + taskBody(found));
 }
 
 function taskPanel([machine, address]) {
   const found = findTask(state.opened, machine, address);
   if (!found) return `<h2>Task</h2><div class="center left">This task is no longer on the board.</div>`;
-  return `<span class="machine">${esc(found.name)}</span><h2>${esc(found.task)}</h2>${taskBody(found)}`;
+  return `<span class="machine">${esc(found.name)}</span><h2>${esc(taskName(found.item, found.task))}</h2>${taskBody(found)}`;
 }
 
 function wideTaskScreen(params) {

@@ -14,6 +14,57 @@ pub struct Board {
     pub routines: Vec<RoutineSummary>,
     pub items: Vec<Item>,
     pub sessions_outside_tasks: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<Vec<NextRow>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counts: Option<Counts>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub later: Option<Vec<Later>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NextRow {
+    pub part: NextPart,
+    pub address: String,
+    pub rank: u32,
+    pub line: String,
+    pub since: Option<u64>,
+    pub waits_behind: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NextPart {
+    Stopped,
+    Push,
+    Read,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Counts {
+    pub working: u32,
+    pub queued: u32,
+    pub parked: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Later {
+    pub address: String,
+    pub title: Option<String>,
+    pub state: LaterState,
+    pub line: String,
+    pub until: Option<u64>,
+    pub question: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LaterState {
+    Queued,
+    Parked,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +110,24 @@ pub struct Item {
     pub card: Option<CardRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steps: Option<Steps>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assessment: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub second_opinion: Option<SecondOpinion>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SecondOpinion {
+    pub by: String,
+    pub points: Option<u32>,
+    pub running: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,6 +135,8 @@ pub struct Item {
 pub struct Steps {
     pub pushed: u32,
     pub items: Vec<Step>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +177,10 @@ pub enum Group {
 #[serde(deny_unknown_fields)]
 pub struct Agent {
     pub status: AgentStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,6 +233,8 @@ pub struct Prompt {
 pub struct PromptOption {
     pub label: String,
     pub takes_text: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,6 +255,8 @@ pub struct Verdict {
     pub sha: Option<String>,
     pub stale: bool,
     pub running: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,5 +362,53 @@ mod tests {
         let mut unknown = stepped;
         unknown["steps"]["items"][0]["state"] = serde_json::json!("pushed");
         assert!(serde_json::from_value::<Item>(unknown).is_err());
+    }
+
+    fn plain_board() -> serde_json::Value {
+        serde_json::json!({ "rev": 3, "kelpie": "0.24.0", "away_since": null, "checkouts": [], "routines": [], "items": [plain()], "sessions_outside_tasks": 0 })
+    }
+
+    #[test]
+    fn a_board_from_a_kebbie_without_next_parses_and_is_written_back_unchanged() {
+        let board: Board = serde_json::from_value(plain_board()).unwrap();
+        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref()), (None, None, None));
+        assert_eq!((board.items[0].title.as_ref(), board.items[0].second_opinion.as_ref()), (None, None));
+        assert_eq!(serde_json::to_value(&board).unwrap(), plain_board());
+    }
+
+    #[test]
+    fn a_board_carries_next_counts_and_the_tasks_set_aside_and_an_item_its_agent_profile_recipe_and_reviews() {
+        let mut full = plain_board();
+        full["next"] = serde_json::json!([
+            { "part": "stopped", "address": "hub@kebbie", "rank": 1, "line": "answer Codex's prompt", "since": 1_761_069_000u64, "waits_behind": 0 },
+            { "part": "push", "address": "stripe@billing", "rank": 2, "line": "2 commits · 1 waits on it", "since": null, "waits_behind": 1 },
+        ]);
+        full["counts"] = serde_json::json!({ "working": 4, "queued": 1, "parked": 1 });
+        full["later"] = serde_json::json!([
+            { "address": "mail@greenhouse", "title": "Mail DNS", "state": "queued", "line": "waits for go-live", "until": null, "question": false },
+            { "address": "herdr@kebbie", "title": null, "state": "parked", "line": "nothing yet", "until": 1_761_100_000u64, "question": true },
+        ]);
+        let item = &mut full["items"][0];
+        item["title"] = serde_json::json!("Charge through Stripe");
+        item["profile"] = serde_json::json!("task");
+        item["recipe"] = serde_json::json!("small fix");
+        item["assessment"] = serde_json::json!("review suggested: touches money");
+        item["agent"] = serde_json::json!({ "status": "blocked", "kind": "codex", "model": "gpt-6.1" });
+        item["verdict"] = serde_json::json!({ "verdict": "ok", "findings": 0, "sha": "abc", "stale": false, "running": false, "held": true });
+        item["second_opinion"] = serde_json::json!({ "by": "codex-review", "points": 2, "running": false });
+        item["steps"] = serde_json::json!({ "pushed": 0, "items": [], "required": false });
+        item["prompt"] = serde_json::json!({ "id": "3f2a9c1d", "question": "Run it?", "options": [{ "label": "Yes, proceed (y)", "takes_text": false, "key": "y" }, { "label": "Type something", "takes_text": true }] });
+        let board: Board = serde_json::from_value(full.clone()).unwrap();
+        assert_eq!(board.next.as_ref().unwrap().iter().map(|row| (row.part, row.rank)).collect::<Vec<_>>(), [(NextPart::Stopped, 1), (NextPart::Push, 2)]);
+        assert_eq!(board.later.as_ref().unwrap()[1].state, LaterState::Parked);
+        assert_eq!(board.items[0].verdict.as_ref().unwrap().held, Some(true));
+        assert_eq!(board.items[0].prompt.as_ref().unwrap().options[0].key.as_deref(), Some("y"));
+        assert_eq!(serde_json::to_value(&board).unwrap(), full);
+        for (path, value) in [("/next/0/part", serde_json::json!("later")), ("/later/0/state", serde_json::json!("working")), ("/later/0/path", serde_json::json!("/Users/x"))] {
+            let mut wrong = full.clone();
+            let (parent, key) = path.rsplit_once('/').unwrap();
+            wrong.pointer_mut(parent).unwrap()[key] = value;
+            assert!(serde_json::from_value::<Board>(wrong).is_err(), "{path}");
+        }
     }
 }

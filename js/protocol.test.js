@@ -162,6 +162,32 @@ test("a board item's steps carry only their own fields and known states, and a b
   }
 });
 
+test("a board with Next, counts, the tasks set aside and each item's agent and reviews passes, and a board without them still does", () => {
+  const full = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
+  checkPayload(full);
+  assert.deepEqual(full.next.map((row) => [row.rank, row.part]), [[1, "stopped"], [2, "push"]]);
+  assert.equal(full.items[0].prompt.options[0].key, "y");
+  const plain = envelopes.cases.find((vector) => vector.name === "board-opened-by-a-device").expect.payload;
+  for (const key of ["next", "counts", "later"]) assert.equal(Object.hasOwn(plain, key), false);
+  for (const key of ["title", "profile", "recipe", "assessment", "second_opinion"]) assert.equal(Object.hasOwn(plain.items[0], key), false);
+  checkPayload(plain);
+  const wrong = [
+    (board) => (board.next[0].part = "later"),
+    (board) => (board.next[0].waits_behind = -1),
+    (board) => (board.later[0].state = "working"),
+    (board) => (board.later[0].path = "/Users/someone"),
+    (board) => (board.counts.idle = 1),
+    (board) => (board.items[1].second_opinion.points = "two"),
+    (board) => (board.items[1].agent.pane = "w1:p9"),
+    (board) => (board.items[1].steps.required = "no"),
+  ];
+  for (const change of wrong) {
+    const payload = structuredClone(full);
+    change(payload);
+    assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", String(change));
+  }
+});
+
 test("a key row under a string that is not an id is refused", () => {
   const good = envelopes.cases.find((vector) => vector.name === "answer-opened-by-the-machine").envelope;
   assert.throws(() => checkShape({ ...good, keys: { ...good.keys, __proto__x: "AAAA" } }), (error) => error.code === "malformed");

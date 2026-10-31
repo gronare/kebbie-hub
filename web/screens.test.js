@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { acceptCount, accountScreen, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, hubProNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen } from "./screens.js";
+import { acceptCount, accountScreen, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, hubProNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -209,8 +209,10 @@ const stripe = {
 };
 const rowOf = (item) => ({ machine: "mch_a", name: "devbox", item, task: "stripe", repo: "billing" });
 
-test("a task with steps lists them under its row, says how many wait to be accepted and which one is next", () => {
-  const html = taskRow(rowOf(stripe));
+const required = { ...stripe, steps: { ...stripe.steps, required: true } };
+
+test("a task whose steps must be accepted lists them under its row, says how many wait to be accepted and which one is next", () => {
+  const html = taskRow(rowOf(required));
   assert.equal(
     text(html),
     "stripe devbox billing · 1 to accept · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed · rules ✓ ◐ 3 Add Stripe as the gateway in progress ○ 4 Remove the old <payment> client you: accept 2 on devbox",
@@ -223,8 +225,16 @@ test("a task with steps lists them under its row, says how many wait to be accep
 
 test("a step's label follows its state, and rules show only when the rules passed", () => {
   const steps = { pushed: 0, items: [{ number: 1, title: "Docs", state: "accepted", sha: "aaa" }, { number: 2, title: "Tests", state: "committed", sha: "bbb" }] };
-  assert.equal(text(stepLines({ ...stripe, git: { ...stripe.git, approved: false }, steps })), "✓ 1 Docs accepted ● 2 Tests committed");
-  assert.equal(text(taskRow(rowOf({ ...stripe, next_for_you: "answer: Keep it?", steps }))).endsWith("you: answer: Keep it?"), true, "what kebbie asks of you comes before an accept");
+  assert.equal(text(stepLines({ ...stripe, git: { ...stripe.git, approved: false }, steps: { ...steps, required: true } })), "✓ 1 Docs accepted ● 2 Tests committed");
+  assert.equal(text(taskRow(rowOf({ ...stripe, next_for_you: "answer: Keep it?", steps: { ...steps, required: true } }))).endsWith("you: answer: Keep it?"), true, "what kebbie asks of you comes before an accept");
+});
+
+test("steps that need no accepting count nothing to accept, ask nothing of you and say push takes what is committed", () => {
+  for (const steps of [stripe.steps, { ...stripe.steps, required: false }]) {
+    const said = text(taskRow(rowOf({ ...stripe, steps })));
+    assert.equal(said, "stripe devbox billing · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed · rules ✓ ◐ 3 Add Stripe as the gateway in progress ○ 4 Remove the old <payment> client accepting each step is optional: push takes what is committed");
+    assert.doesNotMatch(said, /to accept|you:/);
+  }
 });
 
 test("a task without steps shows its row as before, and the board's count only when something waits", () => {
@@ -244,7 +254,7 @@ test("a question's options show as cards with only the recommended one marked, a
   assert.match(html, /class="opt rec"><span class="tag">Recommended<\/span><b>Remove &#60;it&#62;/);
   assert.doesNotMatch(optionCards(options, null), /opt rec|Recommended/);
   assert.doesNotMatch(html, /<button/, "nothing to press until answering ships");
-  assert.match(text(hubProNote()), /^Coming soon · Hub Pro .* Today you answer at the machine with i on the board\.$/);
+  assert.match(text(hubProNote()), /^Coming soon · Hub Pro .* Today you answer at the machine: N on the board, or ask the lead\.$/);
 });
 
 test("the nav names the tabs, counts waiting questions in a badge, marks the open tab and links the account", () => {
@@ -265,4 +275,72 @@ test("a machine reads awake or asleep beside its dot, and the board's header lis
   assert.equal(text(machineRow({ machine: "mch_a", name: "mac", awake: true, facts: ["kebbie 0.24.0"] })), "mac awake · kebbie 0.24.0 Remove");
   assert.match(machineRow({ machine: "mch_a", name: "studio", awake: false, facts: [] }), /class="mrow asleep"><span class="dot"/);
   assert.equal(text(machineDots([{ name: "mac", awake: true, lastSeen: "12:00" }, { name: "studio", awake: false, lastSeen: "Fri 17:40" }])), "mac studio · last seen Fri 17:40");
+});
+
+const NOW = 1_761_070_000;
+const nextRow = (rank, part, address, line, since, item = null, waits = 0) => ({ rank, part, address, line, since, waits_behind: waits, machine: "mch_a", name: "mac", item, task: address.split("@")[0], repo: address.split("@")[1] });
+const codexTask = { ...stripe, address: "hub@kebbie", group: "NEEDS YOU", title: "Clarify machine removal", agent: { status: "blocked", kind: "codex", model: "gpt-6.1-sol" }, prompt: { id: "3f2a9c1d", question: "Would you like to run the following command?", options: [] }, steps: undefined };
+
+test("Next lists what needs you in kebbie's order under its parts, with each task's title, agent, line and wait, and the counts below", () => {
+  const rows = [nextRow(1, "stopped", "hub@kebbie", "answer Codex's prompt", NOW - 12 * 60, codexTask), nextRow(2, "push", "card@web", "2 commits · 2 tasks wait on it", NOW - 3600, { ...stripe, title: "Card component" }, 2), nextRow(3, "read", "research@kebbie", "result ready · stay on the TUI", null)];
+  const html = nextList([{ machine: "mch_a", name: "mac", rows, counts: { working: 4, queued: 1, parked: 1 } }], NOW);
+  assert.equal(text(html), "Stopped on you 1 Clarify machine removal codex answer Codex's prompt 12 min Push, in this order 2 Card component 2 commits · 2 tasks wait on it 1 h To read 3 research result ready · stay on the TUI 4 working · 1 queued · 1 parked · same order as N on the board");
+  assert.match(html, /<a class="nrow" href="#\/task\/mch_a\/hub%40kebbie">/);
+  assert.match(html, /<span class="chip codex">codex<\/span>/);
+});
+
+test("an empty Next says nothing needs you, several machines get a list each under their name, and a board without Next shows none", () => {
+  assert.equal(text(nextList([{ machine: "mch_a", name: "mac", rows: [], counts: { working: 2, queued: 0, parked: 0 } }], NOW)), "Nothing needs you. 2 working");
+  const two = nextList([{ machine: "mch_a", name: "mac", rows: [nextRow(1, "push", "a@web", "1 commit", NOW)], counts: null }, { machine: "mch_b", name: "studio", rows: [], counts: null }], NOW);
+  assert.equal(text(two), "mac Push, in this order 1 a 1 commit now same order as N on the board studio Nothing needs you.");
+  assert.equal(nextList([], NOW), "");
+  assert.deepEqual([waited(30), waited(42 * 60), waited(3600), waited(3 * 86_400)], ["now", "42 min", "1 h", "3 d"]);
+});
+
+test("a row shows the task's title, its agent and model, its recipe and the review assessment", () => {
+  const item = { ...stripe, steps: undefined, title: "Round VAT per invoice", agent: { status: "working", kind: "claude", model: "opus" }, recipe: "small fix", assessment: "review suggested: touches money" };
+  assert.equal(text(taskRow(rowOf(item))), "Round VAT per invoice devbox billing · claude · opus · recipe: small fix · review suggested: touches money · 2 commits");
+  assert.equal(text(taskRow(rowOf({ ...stripe, steps: undefined }))), "stripe devbox billing · 2 commits", "a board from an older kebbie names the task as before");
+  assert.equal(agentChip({ status: "idle" }), "", "an agent without its kind shows no chip");
+});
+
+test("the task card names its agent, profile and recipe, and its review section says what holds the push", () => {
+  const item = { ...stripe, agent: { status: "working", kind: "claude", model: "opus" }, profile: "task", recipe: "small fix", assessment: "review suggested: touches money and its tests", verdict: { verdict: "ok", findings: 0, sha: "abc", stale: false, running: false, held: true }, second_opinion: { by: "codex-review", points: 2, running: false } };
+  assert.equal(text(taskFacts(item)), "claude · opus · profile task · recipe: small fix");
+  assert.equal(text(reviewLines(item)), "Review review suggested: touches money and its tests reviewer ✓ ok · second opinion codex-review: 2 points the push waits for the reviewer's pass; the second opinion never holds it");
+  const changes = { ...item, second_opinion: undefined, verdict: { ...item.verdict, verdict: "changes", findings: 1, held: false } };
+  assert.equal(text(reviewLines(changes)), "Review review suggested: touches money and its tests reviewer: 1 finding the push does not wait for the reviewer");
+  assert.equal(text(reviewLines({ ...stripe, verdict: { verdict: null, findings: null, sha: null, stale: false, running: true } })), "Review reviewer running", "an older kebbie's verdict says nothing about holding");
+  assert.equal(reviewLines(stripe), "");
+  assert.equal(taskFacts(stripe), "");
+});
+
+test("an agent's own prompt shows its question, the command apart, the reason, and each option with its key", () => {
+  const question = "Would you like to run the following command?\nEnvironment: local\nReason: May I record that this task is waiting on the lead?\n$ kebbie report --state blocked --next nothing 'Read-only\ninspection complete.'";
+  assert.deepEqual(promptParts(question), { question: "Would you like to run the following command?", command: "kebbie report --state blocked --next nothing 'Read-only inspection complete.'", details: ["Environment: local", "May I record that this task is waiting on the lead?"] });
+  const options = [{ label: "Yes, proceed (y)", takes_text: false, key: "y" }, { label: "No, and tell Codex what to do differently (esc)", takes_text: false, key: "esc" }, { label: "Type something", takes_text: true }];
+  const html = promptBlock({ item: { ...codexTask, prompt: { id: "3f2a9c1d", question, options } }, repo: "kebbie" });
+  assert.equal(text(html), "Would you like to run the following command? kebbie · codex Environment: local May I record that this task is waiting on the lead? kebbie report --state blocked --next nothing 'Read-only inspection complete.' Yes, proceed (y) No, and tell Codex what to do differently (esc) Type something with text Coming soon · Hub Pro Answer from your phone. Answer here. Today you answer at the machine: N on the board, or ask the lead.");
+  assert.match(html, /<div class="cmd">kebbie report/);
+  assert.doesNotMatch(html, /<button/);
+  const claude = promptParts("Bash command\ncp ../web/logo.png Assets/\nCopy the logo\nDo you want to proceed?");
+  assert.deepEqual(claude, { question: "Do you want to proceed?", command: "", details: ["Bash command", "cp ../web/logo.png Assets/", "Copy the logo"] });
+});
+
+test("queued and parked tasks list under their own groups with their line, and a parked one says when a question waits", () => {
+  const groups = [
+    { key: "queued", title: "Queued", rows: [{ machine: "mch_a", name: "mac", task: "mail-dns", repo: "greenhouse", later: { address: "mail-dns@greenhouse", title: "Mail DNS to Migadu", state: "queued", line: "waits for Forsmancare go-live", until: null, question: false } }] },
+    { key: "parked", title: "Parked", rows: [{ machine: "mch_a", name: "mac", task: "herdr-app", repo: "kebbie", later: { address: "herdr-app@kebbie", title: null, state: "parked", line: "nothing yet", until: NOW + 3600, question: true } }] },
+  ];
+  const said = text(laterGroups(groups, NOW));
+  assert.match(said, /^Queued · 1 Mail DNS to Migadu mac greenhouse · waits for Forsmancare go-live Parked · 1 herdr-app mac kebbie · nothing yet · until \d\d:\d\d · a question waits$/);
+  assert.equal(laterGroups([], NOW), "");
+});
+
+test("routines list with their next run and last outcome, and away mode shows as a line", () => {
+  const said = text(routinesBlock([{ machine: "mch_a", name: "mac", routine: { id: "r1", title: "Nightly deps", repo: "greenhouse", mode: "fix", next_run: NOW + 600, last_outcome: "ok" } }, { machine: "mch_a", name: "mac", routine: { id: "r2", title: "Weekly lint", repo: "web", mode: "report", next_run: null, last_outcome: null } }], NOW));
+  assert.match(said, /^Routines · 2 Nightly deps · greenhouse · next \d\d:\d\d · last run ok · mac Weekly lint · web · not scheduled · mac$/);
+  assert.equal(routinesBlock([], NOW), "");
+  assert.match(text(awayLine([{ machine: "mch_a", name: "mac", since: NOW - 60 }], NOW)), /^mac is away since \d\d:\d\d$/);
+  assert.equal(awayLine([], NOW), "");
 });
