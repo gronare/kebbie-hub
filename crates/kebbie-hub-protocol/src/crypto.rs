@@ -20,9 +20,9 @@ use crate::message::Payload;
 
 type Suite = X25519HkdfSha256;
 
-pub const HPKE_INFO: &[u8] = b"kelpie-hub content key v1";
+pub const HPKE_INFO: &[u8] = b"kebbie-hub content key v1";
 pub const CLOCK_SKEW: u64 = 300;
-const KEY_COMMIT_DOMAIN: &[u8] = b"kelpie-hub key commit v1";
+const KEY_COMMIT_DOMAIN: &[u8] = b"kebbie-hub key commit v1";
 const ENC_LEN: usize = 32;
 const NONCE_LEN: usize = 12;
 

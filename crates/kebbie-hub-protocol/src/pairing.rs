@@ -4,8 +4,8 @@ use sha2::{Digest, Sha256};
 
 use crate::crypto::PublicKeys;
 
-const COMMIT_DOMAIN: &[u8] = b"kelpie-pair-commit-v1";
-const SAS_DOMAIN: &[u8] = b"kelpie-pair-v1";
+const COMMIT_DOMAIN: &[u8] = b"kebbie-pair-commit-v1";
+const SAS_DOMAIN: &[u8] = b"kebbie-pair-v1";
 
 pub fn commitment(device: &PublicKeys, device_nonce: &[u8; 32], code: &str) -> [u8; 32] {
     Sha256::new()

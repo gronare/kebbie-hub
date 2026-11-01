@@ -20,7 +20,7 @@ use crate::store::{AdminScope, KeyStatus, NewReport, NewSignals, ReportWrite, Si
 use crate::{Hub, MAX_STORED_INTEGER, now};
 
 pub const INBOX_PAGE: u64 = 100;
-const TAG_DOMAIN: &[u8] = b"kelpie-report-challenge-v1";
+const TAG_DOMAIN: &[u8] = b"kebbie-report-challenge-v1";
 
 fn mac(secret: &[u8; 32], nonce: &[u8; 32], difficulty: u8, expires: u64) -> Hmac<Sha256> {
     let mut mac =

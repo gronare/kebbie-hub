@@ -4,8 +4,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const SIGNAL_DOMAIN: &[u8] = b"kelpie-signal-v1";
-pub const SIGNAL_SIGN_DOMAIN: &[u8] = b"kelpie-signal-sign-v1";
+pub const SIGNAL_DOMAIN: &[u8] = b"kebbie-signal-v1";
+pub const SIGNAL_SIGN_DOMAIN: &[u8] = b"kebbie-signal-sign-v1";
 pub const MAX_NAME_CHARS: usize = 48;
 pub const MAX_COMMIT_CHARS: usize = 40;
 pub const MAX_SIGNAL_ROWS: usize = 64;

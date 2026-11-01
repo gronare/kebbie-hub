@@ -3,28 +3,28 @@
   "commit_domain": "kebbie-connect-account-commit-v1",
   "encryption_fingerprint_domain": "kebbie-hub account encryption key v1",
   "fingerprints": {
-    "encryption": "NBdM36bONbOLdSjKrMwoaOdLC5MCqYaS6I7kyk-bCC0",
-    "signing": "fkL1FzDsTCQYHTkfuibx2FWElkRHUO_I7prUXFC5Zus"
+    "encryption": "vLdSXbxm2t23vU8zOHzMaL8yWxb1HCdLOpYOe1GL1Ks",
+    "signing": "umzH5AU8YXSr4lM5CnVXK3ALPhsmpmt651WjgyLwInE"
   },
   "handoff": {
-    "code": "XiIC9gRZnNjwJo2r8hAmGNYxz0y6syZzV_aL4OQL_7M",
-    "commitment": "nr1nKFV5mb1WvXfJdw8rK9fPRtcrpBsnCnu61LS4r8w",
-    "nonce": "wryuEzbaUJEEo9e2U31V0xyrrJmBtGhChBdqrpQa874",
+    "code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
+    "commitment": "xb4XvcUuM9bflqpMKDdEYFRbkYf8IaC1XPOA-13Bzoo",
+    "nonce": "qfVl27YBeLDL7cqN-dwvrM4WsbbXoosQ02NnathOZFA",
     "reveals": [
       {
         "expect": {
           "pinned": {
-            "encryption": "NBdM36bONbOLdSjKrMwoaOdLC5MCqYaS6I7kyk-bCC0",
-            "signing": "fkL1FzDsTCQYHTkfuibx2FWElkRHUO_I7prUXFC5Zus"
+            "encryption": "vLdSXbxm2t23vU8zOHzMaL8yWxb1HCdLOpYOe1GL1Ks",
+            "signing": "umzH5AU8YXSr4lM5CnVXK3ALPhsmpmt651WjgyLwInE"
           }
         },
-        "machine_code": "XiIC9gRZnNjwJo2r8hAmGNYxz0y6syZzV_aL4OQL_7M",
+        "machine_code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
         "name": "pins-the-committed-keys",
         "revealed": {
-          "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "keys": {
-            "encryption": "Fy9TWoRCCrV-COPVEsimPfuCwU2cBjs08dDqQHx9hSI",
-            "signing": "ovzOGg2_2CxX0FxHzMOuV137QeLFqdVj4eLfK3AF2Zs"
+            "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+            "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
           },
           "version": 1
         }
@@ -33,13 +33,13 @@
         "expect": {
           "error": "commitment-mismatch"
         },
-        "machine_code": "XiIC9gRZnNjwJo2r8hAmGNYxz0y6syZzV_aL4OQL_7M",
+        "machine_code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
         "name": "swapped-keys-are-refused",
         "revealed": {
-          "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "keys": {
-            "encryption": "c4s3pwXFZPiEZCBWPJOTHhWt5sYaUUSj5UCH9XYai24",
-            "signing": "5wDSk9eBq4--3uwnD3X-Z-gkDJQEEwozLslaIl2Ido8"
+            "encryption": "wEZaNo05NZo-jVZJBp5eInS86QuDWEPCJ6KeLbkQ1Bk",
+            "signing": "8RQtjyFGDUD0D_ibaFHK4erqZdnHqk9Q6tl-4vQQqQ4"
           },
           "version": 1
         }
@@ -51,10 +51,10 @@
         "machine_code": "guessed-code",
         "name": "another-code-is-refused",
         "revealed": {
-          "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "keys": {
-            "encryption": "Fy9TWoRCCrV-COPVEsimPfuCwU2cBjs08dDqQHx9hSI",
-            "signing": "ovzOGg2_2CxX0FxHzMOuV137QeLFqdVj4eLfK3AF2Zs"
+            "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+            "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
           },
           "version": 1
         }
@@ -62,10 +62,10 @@
     ]
   },
   "key": {
-    "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
+    "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
     "keys": {
-      "encryption": "Fy9TWoRCCrV-COPVEsimPfuCwU2cBjs08dDqQHx9hSI",
-      "signing": "ovzOGg2_2CxX0FxHzMOuV137QeLFqdVj4eLfK3AF2Zs"
+      "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+      "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
     },
     "version": 1
   },
@@ -76,17 +76,17 @@
       "machines": [
         {
           "keys": {
-            "encryption": "31kcjbOLwSGg1u5FZ83qMVALrCccF1ke0WmNvUuu0mg",
-            "signing": "L1xBrv3mfhcDxE_nV1ZQ361Bk00O6WKBEN6MKh7D46A"
+            "encryption": "sZILUSCUf-lZqo6SZkihBKrogr1Yh21xB4aS3u8r0C4",
+            "signing": "L9sICBYCmzxJyXQ7OT9ALXOXzFf0rm_9SaSL6wmGhRc"
           },
-          "machine": "mch_01K83YV380C22K88V6NF4RVHXX"
+          "machine": "mch_01K83YV3806W105VXP4AF1F8RM"
         },
         {
           "keys": {
-            "encryption": "Eu8qn70SbRcznhw-iwqc-FfOAwipMVvO8SI6afWc0Es",
-            "signing": "MRhl1thVOFcISeCMeZ0cPe_-H8rC5Oa5SrCiXKqfeLM"
+            "encryption": "bAD9TeLZaUy3FjFNmZ56Yvv_cuHf7mF91gqnlvqggTg",
+            "signing": "KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dw"
           },
-          "machine": "mch_01K83YV380VW3A2NGRP5ZV0J1V"
+          "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4"
         }
       ]
     },
@@ -95,81 +95,81 @@
       "machines": [
         {
           "keys": {
-            "encryption": "31kcjbOLwSGg1u5FZ83qMVALrCccF1ke0WmNvUuu0mg",
-            "signing": "L1xBrv3mfhcDxE_nV1ZQ361Bk00O6WKBEN6MKh7D46A"
+            "encryption": "bAD9TeLZaUy3FjFNmZ56Yvv_cuHf7mF91gqnlvqggTg",
+            "signing": "KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dw"
           },
-          "machine": "mch_01K83YV380C22K88V6NF4RVHXX"
+          "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4"
         }
       ]
     },
     "removed_machine": "other-machine",
-    "removed_signature": "gWRRRylVygOigcEblw3HUtS0i_kIm16IWOIeHSL2_ZKQUu36BF6mSTD8F8ZkAdZxszNcDvd9eeDkWhTSeubXBg",
-    "signature": "Fm0Xyd1w9XOF51rPU8V21Ms5LX6KVcXA6UM7fcsyCno1izorntcvnygjWvVs7S5PMFcT9UazoS6ypvCi0v5WDA",
-    "statement": "a2ViYmllLWh1YiBhY2NvdW50IG1hY2hpbmVzIHYxABphY2NfNWdXYTRlQ3BLSnpaS0RXNm9IOGZCUQAAAAAAAAACAAAAAgAebWNoXzAxSzgzWVYzODBDMjJLODhWNk5GNFJWSFhYL1xBrv3mfhcDxE_nV1ZQ361Bk00O6WKBEN6MKh7D46DfWRyNs4vBIaDW7kVnzeoxUAusJxwXWR7RaY29S67SaAAebWNoXzAxSzgzWVYzODBWVzNBMk5HUlA1WlYwSjFWMRhl1thVOFcISeCMeZ0cPe_-H8rC5Oa5SrCiXKqfeLMS7yqfvRJtFzOeHD6LCpz4V84DCKkxW87xIjpp9ZzQSw",
+    "removed_signature": "NESI4jXBvhXQc_SNeVo1kMmN1v3yAHHinTmvO1oOg6V7NtNZQnseK7pqQQamEzh_geu-A38DEK4m6nBU5_PRBA",
+    "signature": "w61mx2ASlgLM_ygX7caRq4_whJqR8n-zwPcoaQPEb90FtjlrR9gn8BJrl4QSOV7P2Zx2ic3j99KyuyAm7cOGAw",
+    "statement": "a2ViYmllLWh1YiBhY2NvdW50IG1hY2hpbmVzIHYxABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAAAAAAAAACAAAAAgAebWNoXzAxSzgzWVYzODA2VzEwNVZYUDRBRjFGOFJNL9sICBYCmzxJyXQ7OT9ALXOXzFf0rm_9SaSL6wmGhRexkgtRIJR_6VmqjpJmSKEEquiCvViHbXEHhpLe7yvQLgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dxsAP1N4tlpTLcWMU2Znnpi-_9y4d_uYX3WCqeW-qCBOA",
     "trusted": "machine"
   },
   "signing_fingerprint_domain": "kebbie-hub account signing key v1",
   "wrap": {
-    "associated_data": "a2ViYmllLWh1YiBhY2NvdW50IGtleSB3cmFwIHYxABphY2NfNWdXYTRlQ3BLSnpaS0RXNm9IOGZCUQAUxYlfjAvmtwY5FPbSPeiFhMtAcAEAAAAB",
-    "credential": "xYlfjAvmtwY5FPbSPeiFhMtAcAE",
-    "nonce": "umdWi4mL6fnssVLs",
-    "prf_output": "9_IkULrObwlzpjxS2PxVC11T1me3mMqlxHDly1nMhTU",
+    "associated_data": "a2ViYmllLWh1YiBhY2NvdW50IGtleSB3cmFwIHYxABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAUrJzkLqyrg4RUOS3UjGyS6Xssm2YAAAAB",
+    "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
+    "nonce": "81zetjPc5abEcGr_",
+    "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
     "refusals": [
       {
-        "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
-        "credential": "xYlfjAvmtwY5FPbSPeiFhMtAcAE",
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
         "expect": "wrong-account-key",
         "key_version": 1,
         "name": "another-prf-output",
-        "prf_output": "CyF2Jz5ctJ0oaMrcsolcSZNwbP7p-l7jhQ9amU47XuE",
-        "salt": "d0nSjBufm1lvfLL1pr9ReGfgxFsUi81GcyWEp8wgmk8"
+        "prf_output": "vftykOv9gG_gzneAwAq8CNDSU5CPWwxGXcEukBhGVkM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
       },
       {
-        "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
-        "credential": "xYlfjAvmtwY5FPbSPeiFhMtAcAE",
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
         "expect": "wrong-account-key",
         "key_version": 1,
         "name": "another-salt",
-        "prf_output": "9_IkULrObwlzpjxS2PxVC11T1me3mMqlxHDly1nMhTU",
-        "salt": "2iggrT2d2UPvCc53nZDhB_yOOMDHhPhLoHpY71Luy9o"
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "_EHfSe3deoWqiz4WasWxhOYvmkCSfVpXWwXaxC3UyFM"
       },
       {
-        "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
-        "credential": "JQ-MccQ9oVHokHL7c9GLFPBr9ZI",
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "lCtR6cmPhZ2O8CwG68kDzLRnLPU",
         "expect": "wrong-account-key",
         "key_version": 1,
         "name": "another-credential",
-        "prf_output": "9_IkULrObwlzpjxS2PxVC11T1me3mMqlxHDly1nMhTU",
-        "salt": "d0nSjBufm1lvfLL1pr9ReGfgxFsUi81GcyWEp8wgmk8"
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
       },
       {
-        "account": "acc_LBVGrxqjr67CIEzWKwZIVw",
-        "credential": "xYlfjAvmtwY5FPbSPeiFhMtAcAE",
+        "account": "acc_ETEolyOEmutVBFE5Ztvgrg",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
         "expect": "wrong-account-key",
         "key_version": 1,
         "name": "another-account",
-        "prf_output": "9_IkULrObwlzpjxS2PxVC11T1me3mMqlxHDly1nMhTU",
-        "salt": "d0nSjBufm1lvfLL1pr9ReGfgxFsUi81GcyWEp8wgmk8"
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
       },
       {
-        "account": "acc_5gWa4eCpKJzZKDW6oH8fBQ",
-        "credential": "xYlfjAvmtwY5FPbSPeiFhMtAcAE",
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
         "expect": "wrong-account-key",
         "key_version": 2,
         "name": "another-key-version",
-        "prf_output": "9_IkULrObwlzpjxS2PxVC11T1me3mMqlxHDly1nMhTU",
-        "salt": "d0nSjBufm1lvfLL1pr9ReGfgxFsUi81GcyWEp8wgmk8"
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
       }
     ],
-    "salt": "d0nSjBufm1lvfLL1pr9ReGfgxFsUi81GcyWEp8wgmk8",
-    "wrap_key": "mF0f7-A3B3laadxcLThfJw2_lJRSz8UHhugB6DutFZg",
-    "wrapped": "umdWi4mL6fnssVLs_2Wqvx5KMsl1gmvs11e3-Uwc-bXaxpgemdk_JAPUbme-lzPMU9RvXdlZmWOr3ppmmZBdj5Jk6IxLQCOcvL0Qn3PrlWaZXvqa7IlxckK1bzs"
+    "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4",
+    "wrap_key": "uK5Y6DwyTGK9qw4hfNOvBbO4FGXoZTaCN5IUbvuFfWg",
+    "wrapped": "81zetjPc5abEcGr_GhNrasgXuWX1TICBSt860doHQXHjNTLIOxFms8C64NTH_yPOo1sav36yuM45WY-55T6uLFY8fbVMwzQ7Pn6SU_DiHI0NTscJy4IaQXt2dR8"
   },
   "wrap_ad_domain": "kebbie-hub account key wrap v1",
   "wrap_key_info": "kebbie-hub account key v1",
   "wrapper": {
-    "signature": "QxVbf6ydJssgZ-vLIasxfvS0aavomtJTtpOXxzmkjtbsCy476mYN5GUFJiprF70m30-330lKDugXsFkzSn3mAQ",
-    "statement": "a2ViYmllLWh1YiBhY2NvdW50IGtleSB3cmFwcGVyIHYxABphY2NfNWdXYTRlQ3BLSnpaS0RXNm9IOGZCUQAUxYlfjAvmtwY5FPbSPeiFhMtAcAEAAAABovzOGg2_2CxX0FxHzMOuV137QeLFqdVj4eLfK3AF2ZsXL1NahEIKtX4I49USyKY9-4LBTZwGOzTx0OpAfH2FIssL2pvkoahHFUvTgOVyTssCM3oFWUMg1X8ZhTkxXXli"
+    "signature": "MCtYF_eFmG1ec5pqBKDK55XXnHKJN3piB-3J_OPhlVBEuqZYpTe5ZrCc5JQL7TE4IQSw6TaqoCG8BsWuSaWwBw",
+    "statement": "a2ViYmllLWh1YiBhY2NvdW50IGtleSB3cmFwcGVyIHYxABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAUrJzkLqyrg4RUOS3UjGyS6Xssm2YAAAABofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9ELYFSXqKod4oSmnLLX4b3DHfJxsSo5WXNpg91nEwG-CFe3cIq0dzBtF-60eEfl24Tx86-k1rCVctI-6bweLaG2"
   },
   "wrapper_sign_domain": "kebbie-hub account key wrapper v1"
 }

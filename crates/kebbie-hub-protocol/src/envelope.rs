@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::ids::{Id, Prefix};
 use crate::{PROTOCOL_VERSION, SCHEMA};
 
-const HEADER_DOMAIN: &[u8] = b"kelpie-hub envelope\0";
+const HEADER_DOMAIN: &[u8] = b"kebbie-hub envelope\0";
 const MAX_COLLAPSE_CHARS: usize = 64;
 const KEY_COMMIT_CHARS: usize = 43;
 

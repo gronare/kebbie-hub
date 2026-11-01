@@ -128,7 +128,7 @@ impl Parties {
 }
 
 fn seed(label: &str) -> [u8; 32] {
-    Sha256::digest(format!("kelpie-hub test vector {label}")).into()
+    Sha256::digest(format!("kebbie-hub test vector {label}")).into()
 }
 
 fn b64(bytes: &[u8]) -> String {
@@ -1457,7 +1457,7 @@ fn signatures_json(parties: &Parties) -> Value {
     let cases: Vec<Value> = [&parties.machine, &parties.phone]
         .into_iter()
         .map(|party| {
-            let message = format!("kelpie-hub signature vector for {}", party.name);
+            let message = format!("kebbie-hub signature vector for {}", party.name);
             let signature = SigningKey::from_bytes(&party.keys.to_bytes().0).sign(message.as_bytes());
             json!({ "signer": party.name, "message": b64(message.as_bytes()), "signature": b64(&signature.to_bytes()) })
         })
@@ -1604,7 +1604,7 @@ fn pairing_json(parties: &Parties) -> Value {
         "commitment": b64(&browser.commitment()),
         "machine_nonce": b64(&machine_nonce),
     });
-    json!({ "commit_domain": "kelpie-pair-commit-v1", "sas_domain": "kelpie-pair-v1", "cases": cases, "connect": connect })
+    json!({ "commit_domain": "kebbie-pair-commit-v1", "sas_domain": "kebbie-pair-v1", "cases": cases, "connect": connect })
 }
 
 fn reports_json() -> Value {
@@ -1627,9 +1627,9 @@ fn reports_json() -> Value {
         .find(|earlier| !meets(&nonce, &digest, *earlier, difficulty))
         .expect("an earlier counter falls short");
     json!({
-        "pow_domain": "kelpie-report-pow-v1",
-        "sign_domain": "kelpie-report-sign-v1",
-        "report_domain": "kelpie-report-v1",
+        "pow_domain": "kebbie-report-pow-v1",
+        "sign_domain": "kebbie-report-sign-v1",
+        "report_domain": "kebbie-report-v1",
         "install_secret": b64(&key.to_bytes()),
         "install_public": b64(&key.public()),
         "report": report,

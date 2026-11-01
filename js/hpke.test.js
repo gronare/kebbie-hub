@@ -6,7 +6,7 @@ import { Aes128Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from "@hpke
 import { open, seal } from "./hpke.js";
 
 const suite = new CipherSuite({ kem: new DhkemX25519HkdfSha256(), kdf: new HkdfSha256(), aead: new Aes128Gcm() });
-const info = new TextEncoder().encode("kelpie-hub content key v1");
+const info = new TextEncoder().encode("kebbie-hub content key v1");
 const aad = new TextEncoder().encode("header bytes");
 const plaintext = crypto.getRandomValues(new Uint8Array(32));
 

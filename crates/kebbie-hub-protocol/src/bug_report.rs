@@ -6,9 +6,9 @@ use sha2::{Digest, Sha256};
 
 use crate::error_signal::{ErrorSignals, SIGNAL_SIGN_DOMAIN};
 
-pub const REPORT_DOMAIN: &[u8] = b"kelpie-report-v1";
-pub const REPORT_SIGN_DOMAIN: &[u8] = b"kelpie-report-sign-v1";
-pub const REPORT_POW_DOMAIN: &[u8] = b"kelpie-report-pow-v1";
+pub const REPORT_DOMAIN: &[u8] = b"kebbie-report-v1";
+pub const REPORT_SIGN_DOMAIN: &[u8] = b"kebbie-report-sign-v1";
+pub const REPORT_POW_DOMAIN: &[u8] = b"kebbie-report-pow-v1";
 pub const MAX_TITLE_CHARS: usize = 200;
 pub const MAX_TEXT_BYTES: usize = 12 * 1024;
 pub const MAX_FIELD_CHARS: usize = 64;

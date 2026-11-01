@@ -187,7 +187,7 @@ function machinesScreen() {
   const now = nowSeconds();
   const rows = awakeFirst(state.opened, now).map((opened) => {
     const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
-    const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kelpie}`, `board rev ${opened.rev}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
+    const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kebbie}`, `board rev ${opened.rev}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
     return machineRow({ machine: opened.machine, name: opened.name, awake, facts });
   });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";

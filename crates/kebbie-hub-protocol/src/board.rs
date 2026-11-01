@@ -6,8 +6,6 @@ use crate::ids::Id;
 #[serde(deny_unknown_fields)]
 pub struct Board {
     pub rev: u64,
-    // Machines and phones paired before the rename send and read this field under the old name.
-    #[serde(rename = "kelpie")]
     pub kebbie: String,
     pub away_since: Option<u64>,
     pub checkouts: Vec<Checkout>,
@@ -365,7 +363,7 @@ mod tests {
     }
 
     fn plain_board() -> serde_json::Value {
-        serde_json::json!({ "rev": 3, "kelpie": "0.24.0", "away_since": null, "checkouts": [], "routines": [], "items": [plain()], "sessions_outside_tasks": 0 })
+        serde_json::json!({ "rev": 3, "kebbie": "0.24.0", "away_since": null, "checkouts": [], "routines": [], "items": [plain()], "sessions_outside_tasks": 0 })
     }
 
     #[test]

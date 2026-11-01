@@ -2,12 +2,12 @@ import * as hpke from "./hpke.js";
 
 const subtle = globalThis.crypto.subtle;
 const text = new TextEncoder();
-const HEADER_DOMAIN = text.encode("kelpie-hub envelope\0");
-const HPKE_INFO = text.encode("kelpie-hub content key v1");
-const KEY_COMMIT_DOMAIN = text.encode("kelpie-hub key commit v1");
-const PAIR_COMMIT_DOMAIN = text.encode("kelpie-pair-commit-v1");
-const SAS_DOMAIN = text.encode("kelpie-pair-v1");
-const CONNECT_DOMAIN = text.encode("kelpie-connect-machine-v1");
+const HEADER_DOMAIN = text.encode("kebbie-hub envelope\0");
+const HPKE_INFO = text.encode("kebbie-hub content key v1");
+const KEY_COMMIT_DOMAIN = text.encode("kebbie-hub key commit v1");
+const PAIR_COMMIT_DOMAIN = text.encode("kebbie-pair-commit-v1");
+const SAS_DOMAIN = text.encode("kebbie-pair-v1");
+const CONNECT_DOMAIN = text.encode("kebbie-connect-machine-v1");
 const WRAP_KEY_INFO = text.encode("kebbie-hub account key v1");
 const WRAP_AD_DOMAIN = text.encode("kebbie-hub account key wrap v1");
 const WRAPPER_SIGN_DOMAIN = text.encode("kebbie-hub account key wrapper v1");
@@ -183,7 +183,7 @@ const typed = (fields) => shape({ type: string, ...fields });
 const PAYLOADS = {
   board: typed({
     rev: u64v,
-    kelpie: string,
+    kebbie: string,
     away_since: optionalField(u64v),
     checkouts: list(shape({ repo: string, free_worktrees: u32v, busy_worktrees: u32v })),
     routines: list(shape({ id: string, title: string, repo: string, mode: string, next_run: optionalField(u64v), last_outcome: optionalField(string) })),

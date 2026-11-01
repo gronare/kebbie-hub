@@ -708,7 +708,7 @@ impl MachineState {
         let event = serde_json::to_value(event).expect("an event serializes");
         let (_, encryption) = self.secret().to_bytes();
         let digest = Sha256::new()
-            .chain_update(b"kelpie-hub fake collapse\0")
+            .chain_update(b"kebbie-hub fake collapse\0")
             .chain_update(encryption)
             .chain_update(format!("{}:{address}", event.as_str().unwrap_or_default()))
             .finalize();

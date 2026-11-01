@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 
 use crate::crypto::PublicKeys;
 
-pub const CONNECT_FINGERPRINT_DOMAIN: &[u8] = b"kelpie-connect-machine-v1";
+pub const CONNECT_FINGERPRINT_DOMAIN: &[u8] = b"kebbie-connect-machine-v1";
 
 pub fn machine_fingerprint(keys: &PublicKeys) -> [u8; 32] {
     Sha256::new()
