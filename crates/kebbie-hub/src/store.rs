@@ -1244,6 +1244,7 @@ impl Store {
         key: &AccountKey,
         credential: &[u8],
         wrapped: &[u8],
+        prf_salt: Option<&[u8; 32]>,
         now: u64,
     ) -> Result<KeySet> {
         let tx = self.connection.transaction()?;
@@ -1269,7 +1270,15 @@ impl Store {
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![account, key.version, key.keys.signing, key.keys.encryption, now],
         )?;
-        put_wrapper(&tx, account, credential, key.version, wrapped, now)?;
+        put_wrapper(
+            &tx,
+            account,
+            credential,
+            key.version,
+            wrapped,
+            prf_salt,
+            now,
+        )?;
         tx.commit()?;
         Ok(KeySet::Set)
     }
@@ -1280,15 +1289,18 @@ impl Store {
         credential: &[u8],
         version: u32,
         wrapped: &[u8],
+        prf_salt: Option<&[u8; 32]>,
         now: u64,
     ) -> Result<bool> {
-        let owned: bool = self.connection.query_row(
+        let tx = self.connection.unchecked_transaction()?;
+        let owned: bool = tx.query_row(
             "SELECT EXISTS (SELECT 1 FROM passkeys WHERE credential_id = ?1 AND account_id = ?2)",
             params![credential, account],
             |row| row.get(0),
         )?;
         if owned {
-            put_wrapper(&self.connection, account, credential, version, wrapped, now)?;
+            put_wrapper(&tx, account, credential, version, wrapped, prf_salt, now)?;
+            tx.commit()?;
         }
         Ok(owned)
     }
@@ -3032,6 +3044,7 @@ fn put_wrapper(
     credential: &[u8],
     version: u32,
     wrapped: &[u8],
+    prf_salt: Option<&[u8; 32]>,
     now: u64,
 ) -> Result<()> {
     connection.execute(
@@ -3040,6 +3053,12 @@ fn put_wrapper(
          ON CONFLICT (credential_id) DO UPDATE SET key_version = ?3, wrapped = ?4, created_at = ?5",
         params![credential, account, version, wrapped, now],
     )?;
+    if let Some(salt) = prf_salt {
+        connection.execute(
+            "UPDATE passkeys SET prf_salt = ?3 WHERE credential_id = ?1 AND account_id = ?2",
+            params![credential, account, salt.as_slice()],
+        )?;
+    }
     Ok(())
 }
 

@@ -16,11 +16,12 @@ export function creationOptions(json, prfSalt = null) {
   };
 }
 
-export function requestOptions(json, prfSalts = {}) {
+export function requestOptions(json, { first = null, byCredential = {} } = {}) {
   const options = json.publicKey;
-  const salts = Object.entries(prfSalts ?? {});
-  const evalByCredential = Object.fromEntries(salts.map(([credential, salt]) => [credential, { first: decode(salt) }]));
-  const extensions = salts.length ? { ...options.extensions, prf: { evalByCredential } } : options.extensions;
+  const salts = Object.entries(byCredential ?? {});
+  const evalByCredential = () => Object.fromEntries(salts.map(([credential, salt]) => [credential, { first: decode(salt) }]));
+  const prf = first ? { eval: { first: decode(first) } } : salts.length ? { evalByCredential: evalByCredential() } : null;
+  const extensions = prf ? { ...options.extensions, prf } : options.extensions;
   return {
     publicKey: {
       ...options,

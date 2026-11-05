@@ -351,6 +351,7 @@ fn key_setup(account: &str, credential: &[u8]) -> AccountKeySetup {
         credential: URL_SAFE_NO_PAD.encode(credential),
         wrapped: URL_SAFE_NO_PAD.encode(&wrapped),
         signature: Bytes64(signature),
+        prf_salt: None,
     }
 }
 

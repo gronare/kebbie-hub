@@ -347,6 +347,7 @@ pub struct RequestCeremony {
     pub options: RequestChallengeResponse,
     #[serde(default)]
     pub prf_salts: BTreeMap<String, Bytes32>,
+    pub prf_salt: Bytes32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -369,6 +370,8 @@ pub struct AccountKeySetup {
     pub credential: String,
     pub wrapped: String,
     pub signature: Bytes64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prf_salt: Option<Bytes32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -376,6 +379,8 @@ pub struct WrapperUpload {
     pub key_version: u32,
     pub wrapped: String,
     pub signature: Bytes64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prf_salt: Option<Bytes32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

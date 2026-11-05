@@ -43,31 +43,54 @@ const signingPrint = async (key) => (await accountFingerprints(key)).signing;
 
 async function prfCeremony({ account, credentials }, credential) {
   const begun = await account.loginBegin({ credential });
-  const got = await credentials.get(requestOptions(begun.options, begun.prf_salts));
-  return { signedIn: await account.loginFinish(begun.ceremony, assertionJSON(got)), prf: prfOutput(got) };
+  const got = await credentials.get(requestOptions(begun.options, { byCredential: begun.prf_salts }));
+  return { signedIn: await account.loginFinish(begun.ceremony, assertionJSON(got)), prf: prfOutput(got), salt: begun.prf_salts?.[credential] ?? null };
 }
 
 const withoutUnlock = ({ unlock, ...me }) => me;
 
-const unlockOf = (me, unlock, prf) => ({ account: me.account, credential: fromB64(unlock.credential), version: me.key?.version ?? 1, prfOutput: prf, salt: fromB64(unlock.prf_salt) });
+const unlockOf = (me, credential, prf, salt) => ({ account: me.account, credential: fromB64(credential), version: me.key?.version ?? 1, prfOutput: prf, salt: fromB64(salt) });
 
-async function createKey(hub, me, unlock, prf) {
+const saltChange = (salt, unlock) => (salt === unlock.prf_salt ? {} : { prf_salt: salt });
+
+async function createKey(hub, me, unlock, prf, salt) {
   const fresh = await newAccountSecrets(me.account);
   try {
-    const params = unlockOf({ ...me, key: fresh.key }, unlock, prf);
+    const params = unlockOf({ ...me, key: fresh.key }, unlock.credential, prf, salt);
     const wrapped = await wrapAccountSecrets(params, fresh.secrets);
     const identity = await accountIdentity(fresh.key, fresh.secrets, me.account);
     const signature = await signStatement(identity, await wrapperStatement(fresh.key, params.credential, wrapped));
-    await hub.account.setKey({ key: fresh.key, credential: unlock.credential, wrapped: toB64(wrapped), signature: toB64(signature) });
+    await hub.account.setKey({ key: fresh.key, credential: unlock.credential, wrapped: toB64(wrapped), signature: toB64(signature), ...saltChange(salt, unlock) });
     return { state: "unlocked", me: { ...me, key: fresh.key }, identity, credential: unlock.credential };
   } finally {
     fresh.wipe();
   }
 }
 
+async function unlockOntoSalt(hub, me, unlock, prf, salt) {
+  const before = await prfCeremony(hub, unlock.credential);
+  if (!before.prf) return { state: "no-prf", me, credential: unlock.credential };
+  try {
+    if (!before.signedIn.unlock.wrapped) return { state: "not-wrapped", me, credential: unlock.credential };
+    const opened = await unwrapAccountSecrets(unlockOf(me, unlock.credential, before.prf, before.salt), fromB64(before.signedIn.unlock.wrapped));
+    try {
+      const identity = await accountIdentity(me.key, opened, me.account);
+      const params = unlockOf(me, unlock.credential, prf, salt);
+      const wrapped = await wrapAccountSecrets(params, opened);
+      const signature = await signStatement(identity, await wrapperStatement(me.key, params.credential, wrapped));
+      await hub.account.putWrapper(unlock.credential, { key_version: me.key.version, wrapped: toB64(wrapped), signature: toB64(signature), prf_salt: salt });
+      return { state: "unlocked", me, identity, credential: unlock.credential };
+    } finally {
+      opened.wipe();
+    }
+  } finally {
+    before.prf.fill(0);
+  }
+}
+
 export async function unlockAfter(hub, ceremony, storage = localStore()) {
-  let { signedIn, prf } = ceremony;
-  if (!prf) ({ signedIn, prf } = await prfCeremony(hub, signedIn.unlock.credential));
+  let { signedIn, prf, salt } = ceremony;
+  if (!prf) ({ signedIn, prf, salt } = await prfCeremony(hub, signedIn.unlock.credential));
   const { unlock } = signedIn;
   const me = withoutUnlock(signedIn);
   const held = remembered(storage);
@@ -80,7 +103,7 @@ export async function unlockAfter(hub, ceremony, storage = localStore()) {
   try {
     if (!me.key) {
       try {
-        const created = await createKey(hub, me, unlock, prf);
+        const created = await createKey(hub, me, unlock, prf, salt);
         rememberCredential(unlock.credential, me.account, await signingPrint(created.me.key), storage);
         return created;
       } catch (error) {
@@ -89,7 +112,8 @@ export async function unlockAfter(hub, ceremony, storage = localStore()) {
       }
     }
     if (!unlock.wrapped) return { state: "not-wrapped", me, credential: unlock.credential };
-    const opened = await unwrapAccountSecrets(unlockOf(me, unlock, prf), fromB64(unlock.wrapped));
+    if (salt !== unlock.prf_salt) return await unlockOntoSalt(hub, me, unlock, prf, salt);
+    const opened = await unwrapAccountSecrets(unlockOf(me, unlock.credential, prf, salt), fromB64(unlock.wrapped));
     try {
       return { state: "unlocked", me, identity: await accountIdentity(me.key, opened, me.account), credential: unlock.credential };
     } finally {
@@ -105,7 +129,7 @@ export async function addFirstPasskey(hub, me, name, storage = localStore()) {
   const created = await hub.credentials.create(creationOptions(begun.options, begun.prf_salt));
   const added = await hub.account.passkeyFinish(begun.ceremony, registrationJSON(created), name);
   const signedIn = { ...me, unlock: { credential: added.passkey, prf_salt: begun.prf_salt, wrapped: null } };
-  return unlockAfter(hub, { signedIn, prf: prfOutput(created) }, storage);
+  return unlockAfter(hub, { signedIn, prf: prfOutput(created), salt: begun.prf_salt }, storage);
 }
 
 export async function addUnlockingPasskey(hub, session, name) {
@@ -113,7 +137,8 @@ export async function addUnlockingPasskey(hub, session, name) {
   const created = await hub.credentials.create(creationOptions(begun.options, begun.prf_salt));
   const added = await hub.account.passkeyFinish(begun.ceremony, registrationJSON(created), name);
   if (session?.state !== "unlocked") return { added, unlocks: false };
-  const prf = prfOutput(created) ?? (await prfCeremony(hub, added.passkey)).prf;
+  const fromCreate = prfOutput(created);
+  const { prf, salt } = fromCreate ? { prf: fromCreate, salt: begun.prf_salt } : await prfCeremony(hub, added.passkey);
   if (!prf) return { added, unlocks: false };
   const current = await prfCeremony(hub, session.credential);
   if (!current.prf || !current.signedIn.unlock.wrapped) {
@@ -121,11 +146,11 @@ export async function addUnlockingPasskey(hub, session, name) {
     return { added, unlocks: false };
   }
   const { key } = session.me;
-  const opened = await unwrapAccountSecrets(unlockOf(session.me, current.signedIn.unlock, current.prf), fromB64(current.signedIn.unlock.wrapped));
+  const opened = await unwrapAccountSecrets(unlockOf(session.me, current.signedIn.unlock.credential, current.prf, current.salt), fromB64(current.signedIn.unlock.wrapped));
   try {
     await accountIdentity(key, opened, session.me.account);
     const credential = fromB64(added.passkey);
-    const wrapped = await wrapAccountSecrets({ account: key.account, credential, version: key.version, prfOutput: prf, salt: fromB64(begun.prf_salt) }, opened);
+    const wrapped = await wrapAccountSecrets({ account: key.account, credential, version: key.version, prfOutput: prf, salt: fromB64(salt) }, opened);
     const signature = await signStatement(session.identity, await wrapperStatement(key, credential, wrapped));
     await hub.account.putWrapper(added.passkey, { key_version: key.version, wrapped: toB64(wrapped), signature: toB64(signature) });
     return { added, unlocks: true };

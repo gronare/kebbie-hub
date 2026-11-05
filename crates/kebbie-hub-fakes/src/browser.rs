@@ -372,6 +372,7 @@ impl Browser {
                         credential: signed.unlock.credential.clone(),
                         wrapped: URL_SAFE_NO_PAD.encode(&wrapped),
                         signature: Bytes64(signature),
+                        prf_salt: None,
                     },
                 )
                 .await?;
@@ -438,6 +439,7 @@ impl Browser {
                 key_version: key.version,
                 wrapped: URL_SAFE_NO_PAD.encode(&wrapped),
                 signature: Bytes64(signature),
+                prf_salt: None,
             },
         )
         .await?;

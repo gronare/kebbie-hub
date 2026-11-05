@@ -13,6 +13,7 @@ use crate::ids::{Id, Prefix};
 pub const WRAP_KEY_INFO: &[u8] = b"kebbie-hub account key v1";
 pub const WRAP_AD_DOMAIN: &[u8] = b"kebbie-hub account key wrap v1";
 pub const WRAPPER_SIGN_DOMAIN: &[u8] = b"kebbie-hub account key wrapper v1";
+pub const HUB_PRF_SALT_DOMAIN: &[u8] = b"kebbie-hub prf salt v1";
 pub const MACHINE_LIST_DOMAIN: &[u8] = b"kebbie-hub account machines v1";
 pub const SIGNING_FINGERPRINT_DOMAIN: &[u8] = b"kebbie-hub account signing key v1";
 pub const ENCRYPTION_FINGERPRINT_DOMAIN: &[u8] = b"kebbie-hub account encryption key v1";
@@ -196,6 +197,10 @@ fn verify(signing: &[u8; 32], message: &[u8], signature: &[u8; 64]) -> bool {
         key.verify_strict(message, &Signature::from_bytes(signature))
             .is_ok()
     })
+}
+
+pub fn hub_prf_salt() -> [u8; 32] {
+    Sha256::digest(HUB_PRF_SALT_DOMAIN).into()
 }
 
 pub fn wrap_key(prf_output: &[u8; 32], salt: &[u8; 32]) -> [u8; 32] {

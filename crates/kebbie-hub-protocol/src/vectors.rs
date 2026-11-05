@@ -8,9 +8,9 @@ use sha2::{Digest, Sha256};
 
 use crate::account::{
     ACCOUNT_COMMIT_DOMAIN, AccountHandoff, AccountKey, ENCRYPTION_FINGERPRINT_DOMAIN,
-    MACHINE_LIST_DOMAIN, MachineList, SIGNING_FINGERPRINT_DOMAIN, Unlock, WRAP_AD_DOMAIN,
-    WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPER_SIGN_DOMAIN, pin_account, sign_wrapper,
-    wrap_associated_data, wrap_key as account_wrap_key, wrapper_statement,
+    HUB_PRF_SALT_DOMAIN, MACHINE_LIST_DOMAIN, MachineList, SIGNING_FINGERPRINT_DOMAIN, Unlock,
+    WRAP_AD_DOMAIN, WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPER_SIGN_DOMAIN, hub_prf_salt, pin_account,
+    sign_wrapper, wrap_associated_data, wrap_key as account_wrap_key, wrapper_statement,
 };
 use crate::authorize::{AppliedCommands, Machine, Refusal, Role, TrustedDevice, authorize};
 use crate::board::{
@@ -1736,6 +1736,12 @@ fn accounts_json(parties: &Parties) -> Value {
             "nonce": b64(&nonce),
             "wrapped": b64(&wrapped),
             "refusals": refusals,
+        },
+        "hub_prf_salt": {
+            "domain": String::from_utf8_lossy(HUB_PRF_SALT_DOMAIN),
+            "salt": b64(&hub_prf_salt()),
+            "prf_output": b64(&prf_output),
+            "wrap_key": b64(&account_wrap_key(&prf_output, &hub_prf_salt())),
         },
         "fingerprints": fingerprints,
         "wrapper": {

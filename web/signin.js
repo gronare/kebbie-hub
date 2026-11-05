@@ -15,7 +15,7 @@ export function signInWith({ account, credentials }) {
     const controller = new AbortController();
     pending = controller;
     const begun = await account.loginBegin(request);
-    const options = { ...requestOptions(begun.options, begun.prf_salts), signal: controller.signal, ...(mediation ? { mediation } : {}) };
+    const options = { ...requestOptions(begun.options, { first: begun.prf_salt }), signal: controller.signal, ...(mediation ? { mediation } : {}) };
     let credential;
     try {
       credential = await credentials.get(options);
@@ -24,7 +24,7 @@ export function signInWith({ account, credentials }) {
       throw error;
     }
     if (pending === controller) pending = null;
-    return { signedIn: await account.loginFinish(begun.ceremony, assertionJSON(credential)), prf: prfOutput(credential) };
+    return { signedIn: await account.loginFinish(begun.ceremony, assertionJSON(credential)), prf: prfOutput(credential), salt: begun.prf_salt ?? null };
   };
   return {
     withPasskey: (remembered = null) => (remembered ? run({ credential: remembered }, null).catch((error) => (error instanceof HubError ? run({}, null) : Promise.reject(error))) : run({}, null)),
@@ -36,7 +36,7 @@ export function signInWith({ account, credentials }) {
 export async function signUpWith({ account, credentials }, ticket, name) {
   const begun = await account.registerBegin(ticket);
   const created = await credentials.create(creationOptions(begun.options, begun.prf_salt));
-  return { signedIn: await account.registerFinish(begun.ceremony, registrationJSON(created), name), prf: prfOutput(created) };
+  return { signedIn: await account.registerFinish(begun.ceremony, registrationJSON(created), name), prf: prfOutput(created), salt: begun.prf_salt };
 }
 
 export async function autofillAvailable(credential = globalThis.PublicKeyCredential) {

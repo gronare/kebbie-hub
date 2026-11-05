@@ -240,6 +240,9 @@ test("account keys wrap, sign and hand over as the Rust vectors say", async () =
   assert.equal(account.encryption.privateKey.extractable, false);
   assert.equal(await failure(accountIdentity({ ...key, keys: parties.intruder.public }, opened, key.account)), "key-mismatch");
   assert.equal(await failure(accountIdentity({ ...key, keys: { ...key.keys, encryption: parties.intruder.public.encryption } }, opened, key.account)), "key-mismatch");
+  const hubSalt = vectors.hub_prf_salt;
+  assert.equal(toB64(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hubSalt.domain)))), hubSalt.salt);
+  assert.equal(toB64(await accountWrapKey(fromB64(hubSalt.prf_output), fromB64(hubSalt.salt))), hubSalt.wrap_key);
   assert.deepEqual(await accountFingerprints(key), vectors.fingerprints);
   const statement = await wrapperStatement(key, credential, fromB64(wrap.wrapped));
   assert.equal(toB64(statement), vectors.wrapper.statement);

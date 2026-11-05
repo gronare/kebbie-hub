@@ -12,13 +12,14 @@ const { parties } = load("keys.json");
 const envelopes = load("envelopes.json");
 const accounts = load("accounts.json");
 const ACCOUNT = parties.account.id;
+const HUB_SALT = accounts.hub_prf_salt.salt;
 const bytes = (...values) => new Uint8Array(values).buffer;
 
 function authenticator({ prfAtCreate = true, prf = true, outputs = {} } = {}) {
   const made = [];
   const asked = [];
   const output = async (id, salt) => {
-    if (outputs[id]) return fromB64(outputs[id]).buffer;
+    if (outputs[id]?.salt === toB64(new Uint8Array(salt))) return fromB64(outputs[id].output).buffer;
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`secret of ${id}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     return crypto.subtle.sign("HMAC", key, salt);
   };
@@ -37,7 +38,8 @@ function authenticator({ prfAtCreate = true, prf = true, outputs = {} } = {}) {
       asked.push(options);
       const allowed = options.publicKey.allowCredentials.map((credential) => toB64(credential.id));
       const id = allowed[0] ?? made[0] ?? Object.keys(outputs)[0];
-      const salt = options.publicKey.extensions?.prf?.evalByCredential?.[id]?.first;
+      const asks = options.publicKey.extensions?.prf;
+      const salt = asks?.evalByCredential?.[id]?.first ?? asks?.eval?.first;
       const value = prf && salt ? await output(id, salt) : null;
       return { id, rawId: fromB64(id).buffer, type: "public-key", getClientExtensionResults: results(value), response: { authenticatorData: bytes(3), clientDataJSON: bytes(4), signature: bytes(5), userHandle: bytes(6) } };
     },
@@ -48,13 +50,12 @@ function hub({ key = null, passkeys = {} } = {}) {
   const posted = [];
   const state = { key, passkeys: structuredClone(passkeys), fresh: 0 };
   const view = () => ({ account: ACCOUNT, handle: "carl", created_at: 1, owner: true, email: null, plan: { status: "active", until: null, entitled: true }, billing_url: null, key: state.key });
-  const salt = () => toB64(crypto.getRandomValues(new Uint8Array(32)));
   const signedIn = (credential) => ({ ...view(), unlock: { credential, prf_salt: state.passkeys[credential].salt, wrapped: state.passkeys[credential].wrapped ?? null } });
   const account = {
     posted,
     state,
     me: async () => view(),
-    registerBegin: async () => ((state.pending = salt()), { ceremony: "r1", options: { publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" } } }, prf_salt: state.pending }),
+    registerBegin: async () => ((state.pending = HUB_SALT), { ceremony: "r1", options: { publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" } } }, prf_salt: state.pending }),
     registerFinish: async (ceremony, credential) => {
       posted.push(credential);
       state.passkeys[credential.rawId] = { salt: state.pending };
@@ -63,13 +64,13 @@ function hub({ key = null, passkeys = {} } = {}) {
     loginBegin: async (request) => {
       if (request.credential && !state.passkeys[request.credential]) throw new HubError(401, "unauthorized");
       const allowed = request.credential ? [request.credential] : [];
-      return { ceremony: "l1", options: { publicKey: { challenge: "AQID", allowCredentials: allowed.map((id) => ({ type: "public-key", id })) } }, prf_salts: Object.fromEntries(allowed.map((id) => [id, state.passkeys[id].salt])) };
+      return { ceremony: "l1", options: { publicKey: { challenge: "AQID", allowCredentials: allowed.map((id) => ({ type: "public-key", id })) } }, prf_salts: Object.fromEntries(allowed.map((id) => [id, state.passkeys[id].salt])), prf_salt: HUB_SALT };
     },
     loginFinish: async (ceremony, credential) => {
       posted.push(credential);
       return signedIn(credential.rawId);
     },
-    passkeyBegin: async () => ((state.pending = salt()), { ceremony: "p1", options: { publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" } } }, prf_salt: state.pending }),
+    passkeyBegin: async () => ((state.pending = HUB_SALT), { ceremony: "p1", options: { publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" } } }, prf_salt: state.pending }),
     passkeyFinish: async (ceremony, credential, name) => {
       posted.push(credential);
       state.passkeys[credential.rawId] = { salt: state.pending };
@@ -79,10 +80,12 @@ function hub({ key = null, passkeys = {} } = {}) {
       if (state.key) throw new HubError(409, "key-exists");
       state.key = setup.key;
       state.passkeys[setup.credential].wrapped = setup.wrapped;
+      if (setup.prf_salt) state.passkeys[setup.credential].salt = setup.prf_salt;
       state.setup = setup;
     },
     putWrapper: async (passkey, wrapper) => {
       state.passkeys[passkey].wrapped = wrapper.wrapped;
+      if (wrapper.prf_salt) state.passkeys[passkey].salt = wrapper.prf_salt;
       state.wrapper = { passkey, ...wrapper };
     },
   };
@@ -92,6 +95,13 @@ function hub({ key = null, passkeys = {} } = {}) {
 function storage() {
   const values = new Map();
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+}
+
+const vectorOutputs = () => ({ [accounts.wrap.credential]: { salt: accounts.wrap.salt, output: accounts.wrap.prf_output } });
+
+async function hmacOutput(credential, salt) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`secret of ${credential}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, fromB64(salt)));
 }
 
 const vectorPasskeys = () => ({ [accounts.wrap.credential]: { salt: accounts.wrap.salt, wrapped: accounts.wrap.wrapped } });
@@ -143,25 +153,35 @@ test("an authenticator without PRF leaves a no-prf state and no key on the hub",
   assert.equal(credentials.asked.length, 1, "the immediate get was tried");
 });
 
-test("a later sign-in unwraps the account key, which opens the account's board", async () => {
+test("a passkey whose wrapper has another salt than the hub's asks twice once, moves onto the hub's salt, then unlocks in one prompt", async () => {
   const account = hub({ key: accounts.key, passkeys: vectorPasskeys() });
-  const credentials = authenticator({ outputs: { [accounts.wrap.credential]: accounts.wrap.prf_output } });
+  const credentials = authenticator({ outputs: vectorOutputs() });
   const kept = storage();
   const signingIn = signInWith({ account, credentials });
   const first = await unlockAfter({ account, credentials }, await signingIn.withPasskey(), kept);
   assert.equal(first.state, "unlocked");
-  assert.equal(credentials.asked.length, 2, "a discoverable sign-in has no salt yet, so the PRF comes from a get on that passkey");
+  assert.equal(credentials.asked.length, 2, "the old salt's PRF takes one more prompt");
+  assert.equal(toB64(credentials.asked[0].publicKey.extensions.prf.eval.first), HUB_SALT);
+  assert.equal(toB64(credentials.asked[1].publicKey.extensions.prf.evalByCredential[accounts.wrap.credential].first), accounts.wrap.salt);
   const vector = envelopes.cases.find((candidate) => candidate.name === "board-opened-by-the-account");
   assert.deepEqual(await openEnvelope(vector.envelope, first.identity, await importSender(parties.machine.id, parties.machine.public), envelopes.now), vector.expect.payload);
-  const again = await unlockAfter({ account, credentials }, await signingIn.withPasskey(rememberedCredential(kept)), kept);
+  const { wrapper } = account.state;
+  assert.deepEqual([wrapper.passkey, wrapper.prf_salt, account.state.passkeys[wrapper.passkey].salt], [accounts.wrap.credential, HUB_SALT, HUB_SALT]);
+  assert.ok(await verifies(accounts.key, wrapper.passkey, wrapper.wrapped, wrapper.signature));
+  const unlock = { account: ACCOUNT, credential: fromB64(wrapper.passkey), version: 1, prfOutput: await hmacOutput(wrapper.passkey, HUB_SALT), salt: fromB64(HUB_SALT) };
+  assert.equal(toB64((await unwrapAccountSecrets(unlock, fromB64(wrapper.wrapped))).signing), parties.account.signing_secret);
+  const again = await unlockAfter({ account, credentials }, await signingIn.withPasskey(), kept);
   assert.equal(again.state, "unlocked");
-  assert.equal(credentials.asked.length, 3, "the remembered passkey unlocks in one prompt");
+  assert.equal(credentials.asked.length, 3, "a discoverable sign-in unlocks in one prompt");
+  const remembered = await unlockAfter({ account, credentials }, await signingIn.withPasskey(rememberedCredential(kept)), kept);
+  assert.equal(remembered.state, "unlocked");
+  assert.equal(credentials.asked.length, 4, "the remembered passkey unlocks in one prompt");
   assert.ok(extensionsStripped(account));
 });
 
 test("a hub that reports other public keys for the account is refused", async () => {
   const account = hub({ key: { ...accounts.key, keys: parties.intruder.public }, passkeys: vectorPasskeys() });
-  const credentials = authenticator({ outputs: { [accounts.wrap.credential]: accounts.wrap.prf_output } });
+  const credentials = authenticator({ outputs: vectorOutputs() });
   await assert.rejects(unlockAfter({ account, credentials }, await signInWith({ account, credentials }).withPasskey(accounts.wrap.credential), storage()), (error) => error.code === "key-mismatch");
 });
 
@@ -176,7 +196,7 @@ test("a passkey with the wrong PRF, or none wrapped yet, does not unlock", async
 
 test("a passkey added from an unlocked session gets its own wrapper of the same account key", async () => {
   const account = hub({ key: accounts.key, passkeys: vectorPasskeys() });
-  const credentials = authenticator({ outputs: { [accounts.wrap.credential]: accounts.wrap.prf_output } });
+  const credentials = authenticator({ outputs: vectorOutputs() });
   const hubSide = { account, credentials };
   const session = await unlockAfter(hubSide, await signInWith(hubSide).withPasskey(accounts.wrap.credential), storage());
   const added = await addUnlockingPasskey(hubSide, session, "iPad");
@@ -195,7 +215,7 @@ test("a passkey added from an unlocked session gets its own wrapper of the same 
 
 test("a hub that drops the key of an account this device unlocked before gets no new key minted", async () => {
   const account = hub({ key: accounts.key, passkeys: vectorPasskeys() });
-  const credentials = authenticator({ outputs: { [accounts.wrap.credential]: accounts.wrap.prf_output } });
+  const credentials = authenticator({ outputs: vectorOutputs() });
   const kept = storage();
   const signingIn = signInWith({ account, credentials });
   assert.equal((await unlockAfter({ account, credentials }, await signingIn.withPasskey(accounts.wrap.credential), kept)).state, "unlocked");
@@ -209,7 +229,7 @@ test("a hub that drops the key of an account this device unlocked before gets no
 
 test("a hub that offers another account key, or one of another account, than this device unlocked is refused", async () => {
   const account = hub({ key: accounts.key, passkeys: vectorPasskeys() });
-  const credentials = authenticator({ outputs: { [accounts.wrap.credential]: accounts.wrap.prf_output } });
+  const credentials = authenticator({ outputs: vectorOutputs() });
   const kept = storage();
   const signingIn = signInWith({ account, credentials });
   await unlockAfter({ account, credentials }, await signingIn.withPasskey(accounts.wrap.credential), kept);

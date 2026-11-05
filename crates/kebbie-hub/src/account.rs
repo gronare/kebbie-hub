@@ -15,7 +15,7 @@ use kebbie_hub_api::{
     RegisterBegin, RegisterFinish, RequestCeremony, SignedIn, SignupMode, Unlocking,
     WrapperUpload, normalize_code,
 };
-use kebbie_hub_protocol::{Id, Prefix, WRAPPED_LEN};
+use kebbie_hub_protocol::{Id, Prefix, WRAPPED_LEN, hub_prf_salt};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use webauthn_rs::prelude::{
@@ -136,6 +136,14 @@ fn salts_of(stored: &[StoredPasskey]) -> BTreeMap<String, Bytes32> {
         .collect()
 }
 
+fn new_salt(requested: Option<Bytes32>) -> Result<Option<[u8; 32]>, ApiError> {
+    match requested {
+        None => Ok(None),
+        Some(Bytes32(salt)) if salt == hub_prf_salt() => Ok(Some(salt)),
+        Some(_) => Err(ApiError::bad_request("bad-salt")),
+    }
+}
+
 fn wrapped_of(text: &str) -> Result<Vec<u8>, ApiError> {
     URL_SAFE_NO_PAD
         .decode(text)
@@ -228,7 +236,7 @@ pub async fn register_begin(
         .start_passkey_registration(user, &handle, &handle, None)
         .map_err(refused)?;
     let options = discoverable(options);
-    let prf_salt = random::<32>();
+    let prf_salt = hub_prf_salt();
     let ceremony = save_ceremony(
         &hub,
         purpose,
@@ -364,6 +372,7 @@ pub async fn login_begin(
                 ceremony,
                 options,
                 prf_salts: BTreeMap::new(),
+                prf_salt: Bytes32(hub_prf_salt()),
             }));
         }
         Some(typed) => {
@@ -412,6 +421,7 @@ pub async fn login_begin(
         ceremony,
         options,
         prf_salts: salts_of(&stored),
+        prf_salt: Bytes32(hub_prf_salt()),
     }))
 }
 
@@ -579,7 +589,7 @@ pub async fn passkey_begin(
         )
         .map_err(refused)?;
     let options = discoverable(options);
-    let prf_salt = random::<32>();
+    let prf_salt = hub_prf_salt();
     let ceremony = save_ceremony(
         &hub,
         Purpose::AddPasskey,
@@ -698,6 +708,7 @@ pub async fn set_key(
         .decode(&request.credential)
         .map_err(|_| unknown_passkey_here())?;
     let wrapped = wrapped_of(&request.wrapped)?;
+    let prf_salt = new_salt(request.prf_salt)?;
     if !request
         .key
         .verifies_wrapper(&credential, &wrapped, &request.signature.0)
@@ -706,7 +717,7 @@ pub async fn set_key(
     }
     let at = now();
     let mut store = hub.store();
-    match store.set_account_key(&request.key, &credential, &wrapped, at)? {
+    match store.set_account_key(&request.key, &credential, &wrapped, prf_salt.as_ref(), at)? {
         KeySet::Set => {}
         KeySet::KeyExists => return Err(ApiError::conflict("key-exists")),
         KeySet::UnknownPasskey => return Err(unknown_passkey_here()),
@@ -730,6 +741,7 @@ pub async fn set_wrapper(
         .decode(&id)
         .map_err(|_| unknown_passkey_here())?;
     let wrapped = wrapped_of(&request.wrapped)?;
+    let prf_salt = new_salt(request.prf_salt)?;
     let at = now();
     let store = hub.store();
     let key = store
@@ -741,7 +753,14 @@ pub async fn set_wrapper(
     if !key.verifies_wrapper(&credential, &wrapped, &request.signature.0) {
         return Err(ApiError::bad_request("bad-signature"));
     }
-    if !store.set_wrapper(&account, &credential, key.version, &wrapped, at)? {
+    if !store.set_wrapper(
+        &account,
+        &credential,
+        key.version,
+        &wrapped,
+        prf_salt.as_ref(),
+        at,
+    )? {
         return Err(unknown_passkey_here());
     }
     store.log(at, "passkey.wrapper-set", None, None, Some(&account))?;

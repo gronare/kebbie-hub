@@ -277,8 +277,8 @@ fn bytes(value: &Value) -> Vec<u8> {
 #[test]
 fn account_keys_wrap_sign_and_pin_as_the_vectors_say() {
     use kebbie_hub_protocol::{
-        AccountFingerprints, AccountHandoff, AccountKey, MachineList, Unlock, pin_account,
-        sign_wrapper, wrap_associated_data, wrap_key, wrapper_statement,
+        AccountFingerprints, AccountHandoff, AccountKey, HUB_PRF_SALT_DOMAIN, MachineList, Unlock,
+        hub_prf_salt, pin_account, sign_wrapper, wrap_associated_data, wrap_key, wrapper_statement,
     };
     let parties = parties();
     let vectors = load("accounts.json");
@@ -316,6 +316,16 @@ fn account_keys_wrap_sign_and_pin_as_the_vectors_say() {
         };
         assert!(changed.unwrap(&wrapped).is_err(), "{}", refusal["name"]);
     }
+    let hub_salt = &vectors["hub_prf_salt"];
+    assert_eq!(
+        hub_salt["domain"].as_str().unwrap().as_bytes(),
+        HUB_PRF_SALT_DOMAIN
+    );
+    assert_eq!(hub_prf_salt(), bytes32(&hub_salt["salt"]));
+    assert_eq!(
+        wrap_key(&bytes32(&hub_salt["prf_output"]), &hub_prf_salt()),
+        bytes32(&hub_salt["wrap_key"])
+    );
     let fingerprints: AccountFingerprints =
         serde_json::from_value(vectors["fingerprints"].clone()).unwrap();
     assert_eq!(key.fingerprints(), fingerprints);

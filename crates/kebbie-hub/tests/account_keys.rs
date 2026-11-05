@@ -7,10 +7,11 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use common::*;
 use kebbie_hub_api::{
-    AccountKeySetup, Bytes64, LoginBegin, Passkeys, RequestCeremony, WrapperUpload,
+    AccountKeySetup, Bytes32, Bytes64, CreationCeremony, LoginBegin, Passkeys, RegisterBegin,
+    RequestCeremony, WrapperUpload,
 };
 use kebbie_hub_fakes::browser::{Browser, Lock};
-use kebbie_hub_protocol::{AccountKey, Id, SecretKeys, Unlock, sign_wrapper};
+use kebbie_hub_protocol::{AccountKey, Id, SecretKeys, Unlock, hub_prf_salt, sign_wrapper};
 
 fn wrap_for(
     account: &str,
@@ -40,6 +41,30 @@ async fn without_prf(test: &TestHub) -> Browser {
         .await
         .unwrap();
     person
+}
+
+fn set_salt(test: &TestHub, credential: &[u8], salt: [u8; 32]) {
+    rusqlite::Connection::open(test.hub.config().database())
+        .unwrap()
+        .execute(
+            "UPDATE passkeys SET prf_salt = ?2 WHERE credential_id = ?1",
+            rusqlite::params![credential, salt.as_slice()],
+        )
+        .unwrap();
+}
+
+async fn salt_of(person: &mut Browser, credential: &[u8]) -> [u8; 32] {
+    let named = URL_SAFE_NO_PAD.encode(credential);
+    let begun: RequestCeremony = person
+        .post(
+            "/v1/a/login/begin",
+            &LoginBegin {
+                credential: Some(named.clone()),
+            },
+        )
+        .await
+        .unwrap();
+    begun.prf_salts[&named].0
 }
 
 async fn passkeys(person: &mut Browser) -> Vec<(Vec<u8>, bool)> {
@@ -92,6 +117,12 @@ async fn the_first_sign_in_sets_the_account_key_and_every_later_one_unwraps_it()
         .unwrap();
     assert_eq!(by_credential.prf_salts.keys().collect::<Vec<_>>(), [&named]);
     assert_eq!(
+        by_credential.prf_salts[&named].0,
+        hub_prf_salt(),
+        "a new passkey has the hub's salt"
+    );
+    assert_eq!(by_credential.prf_salt.0, hub_prf_salt());
+    assert_eq!(
         by_credential.prf_salts, again.prf_salts,
         "a passkey keeps its salt"
     );
@@ -101,6 +132,11 @@ async fn the_first_sign_in_sets_the_account_key_and_every_later_one_unwraps_it()
         .await
         .unwrap();
     assert!(discoverable.prf_salts.is_empty());
+    assert_eq!(
+        discoverable.prf_salt.0,
+        hub_prf_salt(),
+        "a discoverable sign-in can ask for the PRF"
+    );
     let unknown = person
         .post::<_, RequestCeremony>(
             "/v1/a/login/begin",
@@ -126,6 +162,7 @@ async fn a_key_is_set_once_from_a_fresh_session_with_a_signed_wrap_of_ones_own_p
             credential: URL_SAFE_NO_PAD.encode(credential),
             wrapped: URL_SAFE_NO_PAD.encode(wrapped),
             signature: Bytes64(signature),
+            prf_salt: None,
         }
     };
     let post = async |person: &mut Browser, body: &AccountKeySetup| {
@@ -178,7 +215,21 @@ async fn a_key_is_set_once_from_a_fresh_session_with_a_signed_wrap_of_ones_own_p
         Err((401, "reauth-required".to_string()))
     );
     person.log_in().await.unwrap();
+    let elsewhere = AccountKeySetup {
+        prf_salt: Some(Bytes32([9; 32])),
+        ..body.clone()
+    };
+    assert_eq!(
+        post(&mut person, &elsewhere).await,
+        Err((400, "bad-salt".to_string()))
+    );
+    set_salt(&test, &credential, [7; 32]);
+    let body = AccountKeySetup {
+        prf_salt: Some(Bytes32(hub_prf_salt())),
+        ..body
+    };
     assert_eq!(post(&mut person, &body).await, Ok(()));
+    assert_eq!(salt_of(&mut person, &credential).await, hub_prf_salt());
     assert_eq!(person.account().await.unwrap().key, Some(key));
     let (other, _, wrapped, signature) = wrap_for(&account, &credential, 1);
     assert_eq!(
@@ -242,6 +293,7 @@ async fn a_wrapper_needs_the_account_signature_its_key_version_and_a_passkey_of_
         key_version: version,
         wrapped: URL_SAFE_NO_PAD.encode(&wrapped),
         signature: Bytes64(signature),
+        prf_salt: None,
     };
     assert_eq!(
         put(&mut person, &credential, &body(1, forged)).await,
@@ -315,4 +367,102 @@ async fn a_device_without_prf_signs_in_but_holds_no_key() {
         boards[0].board,
         Err(kebbie_hub_fakes::browser::BoardProblem::NotSealedToTheAccount)
     ));
+}
+
+#[tokio::test]
+async fn new_passkeys_get_the_hub_salt_and_a_wrapper_moves_an_old_salt_onto_it() {
+    let test = start_hub(|_| {}).await;
+    let fresh: CreationCeremony = browser(&test)
+        .post(
+            "/v1/a/register/begin",
+            &RegisterBegin {
+                invite: test.hub.mint_invite().unwrap(),
+                ..RegisterBegin::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(fresh.prf_salt.0, hub_prf_salt());
+    let mut person = member(&test).await;
+    let added: CreationCeremony = person.post("/v1/a/passkeys/begin", &()).await.unwrap();
+    assert_eq!(added.prf_salt.0, hub_prf_salt());
+
+    let key = person.account_key().unwrap().clone();
+    let (signing, encryption) = person.account_secret().unwrap();
+    let secret = SecretKeys::from_bytes(signing, encryption);
+    let credential = person.last_credential.clone().unwrap();
+    let mut stranger = member(&test).await;
+    let theirs = stranger.last_credential.clone().unwrap();
+    let old = [7; 32];
+    set_salt(&test, &credential, old);
+    set_salt(&test, &theirs, old);
+    assert_eq!(salt_of(&mut person, &credential).await, old);
+    let rewrap = |credential: &[u8], prf_salt: Option<[u8; 32]>| {
+        let wrapped = Unlock {
+            account: &key.account,
+            credential,
+            version: key.version,
+            prf_output: &[4; 32],
+            salt: &hub_prf_salt(),
+        }
+        .wrap(&secret)
+        .unwrap();
+        WrapperUpload {
+            key_version: key.version,
+            wrapped: URL_SAFE_NO_PAD.encode(&wrapped),
+            signature: Bytes64(sign_wrapper(&secret, &key, credential, &wrapped).unwrap()),
+            prf_salt: prf_salt.map(Bytes32),
+        }
+    };
+    let put = async |person: &mut Browser, credential: &[u8], body: &WrapperUpload| {
+        person
+            .put::<_, Option<()>>(
+                &format!(
+                    "/v1/a/passkeys/{}/wrapper",
+                    URL_SAFE_NO_PAD.encode(credential)
+                ),
+                body,
+            )
+            .await
+            .map(drop)
+            .map_err(hub_code)
+    };
+
+    assert_eq!(
+        put(
+            &mut person,
+            &credential,
+            &rewrap(&credential, Some([9; 32]))
+        )
+        .await,
+        Err((400, "bad-salt".to_string()))
+    );
+    assert_eq!(
+        put(&mut person, &theirs, &rewrap(&theirs, Some(hub_prf_salt()))).await,
+        Err((404, "unknown-passkey".to_string()))
+    );
+    assert_eq!(
+        salt_of(&mut stranger, &theirs).await,
+        old,
+        "another account's salt stays"
+    );
+    assert_eq!(
+        put(&mut person, &credential, &rewrap(&credential, None)).await,
+        Ok(())
+    );
+    assert_eq!(
+        salt_of(&mut person, &credential).await,
+        old,
+        "no salt named, none changed"
+    );
+    assert_eq!(
+        put(
+            &mut person,
+            &credential,
+            &rewrap(&credential, Some(hub_prf_salt()))
+        )
+        .await,
+        Ok(())
+    );
+    assert_eq!(salt_of(&mut person, &credential).await, hub_prf_salt());
 }

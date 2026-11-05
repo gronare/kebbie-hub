@@ -15,10 +15,10 @@ pub mod vectors;
 
 pub use account::{
     ACCOUNT_COMMIT_DOMAIN, AccountFingerprints, AccountHandoff, AccountKey,
-    ENCRYPTION_FINGERPRINT_DOMAIN, FieldTooLong, ListedMachine, MACHINE_LIST_DOMAIN, MachineList,
+    ENCRYPTION_FINGERPRINT_DOMAIN, FieldTooLong, HUB_PRF_SALT_DOMAIN, ListedMachine, MACHINE_LIST_DOMAIN, MachineList,
     SIGNING_FINGERPRINT_DOMAIN, Unlock,
     WRAP_AD_DOMAIN, WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPED_LEN, WRAPPER_SIGN_DOMAIN, WrongAccountKey,
-    account_commitment, pin_account, sign_wrapper,
+    account_commitment, hub_prf_salt, pin_account, sign_wrapper,
     wrap_associated_data, wrap_key, wrapper_statement,
 };
 pub use alert::{Alert, AlertKind, AlertState};

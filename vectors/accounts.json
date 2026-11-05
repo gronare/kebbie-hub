@@ -61,6 +61,12 @@
       }
     ]
   },
+  "hub_prf_salt": {
+    "domain": "kebbie-hub prf salt v1",
+    "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+    "salt": "hVzZtm6z_D2YvHm-gs92gzscDhSyQt1mfzuODmaPHTE",
+    "wrap_key": "fo7lFfqJE8IbA1uP3XiDukwk28678Myj3pMq1wwRYiM"
+  },
   "key": {
     "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
     "keys": {

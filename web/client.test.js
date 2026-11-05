@@ -17,12 +17,15 @@ test("passkey options from the hub become the buffers WebAuthn takes", () => {
   assert.equal(requested.publicKey.extensions, undefined);
 });
 
-test("the credential's PRF salt goes into create() and each allowed credential's into get()", () => {
+test("the PRF salt goes into create(), into get() for any credential, or per allowed credential", () => {
   const created = creationOptions({ publicKey: { challenge: "AQID", user: { id: "BAU", name: "carl", displayName: "carl" } } }, "CwwN");
   assert.deepEqual([...created.publicKey.extensions.prf.eval.first], [11, 12, 13]);
-  const requested = requestOptions({ publicKey: { challenge: "BwgJ", allowCredentials: [{ type: "public-key", id: "Cg" }] } }, { Cg: "Dg8Q" });
+  const requested = requestOptions({ publicKey: { challenge: "BwgJ", allowCredentials: [{ type: "public-key", id: "Cg" }] } }, { byCredential: { Cg: "Dg8Q" } });
   assert.deepEqual(Object.keys(requested.publicKey.extensions.prf.evalByCredential), ["Cg"]);
   assert.deepEqual([...requested.publicKey.extensions.prf.evalByCredential.Cg.first], [14, 15, 16]);
+  assert.equal(requested.publicKey.extensions.prf.eval, undefined);
+  const any = requestOptions({ publicKey: { challenge: "BwgJ" } }, { first: "ERIT" });
+  assert.deepEqual(any.publicKey.extensions, { prf: { eval: { first: new Uint8Array([17, 18, 19]) } } });
   assert.equal(requestOptions({ publicKey: { challenge: "BwgJ" } }, {}).publicKey.extensions, undefined);
 });
 
