@@ -1194,11 +1194,20 @@ async function resumeBoards() {
   startFeed();
 }
 
+function watchShell(workers) {
+  const hadController = Boolean(workers.controller);
+  workers.addEventListener("controllerchange", () => hadController && location.reload());
+  workers
+    .register("/sw.js", { type: "module", scope: "/", updateViaCache: "none" })
+    .then((registration) => document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && registration.update().catch(() => {})))
+    .catch(() => {});
+}
+
 async function start() {
   if (pageMode) return startPage(root, { showBoard });
   if (!cryptoReady()) return render();
   showHint();
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { type: "module", scope: "/" }).catch(() => {});
+  if ("serviceWorker" in navigator) watchShell(navigator.serviceWorker);
   await forgetDeviceKeys();
   const params = new URLSearchParams(location.search);
   state.notice = githubErrorText(params.get("github_error"));
