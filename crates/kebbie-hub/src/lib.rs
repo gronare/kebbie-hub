@@ -15,6 +15,7 @@ mod machine;
 mod pairing;
 mod push;
 mod server;
+mod signin;
 pub mod store;
 mod wake;
 pub mod web;
@@ -35,7 +36,9 @@ use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
 
 pub use admin::{AccountSwitch, set_account_active};
-pub use auth::{AccountAuth, Anonymous, DEV_SESSION_COOKIE, SameOrigin, SESSION_COOKIE, digest, new_token};
+pub use auth::{AccountAuth, Anonymous, DEV_SESSION_COOKIE, FreshAccount, KeyAccount, SameOrigin, SESSION_COOKIE, SessionAuth, client_address, digest, new_token, passkey_required};
+pub use account::account_view;
+pub use signin::{KeylessSignIn, sign_in_without_key, sign_up_without_key};
 pub use error::ApiError;
 pub use github::{GITHUB_API_URL, GITHUB_WEB_URL, Secret};
 use github::GitHub;
@@ -75,6 +78,8 @@ pub type AccountEmailHook = Box<dyn Fn(&Store, &str, &str) -> store::Result<()> 
 pub struct Hooks {
     pub command_gate: Option<CommandGate>,
     pub account_email: Option<AccountEmailHook>,
+    // Set by an embedder that serves its own sign-in routes on the keyless-session seam; /v1/hub advertises it and a connect sign-up then needs one of those routes or GitHub, never a bare passkey.
+    pub email_sign_in: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -312,6 +317,7 @@ pub struct Hub {
     feeds: Mutex<HashMap<String, usize>>,
     command_gate: Option<CommandGate>,
     account_email: Option<AccountEmailHook>,
+    email_sign_in: bool,
     config: Config,
 }
 
@@ -342,7 +348,7 @@ impl Hub {
     }
 
     pub fn open_with(config: Config, command_gate: Option<CommandGate>) -> Result<Arc<Hub>, OpenError> {
-        Hub::open_with_hooks(config, Hooks { command_gate, account_email: None })
+        Hub::open_with_hooks(config, Hooks { command_gate, ..Hooks::default() })
     }
 
     pub fn open_with_hooks(config: Config, hooks: Hooks) -> Result<Arc<Hub>, OpenError> {
@@ -395,6 +401,7 @@ impl Hub {
             feeds: Mutex::new(HashMap::new()),
             command_gate: hooks.command_gate,
             account_email: hooks.account_email,
+            email_sign_in: hooks.email_sign_in,
             config,
         }))
     }
@@ -477,6 +484,10 @@ impl Hub {
             .setup_url
             .lock()
             .expect("the setup lock is never poisoned") = None;
+    }
+
+    pub fn email_sign_in(&self) -> bool {
+        self.email_sign_in
     }
 
     pub fn keeps_email(&self) -> bool {
@@ -567,7 +578,7 @@ impl Hub {
         }
     }
 
-    fn limit_anonymous(&self, address: &str) -> Result<(), ApiError> {
+    pub fn limit_anonymous(&self, address: &str) -> Result<(), ApiError> {
         self.limit(&format!("address:{address}"))
     }
 

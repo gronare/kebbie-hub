@@ -3,10 +3,12 @@ import { connectBlock, connectBlockText } from "./connect.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
-export const brand = `<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="mark-bg" width="32" height="32" rx="9" fill="#a8501f"/><g transform="translate(16 16) scale(0.66) translate(-16 -16)"><path d="M23 18V12.5A7.5 7.5 0 0 0 8 12.5A4.6 4.6 0 0 0 17.2 12.5" fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.41 22.55L17.30 25.20L14.41 27.85" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect class="mark-dot" x="20.5" y="20.8" width="5" height="8.8" fill="#ffffff"/></g></svg><b>kebbie hub</b></header>`;
-const heading = (title, lead) => `<h1 class="title">${esc(title)}</h1><p class="lead">${esc(lead)}</p>`;
-const warn = (text) => (text ? `<div class="center warn" role="alert">${esc(text)}</div>` : "");
-const disabled = (off) => (off ? " disabled" : "");
+export const brandMark = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="mark-bg" width="32" height="32" rx="9" fill="#a8501f"/><g transform="translate(16 16) scale(0.66) translate(-16 -16)"><path d="M23 18V12.5A7.5 7.5 0 0 0 8 12.5A4.6 4.6 0 0 0 17.2 12.5" fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.41 22.55L17.30 25.20L14.41 27.85" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect class="mark-dot" x="20.5" y="20.8" width="5" height="8.8" fill="#ffffff"/></g></svg>`;
+
+export const brand = `<header class="brand">${brandMark}<b>kebbie hub</b></header>`;
+export const heading = (title, lead) => `<h1 class="title">${esc(title)}</h1><p class="lead">${esc(lead)}</p>`;
+export const warn = (text) => (text ? `<div class="center warn" role="alert">${esc(text)}</div>` : "");
+export const disabled = (off) => (off ? " disabled" : "");
 const MACHINE_ICON = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg>`;
 
 export function lastSeenText(seconds, now = Date.now() / 1000) {
@@ -348,20 +350,21 @@ function emailState(address) {
   return address.sent ? `${address.email} · not confirmed yet. We sent a link; open it to confirm.` : `${address.email} · not confirmed`;
 }
 
-export function emailSection(address, busy = false) {
+export function emailSection(address, busy = false, codes = false) {
+  if (codes) return `<section class="task"><div class="name">Email</div><div class="meta${address?.verified ? " ok" : ""}">${esc(emailState({ ...address, sent: false }))}</div><div class="note-field"><label for="email">Change email</label><input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" value="${esc(address?.email ?? "")}"></div><button type="button" class="btn small" data-action="save-email"${disabled(busy)}>Send code</button></section>`;
   const remove = address?.email ? `<button type="button" class="link" data-action="remove-email"${disabled(busy)}>Remove email</button>` : "";
   return `<section class="task"><div class="name">Email</div><div class="meta${address?.verified ? " ok" : ""}">${esc(emailState(address))}</div>${emailField(address?.email ?? "")}<button type="button" class="btn small" data-action="save-email"${disabled(busy)}>Save email</button>${remove}</section>`;
 }
 
 const accountId = (id) => `<div class="row"><span class="mono">${esc(id)}</span><button type="button" class="btn small" data-action="copy-account" data-copy="${esc(id)}" aria-label="Copy account id">Copy</button></div>`;
 
-export function accountScreen({ me, github, email = false, address = null, notice = null, busy = false }) {
+export function accountScreen({ me, github, email = false, codes = false, address = null, notice = null, busy = false }) {
   const linked = me.github
     ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + accountId(me.account) + linked + (email ? emailSection(address, busy) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + accountId(me.account) + linked + (email ? emailSection(address, busy, codes) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {

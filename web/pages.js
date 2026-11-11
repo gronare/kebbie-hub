@@ -7,6 +7,7 @@ import { put, get } from "./store.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, connectScreen, esc, githubErrorText, nav, setupScreen, signupScreen } from "./screens.js";
+import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/account"];
 
@@ -47,7 +48,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -56,10 +57,15 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     draw();
   });
 
+  const liftKeyboard = keyboardLift();
   const render = (html) => {
     const inApp = path === "/account" && state.me;
-    const main = `<main class="screen page${inApp ? " in-app" : ""}">${html}</main>`;
+    const auth = isAuthScreen(html);
+    liftKeyboard(auth);
+    const focused = document.activeElement?.id && root.contains(document.activeElement) ? document.activeElement.id : null;
+    const main = `<main class="screen page${inApp ? " in-app" : ""}${auth ? " auth" : ""}">${html}</main>`;
     root.innerHTML = inApp ? `<div class="app">${nav({ active: "account", deskOnly: true })}${main}</div>` : main;
+    if (focused) document.getElementById(focused)?.focus({ preventScroll: true });
   };
 
   const fail = (error) => {
@@ -105,6 +111,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   const signInBlock = (purpose) => `${say(esc(purpose))}<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${state.notice ? say(esc(state.notice), "warn") : ""}`;
 
   const keepsEmail = () => Boolean(state.info?.email);
+  const emailSignIn = () => Boolean(state.info?.email_signin);
   const typedEmail = () => root.querySelector("#email")?.value.trim() ?? "";
 
   function setupPage() {
@@ -116,12 +123,21 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   }
 
   function connectPage() {
+    const name = state.view?.name ?? "this machine";
+    const shown = { notice: state.notice, busy: state.busy };
+    if (emailSignIn() && state.view && state.phase === "start" && passkeysSupported()) {
+      if (!state.me && state.codeFor) return codeScreen({ purpose: "connect", email: state.codeFor, name, ...shown });
+      if (!state.me) return connectEmailScreen({ name, code: state.view.code || code, github: Boolean(state.info?.github), email: state.typed, ...shown });
+      if (state.me.key_access === false && !state.me.key) return createPasskeyScreen({ who: signedInAs(state.me, state.address), ...shown });
+    }
     return connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), email: keepsEmail(), machines: state.machines, notice: state.notice, busy: state.busy, code });
   }
 
   function accountPage() {
+    if (!state.me && emailSignIn()) return top("Account") + say("Sign in to see your account.") + `<a class="btn primary" href="/?next=%2Faccount">Sign in</a>`;
     if (!state.me) return top("Account") + signInBlock("Sign in to see your account.");
-    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), address: state.address, notice: state.notice, busy: state.busy });
+    if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
+    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), address: state.address, notice: state.notice, busy: state.busy });
   }
 
   function draw() {
@@ -135,7 +151,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   async function loadView() {
     try {
       if (path === "/connect") await loadConnect();
-      if (path === "/account" && state.me && keepsEmail()) state.address = await account.email();
+      if (state.me && keepsEmail()) state.address = await account.email().catch(() => null);
     } catch (error) {
       state.view = null;
       state.notice = message(error);
@@ -230,7 +246,81 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     }
   }
 
+  async function emailStep(act) {
+    state.busy = true;
+    state.notice = null;
+    draw();
+    try {
+      await act();
+    } catch (error) {
+      state.notice = emailText(error);
+    } finally {
+      state.busy = false;
+    }
+    draw();
+  }
+
+  function sendCode() {
+    const typed = typedEmail();
+    const email = address(typed);
+    if (!email) {
+      state.notice = typed ? "That doesn't look like an email address." : "Type your email first.";
+      return draw();
+    }
+    state.typed = typed;
+    state.codeFor = email;
+    state.notice = null;
+    draw();
+    root.querySelector("#code")?.focus();
+    return account.askCode(email, code).catch((error) => {
+      state.codeFor = null;
+      state.notice = emailText(error);
+      draw();
+    });
+  }
+
+  function enterCode() {
+    const typed = typedCode(root.querySelector("#code")?.value);
+    if (typed.length !== 6) {
+      state.notice = "Type the 6 digits from the mail.";
+      return draw();
+    }
+    return emailStep(async () => {
+      const signed = await account.enterCode(state.codeFor, typed, code);
+      state.me = signed.account;
+      state.session = { state: "locked", me: state.me };
+      state.address = await account.email().catch(() => null);
+      state.codeFor = null;
+      await loadView();
+    });
+  }
+
+  function resendCode() {
+    if (state.emailStep) return emailStep(async () => void (await account.setEmail(state.emailStep.email)));
+    return emailStep(async () => void (await account.askCode(state.codeFor, code)));
+  }
+
+  function confirmEmail() {
+    const typed = typedCode(root.querySelector("#code")?.value);
+    if (typed.length !== 6) {
+      state.notice = "Type the 6 digits from the mail.";
+      return draw();
+    }
+    return emailStep(async () => {
+      state.address = await account.confirmEmail(typed);
+      state.emailStep = null;
+    });
+  }
+
   async function saveEmail(email) {
+    if (emailSignIn()) {
+      if (!email) return;
+      return emailStep(async () => {
+        const asked = await account.setEmail(email);
+        if (asked.verified) state.address = asked;
+        else state.emailStep = { email: asked.email };
+      });
+    }
     state.busy = true;
     state.notice = null;
     draw();
@@ -301,6 +391,16 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
       }
       if (action === "save-email" || action === "remove-email") return await saveEmail(action === "save-email" ? typedEmail() : "");
       if (action === "connect") return await connect();
+      if (action === "send-code") return sendCode();
+      if (action === "enter-code") return await enterCode();
+      if (action === "resend-code") return await resendCode();
+      if (action === "confirm-email") return await confirmEmail();
+      if (action === "other-email") {
+        state.codeFor = null;
+        state.emailStep = null;
+        state.notice = null;
+        return draw();
+      }
       if (action === "cancel") {
         await connectCalls.deny(code);
         state.phase = "cancelled";
@@ -311,6 +411,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     } catch (error) {
       fail(error);
     }
+  });
+
+  root.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !event.target.matches?.("#email, #code")) return;
+    event.preventDefault();
+    root.querySelector(".actions .btn.primary")?.click();
   });
 
   (async () => {

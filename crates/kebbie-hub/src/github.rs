@@ -20,7 +20,7 @@ use crate::account::{
 };
 use crate::auth::{Anonymous, SESSION_TOKEN_PREFIX, digest, new_token, random, session_cookie};
 use crate::error::ApiError;
-use crate::store::{Ceremony, GitHubSignUp, Purpose, SignUpOutcome, Ticket};
+use crate::store::{Access, Ceremony, KeylessSignUp, Purpose, SignUpOutcome, Ticket};
 use crate::{Hub, clean_name, now};
 
 pub const GITHUB_API_URL: &str = "https://api.github.com";
@@ -464,7 +464,7 @@ fn sign_in_or_up(
             return Ok(Outcome::Refused("deactivated"));
         }
         store.set_github_login(&account, &user.login)?;
-        store.create_session(&digest(&session), &account, at, expires_at)?;
+        store.create_session(&digest(&session), &account, at, expires_at, Access::AccountOnly)?;
         return Ok(Outcome::SignedIn(account, session));
     }
     let Some(invite_hash) = &ceremony.invite_hash else {
@@ -475,14 +475,13 @@ fn sign_in_or_up(
         }));
     };
     let account = format!("{ACCOUNT_PREFIX}{}", new_id());
-    let outcome = store.sign_up_github(&GitHubSignUp {
+    let outcome = store.sign_up_keyless(&KeylessSignUp {
         invite_hash,
         connect: ceremony.purpose == Purpose::GitHubConnect,
         account: &account,
         handle: &generated_handle(),
         user_handle: *Uuid::new_v4().as_bytes(),
-        github_id: user.id,
-        github_login: &user.login,
+        github: Some((user.id, &user.login)),
         session_hash: &digest(&session),
         session_expires_at: expires_at,
         now: at,

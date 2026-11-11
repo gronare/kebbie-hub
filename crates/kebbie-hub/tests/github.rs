@@ -389,7 +389,7 @@ fn key_setup(account: &str, credential: &[u8]) -> AccountKeySetup {
 }
 
 #[tokio::test]
-async fn a_passkey_added_long_after_a_github_sign_in_still_makes_the_account_key() {
+async fn a_github_session_makes_no_key_until_its_first_passkey_and_that_passkey_may_long_after() {
     let github = fake_github().await;
     let test = github_hub(&github, |config| config.fresh_session_ttl = 1).await;
     let invite = test.hub.mint_invite().unwrap();
@@ -403,7 +403,7 @@ async fn a_passkey_added_long_after_a_github_sign_in_still_makes_the_account_key
     let stale = person
         .post::<_, Option<()>>("/v1/a/key", &key_setup(&account, b"not-mine"))
         .await;
-    assert_eq!(hub_code(stale.unwrap_err()), (401, "reauth-required".to_string()));
+    assert_eq!(hub_code(stale.unwrap_err()), (403, "passkey-required".to_string()));
 
     let added = person.add_passkey().await.unwrap();
     let credential = URL_SAFE_NO_PAD.decode(&added.passkey).unwrap();
@@ -680,6 +680,7 @@ async fn an_embedder_that_keeps_email_gets_the_verified_primary_address_from_git
             recorded.lock().unwrap().push((account.to_string(), email.to_string()));
             Ok(())
         })),
+        ..Hooks::default()
     };
     let url = github.url.clone();
     let test = start_hub_hooks(

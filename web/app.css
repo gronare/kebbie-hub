@@ -326,6 +326,44 @@ code { font: 500 13px var(--mono); background: var(--sel); color: var(--ink); pa
 button.link { border: 0; background: transparent; font: inherit; font-size: 14px; cursor: pointer; }
 .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
 .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+:root main.screen.auth { max-width: 480px; margin-inline: auto; min-height: var(--vvh, 100dvh); padding-bottom: calc(env(safe-area-inset-bottom) + 12px); display: flex; flex-direction: column; }
+.auth-intro, .auth-fields, .auth-actions, .auth-alt { display: flex; flex-direction: column; gap: 12px; }
+.auth-form { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding-top: 24px; }
+.auth-actions { padding-top: 12px; }
+.auth-actions .foot, .auth-actions .links { margin: 0; }
+.auth-actions .links .link, .auth-actions .foot .link.inline { display: inline-flex; align-items: center; min-height: 44px; }
+.auth-actions .foot { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; column-gap: 4px; }
+.auth .note-field input { min-height: 48px; }
+.auth-art { flex: 1 1 0; min-height: 0; container-type: size; display: grid; place-items: center; pointer-events: none; }
+.art { display: grid; justify-items: center; gap: min(28px, 7cqh); width: min(260px, 80cqw); }
+.art .brand-mark { width: min(112px, 34cqh); height: min(112px, 34cqh); filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--accent) 14%, transparent)); }
+.art-rows { display: grid; gap: 8px; width: 100%; }
+.art-row { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.art-row:nth-child(2) { opacity: 0.7; }
+.art-row:nth-child(3) { opacity: 0.4; }
+.art-row i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.art-row:first-child i { background: var(--accent); }
+.art-row b { display: block; width: 58%; height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 28%, transparent); }
+.art-row:nth-child(2) b { width: 42%; }
+.art-row:nth-child(3) b { width: 66%; }
+.art-row:first-child b { background: color-mix(in srgb, var(--ink) 40%, transparent); }
+.art-row u { margin-left: auto; width: 26px; height: 12px; border-radius: 6px; background: var(--sel); }
+@container (max-height: 230px) { .art-rows { display: none; } }
+@container (max-height: 90px) { .art { display: none; } }
+:root.kb-open main.screen.auth { padding-bottom: 8px; }
+:root.kb-open .auth-form { flex: 1 0 auto; }
+:root.kb-open .auth-alt, :root.kb-open .auth-art { display: none; }
+:root.kb-open .auth-actions { padding-top: 8px; gap: 4px; }
+@media (max-height: 760px) { :root.kb-open main.screen.auth .auth-intro > .brand { display: none; } :root.kb-open main.screen.auth .title { margin-top: 4px; } }
+:root.pose-split main.screen.auth { max-width: none; margin: 0; display: grid; grid-template-columns: calc(50vw - env(safe-area-inset-left) - 40px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 48px; align-items: stretch; }
+:root.pose-split .auth-intro { align-self: start; }
+:root.pose-split .auth-art { grid-column: 1; grid-row: 1 / span 2; align-self: stretch; margin-top: calc(-1 * (env(safe-area-inset-top) + 14px)); margin-bottom: calc(-1 * (env(safe-area-inset-bottom) + 12px)); }
+:root.pose-split .auth-intro, :root.pose-split .auth-form { grid-column: 2; }
+:root.pose-split .art { width: min(300px, 70cqw); }
+:root.pose-split .art .brand-mark { width: min(132px, 22cqh); height: min(132px, 22cqh); }
+.links { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 4px; }
+.note-field input.code-entry { font: 500 26px var(--mono); letter-spacing: 0.45em; text-align: center; padding: 12px 12px 12px calc(12px + 0.45em); }
+.note-field input.code-entry::placeholder { color: var(--line); }
 .row-start { display: flex; align-items: center; gap: 12px; }
 .icon { width: 28px; height: 28px; flex: none; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .code.peach { color: var(--peach); padding: 12px 0 6px; }

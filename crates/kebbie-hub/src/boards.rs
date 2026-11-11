@@ -6,14 +6,14 @@ use axum::http::StatusCode;
 use kebbie_hub_api::{BoardEntry, Boards, Bytes64, SignedMachineList};
 use kebbie_hub_protocol::{Envelope, Id};
 
-use crate::auth::{AccountAuth, FreshAccount, SameOrigin};
+use crate::auth::{FreshAccount, KeyAccount, SameOrigin};
 use crate::error::ApiError;
 use crate::store::ListWrite;
 use crate::{Hub, now};
 
 pub async fn boards(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
 ) -> Result<Json<Boards>, ApiError> {
     let reader = Id::parse(&account).map_err(|_| ApiError::internal())?;
     let (stored, list) = {
@@ -54,7 +54,7 @@ pub async fn boards(
 pub async fn put_machines(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Json(request): Json<SignedMachineList>,
 ) -> Result<StatusCode, ApiError> {
     let mut store = hub.store();

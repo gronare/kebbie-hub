@@ -422,6 +422,13 @@ pub struct AccountView {
     pub github: Option<String>,
     #[serde(default)]
     pub key: Option<AccountKey>,
+    // False for a session email or GitHub opened: it reaches the account, and what needs the account key waits for a passkey.
+    #[serde(default = "key_access_default")]
+    pub key_access: bool,
+}
+
+fn key_access_default() -> bool {
+    true
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -444,6 +451,9 @@ pub struct HubInfo {
     // Set when the embedding service keeps account email and serves /v1/a/email.
     #[serde(default)]
     pub email: bool,
+    // Set when the embedding service signs people in by email code; a new account from `kebbie hub connect` then starts with an email or GitHub.
+    #[serde(default)]
+    pub email_signin: bool,
 }
 
 pub const MAX_EMAIL_CHARS: usize = 254;
@@ -765,12 +775,18 @@ mod tests {
 
     #[test]
     fn released_kebbie_still_reads_a_hub_info_that_advertises_email() {
-        let info = HubInfo { signup: SignupMode::Open, plans: true, needs_setup: false, github: true, commands: true, email: true };
+        let info = HubInfo { signup: SignupMode::Open, plans: true, needs_setup: false, github: true, commands: true, email: true, email_signin: true };
         let json = serde_json::to_string(&info).unwrap();
-        assert!(json.contains("\"email\":true"), "{json}");
+        assert!(json.contains("\"email\":true") && json.contains("\"email_signin\":true"), "{json}");
         let released: ReleasedHubInfo = serde_json::from_str(&json).unwrap();
         assert!(released.plans && released.github);
         let older: HubInfo = serde_json::from_str(r#"{"signup":"invite","plans":false,"needs_setup":true}"#).unwrap();
-        assert!(!older.email);
+        assert!(!older.email && !older.email_signin);
+    }
+
+    #[test]
+    fn an_account_view_without_key_access_reads_as_a_passkey_session() {
+        let view: AccountView = serde_json::from_str(r#"{"account":"acc_x","handle":"k1","created_at":1}"#).unwrap();
+        assert!(view.key_access);
     }
 }

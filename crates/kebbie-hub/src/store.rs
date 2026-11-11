@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     token_hash BLOB PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
+    expires_at INTEGER NOT NULL,
+    keyless INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS ceremonies (
     id_hash BLOB PRIMARY KEY,
@@ -368,6 +369,14 @@ impl Store {
         let tx = connection.transaction()?;
         if fresh {
             tx.execute_batch(SCHEMA)?;
+        }
+        let marked: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'keyless')",
+            [],
+            |row| row.get(0),
+        )?;
+        if !marked {
+            tx.execute_batch("ALTER TABLE sessions ADD COLUMN keyless INTEGER NOT NULL DEFAULT 0")?;
         }
         tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         tx.commit()?;
@@ -1775,14 +1784,14 @@ impl Store {
             ],
         )?;
         tx.execute(
-            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at, keyless) VALUES (?1, ?2, ?3, ?4, 0)",
             params![signup.session_hash, signup.account, signup.now, signup.session_expires_at],
         )?;
         tx.commit()?;
         Ok(SignUpOutcome::Created(kind))
     }
 
-    pub fn sign_up_github(&mut self, signup: &GitHubSignUp<'_>) -> Result<SignUpOutcome> {
+    pub fn sign_up_keyless(&mut self, signup: &KeylessSignUp<'_>) -> Result<SignUpOutcome> {
         let tx = self.connection.transaction()?;
         let Some(kind) = spend_ticket(&tx, signup.invite_hash, signup.connect, signup.now)? else {
             return Ok(SignUpOutcome::InviteSpent);
@@ -1790,14 +1799,17 @@ impl Store {
         if handle_held(&tx, signup.handle)? {
             return Ok(SignUpOutcome::HandleTaken);
         }
-        let linked: bool = tx.query_row(
-            "SELECT EXISTS (SELECT 1 FROM accounts WHERE github_id = ?1)",
-            [signup.github_id],
-            |row| row.get(0),
-        )?;
-        if linked {
-            return Ok(SignUpOutcome::GitHubTaken);
+        if let Some((github_id, _)) = signup.github {
+            let linked: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM accounts WHERE github_id = ?1)",
+                [github_id],
+                |row| row.get(0),
+            )?;
+            if linked {
+                return Ok(SignUpOutcome::GitHubTaken);
+            }
         }
+        let (github_id, github_login) = signup.github.unzip();
         tx.execute(
             "INSERT INTO accounts (id, handle, user_handle, created_at, role, github_id, github_login, created_via)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -1807,13 +1819,13 @@ impl Store {
                 signup.user_handle.to_vec(),
                 signup.now,
                 role_of(kind),
-                signup.github_id,
-                signup.github_login,
+                github_id,
+                github_login,
                 kind.created_via()
             ],
         )?;
         tx.execute(
-            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at, keyless) VALUES (?1, ?2, ?3, ?4, 1)",
             params![signup.session_hash, signup.account, signup.now, signup.session_expires_at],
         )?;
         tx.commit()?;
@@ -1972,27 +1984,34 @@ impl Store {
         account: &str,
         now: u64,
         expires_at: u64,
+        access: Access,
     ) -> Result<()> {
         self.connection.execute(
-            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
-            params![token_hash, account, now, expires_at],
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at, keyless) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![token_hash, account, now, expires_at, access == Access::AccountOnly],
         )?;
         Ok(())
     }
 
     pub fn session_account(&self, token_hash: &[u8], now: u64) -> Result<Option<String>> {
-        Ok(self.session(token_hash, now)?.map(|(account, _)| account))
+        Ok(self.session(token_hash, now)?.map(|session| session.account))
     }
 
-    pub fn session(&self, token_hash: &[u8], now: u64) -> Result<Option<(String, u64)>> {
+    pub fn session(&self, token_hash: &[u8], now: u64) -> Result<Option<Session>> {
         self.connection
             .query_row(
-                "SELECT sessions.account_id, sessions.created_at FROM sessions
+                "SELECT sessions.account_id, sessions.created_at, sessions.keyless FROM sessions
                  JOIN accounts ON accounts.id = sessions.account_id
                  WHERE sessions.token_hash = ?1 AND sessions.expires_at > ?2
                      AND accounts.deactivated_at IS NULL",
                 params![token_hash, now],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| {
+                    Ok(Session {
+                        account: row.get(0)?,
+                        signed_in_at: row.get(1)?,
+                        access: if row.get(2)? { Access::AccountOnly } else { Access::Key },
+                    })
+                },
             )
             .optional()
     }
@@ -2003,6 +2022,15 @@ impl Store {
             params![token_hash, now],
         )?;
         Ok(())
+    }
+
+    // Only the passkey that becomes an account's first key holder lifts its session; an account with a key stays as it was.
+    pub fn grant_key_access(&self, token_hash: &[u8], account: &str, now: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE sessions SET keyless = 0, created_at = ?3 WHERE token_hash = ?1 AND account_id = ?2 AND expires_at > ?3
+                 AND NOT EXISTS (SELECT 1 FROM account_keys WHERE account_id = ?2)",
+            params![token_hash, account, now],
+        )? > 0)
     }
 
     pub fn end_session(&self, token_hash: &[u8]) -> Result<()> {
@@ -2518,14 +2546,26 @@ pub enum SignUpOutcome {
     GitHubTaken,
 }
 
-pub struct GitHubSignUp<'a> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Access {
+    Key,
+    AccountOnly,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Session {
+    pub account: String,
+    pub signed_in_at: u64,
+    pub access: Access,
+}
+
+pub struct KeylessSignUp<'a> {
     pub invite_hash: &'a [u8],
     pub connect: bool,
     pub account: &'a str,
     pub handle: &'a str,
     pub user_handle: [u8; 16],
-    pub github_id: u64,
-    pub github_login: &'a str,
+    pub github: Option<(u64, &'a str)>,
     pub session_hash: &'a [u8],
     pub session_expires_at: u64,
     pub now: u64,

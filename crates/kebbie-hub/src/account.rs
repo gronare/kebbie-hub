@@ -28,12 +28,13 @@ use webauthn_rs_proto::{
 };
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, SESSION_TOKEN_PREFIX,
-    SETUP_TOKEN_PREFIX, SameOrigin, digest, new_token, random, session_cookie,
+    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, KeyAccount, SESSION_TOKEN_PREFIX,
+    SETUP_TOKEN_PREFIX, SameOrigin, SessionAuth, digest, new_token, passkey_required, random,
+    session_cookie,
 };
 use crate::error::ApiError;
 use crate::store::{
-    Ceremony, DeviceListWrite, GitHubUnlink, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey,
+    Access, Ceremony, DeviceListWrite, GitHubUnlink, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey,
     Ticket,
 };
 use crate::{Hub, clean_name, now};
@@ -93,7 +94,7 @@ pub(crate) fn session_set_cookie(hub: &Hub, token: &str, max_age: u64) -> String
     format!("{name}={token}; Path=/; Max-Age={max_age}; HttpOnly;{secure} SameSite=Strict")
 }
 
-fn with_session<T>(hub: &Hub, token: &str, body: T) -> WithCookie<T> {
+pub(crate) fn with_session<T>(hub: &Hub, token: &str, body: T) -> WithCookie<T> {
     (
         AppendHeaders([(
             SET_COOKIE,
@@ -124,7 +125,7 @@ fn unlocking(hub: &Hub, credential: &[u8], prf_salt: [u8; 32]) -> Result<Unlocki
 
 fn signed_in(hub: &Hub, account: &str, credential: &[u8], prf_salt: [u8; 32]) -> Result<SignedIn, ApiError> {
     Ok(SignedIn {
-        account: account_view(hub, account)?,
+        account: account_view(hub, account, Access::Key)?,
         unlock: unlocking(hub, credential, prf_salt)?,
     })
 }
@@ -152,7 +153,7 @@ fn wrapped_of(text: &str) -> Result<Vec<u8>, ApiError> {
         .ok_or(ApiError::bad_request("bad-wrapped"))
 }
 
-pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
+pub fn account_view(hub: &Hub, account: &str, access: Access) -> Result<AccountView, ApiError> {
     let row = hub
         .store()
         .account(account)?
@@ -165,6 +166,7 @@ pub fn account_view(hub: &Hub, account: &str) -> Result<AccountView, ApiError> {
         created_at: row.created_at,
         owner: row.owner,
         github: row.github_login,
+        key_access: access == Access::Key,
     })
 }
 
@@ -218,6 +220,7 @@ pub async fn register_begin(
     hub.limit_anonymous(&client.address)?;
     let handle = generated_handle();
     let (purpose, invite_hash) = match &request.connect {
+        Some(_) if hub.email_sign_in() => return Err(ApiError::forbidden("email-required")),
         Some(typed) => (Purpose::ConnectSignUp, connect_ticket(&hub, &request, typed)?),
         None => (Purpose::SignUp, checked_ticket(&hub, &request)?),
     };
@@ -513,6 +516,7 @@ pub async fn login_finish(
             &account,
             at,
             at + hub.config().session_ttl,
+            Access::Key,
         )?;
         store.log(at, "account.logged-in", None, None, Some(&account))?;
         if let Some(code_hash) = &ceremony.invite_hash {
@@ -558,21 +562,32 @@ pub async fn hub_info(
         github: hub.github().is_some(),
         commands: hub.config().commands,
         email: hub.keeps_email(),
+        email_signin: hub.email_sign_in(),
     }))
 }
 
 pub async fn account(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    SessionAuth(session): SessionAuth,
 ) -> Result<Json<AccountView>, ApiError> {
-    Ok(Json(account_view(&hub, &account)?))
+    Ok(Json(account_view(&hub, &session.account, session.access)?))
+}
+
+// A session without key access may add only the passkey that becomes the account's first key holder.
+fn may_add_passkey(hub: &Hub, session: &crate::store::Session) -> Result<(), ApiError> {
+    if session.access == Access::AccountOnly && hub.store().account_key(&session.account)?.is_some() {
+        return Err(passkey_required());
+    }
+    Ok(())
 }
 
 pub async fn passkey_begin(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    SessionAuth(session): SessionAuth,
 ) -> Result<Json<CreationCeremony>, ApiError> {
+    may_add_passkey(&hub, &session)?;
+    let account = session.account;
     let (row, existing) = {
         let store = hub.store();
         let row = store
@@ -614,10 +629,11 @@ pub async fn passkey_begin(
 pub async fn passkey_finish(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    SessionAuth(session): SessionAuth,
     headers: HeaderMap,
     Json(request): Json<RegisterFinish>,
 ) -> Result<Json<PasskeyView>, ApiError> {
+    let account = session.account.clone();
     let name = optional_name(request.name.as_deref())?;
     let ceremony = take_ceremony(&hub, &request.ceremony, &[Purpose::AddPasskey])?;
     if ceremony.account.as_deref() != Some(account.as_str()) {
@@ -632,6 +648,13 @@ pub async fn passkey_finish(
     let credential_id: &[u8] = passkey.cred_id().as_ref();
     let at = now();
     let store = hub.store();
+    let token = session_cookie(&hub, &headers).map(digest);
+    if session.access == Access::AccountOnly {
+        let first = store.account_key(&account)?.is_none() && token.is_some();
+        if !first {
+            return Err(passkey_required());
+        }
+    }
     if !store.add_passkey(
         &account,
         credential_id,
@@ -642,8 +665,12 @@ pub async fn passkey_finish(
     )? {
         return Err(ApiError::conflict("passkey-taken"));
     }
-    if let Some(token) = session_cookie(&hub, &headers) {
-        store.refresh_session(&digest(token), at)?;
+    if let Some(token) = &token {
+        if session.access == Access::AccountOnly {
+            store.grant_key_access(token, &account, at)?;
+        } else {
+            store.refresh_session(token, at)?;
+        }
     }
     store.log(at, "passkey.added", None, None, Some(&account))?;
     Ok(Json(PasskeyView {
@@ -671,7 +698,7 @@ pub async fn passkeys(
 pub async fn remove_passkey(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let credential_id = URL_SAFE_NO_PAD
@@ -776,7 +803,7 @@ pub async fn set_wrapper(
 pub async fn register_device(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Json(request): Json<DeviceRequest>,
 ) -> Result<Json<DeviceRegistered>, ApiError> {
     let name = optional_name(request.name.as_deref())?;
@@ -798,7 +825,7 @@ pub async fn register_device(
 
 pub async fn devices(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
 ) -> Result<Json<Devices>, ApiError> {
     let devices = hub
         .store()
@@ -818,7 +845,7 @@ pub async fn devices(
 pub async fn remove_device(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let device = Id::parse(&id).map_err(|_| ApiError::not_found())?;
@@ -842,7 +869,7 @@ pub async fn remove_device(
 
 pub async fn device_list(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
 ) -> Result<Json<DeviceListView>, ApiError> {
     Ok(Json(signed_device_list(&hub, &account)?))
 }

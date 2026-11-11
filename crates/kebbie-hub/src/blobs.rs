@@ -7,7 +7,7 @@ use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use axum::response::{IntoResponse, Response};
 use kebbie_hub_protocol::{BLOB_OVERHEAD, Id, Prefix};
 
-use crate::auth::{AccountAuth, MachineAuth};
+use crate::auth::{KeyAccount, MachineAuth};
 use crate::error::ApiError;
 use crate::store::BlobWrite;
 use crate::{Hub, now};
@@ -49,7 +49,7 @@ pub async fn put_blob(
 
 pub async fn blob(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Path(id): Path<String>,
 ) -> Result<Response, ApiError> {
     let id = blob_id(&id).ok_or_else(ApiError::not_found)?;

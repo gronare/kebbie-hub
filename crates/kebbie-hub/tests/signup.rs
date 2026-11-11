@@ -23,7 +23,8 @@ async fn a_fresh_hub_is_claimed_only_with_its_setup_link() {
             needs_setup: true,
             github: false,
             commands: true,
-            email: false
+            email: false,
+            email_signin: false
         }
     );
     let token = setup.split_once("token=").unwrap().1.to_string();

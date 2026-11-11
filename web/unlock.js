@@ -215,7 +215,7 @@ export async function addFirstPasskey(hub, me, name, storage = localStore(), sto
   const begun = await hub.account.passkeyBegin();
   const created = await hub.credentials.create(creationOptions(begun.options, begun.prf_salt, passkeyName(me)));
   const added = await hub.account.passkeyFinish(begun.ceremony, registrationJSON(created), name);
-  const signedIn = { ...me, unlock: { credential: added.passkey, prf_salt: begun.prf_salt, wrapped: null } };
+  const signedIn = { ...me, key_access: true, unlock: { credential: added.passkey, prf_salt: begun.prf_salt, wrapped: null } };
   return unlockAfter(hub, { signedIn, prf: prfOutput(created), salt: begun.prf_salt }, storage, store);
 }
 

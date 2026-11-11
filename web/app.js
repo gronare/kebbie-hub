@@ -11,6 +11,7 @@ import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage } from "./pages.js";
+import { addEmailScreen, address, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
@@ -21,7 +22,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, device: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), devices: null, pro: { busy: false, error: null }, refused: null };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, device: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), devices: null, pro: { busy: false, error: null }, refused: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
 const cameraAtBottom = () => globalThis.screen?.orientation?.angle === (Math.max(innerWidth, innerHeight) > 800 ? 90 : 270);
@@ -416,6 +417,29 @@ function lockedScreen() {
   return top("kebbie") + `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div><button type="button" class="btn primary" data-action="other-passkey">Try another passkey</button>${message}`;
 }
 
+const emailSignIn = () => Boolean(state.info?.email_signin);
+const liftKeyboard = keyboardLift();
+
+function signedOutScreen() {
+  const shown = { notice: state.notice, busy: state.busy };
+  const step = signedOutStep({ info: state.info, remembered: rememberedCredential(), ...state.signin });
+  if (step === "code") return codeScreen({ purpose: "sign-in", email: state.signin.email, code: state.draft.code, ...shown });
+  if (step === "passkey") return passkeySignInScreen(shown);
+  if (step === "email") return emailSignInScreen({ github: Boolean(state.info?.github), email: state.draft.email ?? state.signin.email, next: onward, ...shown });
+  return signInScreen({ github: Boolean(state.info?.github), notice: state.notice, next: onward });
+}
+
+const signedInWaits = () => signedInStep({ info: state.info, me: state.me, session: state.session, address: state.address, emailStep: state.emailStep });
+
+function signedInScreen(step) {
+  const shown = { notice: state.notice, busy: state.busy };
+  const who = signedInAs(state.me, state.address);
+  if (step === "unlock") return keylessUnlockScreen({ who, ...shown });
+  if (step === "create-passkey") return createPasskeyScreen({ who, ...shown });
+  if (step === "confirm-email") return codeScreen({ purpose: "confirm", email: state.emailStep.email, code: state.draft.code, ...shown });
+  return addEmailScreen({ email: state.draft.email ?? state.address?.email ?? "", ...shown });
+}
+
 function unsupportedScreen() {
   return top("kebbie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519, HKDF and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
 }
@@ -427,7 +451,8 @@ function render() {
   let html;
   if (!cryptoReady()) html = unsupportedScreen();
   else if (state.unlocking) html = unlockingScreen();
-  else if (!state.me) html = signInScreen({ github: Boolean(state.info?.github), notice: state.notice, next: onward });
+  else if (!state.me) html = signedOutScreen();
+  else if (signedInWaits()) html = signedInScreen(signedInWaits());
   else if (state.session?.state !== "unlocked") html = lockedScreen();
   else if (name === "questions") html = shell("questions", questionsScreen());
   else if (name === "machines") html = shell("machines", machinesScreen());
@@ -436,7 +461,9 @@ function render() {
   else if (name === "section") html = sectionRoute(params[0]);
   else html = boardRoute();
   const focused = document.activeElement?.id && root.contains(document.activeElement) ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
-  root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen">${html}</main>`;
+  const auth = isAuthScreen(html);
+  liftKeyboard(auth);
+  root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`;
   const refocus = focused ? document.getElementById(focused.id) : null;
   if (refocus) {
     refocus.focus({ preventScroll: true });
@@ -750,6 +777,9 @@ function signedOut(message) {
   following = null;
   state.me = null;
   state.session = null;
+  state.address = null;
+  state.emailStep = null;
+  state.signin = { step: "email", email: "", chosen: false };
   state.opened = [];
   state.marks = emptyMarks();
   state.notice = message;
@@ -802,6 +832,7 @@ async function entered(unlock) {
   state.me = state.session.me;
   if (onward) return location.assign(onward);
   if (previous !== state.me.account) state.marks = emptyMarks();
+  if (emailSignIn()) state.address = await account.email().catch(() => null);
   state.notice = null;
   if (state.session.state !== "unlocked") return render();
   state.unlocking = true;
@@ -813,7 +844,7 @@ async function entered(unlock) {
 }
 
 async function startAutofill() {
-  if (state.me || !(await autofillAvailable())) return;
+  if (state.me || emailSignIn() || !(await autofillAvailable())) return;
   try {
     await unlocked(await signingIn.autofill());
   } catch (error) {
@@ -847,6 +878,115 @@ async function addPasskey() {
   } finally {
     state.busy = false;
   }
+}
+
+async function emailStep(act) {
+  state.busy = true;
+  state.notice = null;
+  render();
+  try {
+    await act();
+  } catch (error) {
+    state.notice = emailText(error);
+  } finally {
+    state.busy = false;
+  }
+  render();
+}
+
+const typedEmail = () => root.querySelector("#email")?.value.trim() ?? "";
+const freshSignIn = () => ({ step: "email", email: "", chosen: true });
+
+// The code field is shown and focused inside the tap, since iOS opens the keyboard only for a focus the tap itself makes.
+function focusCode() {
+  root.querySelector("#code")?.focus();
+}
+
+function sendCode() {
+  const email = address(typedEmail());
+  if (!email) {
+    state.notice = typedEmail() ? "That doesn't look like an email address." : "Type your email first.";
+    return render();
+  }
+  state.signin = { ...state.signin, step: "code", email };
+  state.draft.code = "";
+  state.notice = null;
+  render();
+  focusCode();
+  return account.askCode(email).catch((error) => {
+    state.signin = { ...state.signin, step: "email" };
+    state.notice = emailText(error);
+    render();
+  });
+}
+
+function enterCode() {
+  const code = typedCode(root.querySelector("#code")?.value);
+  if (code.length !== 6) {
+    state.notice = "Type the 6 digits from the mail.";
+    return render();
+  }
+  return emailStep(async () => {
+    const signed = await account.enterCode(state.signin.email, code);
+    if (onward) return location.assign(onward);
+    state.me = signed.account;
+    state.session = { state: "locked", me: state.me };
+    state.address = await account.email().catch(() => null);
+    state.signin = freshSignIn();
+    state.draft = { email: null, code: "" };
+  });
+}
+
+function resendCode() {
+  if (state.emailStep) return emailStep(async () => void (await account.setEmail(state.emailStep.email)));
+  return emailStep(async () => void (await account.askCode(state.signin.email)));
+}
+
+function otherEmail() {
+  state.notice = null;
+  if (state.emailStep) state.emailStep = null;
+  else state.signin = { ...state.signin, step: "email" };
+  render();
+}
+
+function addEmail() {
+  const email = address(typedEmail());
+  if (!email) {
+    state.notice = typedEmail() ? "That doesn't look like an email address." : "Type your email first.";
+    return render();
+  }
+  if (state.address?.verified && state.address.email === email) return;
+  state.emailStep = { email };
+  state.draft.code = "";
+  state.notice = null;
+  render();
+  focusCode();
+  return account.setEmail(email).then(
+    (asked) => {
+      if (!asked.verified) return;
+      state.address = asked;
+      state.emailStep = null;
+      render();
+    },
+    (error) => {
+      state.emailStep = null;
+      state.notice = emailText(error);
+      render();
+    },
+  );
+}
+
+function confirmEmail() {
+  const code = typedCode(root.querySelector("#code")?.value);
+  if (code.length !== 6) {
+    state.notice = "Type the 6 digits from the mail.";
+    return render();
+  }
+  return emailStep(async () => {
+    state.address = await account.confirmEmail(code);
+    state.emailStep = null;
+    state.draft = { email: null, code: "" };
+  });
 }
 
 function showBoard(session, name) {
@@ -903,7 +1043,18 @@ root.addEventListener("click", (event) => {
       localStorage.setItem("kebbie-hint-dismissed", "1");
     } catch {}
     render();
-  } else if (action === "sign-in") signInWithPasskey(rememberedCredential());
+  } else if (action === "send-code") sendCode();
+  else if (action === "enter-code") enterCode();
+  else if (action === "resend-code") resendCode();
+  else if (action === "other-email") otherEmail();
+  else if (action === "email-instead") {
+    state.signin = freshSignIn();
+    state.notice = null;
+    render();
+  } else if (action === "use-passkey") signInWithPasskey(null);
+  else if (action === "add-email") addEmail();
+  else if (action === "confirm-email") confirmEmail();
+  else if (action === "sign-in") signInWithPasskey(rememberedCredential());
   else if (action === "other-passkey") signInWithPasskey(null);
   else if (action === "add-passkey") addPasskey();
   else if (action === "not-now") {
@@ -919,6 +1070,8 @@ root.addEventListener("click", (event) => {
 });
 
 root.addEventListener("input", (event) => {
+  if (event.target.id === "email") state.draft.email = event.target.value;
+  if (event.target.id === "code") state.draft.code = event.target.value;
   const field = event.target.closest("textarea[data-draft]");
   const decided = field?.closest(".decide");
   if (!decided) return;
@@ -931,6 +1084,10 @@ root.addEventListener("input", (event) => {
 });
 
 root.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.target.matches?.("#email, #code")) {
+    event.preventDefault();
+    return root.querySelector(".actions .btn.primary")?.click();
+  }
   const pick = event.target.closest?.('[data-action="pick"]');
   if (!pick || (event.key !== "Enter" && event.key !== " ")) return;
   event.preventDefault();
@@ -1017,6 +1174,7 @@ async function start() {
   state.info = await account.hub().catch(() => null);
   state.me = await signedInAccount(account);
   if (state.me && onward) return location.assign(onward);
+  if (state.me && emailSignIn()) state.address = await account.email().catch(() => null);
   const kept = await keptUnlock(state.me);
   state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
   state.unlocking = Boolean(kept);

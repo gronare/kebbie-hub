@@ -15,7 +15,7 @@ use kebbie_hub_protocol::Id;
 use serde::Serialize;
 use tokio::sync::watch;
 
-use crate::auth::{AccountAuth, DeviceAuth};
+use crate::auth::{KeyAccount, DeviceAuth};
 use crate::error::ApiError;
 use crate::store::BoardHead;
 use crate::wake::{Subscription, account_key, device_key};
@@ -282,7 +282,7 @@ impl AccountFeed {
 
 pub async fn account_events(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ApiError> {
     let permit = hub
         .open_feed(&account_key(&account))

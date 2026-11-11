@@ -15,7 +15,7 @@ use kebbie_hub_protocol::{Id, Prefix};
 use serde::Deserialize;
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_CODE_PREFIX, FreshAccount, MACHINE_TOKEN_PREFIX, SameOrigin,
+    AccountAuth, Anonymous, DEVICE_CODE_PREFIX, FreshAccount, KeyAccount, MACHINE_TOKEN_PREFIX, SameOrigin,
     digest, new_token, random,
 };
 use crate::error::ApiError;
@@ -264,7 +264,7 @@ fn account_pairing(store: &Store, account: &str, id: &str) -> Result<Pairing, Ap
 
 pub async fn pairing(
     State(hub): State<Arc<Hub>>,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Path(id): Path<String>,
     Query(watch): Query<Watch>,
 ) -> Result<Json<PairingView>, ApiError> {
@@ -283,7 +283,7 @@ pub async fn pairing(
 pub async fn reveal(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
-    AccountAuth(account): AccountAuth,
+    KeyAccount(account): KeyAccount,
     Path(id): Path<String>,
     Json(reveal): Json<AccountReveal>,
 ) -> Result<Json<PairingView>, ApiError> {

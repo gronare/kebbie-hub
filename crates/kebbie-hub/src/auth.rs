@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::ApiError;
 use crate::limit::address_key;
+use crate::store::{Access, Session};
 use crate::{Hub, TrustedProxy};
 
 pub const MACHINE_TOKEN_PREFIX: &str = "khm_";
@@ -91,6 +92,11 @@ pub struct SameOrigin;
 
 pub struct FreshAccount(pub String);
 
+// A session a passkey opened; one from email or GitHub reaches the account but not what needs the account key.
+pub struct KeyAccount(pub String);
+
+pub struct SessionAuth(pub Session);
+
 pub struct Anonymous {
     pub address: String,
     pub bearer: Option<String>,
@@ -154,17 +160,45 @@ impl FromRequestParts<Arc<Hub>> for AccountAuth {
         parts: &mut Parts,
         hub: &Arc<Hub>,
     ) -> Result<AccountAuth, ApiError> {
-        let address = client_address(parts, hub);
-        hub.check_anonymous(&address)?;
-        let account = match session_cookie(hub, &parts.headers) {
-            Some(token) => hub.store().session_account(&digest(token), crate::now())?,
-            None => None,
-        };
-        let Some(account) = account else {
-            return Err(hub.refuse_anonymous(&address));
-        };
-        hub.limit(&format!("account:{account}"))?;
-        Ok(AccountAuth(account))
+        signed_in(parts, hub).map(|session| AccountAuth(session.account))
+    }
+}
+
+fn signed_in(parts: &Parts, hub: &Arc<Hub>) -> Result<Session, ApiError> {
+    let address = client_address(parts, hub);
+    hub.check_anonymous(&address)?;
+    let session = match session_cookie(hub, &parts.headers) {
+        Some(token) => hub.store().session(&digest(token), crate::now())?,
+        None => None,
+    };
+    let Some(session) = session else {
+        return Err(hub.refuse_anonymous(&address));
+    };
+    hub.limit(&format!("account:{}", session.account))?;
+    Ok(session)
+}
+
+pub fn passkey_required() -> ApiError {
+    ApiError::forbidden("passkey-required")
+}
+
+impl FromRequestParts<Arc<Hub>> for KeyAccount {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<KeyAccount, ApiError> {
+        let session = signed_in(parts, hub)?;
+        if session.access != Access::Key {
+            return Err(passkey_required());
+        }
+        Ok(KeyAccount(session.account))
+    }
+}
+
+impl FromRequestParts<Arc<Hub>> for SessionAuth {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<SessionAuth, ApiError> {
+        signed_in(parts, hub).map(SessionAuth)
     }
 }
 
@@ -175,24 +209,17 @@ impl FromRequestParts<Arc<Hub>> for FreshAccount {
         parts: &mut Parts,
         hub: &Arc<Hub>,
     ) -> Result<FreshAccount, ApiError> {
-        let address = client_address(parts, hub);
-        hub.check_anonymous(&address)?;
-        let at = crate::now();
-        let session = match session_cookie(hub, &parts.headers) {
-            Some(token) => hub.store().session(&digest(token), at)?,
-            None => None,
-        };
-        let Some((account, signed_in_at)) = session else {
-            return Err(hub.refuse_anonymous(&address));
-        };
-        hub.limit(&format!("account:{account}"))?;
-        if at.saturating_sub(signed_in_at) > hub.config().fresh_session_ttl {
+        let session = signed_in(parts, hub)?;
+        if session.access != Access::Key {
+            return Err(passkey_required());
+        }
+        if crate::now().saturating_sub(session.signed_in_at) > hub.config().fresh_session_ttl {
             return Err(ApiError::new(
                 axum::http::StatusCode::UNAUTHORIZED,
                 "reauth-required",
             ));
         }
-        Ok(FreshAccount(account))
+        Ok(FreshAccount(session.account))
     }
 }
 

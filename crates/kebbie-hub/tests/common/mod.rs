@@ -45,7 +45,7 @@ pub async fn start_hub_with(
     gate: Option<CommandGate>,
     extra: Router<Arc<Hub>>,
 ) -> TestHub {
-    start_hub_hooks(configure, Hooks { command_gate: gate, account_email: None }, extra).await
+    start_hub_hooks(configure, Hooks { command_gate: gate, ..Hooks::default() }, extra).await
 }
 
 pub async fn start_hub_hooks(
