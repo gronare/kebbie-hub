@@ -2,7 +2,7 @@ const decode = (value) => Uint8Array.fromBase64(value, { alphabet: "base64url", 
 const encode = (buffer) => new Uint8Array(buffer).toBase64({ alphabet: "base64url", omitPadding: true });
 const credentialList = (list) => list?.map((credential) => ({ ...credential, id: decode(credential.id) }));
 
-export const passkeyName = (me) => me?.github || "kebbie hub";
+export const passkeyName = (me, email = null) => email || me?.github || "kebbie hub";
 
 export function creationOptions(json, prfSalt = null, name = null) {
   const options = json.publicKey;
@@ -73,12 +73,19 @@ export function assertionJSON(credential) {
 }
 
 // Safari's promise may never settle, so it is not awaited.
-export function signalName(credential, me, rpId = globalThis.location?.hostname, platform = globalThis.PublicKeyCredential) {
+// iOS shows "Passkey Updated" on every signal, so a name is only sent when it differs from the last one sent.
+export function signalName(credential, me, rpId = globalThis.location?.hostname, platform = globalThis.PublicKeyCredential, email = null, store = globalThis.localStorage) {
   const userHandle = credential?.response?.userHandle;
   if (!userHandle || !rpId || typeof platform?.signalCurrentUserDetails !== "function") return;
-  const name = passkeyName(me);
+  const userId = encode(userHandle);
+  const name = passkeyName(me, email);
+  const key = `kebbie-passkey-name:${rpId}:${userId}`;
   try {
-    Promise.resolve(platform.signalCurrentUserDetails({ rpId, userId: encode(userHandle), name, displayName: name })).catch(() => {});
+    if (store?.getItem(key) === name) return;
+  } catch {}
+  try {
+    Promise.resolve(platform.signalCurrentUserDetails({ rpId, userId, name, displayName: name })).catch(() => {});
+    store?.setItem(key, name);
   } catch {}
 }
 

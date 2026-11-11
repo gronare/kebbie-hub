@@ -8,7 +8,7 @@ export class NoPasskeyOffered extends Error {
 }
 
 // A conditional request left pending blocks the next get(), so a new sign-in aborts the one before it.
-export function signInWith({ account, credentials, platform = globalThis.PublicKeyCredential }) {
+export function signInWith({ account, credentials, platform = globalThis.PublicKeyCredential, store = globalThis.localStorage }) {
   let pending = null;
   const run = async (request, mediation) => {
     pending?.abort();
@@ -25,7 +25,8 @@ export function signInWith({ account, credentials, platform = globalThis.PublicK
     }
     if (pending === controller) pending = null;
     const signedIn = await account.loginFinish(begun.ceremony, assertionJSON(credential));
-    signalName(credential, signedIn, begun.options.publicKey.rpId ?? undefined, platform);
+    const email = account.email ? await account.email().then((kept) => kept?.email ?? null, () => null) : null;
+    signalName(credential, signedIn, begun.options.publicKey.rpId ?? undefined, platform, email, store);
     return { signedIn, prf: prfOutput(credential), salt: begun.prf_salt ?? null };
   };
   return {

@@ -934,10 +934,11 @@ function clampScroll() {
   if (target !== null) scrollTo(0, target);
 }
 
-function remarkStrip() {
+// iOS can hand a home-screen app its strip inset after the first frame, at launch and when it returns from the background, without a resize event.
+function remarkStrip(settle = 1300) {
   resizedAt = performance.now();
   const polling = settleUntil > resizedAt;
-  settleUntil = resizedAt + 1300;
+  settleUntil = Math.max(settleUntil, resizedAt + settle);
   markStrip();
   if (polling) return;
   requestAnimationFrame(function poll() {
@@ -946,9 +947,10 @@ function remarkStrip() {
     if (performance.now() < settleUntil) requestAnimationFrame(poll);
   });
 }
-for (const event of ["resize", "orientationchange"]) addEventListener(event, remarkStrip);
+for (const event of ["resize", "orientationchange"]) addEventListener(event, () => remarkStrip());
+addEventListener("pageshow", () => remarkStrip(3000));
 addEventListener("scroll", () => performance.now() < settleUntil && clampScroll(), { passive: true });
-globalThis.screen?.orientation?.addEventListener?.("change", remarkStrip);
+globalThis.screen?.orientation?.addEventListener?.("change", () => remarkStrip());
 
 addEventListener("keydown", (event) => {
   if (pageMode || event.key !== "Escape") return;
@@ -958,7 +960,9 @@ addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") refresh();
+  if (document.visibilityState !== "visible") return;
+  remarkStrip(3000);
+  refresh();
 });
 
 function showHint() {
@@ -1003,4 +1007,5 @@ async function start() {
 }
 
 markStrip();
+remarkStrip(3000);
 start();

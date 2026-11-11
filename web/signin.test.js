@@ -96,8 +96,35 @@ test("a sign-in tells a browser with signalCurrentUserDetails the passkey's read
     loginFinish: async () => ({ account: "acc_1", handle: "kaca606abca3f", github: "octocat" }),
   };
   const credentials = { get: async () => assertion };
-  const { signedIn } = await signInWith({ account, credentials, platform }).withPasskey();
+  const { signedIn } = await signInWith({ account, credentials, platform, store: memoryStore() }).withPasskey();
   assert.equal(signedIn.github, "octocat");
   assert.deepEqual(signalled, [{ rpId: "hub.example.com", userId: "AQID", name: "octocat", displayName: "octocat" }]);
-  await assert.doesNotReject(signInWith({ account, credentials, platform: {} }).withPasskey());
+  await assert.doesNotReject(signInWith({ account, credentials, platform: {}, store: memoryStore() }).withPasskey());
 });
+
+test("a sign-in names the passkey after the account's email when the hub keeps one, and only says so when the name changed", async () => {
+  const signalled = [];
+  const platform = { signalCurrentUserDetails: (details) => (signalled.push(details.name), new Promise(() => {})) };
+  let kept = { email: "alice@example.com", verified: true, sent: false };
+  const account = {
+    loginBegin: async () => ({ ceremony: "c1", options: { publicKey: { challenge: "AAAA", rpId: "hub.example.com" } }, prf_salt: HUB_SALT }),
+    loginFinish: async () => ({ account: "acc_1", handle: "kaca606abca3f", github: "octocat" }),
+    email: async () => kept,
+  };
+  const credentials = { get: async () => assertion };
+  const store = memoryStore();
+  await signInWith({ account, credentials, platform, store }).withPasskey();
+  await signInWith({ account, credentials, platform, store }).withPasskey();
+  assert.deepEqual(signalled, ["alice@example.com"], "the second sign-in with the same name says nothing");
+  kept = { email: "alice@work.example.com", verified: false, sent: true };
+  await signInWith({ account, credentials, platform, store }).withPasskey();
+  assert.deepEqual(signalled, ["alice@example.com", "alice@work.example.com"]);
+  const noEmail = { ...account, email: async () => { throw new Error("404"); } };
+  await signInWith({ account: noEmail, credentials, platform, store: memoryStore() }).withPasskey();
+  assert.equal(signalled.at(-1), "octocat", "a hub without email falls back to the GitHub login");
+});
+
+function memoryStore() {
+  const map = new Map();
+  return { getItem: (key) => map.get(key) ?? null, setItem: (key, value) => map.set(key, String(value)) };
+}
