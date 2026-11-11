@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use axum::Router;
-use kebbie_hub::{CommandGate, Config, DEV_ORIGIN, Hub, serve_with};
+use kebbie_hub::{CommandGate, Config, DEV_ORIGIN, Hooks, Hub, serve_with};
 use kebbie_hub_api::{
     CreationCeremony, DeviceRegistered, DeviceRequest, LoginBegin, LoginFinish, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony,
@@ -45,11 +45,19 @@ pub async fn start_hub_with(
     gate: Option<CommandGate>,
     extra: Router<Arc<Hub>>,
 ) -> TestHub {
+    start_hub_hooks(configure, Hooks { command_gate: gate, account_email: None }, extra).await
+}
+
+pub async fn start_hub_hooks(
+    configure: impl FnOnce(&mut Config),
+    hooks: Hooks,
+    extra: Router<Arc<Hub>>,
+) -> TestHub {
     let data = tempfile::tempdir().unwrap();
     let mut config = Config::new(data.path());
     config.commands = true;
     configure(&mut config);
-    let hub = Hub::open_with(config, gate).unwrap();
+    let hub = Hub::open_with_hooks(config, hooks).unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let (stop, stopped) = oneshot::channel::<()>();

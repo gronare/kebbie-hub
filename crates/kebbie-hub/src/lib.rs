@@ -35,7 +35,7 @@ use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
 
 pub use admin::{AccountSwitch, set_account_active};
-pub use auth::{AccountAuth, Anonymous, DEV_SESSION_COOKIE, SESSION_COOKIE, digest, new_token};
+pub use auth::{AccountAuth, Anonymous, DEV_SESSION_COOKIE, SameOrigin, SESSION_COOKIE, digest, new_token};
 pub use error::ApiError;
 pub use github::{GITHUB_API_URL, GITHUB_WEB_URL, Secret};
 use github::GitHub;
@@ -67,6 +67,15 @@ pub struct Refusal {
 
 // Called with the store locked, so a gate reads through the Store it is given and never calls Hub::store.
 pub type CommandGate = Box<dyn Fn(&Store, &str) -> Result<(), Refusal> + Send + Sync>;
+
+// Set by an embedder that keeps account email and serves /v1/a/email; called with the store locked, an account and the verified primary address GitHub gave.
+pub type AccountEmailHook = Box<dyn Fn(&Store, &str, &str) -> store::Result<()> + Send + Sync>;
+
+#[derive(Default)]
+pub struct Hooks {
+    pub command_gate: Option<CommandGate>,
+    pub account_email: Option<AccountEmailHook>,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrustedProxy {
@@ -302,6 +311,7 @@ pub struct Hub {
     origin: String,
     feeds: Mutex<HashMap<String, usize>>,
     command_gate: Option<CommandGate>,
+    account_email: Option<AccountEmailHook>,
     config: Config,
 }
 
@@ -332,6 +342,10 @@ impl Hub {
     }
 
     pub fn open_with(config: Config, command_gate: Option<CommandGate>) -> Result<Arc<Hub>, OpenError> {
+        Hub::open_with_hooks(config, Hooks { command_gate, account_email: None })
+    }
+
+    pub fn open_with_hooks(config: Config, hooks: Hooks) -> Result<Arc<Hub>, OpenError> {
         let (webauthn, origin) = relying_party(&config.rp_id, &config.origin)?;
         check_subject(&config.vapid_subject).map_err(OpenError::Push)?;
         let vapid = Vapid::load_or_create(&config.vapid_key).map_err(OpenError::Push)?;
@@ -379,7 +393,8 @@ impl Hub {
             github,
             origin,
             feeds: Mutex::new(HashMap::new()),
-            command_gate,
+            command_gate: hooks.command_gate,
+            account_email: hooks.account_email,
             config,
         }))
     }
@@ -462,6 +477,19 @@ impl Hub {
             .setup_url
             .lock()
             .expect("the setup lock is never poisoned") = None;
+    }
+
+    pub fn keeps_email(&self) -> bool {
+        self.account_email.is_some()
+    }
+
+    pub(crate) fn verified_email(&self, account: &str, email: &str) {
+        let Some(hook) = &self.account_email else {
+            return;
+        };
+        if let Err(error) = hook(&self.store(), account, email) {
+            eprintln!("kebbie-hub: keeping {account}'s verified email failed: {error}");
+        }
     }
 
     pub fn has_command_gate(&self) -> bool {

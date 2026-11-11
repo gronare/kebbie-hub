@@ -441,6 +441,37 @@ pub struct HubInfo {
     pub github: bool,
     #[serde(default)]
     pub commands: bool,
+    // Set when the embedding service keeps account email and serves /v1/a/email.
+    #[serde(default)]
+    pub email: bool,
+}
+
+pub const MAX_EMAIL_CHARS: usize = 254;
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountEmail {
+    pub email: Option<String>,
+    pub verified: bool,
+    #[serde(default)]
+    pub sent: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmailUpdate {
+    pub email: String,
+}
+
+pub fn clean_email(text: &str) -> Option<String> {
+    let email = text.trim();
+    let (local, domain) = email.rsplit_once('@')?;
+    let valid = email.chars().count() <= MAX_EMAIL_CHARS
+        && !local.is_empty()
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && !email.chars().any(|char| char.is_control() || char.is_whitespace() || matches!(char, '<' | '>' | ',' | ';' | '"'));
+    valid.then(|| email.to_string())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -710,5 +741,36 @@ mod tests {
         assert_eq!(normalize_code("0l23-ZYXW").as_deref(), Some("0123-ZYXW"));
         assert_eq!(normalize_code("0123-ZYXU"), None);
         assert_eq!(normalize_code("0123-ZYX"), None);
+    }
+
+    #[test]
+    fn an_email_is_one_address_or_nothing() {
+        assert_eq!(clean_email(" ada@example.com ").as_deref(), Some("ada@example.com"));
+        for refused in ["", "ada", "@example.com", "ada@example", "ada@.com", "ada@example.", "a da@example.com", "Ada <ada@example.com>", "ada@example.com,bob@example.com", "ada@example.com\r\nBcc: x@y.z"] {
+            assert_eq!(clean_email(refused), None, "{refused}");
+        }
+        assert_eq!(clean_email(&format!("{}@example.com", "a".repeat(250))), None);
+    }
+
+    // The HubInfo released kebbie 0.37 parses, from kebbie-hub 8d64e3f: no deny_unknown_fields, so added fields pass.
+    #[derive(Deserialize)]
+    #[allow(dead_code)]
+    struct ReleasedHubInfo {
+        signup: SignupMode,
+        plans: bool,
+        needs_setup: bool,
+        #[serde(default)]
+        github: bool,
+    }
+
+    #[test]
+    fn released_kebbie_still_reads_a_hub_info_that_advertises_email() {
+        let info = HubInfo { signup: SignupMode::Open, plans: true, needs_setup: false, github: true, commands: true, email: true };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"email\":true"), "{json}");
+        let released: ReleasedHubInfo = serde_json::from_str(&json).unwrap();
+        assert!(released.plans && released.github);
+        let older: HubInfo = serde_json::from_str(r#"{"signup":"invite","plans":false,"needs_setup":true}"#).unwrap();
+        assert!(!older.email);
     }
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { acceptCount, accountScreen, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, accountScreen, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -177,8 +177,8 @@ test("the connect link after GitHub asks for a passkey first, and Not now says h
 
 test("the account page connects GitHub or removes it", () => {
   const linked = accountScreen({ me: { ...me, github: "octocat" }, github: true });
-  assert.equal(text(linked), "kebbie hub Account acc_1 GitHub Signed in with GitHub as octocat Remove Back to your boards");
-  assert.deepEqual(buttons(linked)[0], { label: "Remove", disabled: false });
+  assert.equal(text(linked), "kebbie hub Account acc_1 Copy GitHub Signed in with GitHub as octocat Remove Back to your boards");
+  assert.deepEqual(buttons(linked)[1], { label: "Remove", disabled: false });
   const unlinked = accountScreen({ me, github: true });
   assert.deepEqual(hrefs(unlinked)[0], { label: "Connect GitHub", href: "/auth/github?link=1&next=%2Faccount" });
   assert.doesNotMatch(text(accountScreen({ me, github: false })), /GitHub/);
@@ -352,4 +352,31 @@ test("a signed-in visitor whose boards are locked is told they are signed in and
   const signedOut = text(signInScreen({ github: false }));
   assert.doesNotMatch(signedOut, /You're signed in|Unlock/);
   assert.match(signedOut, /See your boards .* Sign in with passkey/);
+});
+
+test("the account page copies the account id on every hub", () => {
+  const page = accountScreen({ me, github: false });
+  assert.match(page, /data-action="copy-account" data-copy="acc_1"/);
+});
+
+test("a hub that does not keep email never asks for one", () => {
+  const pages = [
+    signupScreen({ invite: "K7QF-M2XD", github: true }),
+    connectWelcome({ name: "mac", code: "Z78K-XF53", signupOpen: true, github: true }),
+    connectScreen({ view, signupOpen: true }),
+    setupScreen({ phase: "start", needsSetup: true, token: "kho_x" }),
+    accountScreen({ me, github: true }),
+  ];
+  for (const page of pages) assert.doesNotMatch(page, /email/i);
+});
+
+test("a hub that keeps email asks for it at passkey sign-up and shows its state on the account page", () => {
+  assert.match(signupScreen({ invite: "K7QF-M2XD", email: true }), /type="email"/);
+  assert.match(connectScreen({ view, signupOpen: true, email: true }), /type="email"/);
+  assert.match(text(signupScreen({ invite: "K7QF-M2XD", email: true })), new RegExp(EMAIL_LABEL.replace(/[()]/g, "\\$&")));
+  assert.match(text(accountScreen({ me, github: false, email: true })), /Email No email yet .* Save email/);
+  assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: true } })), /Email ada@example\.com · confirmed .*Save email Remove email/);
+  assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: false, sent: true } })), /not confirmed yet\. We sent a link/);
+  assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: false } })), /Email ada@example\.com · not confirmed Email, so/);
+  assert.match(accountScreen({ me, github: false, email: true, address: { email: "a\"<b>@example.com", verified: false } }), /value="a&#34;&#60;b&#62;@example\.com"/);
 });

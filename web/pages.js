@@ -14,6 +14,10 @@ const top = (title, aside = "") => `<header class="top"><b>${esc(title)}</b><spa
 const say = (text, tone = "") => `<div class="center${tone ? ` ${tone}` : ""}"${tone === "warn" ? ' role="alert"' : ""}>${text}</div>`;
 const deviceName = () => proposedName(navigator.userAgent);
 
+const EMAIL_ERRORS = {
+  "invalid-email": "That doesn't look like an email address.",
+};
+
 const ERRORS = {
   unauthorized: "That link is used or expired. Ask for a new one.",
   ...CONNECT_TEXT,
@@ -43,7 +47,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -100,21 +104,24 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
 
   const signInBlock = (purpose) => `${say(esc(purpose))}<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${state.notice ? say(esc(state.notice), "warn") : ""}`;
 
+  const keepsEmail = () => Boolean(state.info?.email);
+  const typedEmail = () => root.querySelector("#email")?.value.trim() ?? "";
+
   function setupPage() {
     return setupScreen({ phase: state.phase, needsSetup: state.info?.needs_setup, token: params.get("token"), github: Boolean(state.info?.github), notice: state.notice });
   }
 
   function signupPage() {
-    return signupScreen({ signedIn: Boolean(state.me), next: safeNext(params.get("next")), invite: params.get("invite"), github: Boolean(state.info?.github), notice: state.notice });
+    return signupScreen({ signedIn: Boolean(state.me), next: safeNext(params.get("next")), invite: params.get("invite"), github: Boolean(state.info?.github), email: keepsEmail(), notice: state.notice });
   }
 
   function connectPage() {
-    return connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), machines: state.machines, notice: state.notice, busy: state.busy, code });
+    return connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), email: keepsEmail(), machines: state.machines, notice: state.notice, busy: state.busy, code });
   }
 
   function accountPage() {
     if (!state.me) return top("Account") + signInBlock("Sign in to see your account.");
-    return accountScreen({ me: state.me, github: Boolean(state.info?.github), notice: state.notice });
+    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), address: state.address, notice: state.notice, busy: state.busy });
   }
 
   function draw() {
@@ -128,6 +135,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   async function loadView() {
     try {
       if (path === "/connect") await loadConnect();
+      if (path === "/account" && state.me && keepsEmail()) state.address = await account.email();
     } catch (error) {
       state.view = null;
       state.notice = message(error);
@@ -199,11 +207,13 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   }
 
   async function createPasskey() {
+    const email = keepsEmail() ? typedEmail() : "";
     state.busy = true;
     state.notice = null;
     draw();
     try {
       await signUp(ticket());
+      if (email) await account.setEmail(email).catch(() => null);
       state.busy = false;
       if (path === "/setup") {
         state.phase = "done";
@@ -216,6 +226,21 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     } catch (error) {
       state.busy = false;
       state.notice = signUpText(error) ?? message(error);
+      draw();
+    }
+  }
+
+  async function saveEmail(email) {
+    state.busy = true;
+    state.notice = null;
+    draw();
+    try {
+      state.address = email ? await account.setEmail(email) : (await account.removeEmail(), { email: null, verified: false, sent: false });
+      state.busy = false;
+      draw();
+    } catch (error) {
+      state.busy = false;
+      state.notice = EMAIL_ERRORS[error?.code] ?? message(error);
       draw();
     }
   }
@@ -269,6 +294,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
         state.me = await account.me();
       }
       if (action === "create-passkey") return await createPasskey();
+      if (action === "copy-account") {
+        await navigator.clipboard.writeText(target.dataset.copy);
+        state.notice = "Account id copied.";
+        return draw();
+      }
+      if (action === "save-email" || action === "remove-email") return await saveEmail(action === "save-email" ? typedEmail() : "");
       if (action === "connect") return await connect();
       if (action === "cancel") {
         await connectCalls.deny(code);

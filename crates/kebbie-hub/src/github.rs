@@ -10,7 +10,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kebbie_hub_api::RegisterBegin;
+use kebbie_hub_api::{RegisterBegin, clean_email};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use webauthn_rs::prelude::{Url, Uuid};
@@ -28,6 +28,7 @@ pub const GITHUB_WEB_URL: &str = "https://github.com";
 const STATE_COOKIE: &str = "__Host-kebbie_github";
 const DEV_STATE_COOKIE: &str = "kebbie_github";
 const SCOPE: &str = "read:user";
+const EMAIL_SCOPE: &str = "read:user user:email";
 const MAX_NEXT_LEN: usize = 512;
 const GITHUB_TIMEOUT: Duration = Duration::from_secs(10);
 const PURPOSES: [Purpose; 3] = [Purpose::GitHub, Purpose::GitHubConnect, Purpose::GitHubLink];
@@ -58,12 +59,20 @@ pub struct GitHub {
 pub struct GitHubUser {
     pub id: u64,
     pub login: String,
+    pub email: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct TokenAnswer {
     access_token: Option<String>,
     error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct EmailAnswer {
+    email: String,
+    primary: bool,
+    verified: bool,
 }
 
 #[derive(Deserialize)]
@@ -99,13 +108,13 @@ impl GitHub {
         })
     }
 
-    fn authorize_url(&self, redirect_uri: &str, state: &str, challenge: &str) -> Result<String, ApiError> {
+    fn authorize_url(&self, redirect_uri: &str, state: &str, challenge: &str, email: bool) -> Result<String, ApiError> {
         Url::parse_with_params(
             &format!("{}/login/oauth/authorize", self.web),
             &[
                 ("client_id", self.client_id.as_str()),
                 ("redirect_uri", redirect_uri),
-                ("scope", SCOPE),
+                ("scope", if email { EMAIL_SCOPE } else { SCOPE }),
                 ("state", state),
                 ("code_challenge", challenge),
                 ("code_challenge_method", "S256"),
@@ -147,32 +156,55 @@ impl GitHub {
         }
     }
 
-    async fn user(&self, code: &str, redirect_uri: &str, verifier: &str) -> Result<GitHubUser, String> {
-        let token = self.token(code, redirect_uri, verifier).await?;
+    async fn api_get(&self, token: &str, path: &str) -> Result<Vec<u8>, String> {
         let response = self
             .http
-            .get(format!("{}/user", self.api))
+            .get(format!("{}{path}", self.api))
             .header(AUTHORIZATION, format!("Bearer {token}"))
             .header(ACCEPT, "application/vnd.github+json")
             .header("x-github-api-version", "2022-11-28")
             .header(USER_AGENT, "kebbie-hub")
             .send()
             .await
-            .map_err(|error| format!("the user request failed: {}", error.without_url()))?;
+            .map_err(|error| format!("the {path} request failed: {}", error.without_url()))?;
         let status = response.status();
         if !status.is_success() {
-            return Err(format!("GitHub refused the user request ({status})"));
+            return Err(format!("GitHub refused the {path} request ({status})"));
         }
-        let bytes = response
+        response
             .bytes()
             .await
-            .map_err(|_| "the user answer did not arrive".to_string())?;
+            .map(|bytes| bytes.to_vec())
+            .map_err(|_| format!("the {path} answer did not arrive"))
+    }
+
+    async fn primary_email(&self, token: &str) -> Result<Option<String>, String> {
+        let bytes = self.api_get(token, "/user/emails").await?;
+        let emails: Vec<EmailAnswer> =
+            serde_json::from_slice(&bytes).map_err(|_| "the /user/emails answer is not a list of emails".to_string())?;
+        Ok(emails
+            .into_iter()
+            .find(|email| email.primary && email.verified)
+            .and_then(|email| clean_email(&email.email)))
+    }
+
+    async fn user(&self, code: &str, redirect_uri: &str, verifier: &str, with_email: bool) -> Result<GitHubUser, String> {
+        let token = self.token(code, redirect_uri, verifier).await?;
+        let bytes = self.api_get(&token, "/user").await?;
         let user: UserAnswer =
             serde_json::from_slice(&bytes).map_err(|_| "the user answer is not a user".to_string())?;
         let login = clean_name(&user.login)
             .ok_or_else(|| "the user's login is not a name".to_string())?
             .to_string();
-        Ok(GitHubUser { id: user.id, login })
+        let email = if with_email {
+            self.primary_email(&token).await.unwrap_or_else(|problem| {
+                eprintln!("kebbie-hub: GitHub gave no email: {problem}");
+                None
+            })
+        } else {
+            None
+        };
+        Ok(GitHubUser { id: user.id, login, email })
     }
 }
 
@@ -313,7 +345,7 @@ pub async fn start(
     let state = new_id();
     let browser = URL_SAFE_NO_PAD.encode(random::<32>());
     let verifier = URL_SAFE_NO_PAD.encode(random::<32>());
-    let location = github.authorize_url(&redirect_uri(&hub), &state, &challenge_of(&verifier))?;
+    let location = github.authorize_url(&redirect_uri(&hub), &state, &challenge_of(&verifier), hub.keeps_email())?;
     let pending = Pending {
         verifier,
         browser: URL_SAFE_NO_PAD.encode(digest(&browser)),
@@ -372,7 +404,7 @@ pub async fn callback(
     let Some(code) = &callback.code else {
         return Ok(redirect(&with_error(&pending.next, "failed"), &[cleared]));
     };
-    let user = match github.user(code, &redirect_uri(&hub), &pending.verifier).await {
+    let user = match github.user(code, &redirect_uri(&hub), &pending.verifier, hub.keeps_email()).await {
         Ok(user) => user,
         Err(problem) => {
             eprintln!("kebbie-hub: GitHub sign-in failed: {problem}");
@@ -385,11 +417,17 @@ pub async fn callback(
     };
     Ok(match outcome {
         Outcome::SignedIn(account, session) => {
+            if let Some(email) = &user.email {
+                hub.verified_email(&account, email);
+            }
             hub.store().log(now(), "account.logged-in", None, None, Some(&format!("{account} via=github")))?;
             let cookie = session_set_cookie(&hub, &session, hub.config().session_ttl);
             redirect(&pending.next, &[cleared, cookie])
         }
         Outcome::Linked(account) => {
+            if let Some(email) = &user.email {
+                hub.verified_email(&account, email);
+            }
             hub.store().log(now(), "account.github-linked", None, None, Some(&account))?;
             redirect(&pending.next, &[cleared])
         }

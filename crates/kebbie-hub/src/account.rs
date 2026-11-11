@@ -557,6 +557,7 @@ pub async fn hub_info(
         needs_setup: hub.store().account_count()? == 0,
         github: hub.github().is_some(),
         commands: hub.config().commands,
+        email: hub.keeps_email(),
     }))
 }
 

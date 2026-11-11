@@ -13,7 +13,7 @@ use axum::routing::{get, post};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use common::*;
-use kebbie_hub::{Config, RateLimit, Secret};
+use kebbie_hub::{Config, Hooks, RateLimit, Secret};
 use kebbie_hub_api::{AccountKeySetup, AccountView, Bytes64, HubInfo, SignupMode};
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_protocol::{AccountKey, Id, SecretKeys, Unlock, sign_wrapper};
@@ -37,12 +37,15 @@ struct Fake {
     tokens: HashMap<String, (u64, String)>,
     exchanges: usize,
     issued: u64,
+    emails: Vec<Value>,
+    email_reads: usize,
 }
 
 #[derive(Clone)]
 struct FakeGitHub {
     url: String,
     state: Arc<Mutex<Fake>>,
+    scope: &'static str,
 }
 
 async fn token(State(fake): State<Arc<Mutex<Fake>>>, body: Bytes) -> Json<Value> {
@@ -80,16 +83,39 @@ async fn user(
     Ok(Json(json!({"id": id, "login": login, "email": "private@example.com"})))
 }
 
+async fn emails(
+    State(fake): State<Arc<Mutex<Fake>>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let token = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let mut fake = fake.lock().unwrap();
+    fake.tokens.get(token).ok_or(StatusCode::UNAUTHORIZED)?;
+    fake.email_reads += 1;
+    Ok(Json(Value::Array(fake.emails.clone())))
+}
+
 async fn fake_github() -> FakeGitHub {
-    let state = Arc::new(Mutex::new(Fake::default()));
+    let state = Arc::new(Mutex::new(Fake {
+        emails: vec![json!({"email": "private@example.com", "primary": true, "verified": true, "visibility": null})],
+        ..Fake::default()
+    }));
     let router = axum::Router::new()
         .route("/login/oauth/access_token", post(token))
         .route("/user", get(user))
+        .route("/user/emails", get(emails))
         .with_state(Arc::clone(&state));
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
-    FakeGitHub { url, state }
+    FakeGitHub { url, state, scope: "read:user" }
+}
+
+async fn fake_github_with_email() -> FakeGitHub {
+    FakeGitHub { scope: "read:user user:email", ..fake_github().await }
 }
 
 impl FakeGitHub {
@@ -98,7 +124,7 @@ impl FakeGitHub {
         assert!(authorize.starts_with(&format!("{}/login/oauth/authorize?", self.url)), "{authorize}");
         let query: HashMap<String, String> = url.query_pairs().into_owned().collect();
         assert_eq!(query["client_id"], CLIENT_ID);
-        assert_eq!(query["scope"], "read:user");
+        assert_eq!(query["scope"], self.scope);
         assert_eq!(query["code_challenge_method"], "S256");
         assert_eq!(query["redirect_uri"], "http://localhost:8470/auth/github/callback");
         let mut fake = self.state.lock().unwrap();
@@ -116,6 +142,14 @@ impl FakeGitHub {
 
     fn exchanges(&self) -> usize {
         self.state.lock().unwrap().exchanges
+    }
+
+    fn email_reads(&self) -> usize {
+        self.state.lock().unwrap().email_reads
+    }
+
+    fn set_emails(&self, emails: Vec<Value>) {
+        self.state.lock().unwrap().emails = emails;
     }
 }
 
@@ -596,4 +630,83 @@ async fn a_client_id_without_its_secret_does_not_start() {
     config.github_client_id = Some(CLIENT_ID.to_string());
     let refused = kebbie_hub::Hub::open(config).err().expect("the hub refuses");
     assert!(refused.to_string().contains("KEBBIE_HUB_GITHUB_CLIENT_SECRET"), "{refused}");
+}
+
+#[tokio::test]
+async fn a_hub_with_default_flags_never_asks_for_email_nor_stores_one() {
+    let github = fake_github().await;
+    let test = github_hub(&github, |config| config.signup = SignupMode::Open).await;
+    let info: HubInfo = browser(&test).get("/v1/hub").await.unwrap();
+    assert!(!info.email && info.github);
+    let member = member(&test).await;
+    GitHubBrowser::signed_in_as(&test, &member)
+        .through_github(&github, "?link=1&next=/account", 31, "linker")
+        .await;
+    let back = GitHubBrowser::new(&test).through_github(&github, "", 31, "linker").await;
+    assert_eq!(back.location, "/");
+    assert_eq!(github.email_reads(), 0, "the hub never read /user/emails");
+    let refused = browser(&test).get::<Value>("/v1/a/email").await.unwrap_err();
+    assert_eq!(refused.status(), Some(404));
+    let database = test.hub.config().database();
+    {
+        let store = test.hub.store();
+        let schema: Vec<String> = store
+            .connection()
+            .prepare("SELECT coalesce(sql, '') FROM sqlite_master")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert!(!schema.iter().any(|sql| sql.to_lowercase().contains("email")), "{schema:?}");
+        store.connection().execute_batch("PRAGMA wal_checkpoint(TRUNCATE)").unwrap();
+    }
+    let bytes = std::fs::read(&database).unwrap();
+    assert!(!bytes.windows(19).any(|window| window == b"private@example.com"));
+}
+
+#[tokio::test]
+async fn an_embedder_that_keeps_email_gets_the_verified_primary_address_from_github() {
+    let github = fake_github_with_email().await;
+    github.set_emails(vec![
+        json!({"email": "old@example.com", "primary": false, "verified": true, "visibility": null}),
+        json!({"email": "ada@example.com", "primary": true, "verified": true, "visibility": "private"}),
+    ]);
+    let kept: Arc<Mutex<Vec<(String, String)>>> = Arc::default();
+    let recorded = Arc::clone(&kept);
+    let hooks = Hooks {
+        command_gate: None,
+        account_email: Some(Box::new(move |_, account, email| {
+            recorded.lock().unwrap().push((account.to_string(), email.to_string()));
+            Ok(())
+        })),
+    };
+    let url = github.url.clone();
+    let test = start_hub_hooks(
+        move |config| {
+            config.github_client_id = Some(CLIENT_ID.to_string());
+            config.github_client_secret = Some(Secret::new(SECRET));
+            config.github_api_url = url.clone();
+            config.github_web_url = url;
+        },
+        hooks,
+        axum::Router::new(),
+    )
+    .await;
+    let info: HubInfo = browser(&test).get("/v1/hub").await.unwrap();
+    assert!(info.email);
+    let mut member = member(&test).await;
+    let account = member.account().await.unwrap().account;
+    GitHubBrowser::signed_in_as(&test, &member)
+        .through_github(&github, "?link=1&next=/account", 51, "ada")
+        .await;
+    GitHubBrowser::new(&test).through_github(&github, "", 51, "ada").await;
+    let pair = (account.clone(), "ada@example.com".to_string());
+    assert_eq!(*kept.lock().unwrap(), [pair.clone(), pair.clone()]);
+
+    github.set_emails(vec![json!({"email": "unconfirmed@example.com", "primary": true, "verified": false, "visibility": null})]);
+    let back = GitHubBrowser::new(&test).through_github(&github, "", 51, "ada").await;
+    assert_eq!(back.location, "/", "an unverified address still signs in");
+    assert_eq!(kept.lock().unwrap().len(), 2, "an unverified address is not handed over");
+    assert_eq!(github.email_reads(), 3);
 }

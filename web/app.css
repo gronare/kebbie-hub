@@ -189,6 +189,8 @@ a.task:active { background: var(--sel); }
 .options.chosen .opt:not(.picked) { opacity: 0.55; }
 .note-field { display: grid; gap: 6px; }
 .note-field label { font-size: 13px; color: var(--muted); }
+.note-field input { font: 16px var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.task .note-field { margin: 10px 0; }
 .note-field textarea { font: 15px/1.4 var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 64px; resize: vertical; }
 .answer-row { display: grid; gap: 10px; }
 .sub-btn { background: none; border: 0; color: var(--accent); font: 600 14px var(--sans); padding: 6px 0; text-align: left; cursor: pointer; justify-self: start; align-self: flex-start; }
