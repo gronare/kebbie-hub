@@ -34,6 +34,7 @@ export const account = {
   registerFinish: (ceremony, credential, name) => call("POST", "/v1/a/register/finish", { body: { ceremony, credential, name } }),
   loginBegin: (request = {}) => call("POST", "/v1/a/login/begin", { body: request }),
   loginFinish: (ceremony, credential) => call("POST", "/v1/a/login/finish", { body: { ceremony, credential } }),
+  logout: () => call("POST", "/v1/a/logout"),
   passkeyBegin: () => call("POST", "/v1/a/passkeys/begin", { body: {} }),
   passkeyFinish: (ceremony, credential, name) => call("POST", "/v1/a/passkeys/finish", { body: { ceremony, credential, name } }),
   setKey: (setup) => call("POST", "/v1/a/key", { body: setup }),

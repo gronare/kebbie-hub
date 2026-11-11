@@ -1,5 +1,7 @@
 import { HubError } from "./hub.js";
-import { brand, brandMark, disabled, esc, githubHref, heading, warn } from "./screens.js";
+import { authScreen, disabled, esc, githubHref, heading } from "./screens.js";
+
+export { authScreen, isAuthScreen } from "./screens.js";
 
 const field = (label, input) => `<div class="note-field"><label for="${input.id}">${esc(label)}</label><input ${Object.entries(input).map(([name, value]) => `${name}="${esc(value)}"`).join(" ")}></div>`;
 
@@ -14,15 +16,6 @@ const primary = (action, label, busy) => `<button type="button" class="btn prima
 const githubLink = (href) => `<a class="btn" href="${esc(href)}">Continue with GitHub</a>`;
 const codeLinks = (busy) => `<p class="foot">Nothing arrived? <button type="button" class="link inline" data-action="resend-code"${disabled(busy)}>Send a new code</button></p><div class="links"><button type="button" class="link" data-action="other-email"${disabled(busy)}>Use another email</button></div>`;
 const newHere = `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p>`;
-const art = `<div class="auth-art" aria-hidden="true"><div class="art">${brandMark}<div class="art-rows">${`<div class="art-row"><i></i><b></b><u></u></div>`.repeat(3)}</div></div></div>`;
-
-// The intro reads from the top, the form sits low where the thumb is, and the art fills what lies between.
-export function authScreen({ intro, fields = "", actions, alt = "", notice = null }) {
-  const form = `${fields ? `<div class="auth-fields">${fields}</div>` : ""}<div class="auth-actions">${actions}${warn(notice)}${alt ? `<div class="auth-alt">${alt}</div>` : ""}</div>`;
-  return `<div class="auth-intro">${brand}${intro}</div>${art}<div class="auth-form">${form}</div>`;
-}
-
-export const isAuthScreen = (html) => html.startsWith('<div class="auth-intro">');
 
 export function emailSignInScreen({ github = false, email = "", next = null, notice = null, busy = false }) {
   return authScreen({

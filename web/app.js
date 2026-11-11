@@ -8,10 +8,10 @@ import * as deviceStore from "./store.js";
 import { collectResults, DeviceListProblem, enableDevice, forgetDevice, keepSent, loadDevice, loadSent, removeListedDevice, sendCommand, trustedDeviceList } from "./device.js";
 import { answerBlock, answerReady, choosable, COMMAND_TEXT, deviceRows, gate, latestSent, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, setupBlock, takesPromptAnswers } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
-import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage } from "./pages.js";
-import { addEmailScreen, address, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
+import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
@@ -413,8 +413,7 @@ function lockedScreen() {
   if (needsFirstPasskey(state.me, state.session)) return addPasskeyScreen({ login: state.me.github, notice: state.notice, busy: state.busy });
   if (status === "locked") return unlockScreen({ notice: state.notice });
   if (status === "no-prf" || status === "not-wrapped" || status === "github") return cantUnlockScreen({ state: status, notice: state.notice });
-  const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  return top("kebbie") + `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div><button type="button" class="btn primary" data-action="other-passkey">Try another passkey</button>${message}`;
+  return authScreen({ intro: `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div>`, actions: `<button type="button" class="btn primary" data-action="other-passkey">Try another passkey</button>`, notice: state.notice });
 }
 
 const emailSignIn = () => Boolean(state.info?.email_signin);
@@ -441,7 +440,7 @@ function signedInScreen(step) {
 }
 
 function unsupportedScreen() {
-  return top("kebbie") + `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519, HKDF and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`;
+  return authScreen({ intro: `<div class="center">This browser lacks the cryptography the app needs (Ed25519, X25519, HKDF and base64 in Uint8Array). Update to iOS 18.2 or later, or a current Chrome or Firefox.</div>`, actions: "" });
 }
 
 function render() {
@@ -462,7 +461,7 @@ function render() {
   else html = boardRoute();
   const focused = document.activeElement?.id && root.contains(document.activeElement) ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
   const auth = isAuthScreen(html);
-  liftKeyboard(auth);
+  liftKeyboard(auth && html.includes("<input"));
   root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`;
   const refocus = focused ? document.getElementById(focused.id) : null;
   if (refocus) {
@@ -493,7 +492,7 @@ async function keepMarks() {
 
 async function cachedListing() {
   try {
-    return (await get("listing")) ?? null;
+    return (await get(LISTING)) ?? null;
   } catch {
     state.storeFailed = true;
     return null;
@@ -508,7 +507,7 @@ async function refresh() {
     listing = await account.boards();
     state.offline = false;
     state.fetchedAt = nowSeconds();
-    await put("listing", { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
+    await put(LISTING, { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
   } catch (error) {
     if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
     clearTimeout(retrying);

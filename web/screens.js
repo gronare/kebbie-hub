@@ -9,6 +9,16 @@ export const brand = `<header class="brand">${brandMark}<b>kebbie hub</b></heade
 export const heading = (title, lead) => `<h1 class="title">${esc(title)}</h1><p class="lead">${esc(lead)}</p>`;
 export const warn = (text) => (text ? `<div class="center warn" role="alert">${esc(text)}</div>` : "");
 export const disabled = (off) => (off ? " disabled" : "");
+const art = `<div class="auth-art" aria-hidden="true"><div class="art">${brandMark}<div class="art-rows">${`<div class="art-row"><i></i><b></b><u></u></div>`.repeat(3)}</div></div></div>`;
+
+// The intro reads from the top, the form sits low where the thumb is, and the art fills what lies between.
+export function authScreen({ intro, fields = "", actions, alt = "", notice = null }) {
+  const form = `${fields ? `<div class="auth-fields">${fields}</div>` : ""}<div class="auth-actions">${actions}${warn(notice)}${alt ? `<div class="auth-alt">${alt}</div>` : ""}</div>`;
+  return `<div class="auth-intro">${brand}${intro}</div>${art}<div class="auth-form">${form}</div>`;
+}
+
+export const isAuthScreen = (html) => html.startsWith('<div class="auth-intro">');
+const status = (text, tone = "") => `<div class="center${tone ? ` ${tone}` : ""}">${text}</div>`;
 const MACHINE_ICON = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg>`;
 
 export function lastSeenText(seconds, now = Date.now() / 1000) {
@@ -271,26 +281,27 @@ export function connectWelcome({ name, code = "", signupOpen, github, email = fa
     : `The hub shows ${name}'s board on your phone and in any browser, end-to-end encrypted. Sign in with your passkey to connect it.`;
   const back = `/connect?code=${encodeURIComponent(code)}`;
   const gh = github ? githubButton(signupOpen ? "Continue with GitHub" : "Sign in with GitHub", githubHref({ connect: signupOpen ? code : null, next: back })) : "";
-  const start = signupOpen
-    ? `${email ? emailField() : ""}<button type="button" class="btn primary" data-action="create-passkey"${disabled(busy)}>Create passkey</button>${gh}${warn(notice)}<p class="foot">Already have a kebbie account? <button type="button" class="link inline" data-action="sign-in">Sign in</button></p>`
-    : `<button type="button" class="btn primary" data-action="sign-in"${disabled(busy)}>Sign in with passkey</button>${gh}${warn(notice)}`;
-  return brand + heading(`Connect ${name} to kebbie hub`, lead) + start;
+  const intro = heading(`Connect ${name} to kebbie hub`, lead);
+  if (!signupOpen) return authScreen({ intro, actions: `<button type="button" class="btn primary" data-action="sign-in"${disabled(busy)}>Sign in with passkey</button>`, alt: gh, notice });
+  return authScreen({
+    intro,
+    fields: email ? emailField() : "",
+    actions: `<button type="button" class="btn primary" data-action="create-passkey"${disabled(busy)}>Create passkey</button>`,
+    alt: `${gh}<p class="foot">Already have a kebbie account? <button type="button" class="link inline" data-action="sign-in">Sign in</button></p>`,
+    notice,
+  });
 }
 
 export function connectAsk({ name, code, machines = [], blocked = null, typed = false, notice = null, busy = false }) {
   const already = machines.length ? `<section class="task small-card"><div class="meta">Already connected</div><div>${esc(machines.join(" · "))}</div></section>` : "";
   const typedLine = typed ? `<div class="center">You typed the code, so this page can't check which machine it is. Its board stays unreadable until you connect it from the link kebbie opens.</div>` : "";
   const reason = blocked ? `<div class="center warn" role="alert">${esc(blocked)}</div>` : "";
-  return (
-    brand +
-    heading(`Connect ${name}?`, "Check that your terminal shows the same code. If it doesn't, cancel: another machine is asking.") +
-    `<section class="task machine-card"><div class="row-start">${MACHINE_ICON}<div><div class="name">${esc(name)}</div><div class="meta">waiting in its terminal</div></div></div><div class="code peach" aria-live="polite">${esc(code)}</div></section>` +
-    already +
-    typedLine +
-    reason +
-    `<div class="pair-answer"><button type="button" class="btn" data-action="cancel"${disabled(busy)}>Cancel</button><button type="button" class="btn primary" data-action="connect"${disabled(busy || blocked)}>Connect ${esc(name)}</button></div>` +
-    warn(notice)
-  );
+  return authScreen({
+    intro: heading(`Connect ${name}?`, "Check that your terminal shows the same code. If it doesn't, cancel: another machine is asking."),
+    fields: `<section class="task machine-card"><div class="row-start">${MACHINE_ICON}<div><div class="name">${esc(name)}</div><div class="meta">waiting in its terminal</div></div></div><div class="code peach" aria-live="polite">${esc(code)}</div></section>` + already + typedLine + reason,
+    actions: `<div class="pair-answer"><button type="button" class="btn" data-action="cancel"${disabled(busy)}>Cancel</button><button type="button" class="btn primary" data-action="connect"${disabled(busy || blocked)}>Connect ${esc(name)}</button></div>`,
+    notice,
+  });
 }
 
 export function connectDone({ name, host }) {
@@ -298,29 +309,29 @@ export function connectDone({ name, host }) {
 }
 
 export function connectTyped({ name }) {
-  return brand + `<div class="center ok">${esc(name)} is connected. Its board stays unreadable until you connect it from the link kebbie opens on that computer.</div>`;
+  return authScreen({ intro: "", actions: status(`${esc(name)} is connected. Its board stays unreadable until you connect it from the link kebbie opens on that computer.`, "ok") });
 }
 
 export function connectCancelled() {
-  return brand + `<div class="center">Cancelled. The terminal shows it too.</div>`;
+  return authScreen({ intro: "", actions: status("Cancelled. The terminal shows it too.") });
 }
 
 export function signInScreen({ github, notice = null, next = null }) {
   const gh = github ? `<a class="btn" href="${esc(githubHref({ next }))}">Sign in with GitHub</a>` : "";
-  return (
-    brand +
-    heading("See your boards", "Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie.") +
-    `<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${gh}${warn(notice)}` +
-    `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p>`
-  );
+  return authScreen({
+    intro: heading("See your boards", "Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie."),
+    actions: `<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${gh}`,
+    alt: `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p>`,
+    notice,
+  });
 }
 
 export function unlockScreen({ notice = null } = {}) {
-  return brand + heading("Unlock your boards", "You're signed in. Unlock with your passkey to read your boards. They stay unlocked on this device for an hour.") + `<button type="button" class="btn primary" data-action="sign-in">Unlock with passkey</button>${warn(notice)}`;
+  return authScreen({ intro: heading("Unlock your boards", "You're signed in. Unlock with your passkey to read your boards. They stay unlocked on this device for an hour."), actions: `<button type="button" class="btn primary" data-action="sign-in">Unlock with passkey</button>`, notice });
 }
 
 export function unlockingScreen() {
-  return brand + `<div class="center"><span class="spinner" aria-hidden="true"></span> Unlocking your boards…</div>`;
+  return authScreen({ intro: "", actions: status(`<span class="spinner" aria-hidden="true"></span> Unlocking your boards…`) });
 }
 
 const CANT_UNLOCK = {
@@ -330,12 +341,11 @@ const CANT_UNLOCK = {
 };
 
 export function addPasskeyScreen({ login, notice = null, busy = false }) {
-  return (
-    brand +
-    `<div class="center ok">✓ Signed in with GitHub as ${esc(login)}</div>` +
-    heading("Add a passkey to unlock your boards", "GitHub signs you in. A passkey also unlocks your boards on every phone and browser, so you never approve one by hand.") +
-    `<button type="button" class="btn primary" data-action="add-passkey"${disabled(busy)}>Add passkey</button><button type="button" class="link" data-action="not-now"${disabled(busy)}>Not now</button>${warn(notice)}`
-  );
+  return authScreen({
+    intro: `<div class="center ok">✓ Signed in with GitHub as ${esc(login)}</div>` + heading("Add a passkey to unlock your boards", "GitHub signs you in. A passkey also unlocks your boards on every phone and browser, so you never approve one by hand."),
+    actions: `<button type="button" class="btn primary" data-action="add-passkey"${disabled(busy)}>Add passkey</button><button type="button" class="link" data-action="not-now"${disabled(busy)}>Not now</button>`,
+    notice,
+  });
 }
 
 export const needsFirstPasskey = (me, session) => Boolean(me?.github && !me.key && (!session || session.state === "locked"));
@@ -364,16 +374,16 @@ export function accountScreen({ me, github, email = false, codes = false, addres
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + accountId(me.account) + linked + (email ? emailSection(address, busy, codes) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + accountId(me.account) + linked + (email ? emailSection(address, busy, codes) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {
-  return (
-    brand +
-    heading("This browser can't unlock your boards", CANT_UNLOCK[state] ?? CANT_UNLOCK["no-prf"]) +
-    `<section class="task"><div class="meta">What works today: sign in on a device whose passkey can unlock them, such as an iPhone or Mac with iCloud Keychain, Google Password Manager or 1Password.</div></section>` +
-    `<button type="button" class="btn primary" data-action="other-passkey">Use a passkey instead</button>${warn(notice)}`
-  );
+  return authScreen({
+    intro: heading("This browser can't unlock your boards", CANT_UNLOCK[state] ?? CANT_UNLOCK["no-prf"]),
+    fields: `<section class="task"><div class="meta">What works today: sign in on a device whose passkey can unlock them, such as an iPhone or Mac with iCloud Keychain, Google Password Manager or 1Password.</div></section>`,
+    actions: `<button type="button" class="btn primary" data-action="other-passkey">Use a passkey instead</button>`,
+    notice,
+  });
 }
 
 export const INSTALL_HINT = "Add kebbie to your Home Screen — Share → Add to Home Screen.";
@@ -398,12 +408,12 @@ export function signupScreen({ signedIn, next, invite, github = false, email = f
 }
 
 export function connectScreen({ supported = true, phase = "start", view = null, me = null, session = null, fragment = null, signupOpen = false, github = false, email = false, machines = [], notice = null, busy = false, code = "" }) {
-  if (!supported) return brand + `<div class="center">This browser cannot sign in with a passkey.</div>`;
+  if (!supported) return authScreen({ intro: "", actions: status("This browser cannot sign in with a passkey.") });
   const name = view?.name ?? "this machine";
   if (phase === "connected") return connectTyped({ name });
   if (phase === "cancelled") return connectCancelled();
-  if (phase === "pairing") return brand + `<div class="center ok">Handing ${esc(name)} your account's key …</div>`;
-  if (!view) return brand + (notice ? warn(notice) : `<div class="center">Loading …</div>`);
+  if (phase === "pairing") return authScreen({ intro: "", actions: status(`Handing ${esc(name)} your account's key …`, "ok") });
+  if (!view) return authScreen({ intro: "", actions: notice ? "" : status("Loading …"), notice });
   if (!me) return connectWelcome({ name, code: view.code || code, signupOpen, github, email, notice, busy });
   if (needsFirstPasskey(me, session)) return addPasskeyScreen({ login: me.github, notice, busy });
   if (session?.state === "github") return cantUnlockScreen({ state: "github", notice });

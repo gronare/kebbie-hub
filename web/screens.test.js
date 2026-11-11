@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { isAuthScreen } from "./email.js";
 import { acceptCount, accountScreen, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
@@ -124,7 +125,7 @@ test("setup and invite pages ask only for a passkey, never an account name", () 
 });
 
 test("every hub screen opens with the kebbie mark before kebbie hub", () => {
-  const mark = /^<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">.*<\/svg><b>kebbie hub<\/b><\/header>/;
+  const mark = /^(<div class="auth-intro">)?<header class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">.*<\/svg><b>kebbie hub<\/b><\/header>/;
   const screens = [
     connectScreen({ view, signupOpen: true }),
     connectScreen({ view, me, session: { state: "locked", me }, fragment }),
@@ -137,6 +138,32 @@ test("every hub screen opens with the kebbie mark before kebbie hub", () => {
     accountScreen({ me: { ...me, github: "octocat" }, github: true }),
   ];
   for (const html of screens) assert.match(html, mark);
+});
+
+test("every screen before the boards uses the auth layout: intro on top, the art, the form low", () => {
+  const github = { ...me, github: "octocat", key: null };
+  const screens = {
+    unlockScreen: unlockScreen(),
+    unlockingScreen: unlockingScreen(),
+    "cantUnlockScreen no-prf": cantUnlockScreen({ state: "no-prf" }),
+    "cantUnlockScreen not-wrapped": cantUnlockScreen({ state: "not-wrapped" }),
+    "cantUnlockScreen github": cantUnlockScreen({ state: "github" }),
+    signInScreen: signInScreen({ github: true }),
+    "connect welcome": connectScreen({ view, signupOpen: true, github: true }),
+    "connect invite-only": connectScreen({ view, signupOpen: false }),
+    "connect ask": connectScreen({ view, me, session: { state: "locked", me }, fragment }),
+    "connect pairing": connectScreen({ view, me, phase: "pairing" }),
+    "connect typed": connectScreen({ view, me, phase: "connected" }),
+    "connect cancelled": connectScreen({ view, me, phase: "cancelled" }),
+    "connect loading": connectScreen({}),
+    "connect unsupported": connectScreen({ supported: false }),
+    addPasskeyScreen: addPasskeyScreen({ login: "octocat" }),
+    "connect after GitHub": connectScreen({ view, me: github, session: { state: "locked", me: github }, fragment }),
+  };
+  for (const [name, html] of Object.entries(screens)) {
+    assert.ok(isAuthScreen(html), name);
+    assert.match(html, /<div class="auth-intro">.*<\/div><div class="auth-art" aria-hidden="true">.*<div class="auth-form">.*<div class="auth-actions">/, name);
+  }
 });
 
 const hrefs = (html) => [...html.matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([^<]*)</g)].map(([, href, label]) => ({ label: label.trim(), href: href.replace(/&#38;/g, "&") }));
@@ -177,7 +204,7 @@ test("the connect link after GitHub asks for a passkey first, and Not now says h
 
 test("the account page connects GitHub or removes it", () => {
   const linked = accountScreen({ me: { ...me, github: "octocat" }, github: true });
-  assert.equal(text(linked), "kebbie hub Account acc_1 Copy GitHub Signed in with GitHub as octocat Remove Back to your boards");
+  assert.equal(text(linked), "kebbie hub Account acc_1 Copy GitHub Signed in with GitHub as octocat Remove Back to your boards Sign out");
   assert.deepEqual(buttons(linked)[1], { label: "Remove", disabled: false });
   const unlinked = accountScreen({ me, github: true });
   assert.deepEqual(hrefs(unlinked)[0], { label: "Connect GitHub", href: "/auth/github?link=1&next=%2Faccount" });
@@ -352,6 +379,11 @@ test("a signed-in visitor whose boards are locked is told they are signed in and
   const signedOut = text(signInScreen({ github: false }));
   assert.doesNotMatch(signedOut, /You're signed in|Unlock/);
   assert.match(signedOut, /See your boards .* Sign in with passkey/);
+});
+
+test("the account page signs out from a plain button, held while busy", () => {
+  assert.match(accountScreen({ me }), /<button type="button" class="btn" data-action="sign-out">Sign out<\/button>/);
+  assert.match(accountScreen({ me, busy: true }), /data-action="sign-out" disabled>Sign out</);
 });
 
 test("the account page copies the account id on every hub", () => {

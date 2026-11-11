@@ -5,6 +5,7 @@ import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSO
 
 const REMEMBERED = "kebbie-credential";
 const KEPT = "unlock";
+export const LISTING = "listing";
 export const KEEP_MS = 60 * 60 * 1000;
 
 export const STATE_TEXT = {
@@ -98,6 +99,15 @@ export async function keepUnlock(session, store = deviceStore) {
 }
 
 export const forgetUnlock = (store = deviceStore) => store.del(KEPT).catch(() => undefined);
+
+export async function signOut(account, store = deviceStore) {
+  try {
+    await account.logout();
+  } finally {
+    await forgetUnlock(store);
+    await store.del(LISTING).catch(() => undefined);
+  }
+}
 
 const nonExtractable = (identity) => identity?.signing?.extractable === false && identity.encryption?.privateKey?.extractable === false;
 

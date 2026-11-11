@@ -4,7 +4,7 @@ import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
-import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, connectScreen, esc, githubErrorText, nav, setupScreen, signupScreen } from "./screens.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
@@ -61,7 +61,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   const render = (html) => {
     const inApp = path === "/account" && state.me;
     const auth = isAuthScreen(html);
-    liftKeyboard(auth);
+    liftKeyboard(auth && html.includes("<input"));
     const focused = document.activeElement?.id && root.contains(document.activeElement) ? document.activeElement.id : null;
     const main = `<main class="screen page${inApp ? " in-app" : ""}${auth ? " auth" : ""}">${html}</main>`;
     root.innerHTML = inApp ? `<div class="app">${nav({ active: "account", deskOnly: true })}${main}</div>` : main;
@@ -352,6 +352,22 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     }
   }
 
+  async function signOutClicked() {
+    state.busy = true;
+    state.notice = null;
+    draw();
+    try {
+      await signOut(account);
+    } finally {
+      state.session = null;
+      state.me = null;
+      state.address = null;
+      unlockEnds.watch(null);
+    }
+    state.left = true;
+    location.replace("/");
+  }
+
   async function signInClicked() {
     state.notice = null;
     try {
@@ -375,6 +391,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     try {
       if (action === "sign-in" || action === "other-passkey") return await signInClicked();
       if (action === "add-passkey") return await addPasskey();
+      if (action === "sign-out") return await signOutClicked();
       if (action === "not-now") {
         state.session = { state: "github", me: state.me };
         return draw();

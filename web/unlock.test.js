@@ -5,7 +5,8 @@ import { test } from "node:test";
 import { fromB64, importSender, openEnvelope, toB64, unwrapAccountSecrets, wrapperStatement } from "../js/protocol.js";
 import { HubError } from "./hub.js";
 import { signUpWith, signInWith } from "./signin.js";
-import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, unlockAfter } from "./unlock.js";
+import { passkeySignInScreen, signedOutStep } from "./email.js";
+import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -424,6 +425,28 @@ test("signing out deletes the kept unlock", async () => {
   const { store } = await unlockedOnce();
   await forgetUnlock(store);
   assert.equal(store.values.size, 0);
+});
+
+test("signing out ends the hub session, deletes the kept unlock and the cached boards, and keeps the passkey so sign-in offers it first", async () => {
+  const { account, store, local, session } = await unlockedOnce();
+  await store.put(LISTING, { listing: { boards: ["sealed"] }, at: 1 });
+  const ended = [];
+  await signOut({ logout: async () => void ended.push("logout") }, store);
+  assert.deepEqual(ended, ["logout"]);
+  assert.equal(store.values.size, 0);
+  assert.equal(await keptUnlock(await account.me(), store, Date.now(), local), null);
+  assert.equal(rememberedCredential(local), session.credential);
+  const step = signedOutStep({ info: { email_signin: true }, remembered: rememberedCredential(local) });
+  assert.equal(step, "passkey");
+  assert.match(passkeySignInScreen({}), /data-action="sign-in"[^>]*>Sign in with your passkey</);
+});
+
+test("signing out while the hub can't be reached still deletes what the device kept", async () => {
+  const { store, local, session } = await unlockedOnce();
+  await store.put(LISTING, { listing: { boards: ["sealed"] }, at: 1 });
+  await assert.rejects(signOut({ logout: async () => Promise.reject(new TypeError("offline")) }, store), TypeError);
+  assert.equal(store.values.size, 0);
+  assert.equal(rememberedCredential(local), session.credential);
 });
 
 test("a device that can't store the unlock still unlocks and stays locked after a reload", async () => {
