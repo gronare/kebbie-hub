@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::envelope::Kind;
 use crate::ids::Id;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +19,8 @@ pub struct Board {
     pub counts: Option<Counts>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub later: Option<Vec<Later>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepts: Option<Vec<Kind>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -397,7 +400,7 @@ mod tests {
     #[test]
     fn a_board_from_a_kebbie_without_next_parses_and_is_written_back_unchanged() {
         let board: Board = serde_json::from_value(plain_board()).unwrap();
-        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref()), (None, None, None));
+        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref(), board.accepts.as_ref()), (None, None, None, None));
         assert_eq!((board.items[0].title.as_ref(), board.items[0].second_opinion.as_ref()), (None, None));
         assert_eq!(serde_json::to_value(&board).unwrap(), plain_board());
     }
@@ -410,6 +413,7 @@ mod tests {
             { "part": "push", "address": "payments@api", "rank": 2, "line": "2 commits · 1 waits on it", "since": null, "waits_behind": 1 },
         ]);
         full["counts"] = serde_json::json!({ "working": 4, "queued": 1, "parked": 1 });
+        full["accepts"] = serde_json::json!(["answer", "push", "prompt-answer"]);
         full["later"] = serde_json::json!([
             { "address": "mail@shop", "title": "Mail DNS", "state": "queued", "line": "waits for go-live", "until": null, "question": false },
             { "address": "editor@app", "title": null, "state": "parked", "line": "nothing yet", "until": 1_761_100_000u64, "question": true },
@@ -429,6 +433,7 @@ mod tests {
         assert_eq!(board.later.as_ref().unwrap()[1].state, LaterState::Parked);
         assert_eq!(board.items[0].verdict.as_ref().unwrap().held, Some(true));
         assert_eq!(board.items[0].prompt.as_ref().unwrap().options[0].key.as_deref(), Some("y"));
+        assert_eq!(board.accepts.as_deref(), Some([Kind::Answer, Kind::Push, Kind::PromptAnswer].as_slice()));
         assert_eq!(serde_json::to_value(&board).unwrap(), full);
         for (path, value) in [("/next/0/part", serde_json::json!("later")), ("/later/0/state", serde_json::json!("working")), ("/later/0/path", serde_json::json!("/Users/x"))] {
             let mut wrong = full.clone();

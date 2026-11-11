@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { commandId, COMMAND_TTL, deviceListStatement, deviceListTrusts, deviceListWith, deviceListWithout, emptyDeviceList, newDeviceKeys, sealCommand, signDeviceList, verifyDeviceList, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, machineFingerprint, openBlob, openEnvelope, pairingCommitment, pairingNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, deviceListStatement, deviceListTrusts, deviceListWith, deviceListWithout, emptyDeviceList, newDeviceKeys, sealCommand, signDeviceList, verifyDeviceList, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, machineFingerprint, openBlob, openEnvelope, pairingCommitment, pairingNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -417,6 +417,29 @@ test("a command sealed by a fresh device key opens for the machine and for the d
   assert.equal(await failure(openEnvelope(envelope, await identity("tablet"), fromDevice, at)), "not-a-recipient");
   assert.equal(await failure(openEnvelope(envelope, await identity("machine"), await sender("phone"), at)), "bad-signature");
   assert.equal(await failure(sealCommand({ device, machine, payload: { type: "answer", address: "a@b", question: "q", choice: "first", comment: "" }, at })), "malformed");
+});
+
+test("an answer to an agent's prompt lives ten minutes, as Rust's limit for its kind says", async () => {
+  assert.equal(envelopes.max_ttl["prompt-answer"], PROMPT_ANSWER_TTL);
+  assert.equal(PROMPT_ANSWER_TTL, 600);
+  const sealed = envelopes.cases.find((candidate) => candidate.name === "prompt-answer-opened-by-the-machine");
+  checkPayload(sealed.expect.payload);
+  checkShape(sealed.envelope);
+  assert.throws(() => checkShape({ ...sealed.envelope, exp: sealed.envelope.at + 601 }), (error) => error.code === "malformed");
+  const keys = await newDeviceKeys();
+  const payload = { type: "prompt-answer", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y" };
+  const envelope = await sealCommand({ device: { id: parties.phone.id, ...keys }, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
+  assert.equal(envelope.exp - envelope.at, 600);
+  assert.throws(() => checkPayload({ ...payload, choice: 0 }), (error) => error.code === "malformed");
+});
+
+test("a board says which commands its machine takes, and a board without the list still passes", () => {
+  const full = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
+  assert.deepEqual(full.accepts, ["answer", "push", "prompt-answer"]);
+  checkPayload(full);
+  const plain = envelopes.cases.find((vector) => vector.name === "board-opened-by-a-device").expect.payload;
+  assert.equal(Object.hasOwn(plain, "accepts"), false);
+  assert.throws(() => checkPayload({ ...full, accepts: "prompt-answer" }), (error) => error.code === "malformed");
 });
 
 test("a question option may say it needs a note, and nothing else", () => {

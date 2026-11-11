@@ -12,8 +12,8 @@ use kebbie_hub_fakes::machine::{Handling, MachineState, Posted};
 use kebbie_hub_fakes::phone::{PairedMachine, PhoneState};
 use kebbie_hub_fakes::{Error, HubError};
 use kebbie_hub_protocol::{
-    Answer, CommandResult, Envelope, Header, Id, Kind, Outcome, Payload, Prefix, PushApproval,
-    Reason, Role, SecretKeys, StartTask, TrustedDevice, seal,
+    Answer, CommandResult, Envelope, Header, Id, Kind, Outcome, Payload, Prefix, PromptAnswer,
+    PushApproval, Reason, Role, SecretKeys, StartTask, TrustedDevice, seal,
 };
 use serde_json::Value;
 
@@ -99,6 +99,33 @@ async fn an_answer_from_the_phone_is_applied_and_its_result_comes_back() {
     assert_eq!(result.command, sent.header.id);
     assert_eq!(result.outcome, Outcome::Done);
     assert_eq!(machine.applied.len(), 1);
+}
+
+#[tokio::test]
+async fn a_prompt_answer_is_relayed_like_any_command_and_lives_ten_minutes_at_most() {
+    let test = start_hub(|_| {}).await;
+    let (mut machine, phone) = paired(&test).await;
+    let chosen = Payload::PromptAnswer(PromptAnswer {
+        address: ADDRESS.to_string(),
+        prompt: "3f2a9c1d".to_string(),
+        key: "y".to_string(),
+    });
+    let sent = phone.command(&machine.machine, &chosen).await.unwrap();
+    assert_eq!(sent.header.exp - sent.header.at, 600);
+    let handled = machine.apply_once(0, None).await.unwrap();
+    assert_eq!(handled[0].kind, Kind::PromptAnswer);
+    assert!(
+        matches!(&handled[0].handling, Handling::Applied { did, .. } if did.contains("prompt 3f2a9c1d")),
+        "{:?}",
+        handled[0].handling
+    );
+    assert_eq!(result_of(&phone, &sent).await.outcome, Outcome::Done);
+    assert!(
+        phone
+            .seal_command(&machine.machine, &chosen, kebbie_hub::now(), Some(601))
+            .is_err(),
+        "a screen prompt is momentary"
+    );
 }
 
 #[tokio::test]

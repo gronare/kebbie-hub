@@ -6,7 +6,9 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use kebbie_hub_fakes::phone::PhoneState;
 use kebbie_hub_fakes::{load, save};
-use kebbie_hub_protocol::{Answer, Id, Outcome, Payload, PushApproval, RunRoutine, StartTask};
+use kebbie_hub_protocol::{
+    Answer, Id, Outcome, Payload, PromptAnswer, PushApproval, RunRoutine, StartTask,
+};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Parser)]
@@ -88,6 +90,15 @@ enum Command {
     #[command(about = "Run one of the machine's routines now")]
     Routine {
         id: String,
+        #[command(flatten)]
+        target: Target,
+    },
+    #[command(about = "Choose an option of the prompt an agent shows on a task's screen, by the prompt's id and the option's key")]
+    Choose {
+        address: String,
+        #[arg(long)]
+        prompt: String,
+        key: String,
         #[command(flatten)]
         target: Target,
     },
@@ -261,6 +272,21 @@ async fn run(cli: Cli) -> Result<(), String> {
                 Payload::Routine(RunRoutine { id }),
             )
             .await?;
+        }
+        Command::Choose {
+            address,
+            prompt,
+            key,
+            target,
+        } => {
+            let state: PhoneState = load(&cli.state).map_err(|e| text(&e))?;
+            let machine = target.machine(&state)?;
+            let payload = Payload::PromptAnswer(PromptAnswer {
+                address,
+                prompt,
+                key,
+            });
+            send(&state, &target, &machine, payload).await?;
         }
     }
     Ok(())

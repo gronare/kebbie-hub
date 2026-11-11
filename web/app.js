@@ -6,7 +6,7 @@ import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, deviceCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { collectResults, DeviceListProblem, enableDevice, forgetDevice, keepSent, loadDevice, loadSent, removeListedDevice, sendCommand, trustedDeviceList } from "./device.js";
-import { answerBlock, answerReady, COMMAND_TEXT, deviceRows, gate, latestSent, pushBlock, pushReady, refusedBlock, sentState, settled, setupBlock } from "./decide.js";
+import { answerBlock, answerReady, choosable, COMMAND_TEXT, deviceRows, gate, latestSent, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, setupBlock, takesPromptAnswers } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
@@ -15,7 +15,7 @@ import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, backButton, reviewLines, routinesBlock, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, reviewLines, routinesBlock, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -244,7 +244,7 @@ function questionBlock(found) {
     const context = [found.repo, item.summary].filter(Boolean).join(" · ");
     return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}${answerArea(found)}`;
   }
-  return promptBlock(found, state.info?.commands ? `<div class="pro">Answer Codex prompts at the machine.</div>` : machineAnswerNote());
+  return promptBlock(found, promptArea(found));
 }
 
 function cardBlock(found) {
@@ -273,7 +273,7 @@ function cardBlock(found) {
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
-const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null });
+const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null });
 
 function uiOf(machine, address) {
   const key = uiKey(machine, address);
@@ -284,8 +284,8 @@ function uiOf(machine, address) {
 const commandGate = () => gate({ info: state.info, refused: state.refused, device: state.device });
 const decide = (found, html) => `<div class="decide" data-machine="${esc(found.machine)}" data-address="${esc(found.item.address)}">${html}</div>`;
 
-function sentFor(found, kind, question = null) {
-  const sent = latestSent(state.kept.sent, { machine: found.machine, address: found.item.address, kind, question });
+function sentFor(found, kind, question = null, prompt = null) {
+  const sent = latestSent(state.kept.sent, { machine: found.machine, address: found.item.address, kind, question, prompt });
   if (!sent) return { sent: null, state: null };
   const opened = state.opened.find((machine) => machine.machine === found.machine);
   return { sent, state: sentState(sent, { now: nowSeconds(), asleep: isAsleep({ lastSeen: opened?.lastSeen ?? null }, nowSeconds()) }) };
@@ -299,6 +299,15 @@ function answerArea(found) {
   if (access === "setup") return optionCards(question.options, question.recommend) + setupBlock(state.pro);
   const { sent, state: shown } = sentFor(found, "answer", question.id);
   return decide(found, answerBlock({ key: uiKey(found.machine, found.item.address), question, ui: uiOf(found.machine, found.item.address), sent, state: shown }));
+}
+
+function promptArea(found) {
+  const prompt = found.item.prompt;
+  if (commandGate() !== "ready" || !takesPromptAnswers(found)) return promptCards(prompt) + (state.info?.commands ? `<div class="pro">Answer Codex prompts at the machine.</div>` : machineAnswerNote());
+  const ui = uiOf(found.machine, found.item.address);
+  if (ui.prompt !== prompt.id && !ui.busy) Object.assign(ui, freshUi(), { prompt: prompt.id });
+  const { sent, state: shown } = sentFor(found, "prompt-answer", null, prompt.id);
+  return decide(found, promptAnswerBlock({ prompt, ui, sent, state: shown }));
 }
 
 function pushArea(found) {
@@ -677,6 +686,16 @@ function sendAnswer(target) {
   send(target, { type: "answer", address, question: question.id, choice, comment: ui.note.trim() }, { question: question.id, choice, label: option?.label ?? null, machineName: found.name });
 }
 
+function sendPromptAnswer(target) {
+  const { machine, address } = target.dataset;
+  const found = findTask(state.opened, machine, address);
+  const prompt = found?.item.prompt;
+  const ui = uiOf(machine, address);
+  const option = prompt?.options[ui.picked];
+  if (!prompt || ui.prompt !== prompt.id || !takesPromptAnswers(found) || !choosable(option)) return;
+  send(target, { type: "prompt-answer", address, prompt: prompt.id, key: option.key }, { prompt: prompt.id, key: option.key, label: option.label, machineName: found.name });
+}
+
 function sendPush(target) {
   const { machine, address } = target.dataset;
   const found = findTask(state.opened, machine, address);
@@ -698,6 +717,7 @@ function decideAction(action, target, element) {
   else if (action === "push-ask") Object.assign(ui, { confirming: true, error: null });
   else if (action === "push-cancel") Object.assign(ui, { confirming: false, error: null });
   else if (action === "answer") return sendAnswer(target);
+  else if (action === "choose") return sendPromptAnswer(target);
   else if (action === "push") return sendPush(target);
   render();
 }

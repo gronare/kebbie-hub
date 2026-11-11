@@ -19,8 +19,8 @@ export function sentState(sent, { now, asleep }) {
 
 export const settled = (state) => state === "expired" || state === "refused";
 
-export function latestSent(sentList, { machine, address, kind, question = null }) {
-  const mine = sentList.filter((one) => one.machine === machine && one.address === address && one.kind === kind && (question === null || one.question === question));
+export function latestSent(sentList, { machine, address, kind, question = null, prompt = null }) {
+  const mine = sentList.filter((one) => one.machine === machine && one.address === address && one.kind === kind && (question === null || one.question === question) && (prompt === null || one.prompt === prompt));
   return mine.sort((a, b) => b.at - a.at)[0] ?? null;
 }
 
@@ -53,6 +53,42 @@ export function pushStatus(sent, state) {
   if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep past the hour`, `Push again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
   if (state === "waiting") return block("wait", `Waiting for ${machine}`, `Your push of ${sha} goes out when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
   return block("wait", `Sent to ${machine}`, `${machine} rebases ${sha} onto main and pushes.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+}
+
+export function promptStatus(sent, state) {
+  const machine = esc(sent.machineName);
+  const label = esc(sent.label);
+  if (state === "done") return block("done", `✓ Chose: ${label}`, `${esc(sent.address)} carries on.`, `${from(sent)} · the lead got a copy`);
+  if (state === "refused") return block("refused", ...refusal("Not chosen", sent.result.text), from(sent));
+  if (state === "expired") return block("refused", `Not delivered: ${machine} didn't take it within ten minutes`, `A prompt on the screen doesn't wait. If it still asks, choose again.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `"${label}" is chosen if ${machine} wakes within ten minutes and the prompt still shows.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+  return block("wait", `Sent to ${machine}`, `${machine} chooses "${label}" if the prompt still shows.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+}
+
+export const takesPromptAnswers = (found) => Array.isArray(found?.accepts) && found.accepts.includes("prompt-answer");
+
+export const choosable = (option) => Boolean(option) && !option.takes_text && typeof option.key === "string" && option.key !== "";
+
+function promptCard(option, index, { picked, pickable }) {
+  const press = pickable && choosable(option);
+  const classes = ["opt", press ? "pick" : "", picked === index ? "picked" : ""].filter(Boolean).join(" ");
+  const attributes = press ? ` role="button" tabindex="0" data-action="pick" data-index="${index}" aria-pressed="${picked === index}"` : "";
+  const meaning = choosable(option) ? "" : "answer at the machine";
+  return `<div class="${classes}"${attributes}><b>${esc(option.label)}</b>${meaning ? `<small>${meaning}</small>` : ""}</div>`;
+}
+
+export function promptAnswerBlock({ prompt, ui, sent, state }) {
+  const live = sent && !settled(state);
+  const sentAt = live ? prompt.options.findIndex((option) => option.key === sent.key) : -1;
+  const picked = live ? (sentAt < 0 ? null : sentAt) : ui.picked;
+  const cards = prompt.options.map((option, index) => promptCard(option, index, { picked, pickable: !live && !ui.busy }));
+  const options = `<div class="options${live || picked !== null ? " chosen" : ""}">${cards.join("")}</div>`;
+  const status = sent ? promptStatus(sent, state) : "";
+  if (live) return options + status;
+  const error = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
+  const option = picked === null ? undefined : prompt.options[picked];
+  if (choosable(option)) return options + status + `<div class="answer-row"><button type="button" class="btn primary" data-action="choose"${ui.busy ? " disabled" : ""}>Choose: ${esc(option.label)}</button></div>` + error;
+  return options + status + error;
 }
 
 function optionCard(option, index, { recommend, picked, pickable }) {

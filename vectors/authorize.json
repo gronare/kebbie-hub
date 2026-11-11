@@ -5,7 +5,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -44,7 +45,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {
@@ -91,7 +93,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {
@@ -133,7 +136,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {
@@ -180,7 +184,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -218,7 +223,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -254,7 +260,143 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "ct": "DCYL6PFhPQ_4kG_TYrtzoNaPdeU9wxT_2JBN8hOZlA2u_XpNKQWiErJejC2z1sF5CbvWgZRwUAlcRXWC9ZhdrNMyZRMIeRlmdZK75p4i3lNGigKpuw8lF8SFPKT-V9aU7V2_4UjyGHwE",
+        "exp": 1761070200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-77fb-a8a5-6828b1ae665f",
+        "kc": "sEa_26yA3RI2qXYLMmEmR-ozO3ggFnjm2WwiOrtcfz0",
+        "keys": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "6ZvFU5C5wLp2t9JWkoxEXa8YFjEFUAblUoor0dXQ5DX566JHw88EwdY2bZmdPqtFaDF1hKQYUspb1i2MChKouvAB7ZBE3zGWiekjspHSduo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "JgW_KUIVr652Q11PZxzuekSOMliNssmmUpfnc668TGmFhRzn-x-ODJ3p-Dgf5tAAmv-s0Z5oMPyHXVHdpGfLfn_xhpQNI__yjhx0K63bwc4"
+        },
+        "kind": "prompt-answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "nZPQ3NVKUlqm7KeL5-n2WCng_MEOyrCrWpq87DXPsQDGfkc1KTp89_wCHhAqUyAQwI3NRnsauMAuqgUylP20Aw",
+        "v": 1
+      },
+      "expect": {
+        "accepted": "dev_01K83YV380329ARS69J86ZB9PB",
+        "payload": {
+          "address": "hub@kebbie",
+          "key": "y",
+          "prompt": "3f2a9c1d",
+          "type": "prompt-answer"
+        }
+      },
+      "name": "control-device-answers-an-agents-prompt"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "ct": "DCYL6PFhPQ_4kG_TYrtzoNaPdeU9wxT_2JBN8hOZlA2u_XpNKQWiErJejC2z1sF5CbvWgZRwUAlcRXWC9ZhdrNMyZRMIeRlmdZK75p4i3lNGigKpuw8lF8SFPKT-V9aU7V2_4UjyGHwE",
+        "exp": 1761070200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-77fb-a8a5-6828b1ae665f",
+        "kc": "sEa_26yA3RI2qXYLMmEmR-ozO3ggFnjm2WwiOrtcfz0",
+        "keys": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "6ZvFU5C5wLp2t9JWkoxEXa8YFjEFUAblUoor0dXQ5DX566JHw88EwdY2bZmdPqtFaDF1hKQYUspb1i2MChKouvAB7ZBE3zGWiekjspHSduo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "JgW_KUIVr652Q11PZxzuekSOMliNssmmUpfnc668TGmFhRzn-x-ODJ3p-Dgf5tAAmv-s0Z5oMPyHXVHdpGfLfn_xhpQNI__yjhx0K63bwc4"
+        },
+        "kind": "prompt-answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "nZPQ3NVKUlqm7KeL5-n2WCng_MEOyrCrWpq87DXPsQDGfkc1KTp89_wCHhAqUyAQwI3NRnsauMAuqgUylP20Aw",
+        "v": 1
+      },
+      "expect": {
+        "answer": "not-allowed"
+      },
+      "name": "prompt-answer-to-a-machine-that-does-not-take-it-is-refused"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "start",
+        "routine",
+        "prompt-answer"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "ct": "oFqVBNTmO2w8MYi2mOLNTzw-UpNFcL8mF_2xh5KE_894j7Y8OzGFUCJDXJh4DJVm4u6lZLr9CmsNW6sA5HhOu-LQCi483UXZjd1fdDQKU6tO3CRcXzpVMNym5DrtD9NVw4Y_RKFGvyYw",
+        "exp": 1761070201,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7b2e-abf3-5667fa981a26",
+        "kc": "1NtZJOk01kKVp1gIWxquF9NOXiHuWEz-dtF_3vYB1Sk",
+        "keys": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "wmJxtmZsyntjg5k7E2N_waPXl57V1dX46B5sMoKhE36mJXKazcSRMy6af79L4CuNCjdiIZx2VLoPwTEKGqF4UfZh_6hnTrMz9yRRCih5r7M",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "gHMBoR2pr3XWDiCYB83h47G9bvy--2ZEHjdT20iEGlTikB3q3s7vcDw7E78wTPJZFgzDH-6fqJO1MXI52hj0t7Pm94ofuazkUvIzMx9aQQY"
+        },
+        "kind": "prompt-answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "KW_zhrzyXhhoGsQbeujJSQaYvumXDNXWe3sNzdqVzmSEMpcv-T5JfcWBZrSp7vG3KOuiAdKHhGG58F8RuIomAw",
+        "v": 1
+      },
+      "expect": {
+        "drop": "malformed"
+      },
+      "name": "prompt-answer-living-past-ten-minutes-is-dropped"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "start",
+        "routine",
+        "prompt-answer"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "ct": "UVp7iMw1boWV9bonx0He0WtDU1T8erUYscv_dyiFpb2zXVMJXH5-aNvLbEEeChHAUTa-kLQBb-hkKmkbfZPn45-bdmTo63NxP_jUB4x0D3kQWktxBwxoMIZrdMZ9-oz99Z5-tGCt8WbUYeY_Zmci",
+        "exp": 1761070200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-76f8-b396-3035913b14ef",
+        "kc": "lH5jfVxrxN5kSP2VFIPWeqHD0LrCGS6533N6yhtcGio",
+        "keys": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "5Soep_8sZqmp4ganCPD5penumko-pBW1TQdgWcbr5GE5zS5l32lrP6JB_gQZD6cAQmXg-XyF2c4Wg-X4Q5zBOW17XyELj5nL8oFaR1sVQsQ",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wFEjauceu5y6gUHvsRpHgUBjSb_msECHwcUF1UO4hDHoN9r797-JmcuIrFBD-8oa6E5fC9JCQGkuBVDIQ28LR3NINYk7LwQSh6c0E-lL7UQ"
+        },
+        "kind": "prompt-answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "a7qNrgVemlaxt4dU2ds04h0brw0W93QK6IzonkQ0t97hnjyLQmvul5_UPBlsKxPeiGwdlgPyGskZp6ceqf2cAw",
+        "v": 1
+      },
+      "expect": {
+        "answer": "bad-request"
+      },
+      "name": "prompt-answer-with-keystrokes-for-a-key-is-refused"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "start",
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -286,7 +428,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -347,7 +490,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -379,7 +523,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -411,7 +556,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -443,7 +589,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -475,7 +622,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -507,7 +655,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -538,7 +687,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -570,7 +720,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -601,7 +752,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -633,7 +785,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -664,7 +817,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}
@@ -696,7 +850,8 @@
         "answer",
         "push",
         "start",
-        "routine"
+        "routine",
+        "prompt-answer"
       ],
       "applied": {
         "applied": {}

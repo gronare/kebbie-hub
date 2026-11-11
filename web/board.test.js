@@ -128,6 +128,9 @@ test("a task is found by machine and address", () => {
   const opened = [machineWith("mch_a", "devbox", now, [item("refunds@api", "NEEDS YOU")])];
   assert.equal(findTask(opened, "mch_a", "refunds@api").task, "refunds");
   assert.equal(findTask(opened, "mch_b", "refunds@api"), null);
+  assert.equal(findTask(opened, "mch_a", "refunds@api").accepts, null, "a board without the list of commands its machine takes");
+  opened[0].board.accepts = ["answer", "push", "prompt-answer"];
+  assert.deepEqual(findTask(opened, "mch_a", "refunds@api").accepts, ["answer", "push", "prompt-answer"]);
   assert.deepEqual(splitAddress("a@b@repo"), { task: "a@b", repo: "repo" });
   assert.deepEqual(splitAddress("loose"), { task: "loose", repo: "" });
 });

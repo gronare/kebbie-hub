@@ -19,6 +19,7 @@ pub enum Kind {
     Push,
     Start,
     Routine,
+    PromptAnswer,
 }
 
 impl Kind {
@@ -31,13 +32,14 @@ impl Kind {
             Kind::Push => "push",
             Kind::Start => "start",
             Kind::Routine => "routine",
+            Kind::PromptAnswer => "prompt-answer",
         }
     }
 
     pub fn is_command(self) -> bool {
         matches!(
             self,
-            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine
+            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::PromptAnswer
         )
     }
 
@@ -55,7 +57,7 @@ impl Kind {
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push => 3_600,
-            Kind::Start | Kind::Routine => 600,
+            Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
         }
     }
 
@@ -65,6 +67,7 @@ impl Kind {
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Start | Kind::Routine => 86_400,
+            Kind::PromptAnswer => 600,
         }
     }
 }

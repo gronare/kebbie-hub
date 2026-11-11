@@ -41,7 +41,7 @@ pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
     Answer, CommandResult, Event, MAX_OPTIONS, MAX_PROMPT_CHARS, Notice, Outcome, Payload,
-    PushApproval, Reason, RunRoutine, StartTask,
+    PromptAnswer, PushApproval, Reason, RunRoutine, StartTask,
 };
 pub use pairing::{CommitmentMismatch, DevicePairing, MachinePairing, commitment, comparison_code};
 

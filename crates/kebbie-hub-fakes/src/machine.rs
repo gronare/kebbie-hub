@@ -34,7 +34,7 @@ fn control() -> Role {
 }
 
 fn every_command() -> Vec<Kind> {
-    vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine]
+    vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer]
 }
 
 impl AdmittedDevice {
@@ -643,6 +643,13 @@ impl MachineState {
             Payload::Routine(routine) => (
                 format!("run routine {}", routine.id),
                 done(format!("Started routine {}.", routine.id)),
+            ),
+            Payload::PromptAnswer(answer) => (
+                format!(
+                    "choose {} in {}'s prompt {}",
+                    answer.key, answer.address, answer.prompt
+                ),
+                done(format!("Chose {} in {}'s prompt.", answer.key, answer.address)),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),

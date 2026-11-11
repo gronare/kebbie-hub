@@ -121,5 +121,5 @@ export function arrange(opened, now) {
 export function findTask(opened, machine, address) {
   const found = opened.find((candidate) => candidate.machine === machine);
   const item = found?.board?.items.find((candidate) => candidate.address === address);
-  return item ? { machine, name: found.name, item, ...splitAddress(address) } : null;
+  return item ? { machine, name: found.name, item, accepts: found.board.accepts ?? null, ...splitAddress(address) } : null;
 }

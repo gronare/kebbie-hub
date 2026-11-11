@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { answerBlock, answerReady, answerStatus, gate, latestSent, pushBlock, pushReady, refusedBlock, sentState } from "./decide.js";
+import { answerBlock, answerReady, answerStatus, choosable, gate, latestSent, promptAnswerBlock, promptStatus, pushBlock, pushReady, refusedBlock, sentState, takesPromptAnswers } from "./decide.js";
 
 const HEAD = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
 const AT = 1_761_069_600;
@@ -98,4 +98,55 @@ test("a ready task offers a push, asks once, then reports the machine's result",
   assert.match(pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: { outcome: "failed", text: "git crashed" } }, state: "refused" }), /<b>Not pushed<\/b><span>git crashed<\/span>/);
   assert.match(refused, /push-ask/, "a refused push can be asked again");
   assert.match(pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: null }, state: "waiting" }), /Waiting for mac/);
+});
+
+const prompt = { id: "3f2a9c1d", question: "Run it?", options: [{ label: "Yes, proceed (y)", takes_text: false, key: "y" }, { label: "No, and tell Codex what to do differently (esc)", takes_text: false, key: "esc" }, { label: "Type something", takes_text: true, key: "3" }] };
+const chose = (extra = {}) => ({ id: "cmd_q", kind: "prompt-answer", machine: "mch_1", machineName: "mac", device: "iPhone Duo", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y", label: "Yes, proceed (y)", at: AT, exp: AT + 600, result: null, ...extra });
+
+test("a prompt is answered from here only on a machine whose board says it takes prompt answers", () => {
+  assert.equal(takesPromptAnswers({ accepts: ["answer", "push", "prompt-answer"] }), true);
+  assert.equal(takesPromptAnswers({ accepts: ["answer", "push"] }), false);
+  assert.equal(takesPromptAnswers({ accepts: null }), false, "a kebbie from before prompt answers sends no list");
+});
+
+test("an option that takes text is shown as answered at the machine and can't be tapped, even when picked", () => {
+  assert.deepEqual(prompt.options.map(choosable), [true, true, false]);
+  assert.equal(choosable({ label: "Yes", takes_text: false }), false, "an option without a key can't be chosen");
+  const idleBlock = promptAnswerBlock({ prompt, ui: idle(), sent: null, state: null });
+  assert.equal((idleBlock.match(/data-action="pick"/g) ?? []).length, 2);
+  assert.match(idleBlock, /<div class="opt"><b>Type something<\/b><small>answer at the machine<\/small><\/div>/);
+  assert.doesNotMatch(idleBlock, /data-action="choose"/);
+  assert.doesNotMatch(promptAnswerBlock({ prompt, ui: { ...idle(), picked: 2 }, sent: null, state: null }), /data-action="choose"/);
+});
+
+test("picking a prompt option asks to confirm the choice, and while it is on its way the options are fixed", () => {
+  const picked = promptAnswerBlock({ prompt, ui: { ...idle(), picked: 1 }, sent: null, state: null });
+  assert.match(picked, /class="options chosen"/);
+  assert.match(picked, /class="opt pick picked"/);
+  assert.match(picked, /data-action="choose">Choose: No, and tell Codex what to do differently \(esc\)</);
+  assert.match(promptAnswerBlock({ prompt, ui: { ...idle(), picked: 0, busy: true }, sent: null, state: null }), /data-action="choose" disabled>/);
+  const pending = promptAnswerBlock({ prompt, ui: idle(), sent: chose(), state: "sending" });
+  assert.doesNotMatch(pending, /data-action="(pick|choose)"/);
+  assert.match(pending, /class="opt picked"/);
+  assert.match(pending, /mac chooses "Yes, proceed \(y\)" if the prompt still shows\./);
+  const refused = promptAnswerBlock({ prompt, ui: idle(), sent: chose({ result: { outcome: "refused", reason: "already-settled", text: "The prompt 3f2a9c1d is not on the task's screen any more" } }), state: "refused" });
+  assert.match(refused, /<b>Not chosen<\/b><span>The prompt 3f2a9c1d is not on the task/);
+  assert.match(refused, /data-action="pick"/, "a refused choice can be made again");
+});
+
+test("a prompt answer expires after ten minutes and its status lines say what happened", () => {
+  assert.equal(sentState(chose(), { now: AT + 599, asleep: true }), "waiting");
+  assert.equal(sentState(chose(), { now: AT + 600, asleep: true }), "expired");
+  assert.match(promptStatus(chose(), "expired"), /Not delivered: mac didn't take it within ten minutes/);
+  const done = promptStatus(chose({ result: { outcome: "done", text: "Chose it." } }), "done");
+  assert.match(done, /✓ Chose: Yes, proceed \(y\)/);
+  assert.match(done, /from iPhone Duo at \d\d:\d\d · the lead got a copy/);
+  assert.match(promptStatus(chose(), "waiting"), /Waiting for mac/);
+});
+
+test("the latest prompt answer shown is the one for the prompt on screen now", () => {
+  const before = chose({ id: "cmd_a", prompt: "0000aaaa" });
+  const now = chose({ id: "cmd_b", at: AT - 60 });
+  assert.equal(latestSent([before, now], { machine: "mch_1", address: "hub@kebbie", kind: "prompt-answer", prompt: "3f2a9c1d" }).id, "cmd_b");
+  assert.equal(latestSent([before], { machine: "mch_1", address: "hub@kebbie", kind: "prompt-answer", prompt: "3f2a9c1d" }), null);
 });

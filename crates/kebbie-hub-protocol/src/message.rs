@@ -6,6 +6,8 @@ use crate::ids::Id;
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
+const MAX_PROMPT_ID_CHARS: usize = 64;
+const MAX_OPTION_KEY_CHARS: usize = 16;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -17,6 +19,7 @@ pub enum Payload {
     Push(PushApproval),
     Start(StartTask),
     Routine(RunRoutine),
+    PromptAnswer(PromptAnswer),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -172,6 +175,14 @@ pub struct RunRoutine {
     pub id: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromptAnswer {
+    pub address: String,
+    pub prompt: String,
+    pub key: String,
+}
+
 impl Payload {
     pub fn kind(&self) -> Kind {
         match self {
@@ -182,6 +193,7 @@ impl Payload {
             Payload::Push(_) => Kind::Push,
             Payload::Start(_) => Kind::Start,
             Payload::Routine(_) => Kind::Routine,
+            Payload::PromptAnswer(_) => Kind::PromptAnswer,
         }
     }
 
@@ -218,6 +230,11 @@ impl Payload {
             Payload::Routine(routine) => {
                 check(is_token(&routine.id), "routine id is not a plain name")
             }
+            Payload::PromptAnswer(answer) => {
+                check(is_address(&answer.address), "address is not task@repo")?;
+                check(is_word(&answer.prompt, MAX_PROMPT_ID_CHARS), "prompt is not a prompt id")?;
+                check(is_word(&answer.key, MAX_OPTION_KEY_CHARS), "key is not an option's key")
+            }
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => Ok(()),
         }
     }
@@ -234,6 +251,11 @@ fn is_token(text: &str) -> bool {
         && bytes.iter().all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
         })
+}
+
+fn is_word(text: &str, max: usize) -> bool {
+    (1..=max).contains(&text.len())
+        && text.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
 fn is_address(text: &str) -> bool {
@@ -307,5 +329,31 @@ mod tests {
             card_sha: None,
         });
         assert!(push.validate().is_err());
+        let prompt = |prompt: &str, key: &str| {
+            Payload::PromptAnswer(PromptAnswer {
+                address: "refunds@shop".into(),
+                prompt: prompt.into(),
+                key: key.into(),
+            })
+        };
+        assert_eq!(prompt("3f9a1c2e", "esc").validate(), Ok(()));
+        assert_eq!(prompt("3f9a1c2e", "1").validate(), Ok(()));
+        assert!(prompt("", "1").validate().is_err());
+        assert!(prompt("3f9a1c2e", "").validate().is_err());
+        assert!(prompt("3f9a1c2e", "y\n").validate().is_err(), "a key is never keystrokes of its own");
+        assert!(prompt("3f9a1c2e", &"y".repeat(17)).validate().is_err());
+    }
+
+    #[test]
+    fn a_prompt_answer_lives_ten_minutes_at_most() {
+        assert_eq!(
+            (Kind::PromptAnswer.default_ttl(), Kind::PromptAnswer.max_ttl()),
+            (600, 600)
+        );
+        let json = serde_json::json!({ "type": "prompt-answer", "address": "refunds@shop", "prompt": "3f9a1c2e", "key": "y" });
+        assert_eq!(
+            serde_json::from_value::<Payload>(json).unwrap().kind(),
+            Kind::PromptAnswer
+        );
     }
 }

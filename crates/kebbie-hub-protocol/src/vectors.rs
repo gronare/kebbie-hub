@@ -27,8 +27,8 @@ use crate::crypto::{
 use crate::envelope::{Envelope, Header, Kind, Urgency};
 use crate::ids::{Id, Prefix};
 use crate::message::{
-    Answer, CommandResult, Event, Notice, Outcome, Payload, PushApproval, Reason, RunRoutine,
-    StartTask,
+    Answer, CommandResult, Event, Notice, Outcome, Payload, PromptAnswer, PushApproval, Reason,
+    RunRoutine, StartTask,
 };
 use crate::pairing::{DevicePairing, MachinePairing};
 
@@ -246,6 +246,7 @@ fn board() -> Payload {
         next: None,
         counts: None,
         later: None,
+        accepts: None,
     })
 }
 
@@ -409,6 +410,7 @@ fn next_board() -> Payload {
             question: true,
         },
     ]);
+    board.accepts = Some(vec![Kind::Answer, Kind::Push, Kind::PromptAnswer]);
     Payload::Board(board)
 }
 
@@ -423,6 +425,14 @@ fn answer_to(address: &str) -> Payload {
 
 fn answer() -> Payload {
     answer_to("refunds@shop")
+}
+
+fn prompt_answer(key: &str) -> Payload {
+    Payload::PromptAnswer(PromptAnswer {
+        address: "hub@kebbie".into(),
+        prompt: "3f2a9c1d".into(),
+        key: key.into(),
+    })
 }
 
 fn push(head: &str) -> Payload {
@@ -693,6 +703,21 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         phone,
         phone,
         answer(),
+    ));
+
+    let prompt_sealed = seal_case(
+        "prompt-answer",
+        command_header("prompt-answer", Kind::PromptAnswer, phone, machine),
+        &prompt_answer("y"),
+        phone,
+        &[phone, machine],
+    );
+    cases.push(opens(
+        "prompt-answer-opened-by-the-machine",
+        &prompt_sealed,
+        machine,
+        phone,
+        prompt_answer("y"),
     ));
 
     let mut notice_header = machine_header("notice", Kind::Notice, machine);
@@ -1133,6 +1158,7 @@ fn envelopes_json(parties: &Parties) -> Value {
         Kind::Push,
         Kind::Start,
         Kind::Routine,
+        Kind::PromptAnswer,
     ]
     .into_iter()
     .map(|kind| (kind.name(), kind.max_ttl()))
@@ -1158,7 +1184,7 @@ fn authorize_json(parties: &Parties) -> Value {
         ..
     } = parties;
     let trusted = parties.trusted();
-    let all = vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine];
+    let all = vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer];
     let start = |prompt: String| {
         Payload::Start(StartTask {
             repo: "shop".into(),
@@ -1204,6 +1230,15 @@ fn authorize_json(parties: &Parties) -> Value {
         "authorize/over-long-ttl",
         long_lived,
         &serde_json::to_vec(&answer()).unwrap(),
+        phone,
+        &[phone, machine],
+    );
+    let mut lingering = command_header("authorize/prompt-over-ten-minutes", Kind::PromptAnswer, phone, machine);
+    lingering.exp = lingering.at + 601;
+    let lingering = seal_bypassing_checks(
+        "authorize/prompt-over-ten-minutes",
+        lingering,
+        &serde_json::to_vec(&prompt_answer("y")).unwrap(),
         phone,
         &[phone, machine],
     );
@@ -1282,6 +1317,28 @@ fn authorize_json(parties: &Parties) -> Value {
             "control-device-runs-a-routine",
             from_phone("authorize/routine", Kind::Routine, &routine),
             Ok(routine.clone()),
+        ),
+        case(
+            "control-device-answers-an-agents-prompt",
+            from_phone("authorize/prompt", Kind::PromptAnswer, &prompt_answer("y")),
+            Ok(prompt_answer("y")),
+        ),
+        AuthorizeCase {
+            name: "prompt-answer-to-a-machine-that-does-not-take-it-is-refused",
+            accepts: vec![Kind::Answer, Kind::Push],
+            applied: AppliedCommands::default(),
+            envelope: from_phone("authorize/prompt", Kind::PromptAnswer, &prompt_answer("y")),
+            expect: Err(Refusal::Answer(Reason::NotAllowed)),
+        },
+        case(
+            "prompt-answer-living-past-ten-minutes-is-dropped",
+            lingering,
+            Err(Refusal::Drop(crate::Dropped::Malformed)),
+        ),
+        case(
+            "prompt-answer-with-keystrokes-for-a-key-is-refused",
+            from_phone("authorize/prompt-keys", Kind::PromptAnswer, &prompt_answer("y enter")),
+            Err(Refusal::Answer(Reason::BadRequest)),
         ),
         case(
             "read-device-is-refused",

@@ -216,13 +216,14 @@ export function promptParts(text) {
   return { question, command: command.join(" "), details };
 }
 
-export function promptBlock({ item, repo }, note = machineAnswerNote()) {
+export const promptCards = (prompt) => optionCards(prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })));
+
+export function promptBlock({ item, repo }, answer = promptCards(item.prompt) + machineAnswerNote()) {
   const { question, command, details } = promptParts(item.prompt.question);
   const context = [esc(repo), agentChip(item.agent)].filter(Boolean).join(" · ");
   const detail = details.map((line) => `<div class="meta pad">${esc(line)}</div>`).join("");
   const cmd = command ? `<div class="cmd">${esc(command)}</div>` : "";
-  const options = optionCards(item.prompt.options.map((option) => ({ label: option.label, meaning: option.takes_text ? "with text" : "" })));
-  return `<p class="q">${esc(question)}</p>${context ? `<div class="meta pad">${context}</div>` : ""}${detail}${cmd}${options}${note}`;
+  return `<p class="q">${esc(question)}</p>${context ? `<div class="meta pad">${context}</div>` : ""}${detail}${cmd}${answer}`;
 }
 
 export function machineRow({ machine, name, awake, facts }) {

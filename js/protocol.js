@@ -28,7 +28,9 @@ export const PROTOCOL_VERSION = 1;
 export const SCHEMA = 1;
 export const CLOCK_SKEW = 300;
 
-const command = { prefix: "cmd", maxTtl: DAY, command: true };
+export const COMMAND_TTL = 3600;
+export const PROMPT_ANSWER_TTL = 600;
+const command = { prefix: "cmd", maxTtl: DAY, ttl: COMMAND_TTL, command: true };
 export const KINDS = {
   board: { prefix: "brd", maxTtl: DAY, command: false },
   notice: { prefix: "ntc", maxTtl: DAY, command: false },
@@ -37,6 +39,7 @@ export const KINDS = {
   push: command,
   start: command,
   routine: command,
+  "prompt-answer": { ...command, maxTtl: PROMPT_ANSWER_TTL, ttl: PROMPT_ANSWER_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -196,6 +199,7 @@ const PAYLOADS = {
     next: optionalField(list(nextRow)),
     counts: optionalField(shape({ working: u32v, queued: u32v, parked: u32v })),
     later: optionalField(list(later)),
+    accepts: optionalField(list(string)),
   }),
   notice: typed({
     event: oneOf(...EVENTS),
@@ -215,6 +219,7 @@ const PAYLOADS = {
   push: typed({ address: string, head: string, card_sha: optionalField(string) }),
   start: typed({ repo: string, name: string, prompt: string }),
   routine: typed({ id: string }),
+  "prompt-answer": typed({ address: string, prompt: string, key: string }),
 };
 
 export function checkPayload(payload) {
@@ -528,8 +533,6 @@ export async function verifyDeviceList(identity, signed) {
   }
 }
 
-export const COMMAND_TTL = 3600;
-
 export function commandId(millis = Date.now(), randomBytes = random(10)) {
   const bytes = new Uint8Array(16);
   new DataView(bytes.buffer).setBigUint64(0, BigInt(millis) << 16n);
@@ -549,7 +552,7 @@ export async function newDeviceKeys() {
 
 export async function sealCommand({ device, machine, payload, at, id = commandId(at * 1000) }) {
   checkPayload(payload);
-  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: device.id, machine: machine.id, at, exp: at + COMMAND_TTL, schema: SCHEMA };
+  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: device.id, machine: machine.id, at, exp: at + KINDS[payload.type].ttl, schema: SCHEMA };
   const recipients = [{ id: machine.id, encryption: machine.keys.encryption }, { id: device.id, encryption: device.public.encryption }];
   return sealEnvelope(header, text.encode(JSON.stringify(payload)), device, recipients);
 }
