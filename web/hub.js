@@ -49,6 +49,9 @@ export const account = {
   confirmEmail: (code) => call("POST", "/v1/a/email/confirm", { body: { code } }),
   command: (envelope) => call("POST", "/v1/a/commands", { body: { envelope } }),
   results: (after, wait = 0) => call("GET", `/v1/a/results?after=${after}&wait=${wait}`),
+  addDevice: (cert) => call("POST", "/v1/a/devices", { body: { cert } }),
+  devices: () => call("GET", "/v1/a/devices"),
+  deviceCommands: (device, before = null) => call("GET", `/v1/a/devices/${query(device)}/commands${before === null ? "" : `?before=${before}`}`),
 };
 
 export const connectCalls = {

@@ -1,13 +1,14 @@
 import { approveFromLink, CONNECT_TEXT, connectText, finishConnect, forgetFragment, keptFragment, PairingFailed, safeNext, signedInDestination, unlockFailedText, withReauth } from "./connect.js";
-import { emptyMarks, mergeMarks } from "./board.js";
+import { emptyMarks, mergeMarks, openBoards } from "./board.js";
 import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
-import { allowsChanges, keepAllowsChanges } from "./device.js";
+import { allowsChanges, ensureDevice, keepAllowsChanges, loadDevice, loadSent, openHistory } from "./device.js";
+import { verifyDeviceCert } from "../js/protocol.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { accountScreen, authScreen, connectScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
+import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/account"];
@@ -16,6 +17,7 @@ export const SUBMIT = '.auth-actions .btn.primary, [data-action="save-email"]';
 
 const top = (title, aside = "") => `<header class="top"><b>${esc(title)}</b><span>${esc(aside)}</span></header>`;
 const deviceName = () => proposedName(navigator.userAgent);
+const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 const EMAIL_ERRORS = {
   "invalid-email": "That doesn't look like an email address.",
@@ -51,7 +53,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -144,7 +146,52 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
   function accountPage() {
     if (!state.me) return accountSignIn();
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
-    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null });
+    const viewing = state.viewing && state.devices?.find((device) => device.id === state.viewing);
+    if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, notice: state.notice, now: nowSeconds() });
+    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
+  }
+
+  const unlockedIdentity = () => (state.session?.state === "unlocked" ? state.session.identity : null);
+
+  async function loadDevices() {
+    const identity = unlockedIdentity();
+    if (!identity || !state.info?.commands) return;
+    const [listed, boards] = await Promise.all([account.devices(), account.boards().catch(() => null)]);
+    const opened = boards ? await openBoards(boards, identity, nowSeconds(), await storedMarks()).catch(() => null) : null;
+    state.opened = opened?.opened ?? [];
+    state.keys = new Map((opened?.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
+    const devices = [];
+    for (const row of listed.devices) {
+      if (!(await verifyDeviceCert(identity.key, row.cert))) continue;
+      const standing = state.opened
+        .map((machine) => ({ machine: machine.name, ...(machine.board?.devices?.[row.device] ?? {}) }))
+        .filter((one) => one.state && one.fingerprint === row.fingerprint);
+      devices.push({ id: row.device, name: row.name, kind: row.kind, self: row.device === state.device?.id, added: row.created_at, seen: row.last_seen_at, key: row.fingerprint, standing });
+    }
+    state.devices = devices.sort((a, b) => Number(b.self) - Number(a.self));
+  }
+
+  async function openDevice(id) {
+    const identity = unlockedIdentity();
+    state.viewing = id;
+    state.history = null;
+    state.notice = null;
+    scrollTo(0, 0);
+    draw();
+    if (!identity) return;
+    try {
+      const listing = await account.deviceCommands(id);
+      const opened = await openHistory(listing.commands, identity, (machine) => state.keys.get(machine) ?? null);
+      const kept = await loadSent({ get }, state.me.account, nowSeconds());
+      const local = new Map(kept.sent.map((one) => [one.id, one]));
+      const names = new Map(state.opened.map((machine) => [machine.machine, machine.name]));
+      if (state.viewing !== id) return;
+      state.history = opened.map((entry) => ({ ...entry, machineName: names.get(entry.machine) ?? entry.machine.slice(-6), label: local.get(entry.id)?.label ?? null, short: entry.payload.head?.slice(0, 7) ?? null }));
+    } catch (error) {
+      state.history = [];
+      state.notice = message(error);
+    }
+    draw();
   }
 
   function draw() {
@@ -159,7 +206,11 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     try {
       if (path === "/connect") await loadConnect();
       if (state.me && keepsEmail()) state.address = await account.email().catch(() => null);
-      if (state.me && path === "/account") state.allowed = await allowsChanges({ get }, state.me.account);
+      if (state.me && path === "/account") {
+        state.allowed = await allowsChanges({ get }, state.me.account);
+        state.device = await loadDevice({ get }, state.me.account);
+        await loadDevices().catch((error) => (state.notice = message(error)));
+      }
     } catch (error) {
       state.view = null;
       state.notice = message(error);
@@ -405,6 +456,15 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
+    if (action === "device" || action === "devices-back") {
+      event.preventDefault();
+      if (action === "device") return openDevice(target.dataset.id);
+      state.viewing = null;
+      state.history = null;
+      state.notice = null;
+      scrollTo(0, 0);
+      return draw();
+    }
     try {
       if (action === "sign-in" || action === "other-passkey") return await signInClicked();
       if (action === "add-passkey") return await addPasskey();
@@ -453,6 +513,15 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (state.left || event.target.name !== "allow-changes" || !state.me) return;
     state.allowed = event.target.checked;
     await keepAllowsChanges({ put }, state.me.account, state.allowed).catch(() => (state.notice = "This browser can't keep the setting; it lasts until you close the page."));
+    const identity = unlockedIdentity();
+    if (state.allowed && identity) {
+      try {
+        state.device = await ensureDevice({ store: { get, put }, calls: account, identity, name: deviceName(), now: nowSeconds(), kept: state.device });
+        await loadDevices();
+      } catch (error) {
+        state.notice = message(error);
+      }
+    }
     draw();
     root.querySelector('input[name="allow-changes"]')?.focus({ preventScroll: true });
   }, { signal: listening.signal });
@@ -485,7 +554,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       state.left = true;
       unlockEnds.watch(null);
       listening.abort();
-      return { session: state.session, me: state.me, address: state.address, allowed: state.allowed };
+      return { session: state.session, me: state.me, address: state.address, allowed: state.allowed, device: state.device };
     },
   };
 }

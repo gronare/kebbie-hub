@@ -6,14 +6,14 @@ use std::time::Duration;
 use common::*;
 use kebbie_hub::RateLimit;
 use kebbie_hub_api::{
-    CommandQueued, CommandUpload, EVENT_RESULT, ResultReady, ResultStored, ResultUpload,
+    CommandQueued, CommandUpload, DeviceUpload, EVENT_RESULT, ResultReady, ResultStored, ResultUpload,
 };
 use kebbie_hub_fakes::HubError;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Handling, MachineState, Posted};
 use kebbie_hub_protocol::{
     AccountKey, Answer, CommandResult, Dropped, Envelope, Header, Id, Kind, Outcome, Payload,
-    Prefix, PromptAnswer, PushApproval, Reason, SecretKeys, StartTask, seal,
+    DeviceCert, DeviceKey, DeviceKind, Prefix, PromptAnswer, PushApproval, Reason, SecretKeys, StartTask, seal, seal_command,
 };
 use serde_json::Value;
 
@@ -23,6 +23,7 @@ const QUESTION: &str = "1761069540-4411-0-question";
 const HEAD: &str = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
 const MOVED_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 const PAST_THE_WINDOW: u64 = 8 * 86_400;
+const PAST_THE_HISTORY: u64 = 91 * 86_400;
 
 async fn commanding(test: &TestHub) -> (MachineState, Browser) {
     let mut person = member(test).await;
@@ -90,20 +91,21 @@ fn account_of(person: &Browser) -> AccountKey {
 fn done(command: &Id) -> CommandResult {
     CommandResult {
         command: command.clone(),
+        device: Id::ulid(Prefix::Device, 0, [0; 10]).unwrap(),
         outcome: Outcome::Done,
         text: "done".to_string(),
     }
 }
 
 #[tokio::test]
-async fn an_answer_from_the_account_is_applied_and_its_result_comes_back() {
+async fn an_answer_from_a_device_is_applied_and_its_result_comes_back() {
     let test = start_hub(|_| {}).await;
     let (mut machine, mut person) = commanding(&test).await;
     let sent = person
         .command(&machine.machine, &answer(Some(1), ""))
         .await
         .unwrap();
-    assert_eq!(sent.header.from, account_of(&person).account);
+    assert_eq!(Some(&sent.header.from), person.device_cert().map(|cert| &cert.device));
 
     let handled = machine.apply_once(0, None).await.unwrap();
     assert_eq!(handled.len(), 1);
@@ -239,16 +241,16 @@ async fn a_forged_or_misattributed_command_is_refused_and_not_queued() {
     let account = account_of(&person);
     let impostor = SecretKeys::generate();
     let forged = seal(
-        Header::new(
+        Header::command(
             Id::new(Prefix::Command).unwrap(),
             Kind::Answer,
-            account.account.clone(),
+            person.device_cert().unwrap().clone(),
             machine.machine.clone(),
             kebbie_hub::now(),
         ),
         &answer(Some(0), ""),
         &impostor,
-        &[(machine.machine.clone(), machine.public())],
+        &[(machine.machine.clone(), machine.public()), account.recipient()],
     )
     .unwrap();
     assert_eq!(
@@ -262,7 +264,7 @@ async fn a_forged_or_misattributed_command_is_refused_and_not_queued() {
     let mut other = member(&test).await;
     assert_eq!(
         refusal_of(other.send_command(&genuine).await),
-        (400, "wrong-sender".to_string())
+        (400, "wrong-account".to_string())
     );
 
     let mut tampered = genuine.clone();
@@ -543,7 +545,7 @@ async fn a_machine_back_after_the_command_window_drains_its_queue() {
         .sweep(kebbie_hub::now() + PAST_THE_WINDOW)
         .unwrap();
     assert_eq!(rows(&test, "queue"), 0);
-    assert_eq!(rows(&test, "commands"), 0);
+    assert_eq!(rows(&test, "commands"), 1, "the command stays in the device's history");
     assert!(machine.apply_once(0, None).await.unwrap().is_empty());
 
     let fresh = person
@@ -713,18 +715,18 @@ async fn a_command_id_once_used_cannot_carry_another_command() {
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
-    let (signing, encryption) = person.account_secret().unwrap();
-    let reused = seal(
-        Header::new(
+    let reused = seal_command(
+        Header::command(
             taken.header.id.clone(),
             Kind::Answer,
-            account.account.clone(),
+            person.device_cert().unwrap().clone(),
             machine.machine.clone(),
             kebbie_hub::now(),
         ),
         &answer(Some(1), ""),
-        &SecretKeys::from_bytes(signing, encryption),
-        &[(machine.machine.clone(), machine.public()), account.recipient()],
+        person.device_key(),
+        &machine.public(),
+        &account,
     )
     .unwrap();
     assert_eq!(
@@ -782,7 +784,7 @@ async fn the_results_endpoint_takes_only_results_about_the_posting_machine() {
 }
 
 #[tokio::test]
-async fn the_sweep_forgets_commands_and_results_after_their_week() {
+async fn the_sweep_drops_the_queue_after_the_window_and_the_history_after_ninety_days() {
     let test = start_hub(|_| {}).await;
     let (mut machine, mut person) = commanding(&test).await;
     let sent = person
@@ -795,6 +797,11 @@ async fn the_sweep_forgets_commands_and_results_after_their_week() {
     test.hub
         .store()
         .sweep(kebbie_hub::now() + PAST_THE_WINDOW)
+        .unwrap();
+    assert_eq!((rows(&test, "queue"), rows(&test, "commands"), rows(&test, "results")), (0, 1, 1));
+    test.hub
+        .store()
+        .sweep(kebbie_hub::now() + PAST_THE_HISTORY)
         .unwrap();
     for table in ["queue", "commands", "results"] {
         assert_eq!(rows(&test, table), 0, "{table}");
@@ -818,8 +825,6 @@ async fn the_device_routes_answer_404() {
         ("PUT", "/v1/d/push"),
         ("DELETE", "/v1/d/push"),
         ("GET", "/v1/push/vapid"),
-        ("GET", "/v1/a/devices"),
-        ("POST", "/v1/a/devices"),
         ("DELETE", "/v1/a/devices/dev_x"),
         ("GET", "/v1/a/device-list"),
         ("PUT", "/v1/a/device-list"),
@@ -841,4 +846,143 @@ async fn the_device_routes_answer_404() {
     assert_eq!(status_of(on_the_machine.delete("/v1/m/devices/dev_x").await), 404);
     assert_eq!(status_of(on_the_machine.post::<_, Value>("/v1/m/pairings", &()).await), 404);
     assert_eq!(status_of(on_the_machine.post::<_, Value>("/v1/m/notices", &serde_json::json!({})).await), 404);
+}
+
+fn certify(person: &Browser, device: &DeviceKey, name: &str) -> DeviceCert {
+    let (signing, encryption) = person.account_secret().unwrap();
+    DeviceCert::issue(
+        &SecretKeys::from_bytes(signing, encryption),
+        &account_of(person).account,
+        Id::new(Prefix::Device).unwrap(),
+        name,
+        DeviceKind::Web,
+        device.public(),
+        kebbie_hub::now(),
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_command_from_a_device_the_hub_never_registered_is_refused() {
+    let test = start_hub(|_| {}).await;
+    let (machine, mut person) = commanding(&test).await;
+    let unknown = DeviceKey::generate();
+    let cert = certify(&person, &unknown, "Unregistered");
+    person.use_device(unknown, cert);
+    let envelope = person
+        .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now(), None)
+        .unwrap();
+    assert_eq!(
+        refusal_of(person.post_command(&envelope).await),
+        (403, "unknown-device".to_string())
+    );
+    assert_eq!(rows(&test, "commands"), 0);
+    person.send_command(&envelope).await.unwrap();
+    assert_eq!(rows(&test, "commands"), 1, "the same command goes once the device is registered");
+}
+
+#[tokio::test]
+async fn the_hub_registers_a_device_only_under_a_certificate_its_account_signed() {
+    let test = start_hub(|_| {}).await;
+    let (_machine, mut person) = commanding(&test).await;
+    let added = person.register_device().await.unwrap();
+    let cert = person.device_cert().unwrap().clone();
+    assert_eq!((added.device.clone(), added.name.as_str(), added.fingerprint.clone()), (cert.device.clone(), "Test browser", cert.fingerprint()));
+    assert_eq!(added.last_seen_at, None);
+
+    let other = member(&test).await;
+    let (signing, encryption) = other.account_secret().unwrap();
+    let theirs = SecretKeys::from_bytes(signing, encryption);
+    let forged = DeviceCert::issue(&theirs, &cert.account, cert.device.clone(), "Mine now", DeviceKind::Web, cert.signing, 1).unwrap();
+    let foreign = DeviceCert::issue(&theirs, &account_of(&other).account, Id::new(Prefix::Device).unwrap(), "Theirs", DeviceKind::Web, cert.signing, 1).unwrap();
+    let rekeyed = DeviceCert { signing: DeviceKey::generate().public(), ..certify(&person, &DeviceKey::generate(), "Rekeyed") };
+    let mut long = certify(&person, &DeviceKey::generate(), "x");
+    long.name = "x".repeat(65);
+    let (other_signing, other_encryption) = person.account_secret().unwrap();
+    let taken_id = DeviceCert::issue(&SecretKeys::from_bytes(other_signing, other_encryption), &cert.account, cert.device.clone(), "Same id", DeviceKind::Web, DeviceKey::generate().public(), 1).unwrap();
+    for (cert, expected) in [
+        (forged, (400, "bad-certificate")),
+        (foreign, (400, "wrong-account")),
+        (rekeyed, (400, "bad-certificate")),
+        (long, (400, "bad-name")),
+        (taken_id, (409, "device-taken")),
+    ] {
+        let refused = person.post::<_, Value>("/v1/a/devices", &DeviceUpload { cert }).await;
+        assert_eq!(refusal_of(refused), (expected.0, expected.1.to_string()));
+    }
+
+    let renamed = person.rename_device("Work phone").await.unwrap();
+    assert_eq!((renamed.device, renamed.name.as_str(), renamed.created_at), (added.device, "Work phone", added.created_at));
+    let listed = person.devices().await.unwrap().devices;
+    assert_eq!(listed.iter().map(|device| device.name.as_str()).collect::<Vec<_>>(), ["Work phone"]);
+    assert!(other.account_key().is_some());
+    let mut other = other;
+    assert!(other.devices().await.unwrap().devices.is_empty(), "devices are listed per account");
+}
+
+#[tokio::test]
+async fn a_devices_history_lists_its_commands_newest_first_with_their_results() {
+    let test = start_hub(|_| {}).await;
+    let (mut machine, mut person) = commanding(&test).await;
+    let first = person.command(&machine.machine, &answer(Some(0), "")).await.unwrap();
+    machine.apply_once(0, None).await.unwrap();
+    result_of(&mut person, &first).await;
+    let second = person.command(&machine.machine, &push(HEAD)).await.unwrap();
+    let device = person.device_cert().unwrap().device.clone();
+    let seen = person.devices().await.unwrap().devices[0].last_seen_at;
+    assert!(seen.is_some_and(|at| at + 5 >= kebbie_hub::now()), "sending touches last seen: {seen:?}");
+
+    let history = person.device_commands(&device, None).await.unwrap();
+    assert_eq!(history.commands.iter().map(|entry| &entry.command).collect::<Vec<_>>(), [&second.header.id, &first.header.id]);
+    assert_eq!(history.cursor, None);
+    let [newest, oldest] = &history.commands[..] else { panic!("two commands") };
+    assert_eq!((newest.kind.as_str(), newest.result.is_none()), ("push", true));
+    assert!(oldest.delivered_at.is_some());
+    let account = account_of(&person).account;
+    assert_eq!(oldest.envelope.keys.keys().collect::<Vec<_>>(), [&account], "the hub hands out only the account's copy");
+    let (sender, payload) = person.open_command(&oldest.envelope).unwrap();
+    assert_eq!((sender.id(), payload), (&device, answer(Some(0), "")));
+    let result = person.open_result(&kebbie_hub_api::ResultEntry {
+        seq: 0,
+        machine: oldest.machine.clone(),
+        command: oldest.command.clone(),
+        stored_at: oldest.result_at.unwrap(),
+        envelope: oldest.result.clone().unwrap(),
+    });
+    assert_eq!(result.map(|result| (result.outcome, result.device)), Ok((Outcome::Done, device.clone())));
+
+    let other = member(&test).await;
+    let mut other = other;
+    assert_eq!(refusal_of(other.device_commands(&device, None).await), (404, "unknown-device".to_string()));
+
+    test.hub.store().sweep(kebbie_hub::now() + PAST_THE_WINDOW).unwrap();
+    assert_eq!(person.device_commands(&device, None).await.unwrap().commands.len(), 2);
+    test.hub.store().sweep(kebbie_hub::now() + PAST_THE_HISTORY).unwrap();
+    assert_eq!((rows(&test, "commands"), rows(&test, "results")), (0, 0));
+}
+
+#[tokio::test]
+async fn a_long_history_pages_by_cursor() {
+    let test = start_hub(|config| {
+        config.command_rate = RateLimit {
+            burst: 100,
+            per_minute: 100,
+        };
+        config.rate = config.command_rate;
+    })
+    .await;
+    let (_machine, mut person) = commanding(&test).await;
+    let machine_id = _machine.machine.clone();
+    let mut sent = Vec::new();
+    for _ in 0..52 {
+        sent.push(person.command(&machine_id, &answer(Some(0), "")).await.unwrap().header.id);
+    }
+    let device = person.device_cert().unwrap().device.clone();
+    let first = person.device_commands(&device, None).await.unwrap();
+    assert_eq!(first.commands.len(), 50);
+    let rest = person.device_commands(&device, first.cursor).await.unwrap();
+    assert_eq!(rest.cursor, None);
+    let all: Vec<_> = first.commands.iter().chain(&rest.commands).map(|entry| entry.command.clone()).collect();
+    sent.reverse();
+    assert_eq!(all, sent);
 }

@@ -6,6 +6,7 @@ mod boards;
 pub mod cli;
 mod command;
 mod connect;
+mod devices;
 mod error;
 mod events;
 mod github;
@@ -608,6 +609,8 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
             post(command::post_command).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
         )
         .route("/v1/a/results", get(command::results))
+        .route("/v1/a/devices", get(devices::devices).post(devices::post_device))
+        .route("/v1/a/devices/{id}/commands", get(devices::device_commands))
         .route("/v1/m/pairings/{id}", get(machine::pairing))
         .route("/v1/m/pairings/{id}/reply", post(machine::reply))
         .route("/v1/m/pairings/{id}/admit", post(machine::admit))

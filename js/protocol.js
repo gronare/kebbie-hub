@@ -13,6 +13,10 @@ const MACHINE_LIST_DOMAIN = text.encode("kebbie-hub account machines v1");
 const SIGNING_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account signing key v1");
 const ENCRYPTION_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account encryption key v1");
 const ACCOUNT_COMMIT_DOMAIN = text.encode("kebbie-connect-account-commit-v1");
+const DEVICE_CERT_DOMAIN = text.encode("kebbie-hub device certificate v1");
+const DEVICE_FINGERPRINT_DOMAIN = text.encode("kebbie-hub device key v1");
+export const MAX_DEVICE_NAME_CHARS = 64;
+export const DEVICE_KINDS = ["web"];
 const BLOB_DOMAIN = text.encode("kebbie-hub blob v1");
 const BLOB_OVERHEAD = 12 + 16;
 export const WRAP_NONCE_LEN = 12;
@@ -97,6 +101,25 @@ const prefixOf = (id) => {
 };
 const isTime = (value) => Number.isSafeInteger(value) && value >= 0;
 const isPlainObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+const hasLength = (value, length) => {
+  try {
+    return fromB64(value).length === length;
+  } catch {
+    return false;
+  }
+};
+const CERT_FIELDS = ["account", "device", "name", "kind", "signing", "created_at", "sig"];
+export const isDeviceName = (name) => typeof name === "string" && [...name].length >= 1 && [...name].length <= MAX_DEVICE_NAME_CHARS && !/\p{Cc}/u.test(name);
+const isCert = (cert) =>
+  isPlainObject(cert) &&
+  Object.keys(cert).every((key) => CERT_FIELDS.includes(key)) &&
+  prefixOf(cert.account) === "acc" &&
+  prefixOf(cert.device) === "dev" &&
+  isDeviceName(cert.name) &&
+  DEVICE_KINDS.includes(cert.kind) &&
+  hasLength(cert.signing, 32) &&
+  isTime(cert.created_at) &&
+  hasLength(cert.sig, 64);
 
 export function checkShape(envelope) {
   if (!isPlainObject(envelope)) throw new ProtocolError("malformed");
@@ -107,7 +130,7 @@ export function checkShape(envelope) {
     kind !== null &&
     prefixOf(envelope.id) === kind.prefix &&
     prefixOf(envelope.machine) === "mch" &&
-    (kind.command ? prefixOf(envelope.from) === "acc" : envelope.from === envelope.machine) &&
+    (kind.command ? isCert(envelope.cert) && prefixOf(envelope.from) === "dev" && envelope.cert.device === envelope.from : absent(envelope.cert) && envelope.from === envelope.machine) &&
     isTime(envelope.at) &&
     isTime(envelope.exp) &&
     envelope.exp > envelope.at &&
@@ -181,7 +204,14 @@ const item = shape({
 });
 const nextRow = shape({ part: oneOf("stopped", "push", "read"), address: string, rank: u32v, line: string, since: optionalField(u64v), waits_behind: u32v });
 const later = shape({ address: string, title: optionalField(string), state: oneOf("queued", "parked"), line: string, until: optionalField(u64v), question: bool });
-const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request"];
+const STANDINGS = {
+  waiting: shape({ state: string, fingerprint: string, until: optionalField(u64v) }),
+  approved: shape({ state: string, fingerprint: string, at: u64v }),
+  denied: shape({ state: string, fingerprint: string, at: u64v }),
+};
+const standing = (value) => isPlainObject(value) && string(value.state) && Object.hasOwn(STANDINGS, value.state) && STANDINGS[value.state](value);
+const devices = (value) => isPlainObject(value) && Object.entries(value).every(([key, entry]) => prefixOf(key) === "dev" && standing(entry));
+const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied"];
 const EVENTS = ["needs-you", "ready", "question", "summary", "ci-failed", "ci-green", "api-error", "routine-findings", "routine-failed"];
 const typed = (fields) => shape({ type: string, ...fields });
 const PAYLOADS = {
@@ -197,6 +227,7 @@ const PAYLOADS = {
     counts: optionalField(shape({ working: u32v, queued: u32v, parked: u32v })),
     later: optionalField(list(later)),
     accepts: optionalField(list(string)),
+    devices: optionalField(devices),
   }),
   notice: typed({
     event: oneOf(...EVENTS),
@@ -210,7 +241,7 @@ const PAYLOADS = {
     retract: optionalField(string),
   }),
   result: (value) =>
-    typed({ command: id, outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), text: string })(value) &&
+    typed({ command: id, device: (value) => prefixOf(value) === "dev", outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), text: string })(value) &&
     (value.outcome === "refused") === !absent(value.reason),
   answer: typed({ address: string, question: string, choice: optionalField(u8), comment: string }),
   push: typed({ address: string, head: string, card_sha: optionalField(string) }),
@@ -238,7 +269,50 @@ export function headerBytes(header) {
     field(header.kc),
     optional(header.urgency),
     optional(header.collapse),
+    absent(header.cert) ? new Uint8Array([0]) : concat(new Uint8Array([1]), deviceCertBody(header.cert), fromB64(header.cert.sig)),
   );
+}
+
+const deviceCertBody = (cert) => concat(field(cert.account), field(cert.device), field(cert.name), field(cert.kind), fromB64(cert.signing), u64(cert.created_at));
+
+export function deviceCertStatement(cert) {
+  if (!isCert({ sig: toB64(new Uint8Array(64)), ...cert })) throw new ProtocolError("malformed");
+  return concat(DEVICE_CERT_DOMAIN, deviceCertBody(cert));
+}
+
+export async function signDeviceCert(account, { device, name, kind = "web", signing, created_at }) {
+  const cert = { account: account.id, device, name, kind, signing, created_at };
+  return { ...cert, sig: toB64(await signStatement(account, deviceCertStatement(cert))) };
+}
+
+export async function verifyDeviceCert(key, cert) {
+  try {
+    if (!isCert(cert) || cert.account !== key.account) return false;
+    const verifying = await subtle.importKey("raw", fromB64(key.keys.signing), { name: "Ed25519" }, false, ["verify"]);
+    return await subtle.verify({ name: "Ed25519" }, verifying, fromB64(cert.sig), deviceCertStatement(cert));
+  } catch {
+    return false;
+  }
+}
+
+export async function deviceFingerprint(signing) {
+  const hex = (await sha256(DEVICE_FINGERPRINT_DOMAIN, fromB64(signing))).slice(0, 4).toHex().toUpperCase();
+  return `${hex.slice(0, 4)}-${hex.slice(4)}`;
+}
+
+const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export function deviceId(millis = Date.now(), randomBytes = random(10)) {
+  let value = (BigInt(millis) & 0xffff_ffff_ffffn) << 80n;
+  randomBytes.forEach((byte, index) => (value |= BigInt(byte) << BigInt(8 * (9 - index))));
+  let body = "";
+  for (let digit = 25; digit >= 0; digit--) body += CROCKFORD[Number((value >> BigInt(5 * digit)) & 31n)];
+  return `dev_${body}`;
+}
+
+export async function newDeviceKey() {
+  const pair = await subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+  return { signing: pair.privateKey, verifying: pair.publicKey, public: toB64(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))) };
 }
 
 export const keyCommitment = async (contentKey) => toB64(await sha256(KEY_COMMIT_DOMAIN, contentKey));
@@ -263,6 +337,20 @@ export async function verifyEnvelope(envelope, sender, now) {
   if (!(await subtle.verify({ name: "Ed25519" }, sender.signing, sig, concat(headerBytes(envelope), ct)))) throw new ProtocolError("bad-signature");
   if (now >= envelope.exp) throw new ProtocolError("expired");
   if (envelope.at > now + CLOCK_SKEW) throw new ProtocolError("not-yet-valid");
+}
+
+export async function verifyCommand(envelope, key, now) {
+  checkShape(envelope);
+  if (!KINDS[envelope.kind].command) throw new ProtocolError("malformed");
+  if (envelope.cert.account !== key.account) throw new ProtocolError("wrong-account");
+  if (!(await verifyDeviceCert(key, envelope.cert))) throw new ProtocolError("bad-certificate");
+  await verifyEnvelope(envelope, await importSender(envelope.cert.device, { signing: envelope.cert.signing }), now);
+  return envelope.cert;
+}
+
+export async function openCommand(envelope, recipient, key, now) {
+  const device = await verifyCommand(envelope, key, now);
+  return { device, payload: await decryptEnvelope(envelope, recipient) };
 }
 
 export async function openBlob(blob, ciphertext) {
@@ -493,9 +581,10 @@ export function commandId(millis = Date.now(), randomBytes = random(10)) {
   return `cmd_${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function sealCommand({ identity, machine, payload, at, id = commandId(at * 1000) }) {
+export async function sealCommand({ device, account, machine, payload, at, id = commandId(at * 1000) }) {
   checkPayload(payload);
-  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: identity.id, machine: machine.id, at, exp: at + KINDS[payload.type].ttl, schema: SCHEMA };
-  const recipients = [{ id: machine.id, encryption: machine.keys.encryption }, { id: identity.id, encryption: identity.key.keys.encryption }];
-  return sealEnvelope(header, text.encode(JSON.stringify(payload)), identity, recipients);
+  if (device.cert.device !== device.id || !(await verifyDeviceCert(account, device.cert))) throw new ProtocolError("cert-mismatch");
+  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: device.id, machine: machine.id, at, exp: at + KINDS[payload.type].ttl, schema: SCHEMA, cert: structuredClone(device.cert) };
+  const recipients = [{ id: machine.id, encryption: machine.keys.encryption }, { id: account.account, encryption: account.keys.encryption }];
+  return sealEnvelope(header, text.encode(JSON.stringify(payload)), device, recipients);
 }

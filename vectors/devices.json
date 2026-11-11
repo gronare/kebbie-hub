@@ -1,0 +1,328 @@
+{
+  "account": "account",
+  "cert_domain": "kebbie-hub device certificate v1",
+  "certs": [
+    {
+      "cert": {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "created_at": 1760983200,
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "kind": "web",
+        "name": "iPhone 16",
+        "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+        "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+      },
+      "device": "phone",
+      "fingerprint": "7F54-8DE4",
+      "statement": "a2ViYmllLWh1YiBkZXZpY2UgY2VydGlmaWNhdGUgdjEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oA"
+    },
+    {
+      "cert": {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "created_at": 1760983200,
+        "device": "dev_01K83YV3800E98GTJMKEDT10QK",
+        "kind": "web",
+        "name": "iPad",
+        "sig": "uCPd5lEiWioYjJsnZQNuwbogrPMWs-6Ps94vt75o5-HVsTy-_E_vvWHTx8vtFNcmaikd3DwfkPAw729nbnR3Ag",
+        "signing": "RBsZHnPUbnlHAF68ROvO4tIjUvE1dMzTmYjsdHuA5Fo"
+      },
+      "device": "tablet",
+      "fingerprint": "7497-ED81",
+      "statement": "a2ViYmllLWh1YiBkZXZpY2UgY2VydGlmaWNhdGUgdjEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDBFOThHVEpNS0VEVDEwUUsABGlQYWQAA3dlYkQbGR5z1G55RwBevETrzuLSI1LxNXTM05mI7HR7gORaAAAAAGj2eKA"
+    }
+  ],
+  "commands": [
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "7V-HUYlyel7Q0eb-r1xSerxW9cE-OPy1ViLkRKXrw7SlAN_p-B3AQ34OPCycn-hYFhJkxfBBm77RTonU8FXavSf_MSIQP8U8UMgMW8NDZNI7ufZSWgZdhFK1c1A3kRaeD3HRAYjui-QDsJ8lTTg0uf2E1vFYfh7n78iopl6dAzw8qjaIgR4",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7374-ac84-2531e13ff906",
+        "kc": "runaazFmDAYGaRQ4T5JoTiN7VFs6WGvNhCE-Xu0JIBI",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "bIh6q4zq3kky2kYIPzh9CuF5xunCPVK-ScR-_u9jaSfSit0vo9IHeDmDZgO98ZLwF9aD2pgwyRtpkF_gKNwIt6kw9Ea7_p7xOs-y1WUzhOw",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "yHJLLsUF3FRcgSaKeH0iuK2yLffppyfuy5mJwYksAQzjjt03l0N6IV8jKOucm2SjBwrDe2hPDoYITsr6PjCgRQAlvuAr9dhiR-vI8mBqQNI"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "Stz4ay4oJnMWXH5DL_A0R2z61URMqTEhjH8-3JcAIdiBC-z5EqdDJYZNW3_nLUARsCnhu1eWaIHVP98im4BuBg",
+        "v": 1
+      },
+      "expect": {
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "fingerprint": "7F54-8DE4"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzM3NC1hYzg0LTI1MzFlMTNmZjkwNgAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArcnVuYWF6Rm1EQVlHYVJRNFQ1Sm9UaU43VkZzNldHdk5oQ0UtWHUwSklCSQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "name": "from-the-phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV3800E98GTJMKEDT10QK",
+          "kind": "web",
+          "name": "iPad",
+          "sig": "uCPd5lEiWioYjJsnZQNuwbogrPMWs-6Ps94vt75o5-HVsTy-_E_vvWHTx8vtFNcmaikd3DwfkPAw729nbnR3Ag",
+          "signing": "RBsZHnPUbnlHAF68ROvO4tIjUvE1dMzTmYjsdHuA5Fo"
+        },
+        "ct": "rQ629oG9Bjt5KfpCl_BTqwsermtBlDBYoXSSjwMHeFp6qscsDj1hJFTWZ25BHiWdpxN6FNZRfjHvUUia7qqsd73n69zDG0Z7FflfhBXPXRObhKifGiGxwU7r0W1IitC8wpZM5DCV465hpQxNcD3hy1S5Mgs9L3zKeOzoexbwiIPpeQQSKlQ",
+        "exp": 1761073200,
+        "from": "dev_01K83YV3800E98GTJMKEDT10QK",
+        "id": "cmd_019a07ed-8d00-7b75-a71f-e41d52509f40",
+        "kc": "aYCTh0YanBBCFfdrE_MxdangLvO4aWEJchWWIu_jPz0",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "EDaMpMUXSzDK1yQ3VFSbxAabGs3zVDD3MuQNIsUxkhNicKSbggbHRhee3m-DvetbsWJNl16yt1ApJD4ZuBjJU3NQ7trZl2hDH6vjhHo8n5s",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "p5XMi37G2LKwwfWfDFZzE4GjAHXFS5Z5iVlBxt20NnemyLKwn53jV7oZRDz-NvgpQiJq7hDv9_OoiUu6Gji0EXLG_n61hAB_M60EVExwILk"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "5yJ8fsNu0fMcqdcSVo-bs9rku6DEGjsFe5sc1J3cQPIycKU58hQeILjDusL2edDgklifak7P3PR5d1LSWe50AQ",
+        "v": 1
+      },
+      "expect": {
+        "device": "dev_01K83YV3800E98GTJMKEDT10QK",
+        "fingerprint": "7497-ED81"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2I3NS1hNzFmLWU0MWQ1MjUwOWY0MAAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDBFOThHVEpNS0VEVDEwUUsAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArYVlDVGgwWWFuQkJDRmZkckVfTXhkYW5nTHZPNGFXRUpjaFdXSXVfalB6MAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMEU5OEdUSk1LRURUMTBRSwAEaVBhZAADd2ViRBsZHnPUbnlHAF68ROvO4tIjUvE1dMzTmYjsdHuA5FoAAAAAaPZ4oLgj3eZRIloqGIybJ2UDbsG6IKzzFrPuj7PeL7e-aOfh1bE8vvxP771h08fL7RTXJmopHdw8H5DwMO9vZ250dwI",
+      "name": "from-the-tablet"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_wwinuTTLNoHZqTLt7pXHbA",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV38015DVZR43PPEYEZPC",
+          "kind": "web",
+          "name": "Stranger's phone",
+          "sig": "lkYCpW3hfwNTUtQhH95E8kmUqQAR6W51mY4nzZhOwgIUH8pLWgAir7zSbcyMtrINGzVB59wtgld_hdEYx9jODA",
+          "signing": "8RQtjyFGDUD0D_ibaFHK4erqZdnHqk9Q6tl-4vQQqQ4"
+        },
+        "ct": "SfH7NUelthANKTDZU94Bx41rXIMngJbSYRh0kFDNKMK3LlPObJXyMwIto--in3G3flthF7Rm7jxDeWFdYL1bDjLbHIGS3nsvUZtxpupX1Lm5B92vY6wAMr7PgdQS7lsk53MqBzB4viswP4uZm8rDklL7Z2ELDrULt57QOnadQu00IbFMYI0",
+        "exp": 1761073200,
+        "from": "dev_01K83YV38015DVZR43PPEYEZPC",
+        "id": "cmd_019a07ed-8d00-73fa-8864-4a92cf3bd378",
+        "kc": "ltuUB5tCFeFjEAN4P2Z8_xb1CJC9tafXXOsQHR-MJos",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "XbdaMId-x7s6zBCDWvsRVz5WcFTv2q_jDUVZZuCtSyOP72OPHpcWjI41dO1jdn3Kqv6VioRDawSD2dNGZ3fjROPhGzy3stUOlpwdZBYQzdU",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "js7quMRAhHTi8HinYoZiJSuZ4j5B49igqasClnhUA3ERd28fBE8jUxbuRHdhngNYnzGVeVxM0as6gy0R2LkWeXgRubFooPna_oWlD5Tv_6E"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "VhHM0G-rzhvQ6nyzfD5d1_TMJl5ICfkQYXmRoXrnSJNWw-TngpM9HXL0GuoiXvjfn5WS4YPjpx_aoAcOJQ74Aw",
+        "v": 1
+      },
+      "expect": {
+        "error": "wrong-account"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzNmYS04ODY0LTRhOTJjZjNiZDM3OAAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDE1RFZaUjQzUFBFWUVaUEMAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArbHR1VUI1dENGZUZqRUFONFAyWjhfeGIxQ0pDOXRhZlhYT3NRSFItTUpvcwAAAQAaYWNjX3d3aW51VFRMTm9IWnFUTHQ3cFhIYkEAHmRldl8wMUs4M1lWMzgwMTVEVlpSNDNQUEVZRVpQQwAQU3RyYW5nZXIncyBwaG9uZQADd2Vi8RQtjyFGDUD0D_ibaFHK4erqZdnHqk9Q6tl-4vQQqQ4AAAAAaPZ4oJZGAqVt4X8DU1LUIR_eRPJJlKkAEeludZmOJ82YTsICFB_KS1oAIq-80m3MjLayDRs1QefcLYJXf4XRGMfYzgw",
+      "name": "from-a-device-of-another-account"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "kind": "web",
+          "name": "Work iPhone",
+          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "a80AAQMSQ5KksS5k_dRVAtYDA_fcrx2jyKjzTubtoTeJS7iCDTS_nXVJe9r3eon8rFIP8dCwPjpO9l6oT3yPfBzD8Xkvo6A3H_XmC4WwN4toHrPT-59jVVbz5AunIiI2zjG5apDkVPqXN4QnuDrzwcXCDEPZMB4xo_8wwJC-yRpuK6B1X00",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-76c1-9ea3-193621ad5e6f",
+        "kc": "njAhk1JjtpIE0AGHrlewE80URdXyGr-hNaUuL-4Sft8",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "hxfVEvMUEvh1LqZTP0ary3l9uNY_Er4ST9LPzuC1mEdV6d3swvgrN6GvTKxNoCQi73uEoCCwsFBGN27RkkrCeknWIlTxJ3LWqZj0xZuJgeI",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "8OoDtKqXBznSacv0Rxd7EZ3nYmnyEHadWwGDQFe-9ShMqnpdVXteEDmUk-NlDDZeXByNawaO1nDRnH1noXK3IrhI9r0LOZyOxL34Qq4YlM4"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "KloSzUVe8326LmzPZs2KsN6MkGbCz1WnWfNJBD9dkCpTyLtrsR9y0SQAO5Q4M5juA_f5N0SI9Ecbuaqh-C1QBQ",
+        "v": 1
+      },
+      "expect": {
+        "error": "bad-certificate"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzZjMS05ZWEzLTE5MzYyMWFkNWU2ZgAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArbmpBaGsxSmp0cElFMEFHSHJsZXdFODBVUmRYeUdyLWhOYVV1TC00U2Z0OAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgALV29yayBpUGhvbmUAA3dlYuMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GAAAAAGj2eKC1LfWxiztePcKb5EjPsVDx9Hj8Px0SD11Tm5eHwJ_qO5pYqY2p7JBwtZQXd5HTcll6lhJmjqrofIztc82Wk-MH",
+      "name": "certificate-renamed-after-signing"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "x7swBceMSRO32pJAVJQpQDVRPLngplRIu6WYaCfW57jB-ur-sS8lirrwBxI4Kp8PAx-YGBTUOTgI8ACCCopwPl9S8nqlF2Uyq0mzRZ-TpUGZXA8TBNXXykUnmhg5QeKMkSlNMZ5nQcyXVJumFiSUow-yJwlrX_AQ-iIVyC03cEkS1TX8hDg",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-79d8-a67b-0c5b1a4c4a35",
+        "kc": "4CyGBWIMFiRkMMEphek95jnPDbfo0Jdrd2PflVuJvXk",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "An-Q_Hgbq8w6sm_YVqpK20Dt4Q7n3ys2DBJCTWYJhgZ2ieoSn1v-eo7PIaLFLpWfldZTo3naznd_Hn1PgEsceN85HIdC_aabOltpu7sQwmc",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "KEuLpc0WYMWIeIsAw5r7OgzSLCYraVAmQEQx2Qd_hmIeRhILSyVe74JAz3LV9srXxJLj2SKqKaY5ntnA7KuHAacbBlLXatz0OkG3U98vq6c"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "lUH5BKxC-LnBu50_fHbdf01AfjNhPRdWz8gdK8mlLwLHNck-qLfQO6VqcLhe6WemYztBWLH93vxWHoXYtD6cBg",
+        "v": 1
+      },
+      "expect": {
+        "error": "bad-signature"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzlkOC1hNjdiLTBjNWIxYTRjNGEzNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArNEN5R0JXSU1GaVJrTU1FcGhlazk1am5QRGJmbzBKZHJkMlBmbFZ1SnZYawAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "name": "signed-by-another-key-than-its-certificate"
+    },
+    {
+      "envelope": {
+        "at": 1761062800,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "qqohnhziV1eUoVq47zjEttdxoA7MzCn0MsXF70yqbWR6QWz9s3Vi71ENobMHhQ6XRSDB_MNIkp5jF4z0hafT4qUS5rqs04TiaqxoqfbfoehLDJiILrg-9jWqb8I-NRiSt9lKRdmpx4eX7QfTRPikIEObpMmQJ_QP6GPwVw1be6Pd_QQKbWQ",
+        "exp": 1761066400,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-77d3-9d6e-59eb606bf99a",
+        "kc": "xCgVaZoFwTUw77Q8_qui1aePprmjUZb-2PgZmBGzJ-o",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "47xc4EkbbxSAV5U5O72aVdAZfT_eCgbxIkk1OZLesjcUzv1QcoYYiHqx7ChDWpjaATGjFLQhskR3LWlxYVAEIf_PmmAAEtz5zPx9iUN5NYM",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "J2e9zGwTxvU8_7uFGbQiaRNEmw-4NPG1g_q8EaxlBlVfsXV5HAErACyPb2eC1TTbO6CtnSReLQ-TNBgWG7NfLRMO7tOJCp7IIByyWBD8p5k"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "CrJ2uZDHsXlDvle9jkuRGGX-t2_WbVTWt_4ZIm9kAehAQVr9X5oqLxCn1LcEuzMre9_Mu4756Xm4wzF0DSUiDA",
+        "v": 1
+      },
+      "expect": {
+        "error": "expired"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzdkMy05ZDZlLTU5ZWI2MDZiZjk5YQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo96-QAAAAAGj3vaAAAQAreENnVmFab0Z3VFV3NzdROF9xdWkxYWVQcHJtalVaYi0yUGdabUJHekotbwAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "name": "expired"
+    }
+  ],
+  "fingerprint_domain": "kebbie-hub device key v1",
+  "ids": [
+    {
+      "id": "dev_01K83YV380329ARS69J86ZB9PB",
+      "millis": 1761069600000,
+      "random": "GJKsZMmSDfWmyw"
+    },
+    {
+      "id": "dev_01K83YV3800E98GTJMKEDT10QK",
+      "millis": 1761069600000,
+      "random": "A5KIalSbm6CC8w"
+    }
+  ],
+  "key": {
+    "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+    "keys": {
+      "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+      "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
+    },
+    "version": 1
+  },
+  "machine": "machine",
+  "now": 1761070000,
+  "payload": {
+    "address": "refunds@shop",
+    "choice": 0,
+    "comment": "",
+    "question": "1761069540-4411-0-question",
+    "type": "answer"
+  },
+  "refusals": [
+    {
+      "cert": {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "created_at": 1760983200,
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "kind": "web",
+        "name": "Work iPhone",
+        "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+        "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+      },
+      "name": "renamed-after-signing"
+    },
+    {
+      "cert": {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "created_at": 1760983200,
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "kind": "web",
+        "name": "iPhone 16",
+        "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+        "signing": "8RQtjyFGDUD0D_ibaFHK4erqZdnHqk9Q6tl-4vQQqQ4"
+      },
+      "name": "another-device-key"
+    },
+    {
+      "cert": {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "created_at": 1760983201,
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "kind": "web",
+        "name": "iPhone 16",
+        "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+        "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+      },
+      "name": "another-creation-time"
+    },
+    {
+      "cert": {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "created_at": 1760983200,
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "kind": "web",
+        "name": "iPhone 16",
+        "sig": "C4w51Cl-rs8JpdLUkkldHFUagXEj_4d1vV3PRKgiJpcqOehunngjtc_VCVwTTBuxZNlo0qs_ssrSWSuKi0vdCQ",
+        "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+      },
+      "name": "signed-by-another-account-key"
+    },
+    {
+      "cert": {
+        "account": "acc_wwinuTTLNoHZqTLt7pXHbA",
+        "created_at": 1760983200,
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "kind": "web",
+        "name": "iPhone 16",
+        "sig": "l0cMwTijoCcr6fw_dA49tByYZ01hFsz1u19JfU_BKVUlOxdk7S62d0QQFRKocNp4Jz1GMnEPUB_WU_Qr7UV9Aw",
+        "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+      },
+      "name": "issued-by-another-account"
+    }
+  ]
+}

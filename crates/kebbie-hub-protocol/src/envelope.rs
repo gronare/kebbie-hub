@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::device::DeviceCert;
 use crate::ids::{Id, Prefix};
 use crate::{PROTOCOL_VERSION, SCHEMA};
 
@@ -103,6 +104,8 @@ pub struct Header {
     pub urgency: Option<Urgency>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collapse: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cert: Option<DeviceCert>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -126,6 +129,14 @@ impl Header {
             kc: String::new(),
             urgency: None,
             collapse: None,
+            cert: None,
+        }
+    }
+
+    pub fn command(id: Id, kind: Kind, cert: DeviceCert, machine: Id, at: u64) -> Header {
+        Header {
+            cert: Some(cert.clone()),
+            ..Header::new(id, kind, cert.device, machine, at)
         }
     }
 
@@ -153,6 +164,14 @@ impl Header {
                 None => out.push(0),
             }
         }
+        match &self.cert {
+            Some(cert) => {
+                out.push(1);
+                cert.put_body(&mut out);
+                out.extend(cert.sig);
+            }
+            None => out.push(0),
+        }
         out
     }
 
@@ -169,13 +188,30 @@ impl Header {
         if self.machine.prefix() != Prefix::Machine {
             return Err(ShapeError::Malformed("machine is not a machine id"));
         }
-        let sender_fits = if self.kind.is_command() {
-            self.from.prefix() == Prefix::Account
-        } else {
-            self.from == self.machine
-        };
-        if !sender_fits {
-            return Err(ShapeError::Malformed("the sender cannot send this kind"));
+        match (self.kind.is_command(), &self.cert) {
+            (true, Some(cert)) => {
+                cert.check()
+                    .map_err(|_| ShapeError::Malformed("the device certificate is malformed"))?;
+                if self.from != cert.device {
+                    return Err(ShapeError::Malformed(
+                        "the sender is not the certified device",
+                    ));
+                }
+            }
+            (true, None) => {
+                return Err(ShapeError::Malformed(
+                    "a command carries its device certificate",
+                ));
+            }
+            (false, Some(_)) => {
+                return Err(ShapeError::Malformed(
+                    "only a command carries a device certificate",
+                ));
+            }
+            (false, None) if self.from != self.machine => {
+                return Err(ShapeError::Malformed("the sender cannot send this kind"));
+            }
+            (false, None) => {}
         }
         if self.exp <= self.at {
             return Err(ShapeError::Malformed("exp is not after at"));

@@ -11,8 +11,9 @@ use kebbie_hub_api::{
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, Board, CommandResult, ConnectSecret, Dropped, Envelope, Header, Id,
     Kind, Machine, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal,
-    SecretKeys, authorize, pin_account, seal,
+    DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal,
 };
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
@@ -27,6 +28,7 @@ pub enum Handling {
     Applied { did: String, result: CommandResult },
     Refused(CommandResult),
     Replayed(CommandResult),
+    Waiting(Id),
     Dropped(Dropped),
 }
 
@@ -36,7 +38,7 @@ impl Handling {
             Handling::Applied { result, .. }
             | Handling::Refused(result)
             | Handling::Replayed(result) => Some(result),
-            Handling::Dropped(_) => None,
+            Handling::Waiting(_) | Handling::Dropped(_) => None,
         }
     }
 }
@@ -75,6 +77,49 @@ pub struct MachineState {
     pub applied: AppliedCommands,
     #[serde(default)]
     pub account: Option<AccountKey>,
+    #[serde(default)]
+    pub trust_devices: bool,
+    #[serde(default)]
+    pub devices: BTreeMap<Id, KnownDevice>,
+    #[serde(default)]
+    pub held: Vec<Envelope>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct KnownDevice {
+    pub name: String,
+    #[serde(with = "signing_key")]
+    pub signing: [u8; 32],
+    pub standing: DeviceStanding,
+}
+
+mod signing_key {
+    use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use serde::{Deserialize, Deserializer, Serializer, de::Error};
+
+    pub fn serialize<S: Serializer>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&URL_SAFE_NO_PAD.encode(bytes))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[u8; 32], D::Error> {
+        URL_SAFE_NO_PAD
+            .decode(String::deserialize(deserializer)?)
+            .map_err(D::Error::custom)?
+            .try_into()
+            .map_err(|_| D::Error::custom("expected 32 bytes"))
+    }
+}
+
+fn trust_of(devices: &BTreeMap<Id, KnownDevice>, device: &VerifiedDevice) -> Trust {
+    match devices.get(device.id()) {
+        Some(known) if known.signing == *device.signing() => match known.standing {
+            DeviceStanding::Approved { .. } => Trust::Approved,
+            DeviceStanding::Denied { .. } => Trust::Denied,
+            DeviceStanding::Waiting { .. } => Trust::Waiting,
+        },
+        _ => Trust::Waiting,
+    }
 }
 
 pub async fn join(hub: &str, code: &str, name: &str) -> Result<MachineState, Error> {
@@ -232,7 +277,48 @@ impl MachineState {
             accepts: every_command(),
             applied: AppliedCommands::default(),
             account: None,
+            trust_devices: false,
+            devices: BTreeMap::new(),
+            held: Vec::new(),
         }
+    }
+
+    pub fn device_named(&self, name_or_id: &str) -> Option<Id> {
+        self.devices
+            .iter()
+            .find(|(id, known)| id.as_str() == name_or_id || known.name == name_or_id)
+            .map(|(id, _)| id.clone())
+    }
+
+    pub async fn decide_device(&mut self, device: &Id, approve: bool, state_file: Option<&Path>) -> Result<Vec<Handled>, Error> {
+        let at = now();
+        let Some(known) = self.devices.get_mut(device) else {
+            return Ok(Vec::new());
+        };
+        let fingerprint = device_fingerprint(&known.signing);
+        known.standing = if approve {
+            DeviceStanding::Approved { fingerprint, at }
+        } else {
+            DeviceStanding::Denied { fingerprint, at }
+        };
+        let held = std::mem::take(&mut self.held);
+        let mut handled = Vec::new();
+        for envelope in &held {
+            handled.push(self.handle(0, envelope, state_file).await?);
+        }
+        if let Some(path) = state_file {
+            save(path, self)?;
+        }
+        Ok(handled)
+    }
+
+    pub fn standings(&self) -> Option<BTreeMap<Id, DeviceStanding>> {
+        self.trust_devices.then(|| {
+            self.devices
+                .iter()
+                .map(|(id, known)| (id.clone(), known.standing.clone()))
+                .collect()
+        })
     }
 
     pub fn secret(&self) -> SecretKeys {
@@ -354,6 +440,7 @@ impl MachineState {
 
     pub async fn post_board_at(&mut self, mut board: Board, rev: u64) -> Result<u64, Error> {
         board.accepts = Some(self.accepts.clone());
+        board.devices = self.standings();
         let envelope = self.seal_board(board.clone(), rev, now())?;
         let stored = self.upload_board(rev, envelope).await?;
         board.rev = stored;
@@ -398,8 +485,29 @@ impl MachineState {
         envelope: &Envelope,
         state_file: Option<&Path>,
     ) -> Result<Handled, Error> {
+        self.handle_at(seq, envelope, state_file, now()).await
+    }
+
+    pub async fn expire_held(&mut self, state_file: Option<&Path>) -> Result<Vec<Handled>, Error> {
+        let held = std::mem::take(&mut self.held);
+        let mut handled = Vec::new();
+        for envelope in &held {
+            handled.push(self.handle_at(0, envelope, state_file, envelope.header.exp).await?);
+        }
+        if let Some(path) = state_file {
+            save(path, self)?;
+        }
+        Ok(handled)
+    }
+
+    async fn handle_at(
+        &mut self,
+        seq: u64,
+        envelope: &Envelope,
+        state_file: Option<&Path>,
+        at: u64,
+    ) -> Result<Handled, Error> {
         let header = &envelope.header;
-        let at = now();
         self.applied.prune(at);
         let secret = self.secret();
         let Some(account) = self.account.clone() else {
@@ -417,18 +525,37 @@ impl MachineState {
             keys: &secret,
             account: &account,
             accepts: &self.accepts,
+            trust: &|device: &VerifiedDevice, _: u64| {
+                if self.trust_devices { trust_of(&self.devices, device) } else { Trust::Approved }
+            },
         };
         let handling = match authorize(&machine, &self.applied, envelope, at) {
-            Ok(payload) => {
-                let (did, result) = self.execute(&header.id, &payload);
+            Ok(verified) => {
+                let (did, result) = self.execute(&header.id, verified.device.id(), &verified.payload);
                 Handling::Applied { did, result }
             }
-            Err(Refusal::Answer(reason)) => Handling::Refused(refusal(&header.id, reason)),
+            Err(Refusal::Answer(reason)) => Handling::Refused(refusal(&header.id, &header.from, reason)),
             Err(Refusal::Replay(result)) => Handling::Replayed(result),
+            Err(Refusal::Waiting(waiting)) => {
+                let device = waiting.device.id().clone();
+                let cert = waiting.device.cert();
+                self.devices.entry(device.clone()).or_insert_with(|| KnownDevice {
+                    name: cert.name.clone(),
+                    signing: cert.signing,
+                    standing: DeviceStanding::Waiting { fingerprint: cert.fingerprint(), until: None },
+                });
+                if !self.held.iter().any(|held| held.header.id == header.id) {
+                    self.held.push(envelope.clone());
+                }
+                if let Some(path) = state_file {
+                    save(path, self)?;
+                }
+                Handling::Waiting(device)
+            }
             Err(Refusal::Drop(dropped)) => Handling::Dropped(dropped),
         };
         if let Handling::Applied { result, .. } | Handling::Refused(result) = &handling {
-            self.applied.record(&header.from, at, result.clone());
+            self.applied.record(at, result.clone());
             if let Some(path) = state_file {
                 save(path, self)?;
             }
@@ -447,9 +574,10 @@ impl MachineState {
         })
     }
 
-    fn execute(&self, command: &Id, payload: &Payload) -> (String, CommandResult) {
+    fn execute(&self, command: &Id, device: &Id, payload: &Payload) -> (String, CommandResult) {
         let done = |text: String| CommandResult {
             command: command.clone(),
+            device: device.clone(),
             outcome: Outcome::Done,
             text,
         };
@@ -501,7 +629,7 @@ impl MachineState {
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),
-                refusal(command, Reason::BadRequest),
+                refusal(command, device, Reason::BadRequest),
             ),
         }
     }
@@ -598,9 +726,10 @@ impl MachineState {
     }
 }
 
-fn refusal(command: &Id, reason: Reason) -> CommandResult {
+fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
     CommandResult {
         command: command.clone(),
+        device: device.clone(),
         outcome: Outcome::Refused { reason },
         text: format!("refused: {}", reason.key()),
     }

@@ -43,13 +43,13 @@ fn user_version(path: &std::path::Path) -> i64 {
 }
 
 #[test]
-fn a_fresh_database_starts_at_schema_15() {
+fn a_fresh_database_starts_at_schema_16() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 15);
+    assert_eq!(user_version(&path), 16);
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 15);
+    assert_eq!(user_version(&path), 16);
 }
 
 fn columns(connection: &rusqlite::Connection, table: &str) -> Vec<String> {
@@ -74,6 +74,7 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
              DROP TABLE results;
              DROP TABLE pairings;
              DROP TABLE events;
+             DROP TABLE devices;
              CREATE TABLE devices (id TEXT PRIMARY KEY, token_hash BLOB NOT NULL, account_id TEXT);
              CREATE TABLE admissions (machine_id TEXT NOT NULL, device_id TEXT NOT NULL);
              CREATE TABLE push_subscriptions (device_id TEXT PRIMARY KEY, endpoint TEXT NOT NULL);
@@ -92,9 +93,13 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
     let store = Store::open(&path).unwrap();
     assert_eq!(store.account("acc_kept").unwrap().unwrap().handle, "alice");
     drop(store);
-    assert_eq!(user_version(&path), 15);
+    assert_eq!(user_version(&path), 16);
     let connection = rusqlite::Connection::open(&path).unwrap();
-    for gone in ["devices", "admissions", "push_subscriptions", "notices", "device_lists"] {
+    let devices = columns(&connection, "devices");
+    assert!(devices.contains(&"cert".to_string()) && !devices.contains(&"token_hash".to_string()), "{devices:?}");
+    let old_devices: i64 = connection.query_row("SELECT count(*) FROM devices", [], |row| row.get(0)).unwrap();
+    assert_eq!(old_devices, 0);
+    for gone in ["admissions", "push_subscriptions", "notices", "device_lists"] {
         let tables: i64 = connection
             .query_row("SELECT count(*) FROM sqlite_master WHERE name = ?1", [gone], |row| row.get(0))
             .unwrap();
@@ -103,13 +108,47 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
     assert!(columns(&connection, "commands").contains(&"account_id".to_string()));
     assert!(columns(&connection, "results").contains(&"account_id".to_string()));
     assert!(columns(&connection, "pairings").contains(&"account_nonce".to_string()));
-    for table in ["commands", "results", "pairings", "events"] {
+    for table in ["results", "pairings", "events"] {
         assert!(!columns(&connection, table).iter().any(|column| column.starts_with("device")), "{table}");
     }
 }
 
 #[test]
-fn a_schema_13_database_opens_as_15_and_keeps_what_an_embedding_binary_added() {
+fn a_schema_15_database_drops_its_account_signed_commands_and_keeps_the_rest() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    drop(Store::open(&path).unwrap());
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             DROP TABLE commands;
+             DROP TABLE devices;
+             CREATE TABLE commands (account_id TEXT NOT NULL, command_id TEXT NOT NULL, machine_id TEXT NOT NULL, kind TEXT NOT NULL, digest BLOB NOT NULL, seq INTEGER NOT NULL, queued_at INTEGER NOT NULL, delivered_at INTEGER);
+             INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
+             INSERT INTO commands VALUES ('acc_kept', 'cmd_old', 'mch_old', 'answer', x'01', 1, 1, NULL);
+             INSERT INTO results (account_id, machine_id, command_id, digest, envelope, stored_at, expires_at) VALUES ('acc_kept', 'mch_old', 'cmd_old', x'01', '{}', 1, 9999999999);
+             INSERT INTO queue VALUES ('mch_old', 1, '{}', 1, 9999999999);
+             PRAGMA user_version = 15;",
+        )
+        .unwrap();
+    let store = Store::open(&path).unwrap();
+    assert_eq!(store.account("acc_kept").unwrap().unwrap().handle, "alice");
+    drop(store);
+    assert_eq!(user_version(&path), 16);
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    for column in ["device_id", "envelope"] {
+        assert!(columns(&connection, "commands").contains(&column.to_string()), "{column}");
+    }
+    assert!(columns(&connection, "devices").contains(&"signing_key".to_string()));
+    for table in ["commands", "results", "queue"] {
+        let left: i64 = connection.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row.get(0)).unwrap();
+        assert_eq!(left, 0, "{table}");
+    }
+}
+
+#[test]
+fn a_schema_13_database_opens_as_16_and_keeps_what_an_embedding_binary_added() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");
     drop(Store::open(&path).unwrap());
@@ -144,7 +183,7 @@ fn a_schema_13_database_opens_as_15_and_keeps_what_an_embedding_binary_added() {
         .unwrap();
     assert!(matches!(outcome, kebbie_hub::store::SignUpOutcome::Created(_)));
     drop(store);
-    assert_eq!(user_version(&path), 15);
+    assert_eq!(user_version(&path), 16);
     let connection = rusqlite::Connection::open(&path).unwrap();
     let tiers: Vec<String> = connection
         .prepare("SELECT tier FROM accounts ORDER BY created_at")
@@ -161,8 +200,8 @@ fn a_schema_13_database_opens_as_15_and_keeps_what_an_embedding_binary_added() {
 }
 
 #[test]
-fn a_database_from_before_schema_13_or_after_15_is_refused() {
-    for version in [4, 12, 16] {
+fn a_database_from_before_schema_13_or_after_16_is_refused() {
+    for version in [4, 12, 17] {
         let data = tempfile::tempdir().unwrap();
         let path = data.path().join("hub.sqlite3");
         rusqlite::Connection::open(&path)

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { acceptCount, accountScreen, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -443,3 +443,47 @@ test("a machine row says what the machine takes from the hub", async () => {
   assert.match(row(["answer", "prompt-answer"]), /awake · takes answers, not pushes · kebbie/);
   assert.match(row([]), /awake · takes nothing from the hub · kebbie/);
 });
+
+const AT_TWO_PM = Math.floor(new Date(2026, 10, 11, 14, 9).getTime() / 1000);
+const devices = [
+  { id: "dev_01JB8Q6Z3V9K2M4N5P6R7S8T9V", name: "iPhone 16", kind: "web", self: true, added: AT_TWO_PM - 660, seen: AT_TWO_PM - 5, key: "7F3A-91C2", standing: [{ machine: "MacBook", state: "approved", at: AT_TWO_PM - 30 }, { machine: "work-mac", state: "waiting", until: AT_TWO_PM + 21 * 3600 + 60 }] },
+  { id: "dev_01JB8Q6Z3V9K2M4N5P6R7S8T9W", name: "Chrome on Mac", kind: "web", added: AT_TWO_PM - 44 * 86_400, seen: null, key: "91AB-44F0", standing: [{ machine: "MacBook", state: "denied", at: AT_TWO_PM - 40 * 86_400 }] },
+];
+
+test("Account lists the account's devices under This device with where each one stands on each machine", () => {
+  const html = accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices, now: AT_TWO_PM });
+  const shown = text(html);
+  assert.ok(shown.indexOf("This device") < shown.indexOf("Devices · 2"), shown);
+  assert.match(shown, /iPhone 16 this device web app · added today · last seen now ✓ Approved on MacBook · ⧗ Waiting on work-mac · 21 h/);
+  assert.match(shown, /Chrome on Mac web app · added \d+ \w+ · last seen not yet ✗ Denied on MacBook/);
+  assert.match(shown, /Each machine decides which devices make changes on it\. Approve or deny a device in kebbie on that machine\./);
+  assert.match(html, /data-action="device" data-id="dev_01JB8Q6Z3V9K2M4N5P6R7S8T9W"/);
+  assert.match(html, /name="allow-changes"/, "the switch stays");
+  assert.doesNotMatch(accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices: null }), /Devices/);
+});
+
+test("a device's page shows its key and what it sent, newest first and grouped by day", () => {
+  const at = (days, hour) => Math.floor(new Date(2026, 10, 11 + days, hour, 5).getTime() / 1000);
+  const answer = { type: "answer", address: "auth@api", question: "q", choice: 0, comment: "" };
+  const history = [
+    { payload: answer, kind: "answer", machineName: "work-mac", label: "Keep the old endpoint", at: at(-6, 16), exp: at(-6, 17), result: { outcome: "done" } },
+    { payload: { type: "push", address: "fix-login@shop", head: "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a" }, short: "9f3c2a1", machineName: "MacBook", at: at(-1, 9), exp: at(-1, 10), result: { outcome: "done" } },
+    { payload: { type: "push", address: "search@shop", head: "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a" }, machineName: "work-mac", at: at(-3, 22), exp: at(-3, 23), result: null },
+    { payload: { type: "prompt-answer", address: "wt3@kebbie", prompt: "p", key: "y" }, label: "Yes", machineName: "MacBook", at: at(0, 9), exp: at(0, 9) + 600, result: { outcome: "refused", reason: "not-approved", text: "" } },
+  ];
+  const html = deviceScreen({ device: devices[1], history, now: AT_TWO_PM });
+  const shown = text(html);
+  assert.match(shown, /^kebbie hub Chrome on Mac web app · added \d+ \w+ · last seen not yet · key 91AB-44F0 ✗ Denied on MacBook Sent from Chrome on Mac · 4/);
+  const order = ["Choice on wt3@kebbie not delivered", "Pushed fix-login@shop", "Push of search@shop not delivered", "Answered auth@api"].map((what) => shown.indexOf(what));
+  assert.deepEqual([...order].sort((a, b) => a - b), order, shown);
+  assert.ok(order.every((index) => index > 0), shown);
+  assert.match(shown, /Today Choice on wt3@kebbie not delivered MacBook didn't approve this device within the hour/);
+  assert.match(shown, /9f3c2a1 · on MacBook/);
+  assert.match(shown, /expired before work-mac took it/);
+  assert.match(shown, /"Keep the old endpoint" · on work-mac/);
+  assert.match(html, /data-action="devices-back"/);
+  assert.match(text(deviceScreen({ device: devices[0], history: [], now: AT_TWO_PM })), /Nothing sent from iPhone 16 in the last 90 days\./);
+  assert.deepEqual(historyEntry({ payload: answer, machineName: "MacBook", at: AT_TWO_PM, exp: AT_TWO_PM + 3600, result: null }, AT_TWO_PM), { icon: "⧗", what: "Answer to auth@api waiting", said: "option 1 · on MacBook", at: AT_TWO_PM });
+  assert.equal(historyEntry({ payload: answer, machineName: "MacBook", at: AT_TWO_PM, exp: AT_TWO_PM + 3600, result: { outcome: "refused", reason: "denied", text: "" } }, AT_TWO_PM).said, "denied on MacBook");
+});
+

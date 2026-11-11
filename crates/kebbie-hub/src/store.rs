@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use kebbie_hub_api::{ConnectState, PairingFailure, PairingState};
-use kebbie_hub_protocol::{AccountKey, Header, Id, MachineList, PublicKeys};
+use kebbie_hub_protocol::{AccountKey, DeviceCert, Header, Id, MachineList, PublicKeys};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 pub type Result<T> = rusqlite::Result<T>;
@@ -82,12 +82,25 @@ CREATE TABLE IF NOT EXISTS queue (
     expires_at INTEGER NOT NULL,
     PRIMARY KEY (machine_id, seq)
 );
+CREATE TABLE IF NOT EXISTS devices (
+    device_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    signing_key BLOB NOT NULL,
+    cert TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS devices_by_account ON devices (account_id);
 CREATE TABLE IF NOT EXISTS commands (
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     command_id TEXT NOT NULL,
     machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    device_id TEXT NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
     kind TEXT NOT NULL,
     digest BLOB NOT NULL,
+    envelope TEXT NOT NULL,
     seq INTEGER NOT NULL,
     queued_at INTEGER NOT NULL,
     delivered_at INTEGER,
@@ -95,6 +108,7 @@ CREATE TABLE IF NOT EXISTS commands (
     UNIQUE (machine_id, command_id)
 );
 CREATE INDEX IF NOT EXISTS commands_by_seq ON commands (machine_id, seq);
+CREATE INDEX IF NOT EXISTS commands_by_device ON commands (device_id, queued_at);
 CREATE TABLE IF NOT EXISTS results (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -179,9 +193,16 @@ CREATE TABLE IF NOT EXISTS blobs (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 15;
-// Schemas 13 and 14 open as 15: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
+const SCHEMA_VERSION: i64 = 16;
+// Schemas 13 and 14 open as 16: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
 const COMPATIBLE_VERSIONS: [i64; 2] = [13, 14];
+// Schema 15 opens as 16 with its account-signed commands and their results dropped.
+const DEVICE_COMMANDS_FROM: i64 = 15;
+const DROPPED_FOR_DEVICE_COMMANDS: &str = "
+DROP TABLE IF EXISTS results;
+DROP TABLE IF EXISTS commands;
+DELETE FROM queue;
+";
 const DROPPED_FOR_ACCOUNT_COMMANDS: &str = "
 DROP TABLE IF EXISTS push_subscriptions;
 DROP TABLE IF EXISTS admissions;
@@ -193,7 +214,7 @@ DROP TABLE IF EXISTS notices;
 DROP TABLE IF EXISTS devices;
 DROP TABLE IF EXISTS events;
 ";
-pub const COMMAND_KEEP_SECONDS: u64 = 7 * 86_400;
+pub const COMMAND_KEEP_SECONDS: u64 = 90 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
 // The hub cannot read which blobs a board references, so a blob lives this long after its machine last PUT it.
@@ -247,9 +268,11 @@ pub struct NewCommand<'a> {
     pub account: &'a str,
     pub command: &'a Id,
     pub machine: &'a Id,
+    pub device: &'a Id,
     pub kind: &'a str,
     pub digest: &'a [u8],
     pub envelope: &'a str,
+    pub kept: &'a str,
     pub now: u64,
     pub expires_at: u64,
 }
@@ -276,6 +299,39 @@ pub enum ResultWrite {
     Stored(u64),
     Resent(u64),
     Differs,
+}
+
+pub struct NewDevice<'a> {
+    pub account: &'a str,
+    pub cert: &'a DeviceCert,
+    pub text: &'a str,
+    pub now: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DeviceWrite {
+    Added,
+    Renamed,
+    Taken,
+}
+
+pub struct DeviceRow {
+    pub account: String,
+    pub cert: DeviceCert,
+    pub created_at: u64,
+    pub last_seen_at: Option<u64>,
+}
+
+pub struct DeviceCommandRow {
+    pub position: u64,
+    pub command: Id,
+    pub machine: Id,
+    pub kind: String,
+    pub queued_at: u64,
+    pub delivered_at: Option<u64>,
+    pub envelope: String,
+    pub result: Option<String>,
+    pub result_at: Option<u64>,
 }
 
 pub struct DeliveredCommand {
@@ -312,7 +368,10 @@ impl Store {
         let tables: i64 =
             connection.query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get(0))?;
         let fresh = version == 0 && tables == 0;
-        if !fresh && version != SCHEMA_VERSION && !COMPATIBLE_VERSIONS.contains(&version) {
+        let opens = version == SCHEMA_VERSION
+            || version == DEVICE_COMMANDS_FROM
+            || COMPATIBLE_VERSIONS.contains(&version);
+        if !fresh && !opens {
             return Err(rusqlite::Error::SqliteFailure(
                 rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISMATCH),
                 Some(format!(
@@ -326,7 +385,10 @@ impl Store {
         if COMPATIBLE_VERSIONS.contains(&version) {
             tx.execute_batch(DROPPED_FOR_ACCOUNT_COMMANDS)?;
         }
-        if fresh || COMPATIBLE_VERSIONS.contains(&version) {
+        if version == DEVICE_COMMANDS_FROM {
+            tx.execute_batch(DROPPED_FOR_DEVICE_COMMANDS)?;
+        }
+        if fresh || version != SCHEMA_VERSION {
             tx.execute_batch(SCHEMA)?;
         }
         let marked: bool = tx.query_row(
@@ -613,20 +675,128 @@ impl Store {
             ],
         )?;
         tx.execute(
-            "INSERT INTO commands (account_id, command_id, machine_id, kind, digest, seq, queued_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO commands (account_id, command_id, machine_id, device_id, kind, digest, envelope, seq, queued_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 new.account,
                 new.command.as_str(),
                 new.machine.as_str(),
+                new.device.as_str(),
                 new.kind,
                 new.digest,
+                new.kept,
                 seq,
                 new.now
             ],
         )?;
+        tx.execute(
+            "UPDATE devices SET last_seen_at = ?2 WHERE device_id = ?1",
+            params![new.device.as_str(), new.now],
+        )?;
         tx.commit()?;
         Ok(CommandWrite::Queued(seq))
+    }
+
+    pub fn register_device(&mut self, new: &NewDevice<'_>) -> Result<DeviceWrite> {
+        let tx = self.connection.transaction()?;
+        let held: Option<(String, Vec<u8>)> = tx
+            .query_row(
+                "SELECT account_id, signing_key FROM devices WHERE device_id = ?1",
+                [new.cert.device.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let written = match held {
+            Some((account, signing)) if account != new.account || signing != new.cert.signing => {
+                return Ok(DeviceWrite::Taken);
+            }
+            Some(_) => {
+                tx.execute(
+                    "UPDATE devices SET name = ?2, kind = ?3, cert = ?4 WHERE device_id = ?1",
+                    params![new.cert.device.as_str(), new.cert.name, new.cert.kind.name(), new.text],
+                )?;
+                DeviceWrite::Renamed
+            }
+            None => {
+                tx.execute(
+                    "INSERT INTO devices (device_id, account_id, name, kind, signing_key, cert, created_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        new.cert.device.as_str(),
+                        new.account,
+                        new.cert.name,
+                        new.cert.kind.name(),
+                        new.cert.signing.as_slice(),
+                        new.text,
+                        new.now
+                    ],
+                )?;
+                DeviceWrite::Added
+            }
+        };
+        tx.commit()?;
+        Ok(written)
+    }
+
+    pub fn devices(&self, account: &str) -> Result<Vec<DeviceRow>> {
+        self.devices_where("account_id = ?1 ORDER BY created_at, device_id", account)
+    }
+
+    pub fn device(&self, device: &Id) -> Result<Option<DeviceRow>> {
+        Ok(self.devices_where("device_id = ?1", device.as_str())?.pop())
+    }
+
+    fn devices_where(&self, condition: &str, value: &str) -> Result<Vec<DeviceRow>> {
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT account_id, cert, created_at, last_seen_at FROM devices WHERE {condition}"
+        ))?;
+        statement
+            .query_map([value], |row| {
+                let cert: String = row.get(1)?;
+                Ok(DeviceRow {
+                    account: row.get(0)?,
+                    cert: serde_json::from_str(&cert).map_err(|_| corrupt(1))?,
+                    created_at: row.get(2)?,
+                    last_seen_at: row.get(3)?,
+                })
+            })?
+            .collect()
+    }
+
+    pub fn device_commands(
+        &self,
+        account: &str,
+        device: &Id,
+        before: Option<u64>,
+        limit: u64,
+    ) -> Result<Vec<DeviceCommandRow>> {
+        let mut statement = self.connection.prepare(
+            "SELECT commands.rowid, commands.command_id, commands.machine_id, commands.kind,
+                    commands.queued_at, commands.delivered_at, commands.envelope,
+                    results.envelope, results.stored_at
+             FROM commands LEFT JOIN results
+                 ON results.account_id = commands.account_id AND results.command_id = commands.command_id
+             WHERE commands.account_id = ?1 AND commands.device_id = ?2 AND commands.rowid < ?3
+             ORDER BY commands.rowid DESC LIMIT ?4",
+        )?;
+        statement
+            .query_map(
+                params![account, device.as_str(), before.unwrap_or(i64::MAX as u64), limit],
+                |row| {
+                    Ok(DeviceCommandRow {
+                        position: row.get(0)?,
+                        command: id_at(row, 1)?,
+                        machine: id_at(row, 2)?,
+                        kind: row.get(3)?,
+                        queued_at: row.get(4)?,
+                        delivered_at: row.get(5)?,
+                        envelope: row.get(6)?,
+                        result: row.get(7)?,
+                        result_at: row.get(8)?,
+                    })
+                },
+            )?
+            .collect()
     }
 
     pub fn mark_delivered(&self, machine: &Id, after: u64, through: u64, now: u64) -> Result<()> {
@@ -1759,8 +1929,10 @@ impl Store {
             "DELETE FROM commands WHERE queued_at + ?2 <= ?1",
             params![now, COMMAND_KEEP_SECONDS],
         )?;
-        self.connection
-            .execute("DELETE FROM results WHERE expires_at <= ?1", [now])?;
+        self.connection.execute(
+            "DELETE FROM results WHERE stored_at + ?2 <= ?1",
+            params![now, COMMAND_KEEP_SECONDS],
+        )?;
         self.connection.execute(
             "DELETE FROM events WHERE at + ?2 <= ?1",
             params![now, EVENT_KEEP_SECONDS],

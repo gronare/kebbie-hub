@@ -5,8 +5,8 @@ import { connectText, listWithout, PairingFailed, publishList, safeNext, withRea
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
-import { allowsChanges, collectResults, CommandProblem, keepSent, loadSent, sendCommand } from "./device.js";
-import { answerBlock, answerReady, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
+import { answerBlock, answerReady, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
@@ -22,7 +22,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
 const cameraAtBottom = () => globalThis.screen?.orientation?.angle === (Math.max(innerWidth, innerHeight) > 800 ? 90 : 270);
@@ -287,9 +287,10 @@ const decide = (found, html) => `<div class="decide" data-machine="${esc(found.m
 
 function sentFor(found, kind, question = null, prompt = null) {
   const sent = latestSent(state.kept.sent, { machine: found.machine, address: found.item.address, kind, question, prompt });
-  if (!sent) return { sent: null, state: null };
+  if (!sent) return { sent: null, state: null, standing: null };
   const opened = state.opened.find((machine) => machine.machine === found.machine);
-  return { sent, state: sentState(sent, { now: nowSeconds(), asleep: isAsleep({ lastSeen: opened?.lastSeen ?? null }, nowSeconds()) }) };
+  const standing = standingOn(opened?.board, state.device?.id === sent.device ? state.device : null);
+  return { sent, standing, state: sentState(sent, { now: nowSeconds(), asleep: isAsleep({ lastSeen: opened?.lastSeen ?? null }, nowSeconds()), standing }) };
 }
 
 function answerArea(found) {
@@ -299,8 +300,8 @@ function answerArea(found) {
   if (access === "refused") return optionCards(question.options, question.recommend) + refusedBlock(state.refused.url);
   if (access === "view-only") return optionCards(question.options, question.recommend) + viewOnlyBlock();
   if (!takes(found.accepts, "answer")) return optionCards(question.options, question.recommend) + notTakenBlock("answer", found.name, found.accepts);
-  const { sent, state: shown } = sentFor(found, "answer", question.id);
-  return decide(found, answerBlock({ key: uiKey(found.machine, found.item.address), question, ui: uiOf(found.machine, found.item.address), sent, state: shown }));
+  const { sent, state: shown, standing } = sentFor(found, "answer", question.id);
+  return decide(found, answerBlock({ key: uiKey(found.machine, found.item.address), question, ui: uiOf(found.machine, found.item.address), sent, state: shown, standing }));
 }
 
 function promptArea(found) {
@@ -312,8 +313,8 @@ function promptArea(found) {
   if (!takesPromptAnswers(found)) return promptCards(prompt) + notTakenBlock("prompt-answer", found.name, found.accepts);
   const ui = uiOf(found.machine, found.item.address);
   if (ui.prompt !== prompt.id && !ui.busy) Object.assign(ui, freshUi(), { prompt: prompt.id });
-  const { sent, state: shown } = sentFor(found, "prompt-answer", null, prompt.id);
-  return decide(found, promptAnswerBlock({ prompt, ui, sent, state: shown }));
+  const { sent, state: shown, standing } = sentFor(found, "prompt-answer", null, prompt.id);
+  return decide(found, promptAnswerBlock({ prompt, ui, sent, state: shown, standing }));
 }
 
 function pushArea(found) {
@@ -325,9 +326,9 @@ function pushArea(found) {
   if (access === "refused") return refusedBlock(state.refused.url);
   if (access === "view-only") return viewOnlyBlock();
   if (!takes(found.accepts, "push")) return notTakenBlock("push", found.name, found.accepts);
-  const { sent, state: shown } = sentFor(found, "push");
+  const { sent, state: shown, standing } = sentFor(found, "push");
   const current = sent && sent.head !== item.head && settled(shown) ? null : sent;
-  return decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null }));
+  return decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing }));
 }
 
 function taskBody(found) {
@@ -571,6 +572,7 @@ async function loadCommands(session) {
   if (state.keptFor !== id) {
     state.kept = await loadSent(deviceStore, id, nowSeconds());
     state.allowed = await allowsChanges(deviceStore, id);
+    state.device = await loadDevice(deviceStore, id);
     state.keptFor = id;
   }
   collect();
@@ -607,7 +609,9 @@ async function send(target, payload, meta) {
   try {
     if (!keys) throw new Error("Your account doesn't list this machine's keys.");
     const identity = state.session.identity;
-    const sent = await sendCommand({ calls: account, identity, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta });
+    if (state.allowed !== true) throw new CommandProblem("view-only");
+    state.device = await ensureDevice({ store: deviceStore, calls: account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: state.device });
+    const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta });
     state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
     await keepSent(deviceStore, identity.id, state.kept);
     state.ui.set(uiKey(machine, address), freshUi());
@@ -669,6 +673,7 @@ function decideAction(action, target, element) {
 
 function stopCommands() {
   state.allowed = false;
+  state.device = null;
   state.keptFor = null;
   state.kept = { cursor: 0, sent: [] };
   state.ui = new Map();
@@ -959,6 +964,7 @@ function leaveAccount() {
   if (left.me) state.me = left.me;
   state.address = left.address;
   if (left.allowed !== null) state.allowed = left.allowed;
+  if (left.device) state.device = left.device;
   render();
 }
 

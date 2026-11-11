@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use kebbie_hub_api::{
     CommandQueued, CommandUpload, ResultEntry, ResultStored, ResultUpload, Results,
 };
-use kebbie_hub_protocol::{Envelope, Id, Kind, OpenError, Prefix, verify};
+use kebbie_hub_protocol::{Envelope, Id, Kind, OpenError, Prefix, verify, verify_command};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -47,18 +47,16 @@ pub async fn post_command(
     if !header.kind.is_command() {
         return Err(ApiError::bad_request("not-a-command"));
     }
-    if header.from.as_str() != account {
-        return Err(refused(OpenError::WrongSender));
+    if header.cert.as_ref().is_some_and(|cert| cert.account.as_str() != account) {
+        return Err(refused(OpenError::WrongAccount));
     }
     if envelope.ct.len() > max_ciphertext(header.kind) {
         return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "too-large"));
     }
     let machine = &header.machine;
-    let addressed = envelope.keys.contains_key(machine)
-        && envelope
-            .keys
-            .keys()
-            .all(|recipient| recipient == machine || recipient == &header.from);
+    let addressed = envelope.keys.len() == 2
+        && envelope.keys.contains_key(machine)
+        && envelope.keys.keys().any(|recipient| recipient.as_str() == account);
     if !addressed {
         return Err(ApiError::bad_request("bad-recipients"));
     }
@@ -87,8 +85,19 @@ pub async fn post_command(
     let key = store
         .account_key(&account)?
         .ok_or(ApiError::conflict("no-key"))?;
-    verify(envelope, &header.from, &key.keys, at).map_err(refused)?;
+    let device = verify_command(envelope, &key, at).map_err(refused)?;
+    let registered = store
+        .device(device.id())?
+        .is_some_and(|row| row.account == account && row.cert.signing == *device.signing());
+    if !registered {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "unknown-device"));
+    }
     hub.limit_command(&account, header.kind)?;
+    let reader = Id::parse(&account).map_err(|_| ApiError::internal())?;
+    let kept = envelope
+        .for_recipient(&reader)
+        .ok_or_else(ApiError::internal)?
+        .to_json();
     if store.queued_count(machine)? >= hub.config().max_queued
         || store.undelivered_count(machine, &account)? >= hub.config().max_undelivered_per_account
     {
@@ -98,9 +107,11 @@ pub async fn post_command(
         account: &account,
         command: &header.id,
         machine,
+        device: device.id(),
         kind: header.kind.name(),
         digest: &digest,
         envelope: &text,
+        kept: &kept,
         now: at,
         expires_at: header.exp,
     })?;

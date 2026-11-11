@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::account::AccountKey;
 use crate::crypto::{self, OpenError, SecretKeys};
+use crate::device::{DeviceTrust, Trust, VerifiedDevice};
 use crate::envelope::{Envelope, Kind, ShapeError};
 use crate::ids::Id;
 use crate::message::{CommandResult, Payload, Reason};
@@ -13,6 +14,7 @@ pub struct Machine<'a> {
     pub keys: &'a SecretKeys,
     pub account: &'a AccountKey,
     pub accepts: &'a [Kind],
+    pub trust: &'a dyn DeviceTrust,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,6 +24,7 @@ pub enum Dropped {
     NotACommand,
     WrongMachine,
     WrongAccount,
+    BadCertificate,
     BadSignature,
 }
 
@@ -33,6 +36,7 @@ impl Dropped {
             Dropped::NotACommand => "not-a-command",
             Dropped::WrongMachine => "wrong-machine",
             Dropped::WrongAccount => "wrong-account",
+            Dropped::BadCertificate => "bad-certificate",
             Dropped::BadSignature => "bad-signature",
         }
     }
@@ -43,6 +47,13 @@ pub enum Refusal {
     Drop(Dropped),
     Answer(Reason),
     Replay(CommandResult),
+    Waiting(Box<Verified>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Verified {
+    pub device: VerifiedDevice,
+    pub payload: Payload,
 }
 
 pub fn authorize(
@@ -50,7 +61,7 @@ pub fn authorize(
     applied: &AppliedCommands,
     envelope: &Envelope,
     now: u64,
-) -> Result<Payload, Refusal> {
+) -> Result<Verified, Refusal> {
     let header = &envelope.header;
     match header.check_shape() {
         Err(ShapeError::UnsupportedVersion | ShapeError::UnsupportedSchema) => {
@@ -65,16 +76,27 @@ pub fn authorize(
     if &header.machine != machine.id {
         return Err(Refusal::Drop(Dropped::WrongMachine));
     }
-    let account = machine.account;
-    if header.from != account.account {
-        return Err(Refusal::Drop(Dropped::WrongAccount));
-    }
-    crypto::verify_signature(envelope, &account.account, &account.keys)
-        .map_err(|_| Refusal::Drop(Dropped::BadSignature))?;
-    if let Some(result) = applied.result(&account.account, &header.id) {
+    let device = crypto::verify_device(envelope, machine.account).map_err(|error| {
+        Refusal::Drop(match error {
+            OpenError::WrongAccount => Dropped::WrongAccount,
+            OpenError::BadCertificate => Dropped::BadCertificate,
+            OpenError::BadSignature => Dropped::BadSignature,
+            _ => Dropped::Malformed,
+        })
+    })?;
+    if let Some(result) = applied.result(device.id(), &header.id) {
         return Err(Refusal::Replay(result.clone()));
     }
-    crypto::check_time(header, now).map_err(|_| Refusal::Answer(Reason::Expired))?;
+    let trust = machine.trust.trust(&device, now);
+    if trust == Trust::Denied {
+        return Err(Refusal::Answer(Reason::Denied));
+    }
+    crypto::check_time(header, now).map_err(|_| {
+        Refusal::Answer(match trust {
+            Trust::Waiting => Reason::NotApproved,
+            _ => Reason::Expired,
+        })
+    })?;
     if !machine.accepts.contains(&header.kind) {
         return Err(Refusal::Answer(Reason::NotAllowed));
     }
@@ -83,7 +105,10 @@ pub fn authorize(
     payload
         .validate()
         .map_err(|_| Refusal::Answer(Reason::BadRequest))?;
-    Ok(payload)
+    match trust {
+        Trust::Waiting => Err(Refusal::Waiting(Box::new(Verified { device, payload }))),
+        _ => Ok(Verified { device, payload }),
+    }
 }
 
 fn undecrypted(error: OpenError) -> Reason {
@@ -107,16 +132,16 @@ pub struct Applied {
 impl AppliedCommands {
     pub const KEEP_SECONDS: u64 = 7 * 86_400;
 
-    pub fn result(&self, sender: &Id, command: &Id) -> Option<&CommandResult> {
+    pub fn result(&self, device: &Id, command: &Id) -> Option<&CommandResult> {
         self.applied
-            .get(sender)?
+            .get(device)?
             .get(command)
             .map(|applied| &applied.result)
     }
 
-    pub fn record(&mut self, sender: &Id, at: u64, result: CommandResult) {
+    pub fn record(&mut self, at: u64, result: CommandResult) {
         self.applied
-            .entry(sender.clone())
+            .entry(result.device.clone())
             .or_default()
             .insert(result.command.clone(), Applied { at, result });
     }
@@ -140,26 +165,27 @@ impl AppliedCommands {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ids::Prefix;
     use crate::message::Outcome;
 
     #[test]
-    fn applied_commands_replay_per_sender_and_forget_after_a_week() {
+    fn applied_commands_replay_per_device_and_forget_after_a_week() {
         let mut applied = AppliedCommands::default();
-        let account = Id::account([1; 16]);
-        let other = Id::account([2; 16]);
+        let phone = Id::ulid(Prefix::Device, 1, [1; 10]).unwrap();
+        let other = Id::ulid(Prefix::Device, 1, [2; 10]).unwrap();
         let command = Id::command(1, [7; 10]);
         applied.record(
-            &account,
             1_000,
             CommandResult {
                 command: command.clone(),
+                device: phone.clone(),
                 outcome: Outcome::Done,
                 text: "answered".into(),
             },
         );
         assert_eq!(
             applied
-                .result(&account, &command)
+                .result(&phone, &command)
                 .map(|result| result.outcome),
             Some(Outcome::Done)
         );

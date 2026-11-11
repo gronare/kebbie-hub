@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -70,12 +70,12 @@ test("the web seals byte for byte what Rust sealed", async () => {
 
 test("a command sealed with fresh randomness opens on the other side", async () => {
   const vector = envelopes.cases.find((candidate) => candidate.name === "answer-opened-by-the-machine");
-  const account = await identity("account");
+  const phone = await identity("phone");
   const recipients = ["account", "machine"].map((name) => ({ id: parties[name].id, encryption: parties[name].public.encryption }));
   const plaintext = new TextEncoder().encode(JSON.stringify(vector.expect.payload));
-  const sealed = await sealEnvelope(headerOf(vector.envelope), plaintext, account, recipients);
+  const sealed = await sealEnvelope(headerOf(vector.envelope), plaintext, phone, recipients);
   assert.notEqual(sealed.ct, vector.envelope.ct);
-  assert.deepEqual(await openEnvelope(sealed, await identity("machine"), await sender("account"), envelopes.now), vector.expect.payload);
+  assert.deepEqual(await openEnvelope(sealed, await identity("machine"), await sender("phone"), envelopes.now), vector.expect.payload);
 });
 
 test("signatures verify and reproduce", async () => {
@@ -344,30 +344,118 @@ test("a command id is a UUIDv7 with the time it was sealed", () => {
   assert.equal(commandId(vector.envelope.at * 1000).slice(0, 17), vector.envelope.id.slice(0, 17));
 });
 
-test("a command sealed by the account opens for the machine and for the account, and for nobody else", async () => {
+const devices = load("devices.json");
+
+async function certifiedPhone() {
+  const phone = await identity("phone");
+  return { id: phone.id, signing: phone.signing, cert: devices.certs.find((listed) => listed.device === "phone").cert };
+}
+
+test("a device is certified by the account byte for byte as Rust certifies it", async () => {
   const { account } = await unlockedAccount();
+  for (const listed of devices.certs) {
+    const { sig, ...unsigned } = listed.cert;
+    assert.equal(toB64(deviceCertStatement(unsigned)), listed.statement, listed.device);
+    assert.deepEqual(await signDeviceCert(account, unsigned), listed.cert, listed.device);
+    assert.equal(await verifyDeviceCert(devices.key, listed.cert), true, listed.device);
+    assert.equal(await deviceFingerprint(listed.cert.signing), listed.fingerprint, listed.device);
+  }
+  for (const refusal of devices.refusals) assert.equal(await verifyDeviceCert(devices.key, refusal.cert), false, refusal.name);
+  for (const listed of devices.ids) assert.equal(deviceId(listed.millis, fromB64(listed.random)), listed.id);
+  const { sig, ...unsigned } = devices.certs[0].cert;
+  for (const name of ["", "x".repeat(65), "iPhone\n16"]) assert.throws(() => deviceCertStatement({ ...unsigned, name }), (error) => error.code === "malformed", JSON.stringify(name));
+  assert.throws(() => deviceCertStatement({ ...unsigned, kind: "ios" }), (error) => error.code === "malformed");
+  assert.throws(() => deviceCertStatement({ ...unsigned, device: parties.machine.id }), (error) => error.code === "malformed");
+});
+
+test("a device's commands verify against the account as Rust verifies them", async () => {
+  const account = await identity("account");
+  for (const vector of devices.commands) {
+    assert.equal(toB64(headerBytes(vector.envelope)), vector.header_bytes, vector.name);
+    if (vector.expect.device) {
+      const device = await verifyCommand(vector.envelope, devices.key, devices.now);
+      assert.deepEqual([device.device, await deviceFingerprint(device.signing)], [vector.expect.device, vector.expect.fingerprint], vector.name);
+      assert.deepEqual((await openCommand(vector.envelope, account, devices.key, devices.now)).payload, devices.payload, vector.name);
+    } else {
+      assert.equal(await failure(verifyCommand(vector.envelope, devices.key, devices.now)), vector.expect.error, vector.name);
+    }
+  }
+});
+
+test("a command sealed by a device opens for the machine and the account, names the device, and opens for nobody else", async () => {
+  const device = await certifiedPhone();
   const machine = { id: parties.machine.id, keys: parties.machine.public };
   const at = envelopes.now;
   const payload = { type: "push", address: "refunds@shop", head: "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a", card_sha: null };
-  const envelope = await sealCommand({ identity: account, machine, payload, at });
+  const envelope = await sealCommand({ device, account: devices.key, machine, payload, at });
   checkShape(envelope);
-  assert.deepEqual([envelope.kind, envelope.from, envelope.machine, envelope.at, envelope.exp], ["push", account.id, machine.id, at, at + COMMAND_TTL]);
+  assert.deepEqual([envelope.kind, envelope.from, envelope.machine, envelope.at, envelope.exp], ["push", device.id, machine.id, at, at + COMMAND_TTL]);
   assert.equal(COMMAND_TTL, 3600);
   assert.match(envelope.id, /^cmd_[0-9a-f]{8}-[0-9a-f]{4}-7/);
-  assert.deepEqual(Object.keys(envelope.keys).sort(), [account.id, machine.id].sort());
-  const fromAccount = await sender("account");
-  assert.deepEqual(await openEnvelope(envelope, await identity("machine"), fromAccount, at), payload);
-  assert.deepEqual(await openEnvelope(envelope, account, fromAccount, at), payload);
-  assert.equal(await failure(openEnvelope(envelope, await identity("phone"), fromAccount, at)), "not-a-recipient");
-  assert.equal(await failure(openEnvelope(envelope, await identity("machine"), await sender("other-account"), at)), "wrong-sender");
-  assert.equal(await failure(openEnvelope(envelope, await identity("machine"), { id: account.id, signing: (await sender("other-account")).signing }, at)), "bad-signature");
-  assert.equal(await failure(sealCommand({ identity: account, machine, payload: { type: "answer", address: "a@b", question: "q", choice: "first", comment: "" }, at })), "malformed");
+  assert.deepEqual(Object.keys(envelope.keys).sort(), [devices.key.account, machine.id].sort());
+  for (const recipient of [await identity("machine"), await identity("account")]) {
+    const opened = await openCommand(envelope, recipient, devices.key, at);
+    assert.deepEqual([opened.device.device, opened.payload], [device.id, payload]);
+  }
+  assert.equal(await failure(openCommand(envelope, await identity("phone"), devices.key, at)), "not-a-recipient");
+  assert.equal(await failure(verifyCommand(envelope, { ...devices.key, account: parties["other-account"].id }, at)), "wrong-account");
+  assert.equal(await failure(verifyCommand(envelope, { ...devices.key, keys: parties["other-account"].public }, at)), "bad-certificate");
+  assert.equal(await failure(verifyCommand(envelope, devices.key, at + COMMAND_TTL)), "expired");
+  assert.equal(await failure(sealCommand({ device: { ...device, signing: (await identity("tablet")).signing }, account: devices.key, machine, payload, at }).then((forged) => verifyCommand(forged, devices.key, at))), "bad-signature");
+  assert.equal(await failure(sealCommand({ device, account: { ...devices.key, keys: parties["other-account"].public }, machine, payload, at })), "cert-mismatch");
+  assert.equal(await failure(sealCommand({ device, account: devices.key, machine, payload: { type: "answer", address: "a@b", question: "q", choice: "first", comment: "" }, at })), "malformed");
 });
 
-test("a command from a device id no longer has a valid shape", () => {
-  const vector = envelopes.cases.find((candidate) => candidate.name === "device-as-command-sender");
-  assert.equal(vector.expect.error, "malformed");
-  assert.throws(() => checkShape(vector.envelope), (error) => error.code === "malformed");
+test("a fresh device key never leaves the browser, and the account certifies it for commands", async () => {
+  const { account } = await unlockedAccount();
+  const key = await newDeviceKey();
+  assert.equal(key.signing.extractable, false);
+  const id = deviceId();
+  assert.match(id, /^dev_[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
+  const cert = await signDeviceCert(account, { device: id, name: "iPhone 16", signing: key.public, created_at: envelopes.now });
+  assert.equal(await verifyDeviceCert(devices.key, cert), true);
+  const payload = { type: "routine", id: "nightly-deps" };
+  const envelope = await sealCommand({ device: { id, signing: key.signing, cert }, account: devices.key, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
+  assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, payload);
+  assert.match(await deviceFingerprint(key.public), /^[0-9A-F]{4}-[0-9A-F]{4}$/);
+});
+
+test("a command without its device's certificate, or from the account, has no valid shape", () => {
+  for (const name of ["account-as-command-sender", "command-without-a-certificate", "sender-is-not-the-certified-device", "certificate-on-a-board"]) {
+    const vector = envelopes.cases.find((candidate) => candidate.name === name);
+    assert.equal(vector.expect.error, "malformed", name);
+    assert.throws(() => checkShape(vector.envelope), (error) => error.code === "malformed", name);
+  }
+});
+
+test("a board says where each device stands on its machine, and a board without it still passes", () => {
+  const full = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
+  assert.deepEqual(Object.values(full.devices).map((standing) => standing.state).sort(), ["approved", "denied", "waiting"]);
+  checkPayload(full);
+  const [phone] = Object.keys(full.devices);
+  const wrong = [
+    (board) => (board.devices[phone] = { state: "trusted", fingerprint: "7F3A-91C2", at: 1 }),
+    (board) => (board.devices[phone] = { state: "approved", fingerprint: "7F3A-91C2", at: 1, until: 2 }),
+    (board) => (board.devices[phone] = { state: "denied", fingerprint: "7F3A-91C2" }),
+    (board) => (board.devices[parties.account.id] = { state: "approved", fingerprint: "7F3A-91C2", at: 1 }),
+    (board) => (board.devices = []),
+  ];
+  for (const change of wrong) {
+    const payload = structuredClone(full);
+    change(payload);
+    assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", String(change));
+  }
+});
+
+test("a result names the device whose command it answers", () => {
+  const result = envelopes.cases.find((vector) => vector.name === "result-opened-by-the-account").expect.payload;
+  assert.equal(result.device, parties.phone.id);
+  checkPayload(result);
+  checkPayload({ ...result, outcome: "refused", reason: "not-approved" });
+  checkPayload({ ...result, outcome: "refused", reason: "denied" });
+  assert.throws(() => checkPayload({ ...result, device: parties.account.id }), (error) => error.code === "malformed");
+  const { device, ...anonymous } = result;
+  assert.throws(() => checkPayload(anonymous), (error) => error.code === "malformed");
 });
 
 test("an answer to an agent's prompt lives ten minutes, as Rust's limit for its kind says", async () => {
@@ -377,9 +465,8 @@ test("an answer to an agent's prompt lives ten minutes, as Rust's limit for its 
   checkPayload(sealed.expect.payload);
   checkShape(sealed.envelope);
   assert.throws(() => checkShape({ ...sealed.envelope, exp: sealed.envelope.at + 601 }), (error) => error.code === "malformed");
-  const { account } = await unlockedAccount();
   const payload = { type: "prompt-answer", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y" };
-  const envelope = await sealCommand({ identity: account, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
+  const envelope = await sealCommand({ device: await certifiedPhone(), account: devices.key, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
   assert.equal(envelope.exp - envelope.at, 600);
   assert.throws(() => checkPayload({ ...payload, choice: 0 }), (error) => error.code === "malformed");
 });

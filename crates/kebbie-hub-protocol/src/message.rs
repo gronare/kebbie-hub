@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::board::Board;
 use crate::envelope::Kind;
-use crate::ids::Id;
+use crate::ids::{Id, Prefix};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
@@ -54,6 +54,7 @@ pub enum Event {
 #[serde(try_from = "ResultFields", into = "ResultFields")]
 pub struct CommandResult {
     pub command: Id,
+    pub device: Id,
     pub outcome: Outcome,
     pub text: String,
 }
@@ -62,6 +63,7 @@ pub struct CommandResult {
 #[serde(deny_unknown_fields)]
 struct ResultFields {
     command: Id,
+    device: Id,
     outcome: OutcomeKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     reason: Option<Reason>,
@@ -87,8 +89,12 @@ impl TryFrom<ResultFields> for CommandResult {
             (OutcomeKind::Refused, None) => return Err("a refusal needs a reason"),
             (_, Some(_)) => return Err("only a refusal carries a reason"),
         };
+        if fields.device.prefix() != Prefix::Device {
+            return Err("device is not a device id");
+        }
         Ok(CommandResult {
             command: fields.command,
+            device: fields.device,
             outcome,
             text: fields.text,
         })
@@ -104,6 +110,7 @@ impl From<CommandResult> for ResultFields {
         };
         ResultFields {
             command: result.command,
+            device: result.device,
             outcome,
             reason,
             text: result.text,
@@ -128,6 +135,8 @@ pub enum Reason {
     Expired,
     Undecryptable,
     BadRequest,
+    NotApproved,
+    Denied,
 }
 
 impl Reason {
@@ -140,6 +149,8 @@ impl Reason {
             Reason::Expired => "expired",
             Reason::Undecryptable => "undecryptable",
             Reason::BadRequest => "bad-request",
+            Reason::NotApproved => "not-approved",
+            Reason::Denied => "denied",
         }
     }
 }
@@ -278,6 +289,7 @@ mod tests {
     fn result_outcome_sits_beside_the_command() {
         let result = Payload::Result(CommandResult {
             command: Id::command(1, [1; 10]),
+            device: Id::ulid(Prefix::Device, 1, [2; 10]).unwrap(),
             outcome: Outcome::Refused {
                 reason: Reason::HeadMoved,
             },
@@ -292,7 +304,10 @@ mod tests {
             ),
             (Some("result"), Some("refused"), Some("head-moved"))
         );
-        assert_eq!(serde_json::from_value::<Payload>(json).unwrap(), result);
+        assert_eq!(serde_json::from_value::<Payload>(json.clone()).unwrap(), result);
+        let mut from_account = json;
+        from_account["device"] = serde_json::json!(Id::account([3; 16]));
+        assert!(serde_json::from_value::<Payload>(from_account).is_err(), "a result names the device that sent the command");
     }
 
     #[test]

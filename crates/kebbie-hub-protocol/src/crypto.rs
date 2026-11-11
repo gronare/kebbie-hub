@@ -14,6 +14,8 @@ use hpke::{Deserializable, Kem, OpModeR, OpModeS, Serializable};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::account::AccountKey;
+use crate::device::{DeviceKey, VerifiedDevice};
 use crate::envelope::{Envelope, Header, ShapeError};
 use crate::ids::Id;
 use crate::message::Payload;
@@ -111,6 +113,8 @@ pub enum SealError {
     NoRecipients,
     DuplicateRecipient(Id),
     MissingRandomness(Id),
+    NotACommand,
+    CertMismatch,
 }
 
 impl fmt::Display for SealError {
@@ -127,6 +131,10 @@ impl fmt::Display for SealError {
             SealError::MissingRandomness(id) => {
                 write!(formatter, "no ephemeral key material for {id}")
             }
+            SealError::NotACommand => formatter.write_str("only a command is sealed by a device"),
+            SealError::CertMismatch => formatter.write_str(
+                "the device certificate is not the account's or not for this device key",
+            ),
         }
     }
 }
@@ -139,6 +147,8 @@ pub enum OpenError {
     UnsupportedSchema,
     Malformed,
     WrongSender,
+    WrongAccount,
+    BadCertificate,
     BadSignature,
     Expired,
     NotYetValid,
@@ -155,6 +165,8 @@ impl OpenError {
             OpenError::UnsupportedSchema => "unsupported-schema",
             OpenError::Malformed => "malformed",
             OpenError::WrongSender => "wrong-sender",
+            OpenError::WrongAccount => "wrong-account",
+            OpenError::BadCertificate => "bad-certificate",
             OpenError::BadSignature => "bad-signature",
             OpenError::Expired => "expired",
             OpenError::NotYetValid => "not-yet-valid",
@@ -202,16 +214,43 @@ pub fn seal(
     seal_with(
         header,
         payload,
-        sender,
+        &sender.signing,
         recipients,
         &Randomness::draw(recipients),
     )
 }
 
+pub fn seal_command(
+    header: Header,
+    payload: &Payload,
+    device: &DeviceKey,
+    machine: &PublicKeys,
+    account: &AccountKey,
+) -> Result<Envelope, SealError> {
+    let recipients = [(header.machine.clone(), *machine), account.recipient()];
+    let randomness = Randomness::draw(&recipients);
+    seal_command_with(header, payload, device, &recipients, account, &randomness)
+}
+
+pub(crate) fn seal_command_with(
+    header: Header,
+    payload: &Payload,
+    device: &DeviceKey,
+    recipients: &[(Id, PublicKeys)],
+    account: &AccountKey,
+    randomness: &Randomness,
+) -> Result<Envelope, SealError> {
+    let cert = header.cert.as_ref().ok_or(SealError::NotACommand)?;
+    if !account.verifies_device(cert) || cert.signing != device.public() {
+        return Err(SealError::CertMismatch);
+    }
+    seal_with(header, payload, device.signing(), recipients, randomness)
+}
+
 pub(crate) fn seal_with(
     mut header: Header,
     payload: &Payload,
-    sender: &SecretKeys,
+    sender: &SigningKey,
     recipients: &[(Id, PublicKeys)],
     randomness: &Randomness,
 ) -> Result<Envelope, SealError> {
@@ -240,7 +279,7 @@ pub(crate) fn seal_with(
 pub(crate) fn seal_unchecked(
     header: Header,
     plaintext: &[u8],
-    sender: &SecretKeys,
+    sender: &SigningKey,
     recipients: &[(Id, PublicKeys)],
     randomness: &Randomness,
 ) -> Envelope {
@@ -271,7 +310,7 @@ pub(crate) fn seal_unchecked(
         .expect("AES-GCM sealing cannot fail for a payload this size");
     let mut ct = randomness.nonce.to_vec();
     ct.extend(sealed);
-    let sig = sender.signing.sign(&signed_bytes(&aad, &ct));
+    let sig = sender.sign(&signed_bytes(&aad, &ct));
     Envelope {
         header,
         keys,
@@ -335,12 +374,54 @@ pub(crate) fn verify_signature(
     if &header.from != sender {
         return Err(OpenError::WrongSender);
     }
+    verify_signed_by(envelope, &sender_keys.signing)
+}
+
+pub fn verify_command(
+    envelope: &Envelope,
+    account: &AccountKey,
+    now: u64,
+) -> Result<VerifiedDevice, OpenError> {
+    let device = verify_device(envelope, account)?;
+    check_time(&envelope.header, now)?;
+    Ok(device)
+}
+
+pub fn open_command(
+    envelope: &Envelope,
+    recipient: &Id,
+    keys: &SecretKeys,
+    account: &AccountKey,
+    now: u64,
+) -> Result<(VerifiedDevice, Payload), OpenError> {
+    let device = verify_command(envelope, account, now)?;
+    Ok((device, decrypt(envelope, recipient, keys)?))
+}
+
+pub(crate) fn verify_device(
+    envelope: &Envelope,
+    account: &AccountKey,
+) -> Result<VerifiedDevice, OpenError> {
+    let header = &envelope.header;
+    header.check_shape()?;
+    let cert = header.cert.as_ref().ok_or(OpenError::Malformed)?;
+    if cert.account != account.account {
+        return Err(OpenError::WrongAccount);
+    }
+    if !account.verifies_device(cert) {
+        return Err(OpenError::BadCertificate);
+    }
+    verify_signed_by(envelope, &cert.signing)?;
+    Ok(VerifiedDevice::new(cert.clone()))
+}
+
+fn verify_signed_by(envelope: &Envelope, signing: &[u8; 32]) -> Result<(), OpenError> {
     let ct = decode(&envelope.ct)?;
     let sig: [u8; 64] = decode(&envelope.sig)?
         .try_into()
         .map_err(|_| OpenError::Malformed)?;
-    let key =
-        VerifyingKey::from_bytes(&sender_keys.signing).map_err(|_| OpenError::BadSignature)?;
+    let key = VerifyingKey::from_bytes(signing).map_err(|_| OpenError::BadSignature)?;
+    let header = &envelope.header;
     key.verify_strict(
         &signed_bytes(&header.bytes(), &ct),
         &Signature::from_bytes(&sig),
@@ -451,6 +532,25 @@ impl rand_core::TryRng for OneShot {
 
 impl rand_core::TryCryptoRng for OneShot {}
 
+pub(crate) mod b64_64 {
+    use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use serde::{Deserialize, Deserializer, Serializer, de::Error};
+
+    pub fn serialize<S: Serializer>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&URL_SAFE_NO_PAD.encode(bytes))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[u8; 64], D::Error> {
+        let text = String::deserialize(deserializer)?;
+        URL_SAFE_NO_PAD
+            .decode(&text)
+            .map_err(D::Error::custom)?
+            .try_into()
+            .map_err(|_| D::Error::custom("expected 64 bytes"))
+    }
+}
+
 pub(crate) mod b64_32 {
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -473,6 +573,7 @@ pub(crate) mod b64_32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::{DeviceCert, DeviceKind};
     use crate::envelope::Kind;
     use crate::ids::Prefix;
     use crate::message::RunRoutine;
@@ -496,14 +597,15 @@ mod tests {
         let machine = Id::ulid(Prefix::Machine, 1, [1; 10]).unwrap();
         let account = Id::account([2; 16]);
         let keys = SecretKeys::generate();
+        let cert = DeviceCert::issue(&keys, &account, Id::ulid(Prefix::Device, 1, [3; 10]).unwrap(), "iPhone", DeviceKind::Web, keys.public().signing, 1_000).unwrap();
         let payload = Payload::Routine(RunRoutine {
             id: "nightly-deps".into(),
         });
         let header = |ttl: u64| {
-            let mut header = Header::new(
+            let mut header = Header::command(
                 Id::new(Prefix::Command).unwrap(),
                 Kind::Routine,
-                account.clone(),
+                cert.clone(),
                 machine.clone(),
                 1_000,
             );
@@ -541,5 +643,26 @@ mod tests {
             seal(header(60), &payload, &keys, &twice),
             Err(SealError::DuplicateRecipient(machine.clone()))
         );
+    }
+
+    #[test]
+    fn a_command_is_sealed_by_the_certified_device_to_its_machine_and_account() {
+        let machine = SecretKeys::generate();
+        let machine_id = Id::ulid(Prefix::Machine, 1, [1; 10]).unwrap();
+        let account_keys = SecretKeys::generate();
+        let account = AccountKey::new(Id::account([2; 16]), 1, account_keys.public()).unwrap();
+        let phone = DeviceKey::generate();
+        let cert = DeviceCert::issue(&account_keys, &account.account, Id::ulid(Prefix::Device, 1, [3; 10]).unwrap(), "iPhone", DeviceKind::Web, phone.public(), 1_000).unwrap();
+        let payload = Payload::Routine(RunRoutine { id: "nightly-deps".into() });
+        let header = Header::command(Id::new(Prefix::Command).unwrap(), Kind::Routine, cert.clone(), machine_id.clone(), 1_000);
+        let envelope = seal_command(header.clone(), &payload, &phone, &machine.public(), &account).unwrap();
+        assert_eq!(envelope.keys.keys().collect::<Vec<_>>(), [&account.account, &machine_id]);
+        let (device, opened) = open_command(&envelope, &machine_id, &machine, &account, 1_000).unwrap();
+        assert_eq!((device.id(), opened), (&cert.device, payload.clone()));
+        assert_eq!(open_command(&envelope, &account.account, &account_keys, &account, 1_000).unwrap().1, payload);
+        assert_eq!(seal_command(header.clone(), &payload, &DeviceKey::generate(), &machine.public(), &account), Err(SealError::CertMismatch));
+        let other = AccountKey::new(Id::account([4; 16]), 1, SecretKeys::generate().public()).unwrap();
+        assert_eq!(seal_command(header, &payload, &phone, &machine.public(), &other), Err(SealError::CertMismatch));
+        assert_eq!(verify_command(&envelope, &other, 1_000).err(), Some(OpenError::WrongAccount));
     }
 }

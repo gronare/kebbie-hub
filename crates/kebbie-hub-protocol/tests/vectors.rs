@@ -4,7 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AppliedCommands, BlobRef, CommandResult, Envelope, Id, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, authorize, open, open_blob,
+    AccountKey, AppliedCommands, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, verify_command,
 };
 use serde_json::Value;
 
@@ -92,32 +92,54 @@ fn envelopes_open_as_the_vectors_say() {
     }
 }
 
+struct CaseTrust(Value);
+
+impl DeviceTrust for CaseTrust {
+    fn trust(&self, device: &VerifiedDevice, _: u64) -> Trust {
+        if self.0 == "account" {
+            return Trust::Approved;
+        }
+        let listed = |key: &str| self.0[key].as_array().unwrap().iter();
+        if listed("denied").any(|id| id == device.id().as_str()) {
+            Trust::Denied
+        } else if listed("approved").any(|entry| entry["device"] == device.id().as_str() && bytes32(&entry["signing"]) == *device.signing()) {
+            Trust::Approved
+        } else {
+            Trust::Waiting
+        }
+    }
+}
+
 #[test]
 fn commands_are_authorised_as_the_vectors_say() {
     let parties = parties();
     let vectors = load("authorize.json");
     let machine = &parties[vectors["machine"].as_str().unwrap()];
-    let account: kebbie_hub_protocol::AccountKey = serde_json::from_value(vectors["account"].clone()).unwrap();
+    let account: AccountKey = serde_json::from_value(vectors["account"].clone()).unwrap();
     for case in vectors["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let accepts: Vec<Kind> = serde_json::from_value(case["accepts"].clone()).unwrap();
         let applied: AppliedCommands = serde_json::from_value(case["applied"].clone()).unwrap();
         let envelope = Envelope::from_json(&case["envelope"].to_string()).unwrap();
+        let trust = CaseTrust(case["trust"].clone());
         let gate = Machine {
             id: &machine.id,
             keys: &machine.secret,
             account: &account,
             accepts: &accepts,
+            trust: &trust,
         };
         let decided = authorize(&gate, &applied, &envelope, vectors["now"].as_u64().unwrap());
         let expect = &case["expect"];
+        let payload = || serde_json::from_value::<Payload>(expect["payload"].clone()).unwrap();
         match decided {
-            Ok(payload) => {
-                assert_eq!(
-                    payload,
-                    serde_json::from_value::<Payload>(expect["payload"].clone()).unwrap(),
-                    "{name}"
-                );
+            Ok(verified) => {
+                assert_eq!(Some(verified.device.id().as_str()), expect["device"].as_str(), "{name}");
+                assert_eq!(verified.payload, payload(), "{name}");
+            }
+            Err(Refusal::Waiting(held)) => {
+                assert_eq!(Some(held.device.id().as_str()), expect["waiting"].as_str(), "{name}");
+                assert_eq!(held.payload, payload(), "{name}");
             }
             Err(Refusal::Answer(reason)) => {
                 assert_eq!(Some(reason.key()), expect["answer"].as_str(), "{name}")
@@ -130,6 +152,48 @@ fn commands_are_authorised_as_the_vectors_say() {
                 serde_json::from_value::<CommandResult>(expect["replay"].clone()).unwrap(),
                 "{name}"
             ),
+        }
+    }
+}
+
+#[test]
+fn devices_are_certified_and_their_commands_verified_as_the_vectors_say() {
+    let parties = parties();
+    let vectors = load("devices.json");
+    let account = &parties[vectors["account"].as_str().unwrap()];
+    let key: AccountKey = serde_json::from_value(vectors["key"].clone()).unwrap();
+    for listed in vectors["certs"].as_array().unwrap() {
+        let device = &parties[listed["device"].as_str().unwrap()];
+        let cert: DeviceCert = serde_json::from_value(listed["cert"].clone()).unwrap();
+        assert_eq!((&cert.device, cert.signing), (&device.id, device.public.signing));
+        assert_eq!(cert.statement().unwrap(), bytes(&listed["statement"]));
+        assert!(key.verifies_device(&cert));
+        let reissued = DeviceCert::issue(&account.secret, &key.account, cert.device.clone(), &cert.name, cert.kind, cert.signing, cert.created_at).unwrap();
+        assert_eq!(reissued, cert, "an Ed25519 signature is deterministic");
+        assert_eq!(device_fingerprint(&cert.signing), listed["fingerprint"].as_str().unwrap());
+    }
+    for refusal in vectors["refusals"].as_array().unwrap() {
+        let cert: DeviceCert = serde_json::from_value(refusal["cert"].clone()).unwrap();
+        assert!(!key.verifies_device(&cert), "{}", refusal["name"]);
+    }
+    for id in vectors["ids"].as_array().unwrap() {
+        let random: [u8; 10] = bytes(&id["random"]).try_into().unwrap();
+        let made = Id::ulid(kebbie_hub_protocol::Prefix::Device, id["millis"].as_u64().unwrap(), random).unwrap();
+        assert_eq!(made.as_str(), id["id"].as_str().unwrap());
+    }
+    let now = vectors["now"].as_u64().unwrap();
+    let payload: Payload = serde_json::from_value(vectors["payload"].clone()).unwrap();
+    for case in vectors["commands"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let envelope = Envelope::from_json(&case["envelope"].to_string()).unwrap();
+        assert_eq!(URL_SAFE_NO_PAD.encode(envelope.header.bytes()), case["header_bytes"].as_str().unwrap(), "{name}");
+        match case["expect"].get("device") {
+            Some(device) => {
+                let verified = verify_command(&envelope, &key, now).unwrap();
+                assert_eq!((verified.id().as_str(), verified.fingerprint().as_str()), (device.as_str().unwrap(), case["expect"]["fingerprint"].as_str().unwrap()), "{name}");
+                assert_eq!(open_command(&envelope, &account.id, &account.secret, &key, now).unwrap().1, payload, "{name}");
+            }
+            None => assert_eq!(verify_command(&envelope, &key, now).unwrap_err().key(), case["expect"]["error"].as_str().unwrap(), "{name}"),
         }
     }
 }

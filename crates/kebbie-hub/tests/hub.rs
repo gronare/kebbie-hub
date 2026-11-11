@@ -12,6 +12,7 @@ use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{MachineState, join};
 use kebbie_hub_fakes::{HubClient, HubError};
 use kebbie_hub_protocol::{
+    DeviceCert, DeviceKey, DeviceKind,
     Header, Id, Kind, Payload, Prefix, RunRoutine, SecretKeys, seal,
 };
 use serde_json::Value;
@@ -407,12 +408,14 @@ async fn the_inbox_hands_over_queued_envelopes_until_they_are_acknowledged() {
     let account = Id::account([7; 16]);
     let account_keys = SecretKeys::generate();
     let (machine_id, machine_keys) = (machine.machine.clone(), machine.public());
+    let phone = DeviceKey::generate();
+    let cert = DeviceCert::issue(&account_keys, &account, Id::new(Prefix::Device).unwrap(), "iPhone", DeviceKind::Web, phone.public(), 0).unwrap();
     let command = |at| {
         seal(
-            Header::new(
+            Header::command(
                 Id::new(Prefix::Command).unwrap(),
                 Kind::Routine,
-                account.clone(),
+                cert.clone(),
                 machine_id.clone(),
                 at,
             ),

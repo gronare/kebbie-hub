@@ -5,6 +5,7 @@ mod blob;
 mod board;
 mod connect;
 mod crypto;
+mod device;
 mod envelope;
 mod ids;
 mod message;
@@ -20,10 +21,10 @@ pub use account::{
     wrap_associated_data, wrap_key, wrapper_statement,
 };
 pub use alert::{Alert, AlertKind, AlertState};
-pub use authorize::{Applied, AppliedCommands, Dropped, Machine, Refusal, authorize};
+pub use authorize::{Applied, AppliedCommands, Verified, Dropped, Machine, Refusal, authorize};
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
-    Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, Git, Group, Item,
+    Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
     Later, LaterState, NextPart, NextRow, Prompt, PromptOption, PushPermission, Question,
     QuestionOption, Recover, Report, RoutineSummary, SecondOpinion, Step, StepState, Steps,
     Verdict, VerdictOutcome,
@@ -31,7 +32,11 @@ pub use board::{
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 pub use crypto::{
     CLOCK_SKEW, HPKE_INFO, OpenError, PublicKeys, Randomness, SealError, SecretKeys,
-    key_commitment, open, seal, verify,
+    key_commitment, open, open_command, seal, seal_command, verify, verify_command,
+};
+pub use device::{
+    BadCert, DEVICE_CERT_DOMAIN, DEVICE_FINGERPRINT_DOMAIN, DeviceCert, DeviceKey, DeviceKind,
+    DeviceTrust, MAX_DEVICE_NAME_CHARS, Trust, TrustAccount, VerifiedDevice, device_fingerprint,
 };
 pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};

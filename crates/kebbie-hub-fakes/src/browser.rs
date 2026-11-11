@@ -10,12 +10,12 @@ use kebbie_hub_api::{
     CommandQueued, CommandUpload, ConnectApproved, ConnectDenial, ConnectRequestView,
     CreationCeremony, LoginBegin, LoginFinish, PairingState, PairingView, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony, ResultEntry, Results, SignedIn,
-    SignedMachineList, WrapperUpload,
+    SignedMachineList, WrapperUpload, DeviceCommands, DeviceUpload, DeviceView, Devices,
 };
 use kebbie_hub_protocol::{
-    AccountHandoff, AccountKey, Board, CommandResult, ConnectSecret, Envelope, Header, Id,
-    MachineList, OpenError, Payload, Prefix, PublicKeys, SecretKeys, Unlock, open, seal,
-    sign_wrapper,
+    AccountHandoff, AccountKey, Board, CommandResult, ConnectSecret, DeviceCert, DeviceKey,
+    DeviceKind, Envelope, Header, Id, MachineList, OpenError, Payload, Prefix, PublicKeys,
+    SecretKeys, Unlock, VerifiedDevice, open, open_command, seal_command, sign_wrapper,
 };
 use reqwest::{Method, RequestBuilder, Response};
 use serde::Serialize;
@@ -51,6 +51,11 @@ pub struct Browser {
     pub seen_list: u64,
     prf_secrets: BTreeMap<Vec<u8>, [u8; 32]>,
     unlocked: Option<(AccountKey, SecretKeys)>,
+    pub device_name: String,
+    device: DeviceKey,
+    device_id: Id,
+    cert: Option<DeviceCert>,
+    registered: bool,
     http: reqwest::Client,
 }
 
@@ -149,8 +154,74 @@ impl Browser {
             seen_list: 0,
             prf_secrets: BTreeMap::new(),
             unlocked: None,
+            device_name: "Test browser".to_string(),
+            device: DeviceKey::generate(),
+            device_id: Id::new(Prefix::Device).expect("a fresh device id is valid"),
+            cert: None,
+            registered: false,
             http: reqwest::Client::new(),
         }
+    }
+
+    fn certify(&self, secret: &SecretKeys, account: &Id) -> Result<DeviceCert, HubError> {
+        DeviceCert::issue(
+            secret,
+            account,
+            self.device_id.clone(),
+            &self.device_name,
+            DeviceKind::Web,
+            self.device.public(),
+            crate::now(),
+        )
+        .map_err(|error| status(&error.to_string()))
+    }
+
+    pub fn device_cert(&self) -> Option<&DeviceCert> {
+        self.cert.as_ref()
+    }
+
+    pub fn device_key(&self) -> &DeviceKey {
+        &self.device
+    }
+
+    pub fn use_device(&mut self, device: DeviceKey, cert: DeviceCert) {
+        self.device_id = cert.device.clone();
+        self.device = device;
+        self.cert = Some(cert);
+        self.registered = false;
+    }
+
+    pub async fn rename_device(&mut self, name: &str) -> Result<DeviceView, HubError> {
+        let (key, secret) = self.unlocked.clone().ok_or_else(|| status("locked"))?;
+        self.device_name = name.to_string();
+        self.cert = Some(self.certify(&secret, &key.account)?);
+        self.register_device().await
+    }
+
+    pub async fn register_device(&mut self) -> Result<DeviceView, HubError> {
+        let cert = self.cert.clone().ok_or_else(|| status("locked"))?;
+        let view: DeviceView = self.post("/v1/a/devices", &DeviceUpload { cert }).await?;
+        self.registered = true;
+        Ok(view)
+    }
+
+    pub async fn devices(&mut self) -> Result<Devices, HubError> {
+        self.get("/v1/a/devices").await
+    }
+
+    pub async fn device_commands(
+        &mut self,
+        device: &Id,
+        before: Option<u64>,
+    ) -> Result<DeviceCommands, HubError> {
+        let query = before.map(|before| format!("?before={before}")).unwrap_or_default();
+        self.get(&format!("/v1/a/devices/{device}/commands{query}")).await
+    }
+
+    pub fn open_command(&self, envelope: &Envelope) -> Result<(VerifiedDevice, Payload), String> {
+        let (key, secret) = self.unlocked.clone().ok_or("locked")?;
+        open_command(envelope, &key.account, &secret, &key, envelope.header.at)
+            .map_err(|error| error.to_string())
     }
 
     pub fn account_key(&self) -> Option<&AccountKey> {
@@ -395,6 +466,10 @@ impl Browser {
                 return Ok(());
             }
         };
+        if self.cert.as_ref().is_none_or(|cert| cert.account != unlocked.0.account) {
+            self.cert = Some(self.certify(&unlocked.1, &unlocked.0.account)?);
+            self.registered = false;
+        }
         self.unlocked = Some(unlocked);
         self.lock = Lock::Unlocked;
         Ok(())
@@ -473,27 +548,30 @@ impl Browser {
         at: u64,
         ttl: Option<u64>,
     ) -> Result<Envelope, HubError> {
-        let (key, secret) = self.unlocked.clone().ok_or_else(|| status("locked"))?;
-        let mut header = Header::new(
+        let (key, _) = self.unlocked.clone().ok_or_else(|| status("locked"))?;
+        let cert = self.cert.clone().ok_or_else(|| status("locked"))?;
+        let mut header = Header::command(
             Id::new(Prefix::Command).expect("a fresh command id is valid"),
             payload.kind(),
-            key.account.clone(),
+            cert,
             machine.clone(),
             at,
         );
         if let Some(ttl) = ttl {
             header.exp = at + ttl;
         }
-        seal(
-            header,
-            payload,
-            &secret,
-            &[(machine.clone(), self.machine_keys(machine)?), key.recipient()],
-        )
-        .map_err(|error| status(&error.to_string()))
+        seal_command(header, payload, &self.device, &self.machine_keys(machine)?, &key)
+            .map_err(|error| status(&error.to_string()))
     }
 
     pub async fn send_command(&mut self, envelope: &Envelope) -> Result<CommandQueued, HubError> {
+        if !self.registered && self.cert.is_some() {
+            self.register_device().await?;
+        }
+        self.post_command(envelope).await
+    }
+
+    pub async fn post_command(&mut self, envelope: &Envelope) -> Result<CommandQueued, HubError> {
         self.post(
             "/v1/a/commands",
             &CommandUpload {

@@ -66,6 +66,22 @@ enum Command {
     },
     #[command(about = "Set what this machine takes from the account's commands; boards posted after say so")]
     Takes { takes: Takes },
+    #[command(about = "Take commands from any device of the account, or only from devices approved here")]
+    Trust { trust: TrustMode },
+    #[command(about = "List the devices that sent commands here and where each stands")]
+    Devices,
+    #[command(about = "Approve a device by name or id and apply what it sent while it waited")]
+    Approve { device: String },
+    #[command(about = "Deny a device by name or id and refuse what it sent while it waited")]
+    Deny { device: String },
+    #[command(about = "Answer each held command as the machine would once its hour ran out unapproved")]
+    Expire,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum TrustMode {
+    Account,
+    Device,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -92,6 +108,7 @@ fn describe(handled: &Handled) -> String {
         Handling::Replayed(result) => {
             format!("replayed the stored result: {}", outcome(result.outcome))
         }
+        Handling::Waiting(device) => format!("held until {device} is approved"),
         Handling::Dropped(dropped) => format!("dropped without a reply: {}", dropped.key()),
     };
     let posted = match handled.posted {
@@ -114,6 +131,22 @@ fn outcome(outcome: Outcome) -> String {
         Outcome::Failed => "failed".to_string(),
         Outcome::Refused { reason } => format!("refused {}", reason.key()),
     }
+}
+
+async fn decide(path: &std::path::Path, device: &str, approve: bool) -> Result<(), String> {
+    let mut state: MachineState = load(path).map_err(|e| e.to_string())?;
+    let id = state
+        .device_named(device)
+        .ok_or_else(|| format!("no device {device:?} has sent a command here"))?;
+    let handled = state
+        .decide_device(&id, approve, Some(path))
+        .await
+        .map_err(|e| e.to_string())?;
+    println!("{} {id}", if approve { "approved" } else { "denied" });
+    for entry in &handled {
+        println!("{}", describe(entry));
+    }
+    Ok(())
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
@@ -197,6 +230,26 @@ async fn run(cli: Cli) -> Result<(), String> {
                 if once {
                     break;
                 }
+            }
+        }
+        Command::Trust { trust } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.trust_devices = matches!(trust, TrustMode::Device);
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("trust: {}", if state.trust_devices { "each device approved here" } else { "any device of the account" });
+        }
+        Command::Devices => {
+            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            for (id, known) in &state.devices {
+                println!("{id} {} {:?}", known.name, known.standing);
+            }
+        }
+        Command::Approve { device } => decide(&cli.state, &device, true).await?,
+        Command::Deny { device } => decide(&cli.state, &device, false).await?,
+        Command::Expire => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            for entry in state.expire_held(Some(&cli.state)).await.map_err(|e| text(&e))? {
+                println!("{}", describe(&entry));
             }
         }
         Command::Takes { takes } => {

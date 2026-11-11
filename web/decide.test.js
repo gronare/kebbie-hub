@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { answerBlock, answerReady, answerStatus, choosable, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, promptStatus, pushBlock, pushReady, refusedBlock, sentState, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { answerBlock, answerReady, answerStatus, choosable, gate, standingOn, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, promptStatus, pushBlock, pushStatus, pushReady, refusedBlock, sentState, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 
 const HEAD = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
 const AT = 1_761_069_600;
@@ -169,3 +169,35 @@ test("the latest prompt answer shown is the one for the prompt on screen now", (
   assert.equal(latestSent([before, now], { machine: "mch_1", address: "hub@kebbie", kind: "prompt-answer", prompt: "3f2a9c1d" }).id, "cmd_b");
   assert.equal(latestSent([before], { machine: "mch_1", address: "hub@kebbie", kind: "prompt-answer", prompt: "3f2a9c1d" }), null);
 });
+
+test("a command from a device the machine hasn't approved waits, says when it is approved automatically, and settles as not delivered or denied", () => {
+  const device = { id: "dev_01JB8Q6Z3V9K2M4N5P6R7S8T9V", fingerprint: "7F3A-91C2" };
+  const sent = answer({ device: device.id, deviceName: "iPhone 16", machineName: "MacBook", label: "Per invoice" });
+  const board = { devices: { [device.id]: { state: "waiting", fingerprint: "7F3A-91C2", until: AT + 23 * 3600 + 120 } } };
+  const standing = standingOn(board, device);
+  assert.equal(standingOn(board, { ...device, fingerprint: "0000-0000" }), null, "a standing for another key is not this device's");
+  assert.equal(sentState(sent, { now: AT + 60, asleep: false, standing }), "approval");
+  const waiting = answerStatus(sent, "approval", { standing, now: AT + 60 });
+  assert.match(waiting, /class="sent wait"/);
+  assert.match(waiting, /<b>Waiting for MacBook to approve this iPhone 16<\/b>/);
+  assert.match(waiting, /Approve it in kebbie, or it is approved automatically in 23\u00a0h\. Your answer "Per invoice" goes to the task if MacBook approves before \d\d:\d\d\./);
+  assert.match(waiting, /Sent from iPhone 16 at \d\d:\d\d · expires \d\d:\d\d/);
+  assert.match(answerStatus(sent, "approval", { standing: { ...standing, until: null }, now: AT }), /Approve it in kebbie on MacBook\./, "a machine that never approves on its own says so");
+  assert.equal(sentState(sent, { now: AT + 3600, asleep: false, standing }), "not-approved");
+  assert.equal(sentState({ ...sent, result: { outcome: "refused", reason: "not-approved", text: "" } }, { now: AT, asleep: false }), "not-approved");
+  const expired = answerStatus(sent, "not-approved");
+  assert.match(expired, /class="sent refused"/);
+  assert.match(expired, /Not delivered: MacBook didn't approve this iPhone 16 within the hour/);
+  assert.match(expired, /Approve it in kebbie on MacBook, then answer again\./);
+  assert.equal(sentState({ ...sent, result: { outcome: "refused", reason: "denied", text: "" } }, { now: AT, asleep: false }), "denied");
+  assert.equal(sentState(sent, { now: AT, asleep: false, standing: { state: "denied", fingerprint: "7F3A-91C2", at: AT } }), "denied");
+  const denied = answerStatus(sent, "denied");
+  assert.match(denied, /<b>MacBook doesn't take changes from this iPhone 16<\/b><span>Approve it in kebbie on MacBook\.<\/span>/);
+  for (const state of ["not-approved", "denied"]) assert.match(answerBlock({ key: "k", question, ui: idle(), sent, state }), /data-action="pick"/, `${state} lets the owner answer again`);
+  const done = answerStatus({ ...sent, result: { outcome: "done", text: "" } }, "done", { standing: { state: "approved", fingerprint: "7F3A-91C2", at: AT + 390 } });
+  assert.match(done, /from iPhone 16 at \d\d:\d\d · approved on MacBook at \d\d:\d\d · the lead got a copy/);
+  assert.match(pushStatus({ ...sent, kind: "push", short: "9f3c2a1" }, "approval", { standing, now: AT }), /Your push of 9f3c2a1 goes out if MacBook approves before/);
+  assert.match(promptStatus({ ...sent, kind: "prompt-answer" }, "not-approved"), /then choose again\./);
+  for (const html of [waiting, expired, denied, done]) assert.doesNotMatch(html, /\u2014/, "no dashes in the copy");
+});
+

@@ -378,13 +378,13 @@ export function thisDevice(allowed) {
   return `<h2 class="group g-muted">This device</h2><section class="task"><label class="row switch-row"><div><div class="name" id="allow-name">Allow changes from this device</div><div class="meta" id="allow-state">${state}</div></div><input type="checkbox" role="switch" class="switch" name="allow-changes" aria-labelledby="allow-name" aria-describedby="allow-state" aria-checked="${allowed ? "true" : "false"}"${allowed ? " checked" : ""}></label></section>`;
 }
 
-export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null }) {
+export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null, devices = null, now = Date.now() / 1000 }) {
   const linked = me.github
     ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed)) + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed)) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {
@@ -430,3 +430,85 @@ export function connectScreen({ supported = true, phase = "start", view = null, 
   const blocked = session?.state === "locked" ? null : connectBlock({ fragment, session });
   return connectAsk({ name, code: view.code || code, machines, blocked: blocked ? connectBlockText(blocked, name) : null, typed: !fragment, notice, busy });
 }
+
+const KIND_TEXT = { web: "web app" };
+const day = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
+const hoursLeft = (seconds) => `${Math.max(1, Math.floor(seconds / 3600))} h`;
+
+export function standingText(standing, now) {
+  if (standing.state === "approved") return `<span class="ok">✓ Approved on ${esc(standing.machine)}</span>`;
+  if (standing.state === "waiting") return `<span class="warn">⧗ Waiting on ${esc(standing.machine)}${standing.until ? ` · ${esc(hoursLeft(standing.until - now))}` : ""}</span>`;
+  return `<span class="g-yellow">✗ Denied on ${esc(standing.machine)}</span>`;
+}
+
+function deviceFacts(device, now) {
+  const seen = device.self ? "now" : device.seen ? lastSeenText(device.seen, now) : "not yet";
+  return [KIND_TEXT[device.kind] ?? device.kind, `added ${day(device.added, now)}`, `last seen ${seen}`];
+}
+
+export function deviceRow(device, now) {
+  const facts = deviceFacts(device, now).map(esc).join(" · ");
+  const standing = device.standing.map((one) => standingText(one, now)).join(" · ");
+  return `<a class="task" href="#device/${esc(device.id)}" data-action="device" data-id="${esc(device.id)}"><div class="head"><span class="name">${esc(device.name)}</span> ${device.self ? `<span class="machine">this device</span>` : ""}</div><div class="meta">${facts}</div>${standing ? `<div class="meta">${standing}</div>` : ""}</a>`;
+}
+
+export function devicesSection(devices, now) {
+  return `<h2 class="group g-muted">Devices · ${devices.length}</h2>${devices.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine.</div>`;
+}
+
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine" };
+
+function said(entry) {
+  const { payload } = entry;
+  if (payload.type === "answer") return entry.label ? `"${entry.label}"` : payload.choice === null ? `"${payload.comment}"` : `option ${payload.choice + 1}`;
+  if (payload.type === "prompt-answer") return `"${entry.label ?? payload.key}"`;
+  return null;
+}
+
+function subject(entry) {
+  const { payload } = entry;
+  if (payload.type === "routine") return payload.id;
+  if (payload.type === "start") return `${payload.name}@${payload.repo}`;
+  return payload.address;
+}
+
+export function historyEntry(entry, now) {
+  const machine = entry.machineName;
+  const kind = entry.payload.type;
+  const what = subject(entry);
+  const words = said(entry);
+  const on = [words, `on ${machine}`].filter(Boolean).join(" · ");
+  const reason = entry.result?.reason;
+  if (entry.result?.outcome === "done") {
+    if (kind === "answer") return { icon: "✓", what: `Answered ${what}`, said: on, at: entry.at };
+    if (kind === "push") return { icon: "↑", what: `Pushed ${what}`, said: [entry.short, `on ${machine}`].filter(Boolean).join(" · "), at: entry.at };
+    if (kind === "prompt-answer") return { icon: "?", what: `Chose ${words} on ${what}'s prompt`, said: `on ${machine}`, at: entry.at };
+    if (kind === "routine") return { icon: "✓", what: `Ran routine ${what}`, said: `on ${machine}`, at: entry.at };
+    return { icon: "✓", what: `Started ${what}`, said: `on ${machine}`, at: entry.at };
+  }
+  const noun = `${NOUNS[kind] ?? kind} ${what}`;
+  if (reason === "not-approved") return { icon: "✗", what: `${noun} not delivered`, said: `${machine} didn't approve this device within the hour`, at: entry.at };
+  if (reason === "denied") return { icon: "✗", what: `${noun} refused`, said: `denied on ${machine}`, at: entry.at };
+  if (entry.result) return { icon: "✗", what: `${noun} refused`, said: entry.result.text || `on ${machine}`, at: entry.at };
+  if (now >= entry.exp) return { icon: "✗", what: `${noun} not delivered`, said: `expired before ${machine} took it`, at: entry.at };
+  return { icon: "⧗", what: `${noun} waiting`, said: on, at: entry.at };
+}
+
+const TONES = { "✓": "ok", "↑": "ok", "?": "warn", "⧗": "warn", "✗": "g-yellow" };
+
+export function deviceScreen({ device, history, loading = false, notice = null, now = Date.now() / 1000 }) {
+  const facts = [...deviceFacts(device, now), `key ${device.key}`].map(esc).join(" · ");
+  const standing = `<section class="task"><div class="meta">${facts}</div>${device.standing.map((one) => `<div>${standingText(one, now)}</div>`).join("")}</section>`;
+  const entries = history.map((entry) => historyEntry(entry, now));
+  const days = new Map();
+  for (const entry of [...entries].sort((a, b) => b.at - a.at)) {
+    const date = new Date(entry.at * 1000);
+    const heading = date.toDateString() === new Date(now * 1000).toDateString() ? "Today" : date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
+    if (!days.has(heading)) days.set(heading, []);
+    days.get(heading).push(entry);
+  }
+  const list = [...days].map(([heading, shown]) => `<div class="nsub">${esc(heading)}</div>${shown.map((entry) => `<div class="nrow"><span class="n"></span><span class="${TONES[entry.icon] ?? ""}" aria-hidden="true">${esc(entry.icon)}</span><span class="t"><b>${esc(entry.what)}</b><small>${esc(entry.said)}</small></span><span class="w">${esc(new Date(entry.at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }))}</span></div>`).join("")}`).join("");
+  const sent = loading ? `<div class="center">Loading …</div>` : entries.length ? `<section class="next" aria-label="Sent from ${esc(device.name)}">${list}</section>` : `<div class="meta pad">Nothing sent from ${esc(device.name)} in the last 90 days.</div>`;
+  return `${brand}<h1 class="title">${esc(device.name)}</h1>${standing}<h2 class="group g-muted">Sent from ${esc(device.name)}${loading ? "" : ` · ${entries.length}`}</h2>${sent}${warn(notice)}<a class="btn back-link" href="/account" data-action="devices-back">Back to Account</a><a class="back-btn round" href="/account" data-action="devices-back" aria-label="Back">${icon("back")}</a>`;
+}
+

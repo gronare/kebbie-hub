@@ -17,7 +17,7 @@ It offers the public hub at hub.kebbie.dev or your own, shows a code, and opens 
 - Every connected machine's board in one place: what needs you first, then the work in progress.
 - A task's question with its options, and the plan behind it in full.
 - A ready task's card, and whether it still matches the task's latest commit.
-- On a hub run with `--commands on`: answers, choices on an agent's prompt and pushes from a device where you turn on "Allow changes from this device" under Account. Your account signs each one, and each machine's `hub.commands` setting in kebbie decides what it takes.
+- On a hub run with `--commands on`: answers, choices on an agent's prompt and pushes from a device where you turn on "Allow changes from this device" under Account. That device gets its own key, which your account certifies, and signs what it sends. Each machine's `hub.commands` setting in kebbie decides what it takes, and you approve or deny each device in kebbie on that machine. Account lists your devices, where each one stands on each machine, and what it sent in the last 90 days.
 - Layouts for phones, the iPhone Duo folded and unfolded, tablets and desktops.
 - Boards sealed on the machine to your account's key; only your passkeys unlock that key, and the hub stores what it cannot open.
 

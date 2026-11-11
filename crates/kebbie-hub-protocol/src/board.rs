@@ -1,7 +1,9 @@
-use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::envelope::Kind;
-use crate::ids::Id;
+use crate::ids::{Id, Prefix};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -21,6 +23,30 @@ pub struct Board {
     pub later: Option<Vec<Later>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accepts: Option<Vec<Kind>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "device_ids")]
+    pub devices: Option<BTreeMap<Id, DeviceStanding>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum DeviceStanding {
+    Waiting { fingerprint: String, until: Option<u64> },
+    Approved { fingerprint: String, at: u64 },
+    Denied { fingerprint: String, at: u64 },
+}
+
+fn device_ids<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<BTreeMap<Id, DeviceStanding>>, D::Error> {
+    let devices = Option::<BTreeMap<Id, DeviceStanding>>::deserialize(deserializer)?;
+    if devices
+        .iter()
+        .flat_map(BTreeMap::keys)
+        .any(|id| id.prefix() != Prefix::Device)
+    {
+        return Err(serde::de::Error::custom("devices are keyed by device id"));
+    }
+    Ok(devices)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -400,7 +426,7 @@ mod tests {
     #[test]
     fn a_board_from_a_kebbie_without_next_parses_and_is_written_back_unchanged() {
         let board: Board = serde_json::from_value(plain_board()).unwrap();
-        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref(), board.accepts.as_ref()), (None, None, None, None));
+        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref(), board.accepts.as_ref(), board.devices.as_ref()), (None, None, None, None, None));
         assert_eq!((board.items[0].title.as_ref(), board.items[0].second_opinion.as_ref()), (None, None));
         assert_eq!(serde_json::to_value(&board).unwrap(), plain_board());
     }
@@ -440,6 +466,34 @@ mod tests {
             let (parent, key) = path.rsplit_once('/').unwrap();
             wrong.pointer_mut(parent).unwrap()[key] = value;
             assert!(serde_json::from_value::<Board>(wrong).is_err(), "{path}");
+        }
+    }
+
+    #[test]
+    fn a_board_says_where_each_device_stands_on_its_machine() {
+        let phone = Id::ulid(Prefix::Device, 1, [1; 10]).unwrap();
+        let tablet = Id::ulid(Prefix::Device, 1, [2; 10]).unwrap();
+        let laptop = Id::ulid(Prefix::Device, 1, [3; 10]).unwrap();
+        let mut full = plain_board();
+        full["devices"] = serde_json::json!({
+            phone.as_str(): { "state": "approved", "fingerprint": "7F3A-91C2", "at": 1_761_069_000u64 },
+            tablet.as_str(): { "state": "waiting", "fingerprint": "0C11-5E9A", "until": null },
+            laptop.as_str(): { "state": "denied", "fingerprint": "B204-77D1", "at": 1_761_069_100u64 },
+        });
+        let board: Board = serde_json::from_value(full.clone()).unwrap();
+        let devices = board.devices.as_ref().unwrap();
+        assert_eq!(devices[&tablet], DeviceStanding::Waiting { fingerprint: "0C11-5E9A".into(), until: None });
+        assert_eq!(serde_json::to_value(&board).unwrap(), full);
+        let account = Id::account([1; 16]);
+        for (key, value) in [
+            (phone.as_str(), serde_json::json!({ "state": "approved", "fingerprint": "7F3A-91C2", "at": 1, "until": 2 })),
+            (phone.as_str(), serde_json::json!({ "state": "trusted", "fingerprint": "7F3A-91C2", "at": 1 })),
+            (phone.as_str(), serde_json::json!({ "state": "denied", "fingerprint": "7F3A-91C2" })),
+            (account.as_str(), serde_json::json!({ "state": "approved", "fingerprint": "7F3A-91C2", "at": 1 })),
+        ] {
+            let mut wrong = plain_board();
+            wrong["devices"] = serde_json::json!({ key: value });
+            assert!(serde_json::from_value::<Board>(wrong).is_err(), "{key}: {value}");
         }
     }
 }

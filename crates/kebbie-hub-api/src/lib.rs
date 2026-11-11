@@ -3,7 +3,7 @@ use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kebbie_hub_protocol::{AccountKey, Envelope, Id, MachineList, PublicKeys};
+use kebbie_hub_protocol::{AccountKey, DeviceCert, DeviceKind, Envelope, Id, MachineList, PublicKeys};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 pub use webauthn_rs_proto::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
@@ -484,6 +484,46 @@ pub struct ResultEntry {
 pub struct Results {
     pub cursor: u64,
     pub results: Vec<ResultEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceUpload {
+    pub cert: DeviceCert,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceView {
+    pub device: Id,
+    pub name: String,
+    pub kind: DeviceKind,
+    pub signing: Bytes32,
+    pub fingerprint: String,
+    pub cert: DeviceCert,
+    pub created_at: u64,
+    pub last_seen_at: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Devices {
+    pub devices: Vec<DeviceView>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceCommand {
+    pub command: Id,
+    pub machine: Id,
+    pub kind: String,
+    pub queued_at: u64,
+    pub delivered_at: Option<u64>,
+    pub envelope: Envelope,
+    pub result: Option<Envelope>,
+    pub result_at: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceCommands {
+    pub commands: Vec<DeviceCommand>,
+    pub cursor: Option<u64>,
 }
 
 pub const CONNECT_PENDING: &str = "authorization_pending";
