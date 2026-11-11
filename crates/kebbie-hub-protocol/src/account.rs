@@ -7,7 +7,6 @@ use hkdf::Hkdf;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::authorize::{Role, TrustedDevice};
 use crate::crypto::{PublicKeys, SecretKeys};
 use crate::ids::{Id, Prefix};
 
@@ -16,7 +15,6 @@ pub const WRAP_AD_DOMAIN: &[u8] = b"kebbie-hub account key wrap v1";
 pub const WRAPPER_SIGN_DOMAIN: &[u8] = b"kebbie-hub account key wrapper v1";
 pub const HUB_PRF_SALT_DOMAIN: &[u8] = b"kebbie-hub prf salt v1";
 pub const MACHINE_LIST_DOMAIN: &[u8] = b"kebbie-hub account machines v1";
-pub const DEVICE_LIST_DOMAIN: &[u8] = b"kebbie-hub account devices v1";
 pub const SIGNING_FINGERPRINT_DOMAIN: &[u8] = b"kebbie-hub account signing key v1";
 pub const ENCRYPTION_FINGERPRINT_DOMAIN: &[u8] = b"kebbie-hub account encryption key v1";
 pub const ACCOUNT_COMMIT_DOMAIN: &[u8] = b"kebbie-connect-account-commit-v1";
@@ -33,6 +31,17 @@ impl fmt::Display for WrongAccountKey {
 }
 
 impl std::error::Error for WrongAccountKey {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CommitmentMismatch;
+
+impl fmt::Display for CommitmentMismatch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("the hub revealed an account key, a nonce or a code the browser did not commit to")
+    }
+}
+
+impl std::error::Error for CommitmentMismatch {}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FieldTooLong;
@@ -114,91 +123,6 @@ impl MachineList {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ListedDevice {
-    pub device: Id,
-    pub name: String,
-    pub keys: PublicKeys,
-    pub role: Role,
-}
-
-impl ListedDevice {
-    pub fn trusted(&self) -> TrustedDevice {
-        TrustedDevice {
-            id: self.device.clone(),
-            name: self.name.clone(),
-            keys: self.keys,
-            role: self.role,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DeviceList {
-    pub counter: u64,
-    pub devices: Vec<ListedDevice>,
-}
-
-impl DeviceList {
-    pub fn statement(&self, account: &Id) -> Option<Vec<u8>> {
-        let canonical = self
-            .devices
-            .windows(2)
-            .all(|pair| pair[0].device < pair[1].device)
-            && self
-                .devices
-                .iter()
-                .all(|listed| listed.device.prefix() == Prefix::Device);
-        if !canonical {
-            return None;
-        }
-        let mut out = DEVICE_LIST_DOMAIN.to_vec();
-        id_field(&mut out, account);
-        out.extend(self.counter.to_be_bytes());
-        out.extend(u32::try_from(self.devices.len()).ok()?.to_be_bytes());
-        for listed in &self.devices {
-            id_field(&mut out, &listed.device);
-            field(&mut out, listed.name.as_bytes()).ok()?;
-            out.extend(listed.keys.signing);
-            out.extend(listed.keys.encryption);
-            field(&mut out, listed.role.key().as_bytes()).ok()?;
-        }
-        Some(out)
-    }
-
-    pub fn sign(&self, account: &SecretKeys, account_id: &Id) -> Option<[u8; 64]> {
-        self.statement(account_id)
-            .map(|statement| sign(account, &statement))
-    }
-
-    pub fn listed(&self, device: &Id) -> Option<&ListedDevice> {
-        self.devices.iter().find(|listed| &listed.device == device)
-    }
-
-    pub fn trusted(&self) -> Vec<TrustedDevice> {
-        self.devices.iter().map(ListedDevice::trusted).collect()
-    }
-
-    pub fn with(&self, listed: ListedDevice) -> DeviceList {
-        let mut next = self.without(&listed.device);
-        next.devices.push(listed);
-        next.devices.sort_by(|a, b| a.device.cmp(&b.device));
-        next
-    }
-
-    pub fn without(&self, device: &Id) -> DeviceList {
-        DeviceList {
-            counter: self.counter + 1,
-            devices: self
-                .devices
-                .iter()
-                .filter(|listed| &listed.device != device)
-                .cloned()
-                .collect(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountKey {
     pub account: Id,
     pub version: u32,
@@ -234,11 +158,6 @@ impl AccountKey {
     }
 
     pub fn verifies_list(&self, list: &MachineList, signature: &[u8; 64]) -> bool {
-        list.statement(&self.account)
-            .is_some_and(|statement| verify(&self.keys.signing, &statement, signature))
-    }
-
-    pub fn verifies_device_list(&self, list: &DeviceList, signature: &[u8; 64]) -> bool {
         list.statement(&self.account)
             .is_some_and(|statement| verify(&self.keys.signing, &statement, signature))
     }
@@ -464,9 +383,9 @@ pub fn pin_account(
     revealed: &AccountKey,
     nonce: &[u8; 32],
     code: &str,
-) -> Result<AccountFingerprints, crate::pairing::CommitmentMismatch> {
+) -> Result<AccountFingerprints, CommitmentMismatch> {
     if &account_commitment(revealed, nonce, code) != commitment {
-        return Err(crate::pairing::CommitmentMismatch);
+        return Err(CommitmentMismatch);
     }
     Ok(revealed.fingerprints())
 }
@@ -571,65 +490,6 @@ mod tests {
             machines: vec![list.machines[0].clone(), list.machines[0].clone()],
         };
         assert!(doubled.sign(&keys, &account.account).is_none());
-    }
-
-    #[test]
-    fn a_device_list_is_trusted_only_as_signed_canonical_and_by_its_account() {
-        let keys = SecretKeys::generate();
-        let account = key(&keys);
-        let phone = Id::ulid(Prefix::Device, 1, [5; 10]).unwrap();
-        let tablet = Id::ulid(Prefix::Device, 2, [6; 10]).unwrap();
-        let listed = |device: &Id, name: &str, role| ListedDevice {
-            device: device.clone(),
-            name: name.into(),
-            keys: SecretKeys::generate().public(),
-            role,
-        };
-        let list = DeviceList::default()
-            .with(listed(&tablet, "iPad", Role::Read))
-            .with(listed(&phone, "iPhone", Role::Control));
-        assert_eq!(list.counter, 2);
-        assert_eq!(list.devices[0].device, phone);
-        let signature = list.sign(&keys, &account.account).unwrap();
-        assert!(account.verifies_device_list(&list, &signature));
-        assert!(!key(&SecretKeys::generate()).verifies_device_list(&list, &signature));
-        assert!(
-            !account.verifies_list(
-                &MachineList {
-                    counter: list.counter,
-                    machines: Vec::new()
-                },
-                &signature
-            ),
-            "a device list does not pass as a machine list"
-        );
-        for changed in [
-            DeviceList { counter: 1, ..list.clone() },
-            list.without(&tablet),
-            {
-                let mut renamed = list.clone();
-                renamed.devices[0].name = "Other".into();
-                renamed
-            },
-            {
-                let mut promoted = list.clone();
-                promoted.devices[1].role = Role::Control;
-                promoted
-            },
-        ] {
-            assert!(!account.verifies_device_list(&changed, &signature));
-        }
-        let mut shuffled = list.clone();
-        shuffled.devices.reverse();
-        assert!(shuffled.statement(&account.account).is_none());
-        let machine = Id::ulid(Prefix::Machine, 1, [7; 10]).unwrap();
-        assert!(
-            DeviceList::default()
-                .with(listed(&machine, "mac", Role::Control))
-                .statement(&account.account)
-                .is_none()
-        );
-        assert_eq!(list.trusted()[1].role, Role::Read);
     }
 
     #[test]

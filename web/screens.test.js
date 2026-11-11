@@ -423,3 +423,23 @@ test("on a hub that signs in by email the account page shows the address and ope
   assert.match(text(open), /Email ada@example\.com · confirmed New email Send code Cancel Back to your boards Sign out$/);
   assert.match(open, /<input id="email"[^>]* value="">/);
 });
+
+test("the account page shows this device's switch only when the hub takes commands, off as view only", () => {
+  const me = { account: "acc_1", handle: "k1", github: null };
+  assert.doesNotMatch(accountScreen({ me }), /This device|role="switch"/);
+  const off = accountScreen({ me, allowed: false });
+  assert.match(off, /<h2 class="group g-muted">This device<\/h2>/);
+  assert.match(off, /Allow changes from this device<\/div><div class="meta" id="allow-state">View only<\/div>/);
+  assert.match(off, /<input type="checkbox" role="switch" class="switch" name="allow-changes"[^>]*aria-checked="false">/);
+  const on = accountScreen({ me, allowed: true });
+  assert.match(on, /<div class="meta" id="allow-state">Changes go to each machine that takes them\.<\/div>/);
+  assert.match(on, /aria-checked="true" checked>/);
+});
+
+test("a machine row says what the machine takes from the hub", async () => {
+  const { machinePolicy } = await import("./decide.js");
+  const row = (accepts) => machineRow({ machine: "mch_1", name: "devbox", awake: true, facts: [machinePolicy(accepts), "kebbie 0.48.0"] });
+  assert.match(row(["answer", "push", "prompt-answer"]), /awake · takes answers and pushes · kebbie 0\.48\.0/);
+  assert.match(row(["answer", "prompt-answer"]), /awake · takes answers, not pushes · kebbie/);
+  assert.match(row([]), /awake · takes nothing from the hub · kebbie/);
+});

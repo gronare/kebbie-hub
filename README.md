@@ -17,6 +17,7 @@ It offers the public hub at hub.kebbie.dev or your own, shows a code, and opens 
 - Every connected machine's board in one place: what needs you first, then the work in progress.
 - A task's question with its options, and the plan behind it in full.
 - A ready task's card, and whether it still matches the task's latest commit.
+- On a hub run with `--commands on`: answers, choices on an agent's prompt and pushes from a device where you turn on "Allow changes from this device" under Account. Your account signs each one, and each machine's `hub.commands` setting in kebbie decides what it takes.
 - Layouts for phones, the iPhone Duo folded and unfolded, tablets and desktops.
 - Boards sealed on the machine to your account's key; only your passkeys unlock that key, and the hub stores what it cannot open.
 
@@ -32,8 +33,7 @@ Run it behind TLS on your own domain:
 
 ```sh
 target/release/kebbie-hub --data /var/lib/kebbie-hub --listen 0.0.0.0:8470 \
-  --rp-id hub.example.com --origin https://hub.example.com \
-  --vapid-subject mailto:you@example.com
+  --rp-id hub.example.com --origin https://hub.example.com
 ```
 
 On its first start the hub prints a one-time setup link to its log; open it to create the owner's passkey. Then run `kebbie hub connect` on a machine and give it `https://hub.example.com`. `kebbie-hub --help` lists the rest of the options.

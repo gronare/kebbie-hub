@@ -5,9 +5,7 @@ use std::path::Path;
 
 use common::*;
 use kebbie_hub::web::ASSETS;
-use kebbie_hub_api::{Boards, Bytes32, CommitRequest, Committed, PairingOpened, PairingView};
-use kebbie_hub_fakes::{HubClient, HubError, PairError};
-use tokio::sync::oneshot;
+use kebbie_hub_api::Boards;
 
 fn repository() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
@@ -143,86 +141,6 @@ async fn a_board_entry_names_its_machine_its_keys_and_when_it_was_last_heard() {
     let theirs: Boards = stranger.get("/v1/a/boards").await.unwrap();
     assert!(theirs.boards.is_empty());
     assert_eq!(status_of(browser(&test).get::<Boards>("/v1/a/boards").await), 401);
-}
-
-#[tokio::test]
-async fn a_phone_that_does_not_confirm_the_digits_trusts_no_machine() {
-    let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    let (code_out, code_in) = oneshot::channel::<String>();
-    let (admitted, paired) = tokio::join!(
-        machine.pair(
-            PAIRING_TIMEOUT,
-            move |code| {
-                let _ = code_out.send(code.to_string());
-            },
-            async |_| true
-        ),
-        async {
-            let code = code_in.await.unwrap();
-            phone.pair(&code, PAIRING_TIMEOUT, async |_| false).await
-        }
-    );
-    admitted.unwrap();
-    assert!(matches!(paired, Err(PairError::Declined)), "{paired:?}");
-    assert!(phone.machines.is_empty());
-    assert_eq!(phone.attempts.len(), 1);
-}
-
-#[tokio::test]
-async fn a_removed_device_is_told_it_is_unknown_and_a_missing_token_is_not() {
-    let test = start_hub(|_| {}).await;
-    let person = signed_up(&test).await;
-    let registered = person.register_device().await;
-    let client = device_client(&test, &registered);
-    let _: serde_json::Value = client.get("/v1/d/results", &[]).await.unwrap();
-    let removed = person
-        .delete(&format!("/v1/a/devices/{}", registered.device))
-        .await;
-    assert!(removed.status().is_success(), "{}", removed.status());
-    assert_eq!(
-        client.get::<serde_json::Value>("/v1/d/results", &[]).await.unwrap_err(),
-        HubError::Status {
-            status: 401,
-            code: "unknown-device".to_string()
-        }
-    );
-    assert_eq!(
-        HubClient::new(&test.url, None)
-            .get::<serde_json::Value>("/v1/d/results", &[])
-            .await
-            .unwrap_err(),
-        HubError::Status {
-            status: 401,
-            code: "unauthorized".to_string()
-        }
-    );
-}
-
-#[tokio::test]
-async fn the_phone_sees_the_machine_name_while_pairing() {
-    let test = start_hub(|_| {}).await;
-    let machine = joined_machine(&test).await;
-    let phone = phone(&test).await;
-    let opened: PairingOpened = machine.client().post("/v1/m/pairings", &()).await.unwrap();
-    let committed: Committed = phone
-        .client()
-        .post(
-            "/v1/d/pairings",
-            &CommitRequest {
-                code: opened.code,
-                commitment: Bytes32([7; 32]),
-            },
-        )
-        .await
-        .unwrap();
-    let view: PairingView = phone
-        .client()
-        .get(&format!("/v1/d/pairings/{}", committed.pairing), &[])
-        .await
-        .unwrap();
-    assert_eq!(view.machine_name.as_deref(), Some("mac"));
 }
 
 #[tokio::test]

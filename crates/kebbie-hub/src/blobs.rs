@@ -37,9 +37,7 @@ pub async fn put_blob(
             at,
             "blob.stored",
             Some(&machine),
-            None,
-            Some(&format!("bytes={}", body.len())),
-        )?,
+            Some(&format!("bytes={}", body.len())),)?,
         BlobWrite::OverQuota => {
             return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "blob-quota"));
         }

@@ -8,7 +8,7 @@ import { HubError } from "./hub.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
-const vector = load("pairing.json").connect;
+const vector = load("connect.json");
 const accounts = load("accounts.json");
 const MACHINE = parties.machine.id;
 const fragment = parseConnectFragment(new URL(vector.link).hash);

@@ -10,7 +10,7 @@ use kebbie_hub_protocol::Id;
 
 use crate::store::{MadeOwner, Store};
 use crate::{
-    AccountSwitch, Config, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, GITHUB_API_URL,
+    AccountSwitch, Config, DEV_ORIGIN, DEV_RP_ID, GITHUB_API_URL,
     GITHUB_WEB_URL, Hub, Secret, TrustedProxy, database_path, mint_invite, mint_join_code, now,
     serve_with, set_account_active,
 };
@@ -48,22 +48,6 @@ pub struct HubArgs {
     pub origin: Option<String>,
     #[arg(
         long,
-        help = "Contact the push services see in every VAPID token: mailto:you@example.com or the hub's https: URL"
-    )]
-    pub vapid_subject: Option<String>,
-    #[arg(
-        long,
-        help = "File holding the hub's VAPID private key, created on first start [default: <data>/vapid.key]"
-    )]
-    pub vapid_key: Option<PathBuf>,
-    #[arg(
-        long = "push-allow-host",
-        value_name = "HOST",
-        help = "Accept push endpoints on this host besides the known push services; *.example.com matches subdomains, and a loopback host may use http"
-    )]
-    pub push_allow_hosts: Vec<String>,
-    #[arg(
-        long,
         value_enum,
         default_value_t = Signup::Invite,
         help = "Who signs up: people with an invite, or anyone whose machine opened a connect link"
@@ -73,7 +57,7 @@ pub struct HubArgs {
         long,
         value_enum,
         default_value_t = Switch::Off,
-        help = "With on, paired phones answer questions and approve pushes through the hub; with off, the hub refuses commands and the web hides them"
+        help = "With on, a device that allows changes answers questions and approves pushes through the hub, signed by its account; with off, the hub refuses commands and the web hides them"
     )]
     pub commands: Switch,
     #[arg(
@@ -138,7 +122,7 @@ pub enum Admin {
         replace: bool,
     },
     #[command(
-        about = "Deactivate an account: its sessions end and its devices and machines are refused until it is activated"
+        about = "Deactivate an account: its sessions end and its machines are refused until it is activated"
     )]
     Deactivate {
         #[arg(help = "The account's id (acc_…), as admin accounts lists it")]
@@ -168,7 +152,7 @@ impl HubArgs {
     pub fn listen_address(&self) -> Result<SocketAddr, String> {
         match (self.listen, self.dev) {
             (Some(address), true) if !address.ip().is_loopback() => Err(format!(
-                "--dev lets devices in without an account; listen on a loopback address, not {address}"
+                "--dev serves plain http with test defaults; listen on a loopback address, not {address}"
             )),
             (Some(address), _) => Ok(address),
             (None, true) => Ok(DEV_LISTEN.parse().expect("the dev address parses")),
@@ -185,17 +169,6 @@ impl HubArgs {
             (None, None, true) => Ok((DEV_RP_ID.to_string(), DEV_ORIGIN.to_string())),
             _ => Err(
                 "pass --rp-id <domain> and --origin <url>, or --dev for a local hub".to_string(),
-            ),
-        }
-    }
-
-    fn vapid_subject(&self) -> Result<String, String> {
-        match (&self.vapid_subject, self.dev) {
-            (Some(subject), _) => Ok(subject.clone()),
-            (None, true) => Ok(DEV_VAPID_SUBJECT.to_string()),
-            (None, false) => Err(
-                "pass --vapid-subject mailto:<you@your-domain> (or the hub's https: URL), or --dev for a local hub"
-                    .to_string(),
             ),
         }
     }
@@ -217,16 +190,6 @@ impl HubArgs {
         let mut config = Config::new(data);
         config.rp_id = rp_id;
         config.origin = origin;
-        config.vapid_subject = self.vapid_subject()?;
-        if let Some(key) = &self.vapid_key {
-            config.vapid_key = key.clone();
-        }
-        config.push_allow_hosts = self
-            .push_allow_hosts
-            .iter()
-            .map(|host| host.trim().to_ascii_lowercase())
-            .collect();
-        config.anonymous_devices = self.dev;
         config.trusted_proxy = self
             .trusted_proxy
             .map(|Proxy::Cloudflare| TrustedProxy::Cloudflare);
@@ -294,7 +257,7 @@ fn switch_account(data: &Path, account: &str, active: bool) -> Result<(), String
     match set_account_active(&store, account, active, "cli").map_err(|error| error.to_string())? {
         AccountSwitch::Switched if active => println!("{account} is active"),
         AccountSwitch::Switched => {
-            println!("{account} is deactivated; its sessions ended and its devices and machines are refused")
+            println!("{account} is deactivated; its sessions ended and its machines are refused")
         }
         AccountSwitch::Owner => {
             return Err(format!("{account} is the owner, who cannot be deactivated"));
@@ -354,7 +317,7 @@ pub fn run_admin(data: &Path, admin: &Admin) -> Result<(), String> {
                 return Err(format!("no machine {machine}"));
             }
             store
-                .log(now(), "machine.removed", Some(&machine), None, None)
+                .log(now(), "machine.removed", Some(&machine), None)
                 .map_err(failed)?;
             println!("removed {machine}");
         }

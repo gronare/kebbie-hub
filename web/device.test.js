@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { accountIdentity, fromB64, importIdentity, openEnvelope, sealEnvelope, signDeviceList, verifyDeviceList } from "../js/protocol.js";
-import { collectResults, DeviceListProblem, enableDevice, loadDevice, removeListedDevice, sendCommand } from "./device.js";
-import { HubError } from "./hub.js";
+import { accountIdentity, fromB64, importIdentity, importSender, openEnvelope, sealEnvelope } from "../js/protocol.js";
+import { allowsChanges, collectResults, CommandProblem, keepAllowsChanges, sendCommand } from "./device.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -20,97 +19,53 @@ const memoryStore = () => {
   return { kept, get: async (key) => kept.get(key), put: async (key, value) => void kept.set(key, value), del: async (key) => void kept.delete(key) };
 };
 
-function fakeHub(identity, held = null) {
-  const calls = [];
-  const hub = {
-    calls,
-    held,
-    registerDevice: async (request) => (calls.push(["register", request]), { device: "dev_01K83YV380AAAAAAAAAAAAAAAA", token: "khd_secret" }),
-    deviceList: async () => (calls.push(["get"]), { list: hub.held }),
-    putDeviceList: async (signed) => {
-      calls.push(["put", signed]);
-      if (!(await verifyDeviceList(identity, signed))) throw new HubError(400, "bad-signature");
-      hub.held = signed;
-    },
-    removeDevice: async (device) => void calls.push(["delete", device]),
-  };
-  return hub;
-}
+const AT = 1_761_069_600;
+const answer = { type: "answer", address: "refunds@shop", question: "q1", choice: 0, comment: "" };
 
-test("letting this device answer registers its public keys, asks for the passkey, then signs it onto the account's list", async () => {
-  const identity = await account();
-  const signed = { list: accounts.devices.list, signature: accounts.devices.signature };
-  const hub = fakeHub(identity, signed);
+test("this device views only until it is allowed, per account, and an unreadable store reads as view only", async () => {
   const store = memoryStore();
-  const order = [];
-  const reauth = async () => void order.push(hub.calls.length);
-  const { device, list } = await enableDevice({ hub, store, identity, name: "iPhone", reauth, seen: 2 });
-  assert.deepEqual(hub.calls[0][0], "register");
-  assert.deepEqual(Object.keys(hub.calls[0][1].keys).sort(), ["encryption", "signing"]);
-  assert.deepEqual(order, [1], "the passkey is asked for after registering and before the list is read and signed");
-  assert.equal(list.counter, 3);
-  assert.deepEqual(list.devices.map((listed) => listed.device), [...accounts.devices.list.devices.map((listed) => listed.device), device.id].sort());
-  const mine = list.devices.find((listed) => listed.device === device.id);
-  assert.deepEqual([mine.name, mine.role, mine.keys], ["iPhone", "control", device.public]);
-  assert.equal(device.signing.extractable, false);
-  assert.equal(device.encryption.privateKey.extractable, false);
-  assert.equal((await loadDevice(store, identity.id)).listed, 3);
+  assert.equal(await allowsChanges(store, "acc_a"), false);
+  await keepAllowsChanges(store, "acc_a", true);
+  assert.equal(await allowsChanges(store, "acc_a"), true);
+  assert.equal(await allowsChanges(store, "acc_b"), false, "another account on this browser starts view only");
+  await keepAllowsChanges(store, "acc_a", false);
+  assert.equal(await allowsChanges(store, "acc_a"), false);
+  assert.equal(await allowsChanges({ get: async () => { throw new Error("blocked"); } }, "acc_a"), false);
 });
 
-test("a device list the account did not sign, or one older than seen, is never extended", async () => {
+test("with the switch off nothing is sealed or sent", async () => {
   const identity = await account();
-  const forged = { list: { ...accounts.devices.list, counter: 9 }, signature: accounts.devices.signature };
-  const store = memoryStore();
-  const problem = async (hub, seen) => {
-    try {
-      await enableDevice({ hub, store, identity, name: "iPhone", reauth: async () => {}, seen });
-      return null;
-    } catch (error) {
-      assert.ok(error instanceof DeviceListProblem);
-      return error.reason;
-    }
-  };
-  const forgedHub = fakeHub(identity, forged);
-  assert.equal(await problem(forgedHub, 0), "unsigned-device-list");
-  assert.ok(!forgedHub.calls.some(([name]) => name === "put"));
-  const old = fakeHub(identity, { list: accounts.devices.list, signature: accounts.devices.signature });
-  assert.equal(await problem(old, 5), "rolled-back-device-list");
-  assert.ok(!old.calls.some(([name]) => name === "put"));
+  const posted = [];
+  const calls = { command: async (envelope) => void posted.push(envelope) };
+  for (const allowed of [false, undefined, "yes"]) {
+    await assert.rejects(sendCommand({ calls, identity, allowed, machine: { id: parties.machine.id, keys: parties.machine.public }, payload: answer, at: AT }), (error) => error instanceof CommandProblem && error.reason === "view-only");
+  }
+  assert.deepEqual(posted, []);
 });
 
-test("removing a device signs a list without it before the hub drops its token", async () => {
+test("an answer is sealed by the account to the machine and the account, and its result opens with the account key", async () => {
   const identity = await account();
-  const hub = fakeHub(identity, { list: accounts.devices.list, signature: await signDeviceList(identity, accounts.devices.list) });
-  const gone = parties[accounts.devices.removed_device].id;
-  const list = await removeListedDevice({ hub, store: memoryStore(), identity, device: gone, reauth: async () => {} });
-  assert.deepEqual(list, accounts.devices.removed);
-  assert.deepEqual(hub.calls.map(([name]) => name), ["get", "put", "delete"]);
-});
-
-test("an answer is sealed to the machine and this device, sent with the device token, and its result opens with the device key", async () => {
-  const identity = await account();
-  const hub = fakeHub(identity, null);
-  const { device } = await enableDevice({ hub, store: memoryStore(), identity, name: "iPhone", reauth: async () => {} });
   const machine = await importIdentity(parties.machine);
   const posted = [];
-  const at = 1_761_069_600;
-  const calls = { command: async (token, envelope) => (posted.push([token, envelope]), { command: envelope.id, seq: 1 }) };
-  const payload = { type: "answer", address: "refunds@shop", question: "q1", choice: 0, comment: "" };
-  const sent = await sendCommand({ calls, device, machine: { id: machine.id, keys: parties.machine.public }, payload, at, meta: { label: "Keep it" } });
-  const [[token, envelope]] = posted;
-  assert.equal(token, "khd_secret");
-  assert.deepEqual([sent.id, sent.kind, sent.exp, sent.label, sent.result], [envelope.id, "answer", at + 3600, "Keep it", null]);
-  assert.deepEqual(await openEnvelope(envelope, machine, { id: device.id, signing: device.verifying }, at), payload);
+  const calls = { command: async (envelope) => (posted.push(envelope), { command: envelope.id, seq: 1 }) };
+  const sent = await sendCommand({ calls, identity, allowed: true, machine: { id: machine.id, keys: parties.machine.public }, payload: answer, at: AT, meta: { label: "Keep it" } });
+  const [envelope] = posted;
+  assert.equal(envelope.from, identity.id);
+  assert.deepEqual(Object.keys(envelope.keys).sort(), [identity.id, machine.id].sort());
+  assert.deepEqual([sent.id, sent.kind, sent.exp, sent.label, sent.result], [envelope.id, "answer", AT + 3600, "Keep it", null]);
+  assert.deepEqual(await openEnvelope(envelope, machine, await importSender(identity.id, accounts.key.keys), AT), answer);
 
-  const header = { v: 1, id: envelope.id, kind: "result", from: machine.id, machine: machine.id, at, exp: at + 86_400, schema: 1 };
-  const result = { type: "result", command: envelope.id, outcome: "done", text: "Answered." };
-  const sealed = await sealEnvelope(header, new TextEncoder().encode(JSON.stringify(result)), machine, [{ id: machine.id, encryption: parties.machine.public.encryption }, { id: device.id, encryption: device.public.encryption }]);
-  const listing = { cursor: 7, results: [{ seq: 7, machine: machine.id, command: envelope.id, stored_at: at + 5, envelope: sealed }] };
-  const kept = await collectResults({ calls: { results: async () => listing }, device, kept: { cursor: 0, sent: [sent] }, keysOf: () => parties.machine.public, now: at + 10 });
+  const header = { v: 1, id: envelope.id, kind: "result", from: machine.id, machine: machine.id, at: AT, exp: AT + 86_400, schema: 1 };
+  const result = { type: "result", command: envelope.id, outcome: "refused", reason: "not-allowed", text: "Not pushed: devbox takes answers, not pushes." };
+  const sealed = await sealEnvelope(header, new TextEncoder().encode(JSON.stringify(result)), machine, [{ id: machine.id, encryption: parties.machine.public.encryption }, { id: identity.id, encryption: accounts.key.keys.encryption }]);
+  const listing = { cursor: 7, results: [{ seq: 7, machine: machine.id, command: envelope.id, stored_at: AT + 5, envelope: sealed }] };
+  const asked = [];
+  const kept = await collectResults({ calls: { results: async (after, wait) => (asked.push([after, wait]), listing) }, identity, kept: { cursor: 3, sent: [sent] }, keysOf: () => parties.machine.public, now: AT + 10 });
+  assert.deepEqual(asked, [[3, 0]]);
   assert.equal(kept.cursor, 7);
-  assert.deepEqual(kept.sent[0].result, { outcome: "done", reason: null, text: "Answered.", at: at + 5 });
+  assert.deepEqual(kept.sent[0].result, { outcome: "refused", reason: "not-allowed", text: "Not pushed: devbox takes answers, not pushes.", at: AT + 5 });
 
   const misfiled = { cursor: 8, results: [{ ...listing.results[0], command: "cmd_019a07ed-8d00-7f3f-8567-000000000000" }] };
-  const untouched = await collectResults({ calls: { results: async () => misfiled }, device, kept: { cursor: 7, sent: [{ ...sent, id: misfiled.results[0].command }] }, keysOf: () => parties.machine.public, now: at + 10 });
+  const untouched = await collectResults({ calls: { results: async () => misfiled }, identity, kept: { cursor: 7, sent: [{ ...sent, id: misfiled.results[0].command }] }, keysOf: () => parties.machine.public, now: AT + 10 });
   assert.equal(untouched.sent[0].result, null, "a result filed under another command is not believed");
 });

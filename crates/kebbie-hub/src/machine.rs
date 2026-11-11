@@ -3,17 +3,15 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_api::{
-    AdmittedDevices, BoardStored, BoardUpload, DeviceListView, Inbox, JoinRequest, Joined, MachineName, PairingFailure,
-    PairingOpened, PairingRefusal, PairingReply, PairingState, PairingView, QueuedMessage,
-    code_from_random, normalize_code,
+    BoardStored, BoardUpload, Inbox, JoinRequest, Joined, MachineName,
+    PairingRefusal, PairingReply, PairingState, PairingView, QueuedMessage,
+    normalize_code,
 };
 use kebbie_hub_protocol::{Envelope, Id, Kind, Prefix, verify};
 use serde::Deserialize;
 
-use crate::auth::{Anonymous, MACHINE_TOKEN_PREFIX, MachineAuth, digest, new_token, random};
+use crate::auth::{Anonymous, MACHINE_TOKEN_PREFIX, MachineAuth, digest, new_token};
 use crate::error::ApiError;
 use crate::pairing::{Side, Watch, view};
 use crate::store::{BoardWrite, Pairing, Store};
@@ -42,7 +40,7 @@ pub async fn join(
     )? {
         return Err(ApiError::unauthorized());
     }
-    store.log(at, "machine.joined", Some(&machine), None, None)?;
+    store.log(at, "machine.joined", Some(&machine), None)?;
     Ok(Json(Joined { machine, token }))
 }
 
@@ -59,7 +57,7 @@ pub async fn rename(
         .ok_or_else(ApiError::unauthorized)?;
     if before != name {
         store.rename_machine(&machine, name)?;
-        store.log(at, "machine.renamed", Some(&machine), None, None)?;
+        store.log(at, "machine.renamed", Some(&machine), None)?;
     }
     Ok(Json(MachineName {
         name: name.to_string(),
@@ -70,17 +68,15 @@ pub async fn leave(
     State(hub): State<Arc<Hub>>,
     MachineAuth(machine): MachineAuth,
 ) -> Result<StatusCode, ApiError> {
-    let (readers, account) = {
+    let account = {
         let store = hub.store();
-        let readers = store.admitted_devices(&machine)?;
         let account = store.machine_owner(&machine)?;
         if !store.remove_machine(&machine)? {
             return Err(ApiError::unauthorized());
         }
-        store.log(now(), "machine.left", Some(&machine), None, account.as_deref())?;
-        (readers, account)
+        store.log(now(), "machine.left", Some(&machine), account.as_deref())?;
+        account
     };
-    hub.wake_devices(&readers);
     if let Some(account) = account {
         hub.wake_account(&account);
     }
@@ -118,9 +114,7 @@ pub async fn put_board(
         at,
         "board.stored",
         Some(&machine),
-        None,
-        Some(&format!("rev={} bytes={}", upload.rev, text.len())),
-    )?;
+        Some(&format!("rev={} bytes={}", upload.rev, text.len())),)?;
     let owner = store.machine_owner(&machine)?;
     drop(store);
     if let Some(owner) = owner {
@@ -135,8 +129,6 @@ pub struct InboxQuery {
     after: u64,
     #[serde(default)]
     wait: u64,
-    #[serde(default)]
-    devices: Option<u64>,
 }
 
 pub async fn inbox(
@@ -150,11 +142,8 @@ pub async fn inbox(
     hub.store().acknowledge(&machine, query.after)?;
     let queued = hub
         .wait_until(&machine_key(&machine), query.wait, || {
-            let store = hub.store();
-            let queued = store.queued_after(&machine, query.after)?;
-            let listed = store.device_list_rev(&machine)?;
-            let ready = !queued.is_empty()
-                || query.devices.is_some_and(|held| listed.is_some_and(|rev| rev != held));
+            let queued = hub.store().queued_after(&machine, query.after)?;
+            let ready = !queued.is_empty();
             Ok((queued, ready))
         })
         .await?;
@@ -170,49 +159,12 @@ pub async fn inbox(
     let store = hub.store();
     store.mark_delivered(&machine, query.after, seq, now())?;
     let board_rev = store.board_rev(&machine)?;
-    let device_list_rev = store.device_list_rev(&machine)?;
     drop(store);
     Ok(Json(Inbox {
         seq,
         messages,
         board_rev,
-        device_list_rev,
     }))
-}
-
-pub async fn device_list(
-    State(hub): State<Arc<Hub>>,
-    MachineAuth(machine): MachineAuth,
-) -> Result<Json<DeviceListView>, ApiError> {
-    let owner = hub.store().machine_owner(&machine)?;
-    match owner {
-        Some(account) => Ok(Json(crate::account::signed_device_list(&hub, &account)?)),
-        None => Ok(Json(DeviceListView { list: None })),
-    }
-}
-
-impl Hub {
-    pub(crate) fn open_pairing_for(&self, machine: &Id) -> Result<PairingOpened, ApiError> {
-        let id = URL_SAFE_NO_PAD.encode(random::<16>());
-        let code = code_from_random(random());
-        let at = now();
-        let expires_at = at + self.config.pairing_ttl;
-        let store = self.store();
-        store.open_pairing(&id, machine, &digest(&code), at, expires_at)?;
-        store.log(at, "pairing.opened", Some(machine), None, None)?;
-        Ok(PairingOpened {
-            pairing: id,
-            code,
-            expires_at,
-        })
-    }
-}
-
-pub async fn open_pairing(
-    State(hub): State<Arc<Hub>>,
-    MachineAuth(machine): MachineAuth,
-) -> Result<Json<PairingOpened>, ApiError> {
-    Ok(Json(hub.open_pairing_for(&machine)?))
 }
 
 fn own_pairing(store: &Store, machine: &Id, id: &str) -> Result<Pairing, ApiError> {
@@ -293,22 +245,7 @@ pub async fn admit(
         &id,
         PairingState::Revealed,
         |store, pairing| {
-            let at = now();
-            if let Some(account) = &pairing.account {
-                store.log(at, "account.pinned", Some(&machine), None, Some(account))?;
-                pairing.state = PairingState::Admitted;
-                return Ok(());
-            }
-            let device = pairing
-                .device
-                .clone()
-                .ok_or_else(|| ApiError::conflict("wrong-state"))?;
-            let keys = pairing
-                .device_keys
-                .ok_or_else(|| ApiError::conflict("wrong-state"))?;
-            store.fix_device_keys(&device, &keys)?;
-            store.admit(&machine, &device, at)?;
-            store.log(at, "pairing.admitted", Some(&machine), Some(&device), None)?;
+            store.log(now(), "account.pinned", Some(&machine), Some(pairing.account.as_str()))?;
             pairing.state = PairingState::Admitted;
             Ok(())
         },
@@ -321,9 +258,6 @@ pub async fn refuse(
     Path(id): Path<String>,
     Json(refusal): Json<PairingRefusal>,
 ) -> Result<Json<PairingView>, ApiError> {
-    if refusal.reason == PairingFailure::SecondCommitment {
-        return Err(ApiError::bad_request("bad-reason"));
-    }
     let store = hub.store();
     let mut pairing = own_pairing(&store, &machine, &id)?;
     let at = now();
@@ -337,36 +271,9 @@ pub async fn refuse(
         at,
         "pairing.refused",
         Some(&machine),
-        pairing.device.as_ref(),
-        Some(refusal.reason.name()),
-    )?;
+        Some(refusal.reason.name()),)?;
     drop(store);
     hub.wake_pairing(&pairing);
     Ok(Json(view(&pairing, Side::Machine, at)))
 }
 
-pub async fn devices(
-    State(hub): State<Arc<Hub>>,
-    MachineAuth(machine): MachineAuth,
-) -> Result<Json<AdmittedDevices>, ApiError> {
-    let devices = hub.store().admitted_device_views(&machine)?;
-    Ok(Json(AdmittedDevices { devices }))
-}
-
-pub async fn remove_device(
-    State(hub): State<Arc<Hub>>,
-    MachineAuth(machine): MachineAuth,
-    Path(id): Path<String>,
-) -> Result<StatusCode, ApiError> {
-    let device = Id::parse(&id).map_err(|_| ApiError::not_found())?;
-    let at = now();
-    {
-        let store = hub.store();
-        if !store.remove_admission(&machine, &device)? {
-            return Err(ApiError::not_found());
-        }
-        store.log(at, "admission.removed", Some(&machine), Some(&device), None)?;
-    }
-    hub.wake_device(&device);
-    Ok(StatusCode::NO_CONTENT)
-}

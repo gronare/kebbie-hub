@@ -8,12 +8,12 @@ use kebbie_hub::RateLimit;
 use kebbie_hub_api::{
     CommandQueued, CommandUpload, EVENT_RESULT, ResultReady, ResultStored, ResultUpload,
 };
+use kebbie_hub_fakes::HubError;
+use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Handling, MachineState, Posted};
-use kebbie_hub_fakes::phone::{PairedMachine, PhoneState};
-use kebbie_hub_fakes::{Error, HubError};
 use kebbie_hub_protocol::{
-    Answer, CommandResult, Envelope, Header, Id, Kind, Outcome, Payload, Prefix, PromptAnswer,
-    PushApproval, Reason, Role, SecretKeys, StartTask, TrustedDevice, seal,
+    AccountKey, Answer, CommandResult, Dropped, Envelope, Header, Id, Kind, Outcome, Payload,
+    Prefix, PromptAnswer, PushApproval, Reason, SecretKeys, StartTask, seal,
 };
 use serde_json::Value;
 
@@ -22,13 +22,14 @@ const ADDRESS: &str = "refunds@shop";
 const QUESTION: &str = "1761069540-4411-0-question";
 const HEAD: &str = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
 const MOVED_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+const PAST_THE_WINDOW: u64 = 8 * 86_400;
 
-async fn paired(test: &TestHub) -> (MachineState, PhoneState) {
-    let mut machine = joined_machine(test).await;
-    let mut phone = phone(test).await;
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
+async fn commanding(test: &TestHub) -> (MachineState, Browser) {
+    let mut person = member(test).await;
+    let mut machine = connected_with_board(test, &mut person).await;
+    person.knows(&machine.machine, machine.public());
     machine.post_board(board(MARKER)).await.unwrap();
-    (machine, phone)
+    (machine, person)
 }
 
 fn answer(choice: Option<u8>, comment: &str) -> Payload {
@@ -56,15 +57,22 @@ fn start(name: &str, prompt: &str) -> Payload {
     })
 }
 
-fn hub_refusal<T: std::fmt::Debug>(result: Result<T, Error>) -> (u16, String) {
+fn refusal_of<T: std::fmt::Debug>(result: Result<T, HubError>) -> (u16, String) {
     match result {
-        Err(Error::Hub(HubError::Status { status, code })) => (status, code),
+        Err(error) => hub_code(error),
         other => panic!("the hub accepted it: {other:?}"),
     }
 }
 
-async fn result_of(phone: &PhoneState, envelope: &Envelope) -> CommandResult {
-    phone
+fn machine_refusal<T: std::fmt::Debug>(result: Result<T, kebbie_hub_fakes::Error>) -> (u16, String) {
+    match result {
+        Err(kebbie_hub_fakes::Error::Hub(error)) => hub_code(error),
+        other => panic!("the hub accepted it: {other:?}"),
+    }
+}
+
+async fn result_of(person: &mut Browser, envelope: &Envelope) -> CommandResult {
+    person
         .await_result(&envelope.header.id, SOON)
         .await
         .unwrap()
@@ -75,14 +83,27 @@ fn refused(reason: Reason) -> Outcome {
     Outcome::Refused { reason }
 }
 
+fn account_of(person: &Browser) -> AccountKey {
+    person.account_key().expect("the account is unlocked").clone()
+}
+
+fn done(command: &Id) -> CommandResult {
+    CommandResult {
+        command: command.clone(),
+        outcome: Outcome::Done,
+        text: "done".to_string(),
+    }
+}
+
 #[tokio::test]
-async fn an_answer_from_the_phone_is_applied_and_its_result_comes_back() {
+async fn an_answer_from_the_account_is_applied_and_its_result_comes_back() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    let sent = phone
+    let (mut machine, mut person) = commanding(&test).await;
+    let sent = person
         .command(&machine.machine, &answer(Some(1), ""))
         .await
         .unwrap();
+    assert_eq!(sent.header.from, account_of(&person).account);
 
     let handled = machine.apply_once(0, None).await.unwrap();
     assert_eq!(handled.len(), 1);
@@ -95,7 +116,7 @@ async fn an_answer_from_the_phone_is_applied_and_its_result_comes_back() {
         }
         other => panic!("not applied: {other:?}"),
     }
-    let result = result_of(&phone, &sent).await;
+    let result = result_of(&mut person, &sent).await;
     assert_eq!(result.command, sent.header.id);
     assert_eq!(result.outcome, Outcome::Done);
     assert_eq!(machine.applied.len(), 1);
@@ -104,13 +125,13 @@ async fn an_answer_from_the_phone_is_applied_and_its_result_comes_back() {
 #[tokio::test]
 async fn a_prompt_answer_is_relayed_like_any_command_and_lives_ten_minutes_at_most() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
+    let (mut machine, mut person) = commanding(&test).await;
     let chosen = Payload::PromptAnswer(PromptAnswer {
         address: ADDRESS.to_string(),
         prompt: "3f2a9c1d".to_string(),
         key: "y".to_string(),
     });
-    let sent = phone.command(&machine.machine, &chosen).await.unwrap();
+    let sent = person.command(&machine.machine, &chosen).await.unwrap();
     assert_eq!(sent.header.exp - sent.header.at, 600);
     let handled = machine.apply_once(0, None).await.unwrap();
     assert_eq!(handled[0].kind, Kind::PromptAnswer);
@@ -119,9 +140,9 @@ async fn a_prompt_answer_is_relayed_like_any_command_and_lives_ten_minutes_at_mo
         "{:?}",
         handled[0].handling
     );
-    assert_eq!(result_of(&phone, &sent).await.outcome, Outcome::Done);
+    assert_eq!(result_of(&mut person, &sent).await.outcome, Outcome::Done);
     assert!(
-        phone
+        person
             .seal_command(&machine.machine, &chosen, kebbie_hub::now(), Some(601))
             .is_err(),
         "a screen prompt is momentary"
@@ -129,41 +150,58 @@ async fn a_prompt_answer_is_relayed_like_any_command_and_lives_ten_minutes_at_mo
 }
 
 #[tokio::test]
-async fn a_read_only_device_is_refused_by_the_machine_and_hears_why() {
+async fn a_command_another_account_signed_is_dropped_by_the_machine_and_nothing_is_applied() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    assert!(machine.set_role(phone.device.as_ref().unwrap(), Role::Read));
-    let sent = phone
+    let (mut machine, _person) = commanding(&test).await;
+    let mut stranger = member(&test).await;
+    stranger.knows(&machine.machine, machine.public());
+    let theirs = stranger
+        .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now(), None)
+        .unwrap();
+    assert_eq!(
+        refusal_of(stranger.send_command(&theirs).await),
+        (404, "unknown-machine".to_string()),
+        "the hub queues nothing for a machine on another account"
+    );
+    test.hub.enqueue(&machine.machine, &theirs).unwrap();
+    let handled = machine.apply_once(0, None).await.unwrap();
+    assert_eq!(handled.len(), 1);
+    assert_eq!(handled[0].handling, Handling::Dropped(Dropped::WrongAccount));
+    assert_eq!(handled[0].posted, None);
+    assert!(machine.applied.is_empty());
+    assert_eq!(rows(&test, "results"), 0);
+}
+
+#[tokio::test]
+async fn a_kind_the_machine_does_not_take_is_refused_and_the_account_hears_why() {
+    let test = start_hub(|_| {}).await;
+    let (mut machine, mut person) = commanding(&test).await;
+    machine.accepts = vec![Kind::Answer, Kind::PromptAnswer];
+    let pushed = person.command(&machine.machine, &push(HEAD)).await.unwrap();
+    let answered = person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
-
     let handled = machine.apply_once(0, None).await.unwrap();
     assert!(
         matches!(&handled[0].handling, Handling::Refused(result) if result.outcome == refused(Reason::NotAllowed)),
         "{:?}",
         handled[0].handling
     );
-    assert_eq!(
-        result_of(&phone, &sent).await.outcome,
-        refused(Reason::NotAllowed)
-    );
+    assert!(matches!(&handled[1].handling, Handling::Applied { .. }));
+    assert_eq!(result_of(&mut person, &pushed).await.outcome, refused(Reason::NotAllowed));
+    assert_eq!(result_of(&mut person, &answered).await.outcome, Outcome::Done);
 }
 
 #[tokio::test]
 async fn a_command_delivered_twice_gets_the_stored_result_and_a_resend_queues_nothing() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    let envelope = phone
-        .seal_command(
-            &machine.machine,
-            &answer(Some(1), ""),
-            kebbie_hub::now(),
-            None,
-        )
+    let (mut machine, mut person) = commanding(&test).await;
+    let envelope = person
+        .seal_command(&machine.machine, &answer(Some(1), ""), kebbie_hub::now(), None)
         .unwrap();
-    let first = phone.send_command(&envelope).await.unwrap();
-    let again = phone.send_command(&envelope).await.unwrap();
+    let first = person.send_command(&envelope).await.unwrap();
+    let again = person.send_command(&envelope).await.unwrap();
     assert_eq!(first, again);
     assert_eq!(rows(&test, "queue"), 1);
     assert_eq!(rows(&test, "commands"), 1);
@@ -178,42 +216,33 @@ async fn a_command_delivered_twice_gets_the_stored_result_and_a_resend_queues_no
     assert_eq!(replayed[0].handling, Handling::Replayed(result.clone()));
 
     assert_eq!(rows(&test, "results"), 1);
-    assert_eq!(&result_of(&phone, &envelope).await, result);
-    let (_, received) = phone.results(0, 0).await.unwrap();
-    assert_eq!(received.len(), 1);
+    assert_eq!(&result_of(&mut person, &envelope).await, result);
+    assert_eq!(person.results(0, 0).await.unwrap().results.len(), 1);
 }
 
 #[tokio::test]
-async fn a_command_for_a_machine_that_did_not_admit_the_device_is_refused_and_not_queued() {
+async fn a_command_for_a_machine_off_the_account_is_refused_and_not_queued() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, mut phone) = paired(&test).await;
+    let (_machine, mut person) = commanding(&test).await;
     let stranger = joined_machine(&test).await;
-    phone.machines.push(PairedMachine {
-        id: stranger.machine.clone(),
-        keys: stranger.public(),
-    });
-    let elsewhere = phone.command(&stranger.machine, &answer(Some(0), "")).await;
-    assert_eq!(hub_refusal(elsewhere), (404, "unknown-machine".to_string()));
-
-    let device = phone.device.clone().unwrap();
-    machine.remove_device(&device).await.unwrap();
-    let removed = phone.command(&machine.machine, &answer(Some(0), "")).await;
-    assert_eq!(hub_refusal(removed), (404, "unknown-machine".to_string()));
+    person.knows(&stranger.machine, stranger.public());
+    let elsewhere = person.command(&stranger.machine, &answer(Some(0), "")).await;
+    assert_eq!(refusal_of(elsewhere), (404, "unknown-machine".to_string()));
     assert_eq!(rows(&test, "queue"), 0);
     assert_eq!(rows(&test, "commands"), 0);
 }
 
 #[tokio::test]
-async fn a_forged_or_misattributed_command_is_refused_with_400_and_not_queued() {
+async fn a_forged_or_misattributed_command_is_refused_and_not_queued() {
     let test = start_hub(|_| {}).await;
-    let (machine, phone) = paired(&test).await;
-    let device = phone.device.clone().unwrap();
+    let (machine, mut person) = commanding(&test).await;
+    let account = account_of(&person);
     let impostor = SecretKeys::generate();
     let forged = seal(
         Header::new(
             Id::new(Prefix::Command).unwrap(),
             Kind::Answer,
-            device.clone(),
+            account.account.clone(),
             machine.machine.clone(),
             kebbie_hub::now(),
         ),
@@ -223,33 +252,23 @@ async fn a_forged_or_misattributed_command_is_refused_with_400_and_not_queued() 
     )
     .unwrap();
     assert_eq!(
-        hub_refusal(phone.send_command(&forged).await),
+        refusal_of(person.send_command(&forged).await),
         (400, "bad-signature".to_string())
     );
 
-    let genuine = phone
-        .seal_command(
-            &machine.machine,
-            &answer(Some(0), ""),
-            kebbie_hub::now(),
-            None,
-        )
+    let genuine = person
+        .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now(), None)
         .unwrap();
-    let other = device_client(&test, &signed_up(&test).await.register_device().await);
-    let misattributed = other
-        .post::<_, CommandQueued>(
-            "/v1/d/commands",
-            &CommandUpload {
-                envelope: genuine.clone(),
-            },
-        )
-        .await;
-    assert_eq!(status_of(misattributed), 400);
+    let mut other = member(&test).await;
+    assert_eq!(
+        refusal_of(other.send_command(&genuine).await),
+        (400, "wrong-sender".to_string())
+    );
 
     let mut tampered = genuine.clone();
     tampered.header.exp -= 1;
     assert_eq!(
-        hub_refusal(phone.send_command(&tampered).await),
+        refusal_of(person.send_command(&tampered).await),
         (400, "bad-signature".to_string())
     );
 
@@ -257,18 +276,28 @@ async fn a_forged_or_misattributed_command_is_refused_with_400_and_not_queued() 
         .seal_board(board(MARKER), 9, kebbie_hub::now())
         .unwrap();
     assert_eq!(
-        hub_refusal(phone.send_command(&board).await),
+        refusal_of(person.send_command(&board).await),
         (400, "not-a-command".to_string())
     );
 
-    let mut sprayed = genuine;
+    let mut sprayed = genuine.clone();
     sprayed
         .keys
         .insert(Id::new(Prefix::Device).unwrap(), "AAAA".to_string());
     assert_eq!(
-        hub_refusal(phone.send_command(&sprayed).await),
+        refusal_of(person.send_command(&sprayed).await),
         (400, "bad-recipients".to_string())
     );
+
+    let cross_site = reqwest::Client::new()
+        .post(format!("{}/v1/a/commands", test.url))
+        .header("cookie", person.cookie.clone().unwrap())
+        .header("origin", "https://elsewhere.example")
+        .json(&CommandUpload { envelope: genuine })
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(refusal(cross_site).await, (403, "cross-origin".to_string()));
     assert_eq!(rows(&test, "queue"), 0);
     assert_eq!(rows(&test, "commands"), 0);
 }
@@ -276,30 +305,20 @@ async fn a_forged_or_misattributed_command_is_refused_with_400_and_not_queued() 
 #[tokio::test]
 async fn an_expired_command_is_refused_by_the_hub_or_by_the_machine() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    let stale = phone
-        .seal_command(
-            &machine.machine,
-            &answer(Some(0), ""),
-            kebbie_hub::now() - 700,
-            Some(600),
-        )
+    let (mut machine, mut person) = commanding(&test).await;
+    let stale = person
+        .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now() - 700, Some(600))
         .unwrap();
     assert_eq!(
-        hub_refusal(phone.send_command(&stale).await),
+        refusal_of(person.send_command(&stale).await),
         (400, "expired".to_string())
     );
     assert_eq!(rows(&test, "queue"), 0);
 
-    let short = phone
-        .seal_command(
-            &machine.machine,
-            &answer(Some(0), ""),
-            kebbie_hub::now(),
-            Some(1),
-        )
+    let short = person
+        .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now(), Some(1))
         .unwrap();
-    phone.send_command(&short).await.unwrap();
+    person.send_command(&short).await.unwrap();
     tokio::time::sleep(Duration::from_millis(2100)).await;
     let handled = machine.apply_once(0, None).await.unwrap();
     assert_eq!(
@@ -307,26 +326,26 @@ async fn an_expired_command_is_refused_by_the_hub_or_by_the_machine() {
         refused(Reason::Expired)
     );
     assert_eq!(
-        result_of(&phone, &short).await.outcome,
+        result_of(&mut person, &short).await.outcome,
         refused(Reason::Expired)
     );
 }
 
 #[tokio::test]
-async fn a_push_of_a_head_that_moved_since_the_phone_saw_it_is_still_pushed() {
+async fn a_push_of_a_head_that_moved_since_the_account_saw_it_is_still_pushed() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
+    let (mut machine, mut person) = commanding(&test).await;
     let mut moved = board(MARKER);
     moved.items[0].head = Some(MOVED_HEAD.to_string());
     machine.post_board(moved).await.unwrap();
 
-    let seen = phone.command(&machine.machine, &push(HEAD)).await.unwrap();
+    let seen = person.command(&machine.machine, &push(HEAD)).await.unwrap();
     let handled = machine.apply_once(0, None).await.unwrap();
     match &handled[0].handling {
         Handling::Applied { did, .. } => assert!(did.contains(MOVED_HEAD), "{did}"),
         other => panic!("not applied: {other:?}"),
     }
-    assert_eq!(result_of(&phone, &seen).await.outcome, Outcome::Done);
+    assert_eq!(result_of(&mut person, &seen).await.outcome, Outcome::Done);
 }
 
 #[tokio::test]
@@ -338,83 +357,47 @@ async fn starts_past_their_rate_limit_get_429_while_answers_still_go_through() {
         }
     })
     .await;
-    let (machine, phone) = paired(&test).await;
+    let (machine, mut person) = commanding(&test).await;
     for name in ["first-task", "second-task"] {
-        phone
+        person
             .command(&machine.machine, &start(name, "do the thing"))
             .await
             .unwrap();
     }
-    let third = phone
+    let third = person
         .command(&machine.machine, &start("third-task", "do the thing"))
         .await;
-    assert_eq!(hub_refusal(third), (429, "rate-limited".to_string()));
-    phone
+    assert_eq!(refusal_of(third), (429, "rate-limited".to_string()));
+    person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
     assert_eq!(rows(&test, "queue"), 3);
 }
 
-fn trusted(machine: &MachineState, device: &Id) -> TrustedDevice {
-    let admitted = machine
-        .devices
-        .iter()
-        .find(|admitted| &admitted.id == device)
-        .unwrap();
-    TrustedDevice {
-        id: admitted.id.clone(),
-        name: "phone".to_string(),
-        keys: admitted.keys,
-        role: Role::Control,
-    }
-}
-
-fn done(command: &Id) -> CommandResult {
-    CommandResult {
-        command: command.clone(),
-        outcome: Outcome::Done,
-        text: "done".to_string(),
-    }
-}
-
 #[tokio::test]
-async fn a_result_reaches_only_the_device_that_sent_the_command() {
+async fn a_result_reaches_only_the_account_that_sent_the_command() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, sender) = paired(&test).await;
-    let mut bystander = phone(&test).await;
-    pair_both(&mut machine, &mut bystander, true)
-        .await
-        .0
-        .unwrap();
-    let sender_id = sender.device.clone().unwrap();
-    let bystander_id = bystander.device.clone().unwrap();
+    let (mut machine, mut person) = commanding(&test).await;
+    let account = account_of(&person);
+    let mut bystander = member(&test).await;
+    let elsewhere = account_of(&bystander);
 
-    let waiting = sender
+    let waiting = person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
     let command = waiting.header.id.clone();
-    let early = machine
-        .post_result(&trusted(&machine, &sender_id), &done(&command))
-        .await;
-    assert_eq!(hub_refusal(early), (409, "not-delivered".to_string()));
+    let early = machine.post_result(&account, &done(&command)).await;
+    assert_eq!(machine_refusal(early), (409, "not-delivered".to_string()));
 
     machine.poll_once(0).await.unwrap();
-    let misdirected = machine
-        .post_result(&trusted(&machine, &bystander_id), &done(&command))
-        .await;
-    assert_eq!(
-        hub_refusal(misdirected),
-        (404, "unknown-command".to_string())
-    );
+    let misdirected = machine.post_result(&elsewhere, &done(&command)).await;
+    assert_eq!(machine_refusal(misdirected), (404, "unknown-command".to_string()));
     let unknown = machine
-        .post_result(
-            &trusted(&machine, &sender_id),
-            &done(&Id::new(Prefix::Command).unwrap()),
-        )
+        .post_result(&account, &done(&Id::new(Prefix::Command).unwrap()))
         .await;
-    assert_eq!(hub_refusal(unknown), (404, "unknown-command".to_string()));
+    assert_eq!(machine_refusal(unknown), (404, "unknown-command".to_string()));
 
     let to_both = seal(
         Header::new(
@@ -426,10 +409,7 @@ async fn a_result_reaches_only_the_device_that_sent_the_command() {
         ),
         &Payload::Result(done(&command)),
         &machine.secret(),
-        &[
-            (sender_id.clone(), sender.public()),
-            (bystander_id.clone(), bystander.public()),
-        ],
+        &[account.recipient(), elsewhere.recipient()],
     )
     .unwrap();
     let doubled = machine
@@ -439,62 +419,40 @@ async fn a_result_reaches_only_the_device_that_sent_the_command() {
     assert_eq!(status_of(doubled), 400);
 
     let impostor_result = {
-        let mut envelope = machine
-            .seal_result(&trusted(&machine, &sender_id), &done(&command))
-            .unwrap();
-        envelope.sig = sender
-            .seal_command(
-                &machine.machine,
-                &answer(Some(0), ""),
-                kebbie_hub::now(),
-                None,
-            )
+        let mut envelope = machine.seal_result(&account, &done(&command)).unwrap();
+        envelope.sig = person
+            .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now(), None)
             .unwrap()
             .sig;
         envelope
     };
     let forged = machine
         .client()
-        .post::<_, Value>(
-            "/v1/m/results",
-            &ResultUpload {
-                envelope: impostor_result,
-            },
-        )
+        .post::<_, Value>("/v1/m/results", &ResultUpload { envelope: impostor_result })
         .await;
     assert_eq!(status_of(forged), 400);
 
-    machine
-        .post_result(&trusted(&machine, &sender_id), &done(&command))
-        .await
-        .unwrap();
-    assert_eq!(result_of(&sender, &waiting).await, done(&command));
-    let (_, seen_by_bystander) = bystander.results(0, 0).await.unwrap();
-    assert!(seen_by_bystander.is_empty());
+    machine.post_result(&account, &done(&command)).await.unwrap();
+    assert_eq!(result_of(&mut person, &waiting).await, done(&command));
+    assert!(bystander.results(0, 0).await.unwrap().results.is_empty());
 }
 
 #[tokio::test]
 async fn the_database_never_holds_command_text() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    let answered = phone
-        .command(
-            &machine.machine,
-            &answer(None, &format!("{MARKER} comment")),
-        )
+    let (mut machine, mut person) = commanding(&test).await;
+    let answered = person
+        .command(&machine.machine, &answer(None, &format!("{MARKER} comment")))
         .await
         .unwrap();
-    let started = phone
-        .command(
-            &machine.machine,
-            &start("zebra-task", &format!("{MARKER} prompt")),
-        )
+    let started = person
+        .command(&machine.machine, &start("zebra-task", &format!("{MARKER} prompt")))
         .await
         .unwrap();
-    let pushed = phone.command(&machine.machine, &push(HEAD)).await.unwrap();
+    let pushed = person.command(&machine.machine, &push(HEAD)).await.unwrap();
     machine.apply_once(0, None).await.unwrap();
     for sent in [&answered, &started, &pushed] {
-        assert_eq!(result_of(&phone, sent).await.outcome, Outcome::Done);
+        assert_eq!(result_of(&mut person, sent).await.outcome, Outcome::Done);
     }
 
     let stored = database_bytes(&test);
@@ -503,36 +461,27 @@ async fn the_database_never_holds_command_text() {
         "the scan did not read the commands"
     );
     for leak in [
-        MARKER,
-        "zebra-task",
-        QUESTION,
-        ADDRESS,
-        HEAD,
-        "Answered",
-        "Started",
+        format!("{MARKER} comment"),
+        format!("{MARKER} prompt"),
+        "zebra-task".to_string(),
+        QUESTION.to_string(),
+        ADDRESS.to_string(),
+        HEAD.to_string(),
+        "Answered".to_string(),
+        "Started".to_string(),
     ] {
-        assert!(
-            !holds(&stored, leak.as_bytes()),
-            "the database holds {leak:?}"
-        );
+        assert!(!holds(&stored, leak.as_bytes()), "the database holds {leak:?}");
     }
 }
 
 #[tokio::test]
-async fn the_feed_announces_a_result_by_command_id_only() {
+async fn the_account_feed_announces_a_result_by_command_id_only() {
     let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let registered = signed_up(&test).await.register_device().await;
-    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    machine.post_board(board(MARKER)).await.unwrap();
-    let mut events = EventStream::open(&test.url, &registered.token).await;
+    let (mut machine, mut person) = commanding(&test).await;
+    let mut events = EventStream::of_account(&person).await;
 
-    let sent = phone
-        .command(
-            &machine.machine,
-            &answer(None, &format!("{MARKER} comment")),
-        )
+    let sent = person
+        .command(&machine.machine, &answer(None, &format!("{MARKER} comment")))
         .await
         .unwrap();
     machine.apply_once(0, None).await.unwrap();
@@ -546,42 +495,46 @@ async fn the_feed_announces_a_result_by_command_id_only() {
         }
     );
     assert!(!data.to_string().contains(MARKER));
-    assert_eq!(events.next(Duration::from_millis(300)).await, Next::Quiet);
 
-    let mut fresh = EventStream::open(&test.url, &registered.token).await;
-    assert_eq!(
-        fresh.until(EVENT_RESULT, SOON).await["command"],
-        sent.header.id.as_str()
-    );
-    let (_, received) = phone.results(0, 0).await.unwrap();
-    let mut resumed = EventStream::open_after(&test.url, &registered.token, received[0].seq).await;
-    loop {
-        match resumed.next(Duration::from_millis(300)).await {
-            Next::Event(name, _) if name == EVENT_RESULT => panic!("announced again"),
-            Next::Event(..) => continue,
-            Next::Quiet => break,
-            Next::Ended => panic!("the feed ended"),
+    async fn quiet_about_results(mut stream: EventStream) {
+        loop {
+            match stream.next(Duration::from_millis(300)).await {
+                Next::Event(name, _) if name == EVENT_RESULT => panic!("announced again"),
+                Next::Event(..) => continue,
+                Next::Quiet => break,
+                Next::Ended => panic!("the feed ended"),
+            }
         }
     }
+    quiet_about_results(EventStream::of_account(&person).await).await;
+    let mut replayed = EventStream::of_account_after(&person, 0).await;
+    assert_eq!(
+        replayed.until(EVENT_RESULT, SOON).await["command"],
+        sent.header.id.as_str()
+    );
+    let seq = person.results(0, 0).await.unwrap().results[0].seq;
+    quiet_about_results(EventStream::of_account_after(&person, seq).await).await;
 }
 
-const PAST_THE_WINDOW: u64 = 8 * 86_400;
-
-async fn paired_with_account(test: &TestHub) -> (MachineState, PhoneState, Person) {
-    let mut machine = joined_machine(test).await;
-    let person = signed_up(test).await;
-    let registered = person.register_device().await;
-    let mut phone = PhoneState::registered(&test.url, registered.device, &registered.token);
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    machine.post_board(board(MARKER)).await.unwrap();
-    (machine, phone, person)
+#[tokio::test]
+async fn a_last_event_id_past_what_sqlite_holds_is_refused_with_400() {
+    let test = start_hub(|_| {}).await;
+    let person = member(&test).await;
+    for id in ["9223372036854775808", "soon"] {
+        let response = EventStream::account_request(&person)
+            .header("last-event-id", id)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(refusal(response).await, (400, "bad-last-event-id".to_string()));
+    }
 }
 
 #[tokio::test]
 async fn a_machine_back_after_the_command_window_drains_its_queue() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    phone
+    let (mut machine, mut person) = commanding(&test).await;
+    person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
@@ -593,27 +546,29 @@ async fn a_machine_back_after_the_command_window_drains_its_queue() {
     assert_eq!(rows(&test, "commands"), 0);
     assert!(machine.apply_once(0, None).await.unwrap().is_empty());
 
-    let fresh = phone
+    let fresh = person
         .command(&machine.machine, &answer(Some(1), ""))
         .await
         .unwrap();
     machine.apply_once(0, None).await.unwrap();
-    assert_eq!(result_of(&phone, &fresh).await.outcome, Outcome::Done);
+    assert_eq!(result_of(&mut person, &fresh).await.outcome, Outcome::Done);
 }
 
 #[tokio::test]
 async fn a_result_for_a_command_the_hub_dropped_is_dropped_and_the_inbox_moves_on() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone, person) = paired_with_account(&test).await;
-    phone
+    let (mut machine, mut person) = commanding(&test).await;
+    person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
     machine.poll_once(0).await.unwrap();
     machine.inbox_seq = 0;
-    let device = phone.device.clone().unwrap();
-    let removed = person.delete(&format!("/v1/a/devices/{device}")).await;
-    assert!(removed.status().is_success());
+    test.hub
+        .store()
+        .connection()
+        .execute("DELETE FROM commands", [])
+        .unwrap();
 
     let handled = machine.apply_once(0, None).await.unwrap();
     assert_eq!(handled.len(), 1);
@@ -622,121 +577,75 @@ async fn a_result_for_a_command_the_hub_dropped_is_dropped_and_the_inbox_moves_o
     assert_eq!(rows(&test, "queue"), 0);
 }
 
-#[tokio::test]
-async fn a_revoked_device_s_undelivered_commands_never_reach_the_machine() {
-    let test = start_hub(|_| {}).await;
-    let (mut machine, phone, person) = paired_with_account(&test).await;
-    phone
-        .command(&machine.machine, &answer(Some(0), ""))
-        .await
-        .unwrap();
-    let device = phone.device.clone().unwrap();
-    let removed = person.delete(&format!("/v1/a/devices/{device}")).await;
-    assert!(removed.status().is_success());
-    assert!(machine.poll_once(0).await.unwrap().messages.is_empty());
-    assert_eq!(rows(&test, "queue"), 0);
-
-    let (mut machine, phone) = paired(&test).await;
-    phone
-        .command(&machine.machine, &answer(Some(0), ""))
-        .await
-        .unwrap();
-    machine
-        .remove_device(&phone.device.clone().unwrap())
-        .await
-        .unwrap();
-    assert!(machine.poll_once(0).await.unwrap().messages.is_empty());
-    assert_eq!(rows(&test, "queue"), 0);
-    assert_eq!(rows(&test, "commands"), 0);
-}
-
-async fn send(phone: &PhoneState, machine: &Id) -> Result<CommandQueued, Error> {
-    let envelope = phone
+async fn send(person: &mut Browser, machine: &Id) -> Result<CommandQueued, HubError> {
+    let envelope = person
         .seal_command(machine, &answer(Some(0), ""), kebbie_hub::now(), None)
         .unwrap();
-    phone.send_command(&envelope).await
+    person.send_command(&envelope).await
 }
 
 #[tokio::test]
-async fn a_device_and_a_machine_each_hold_only_so_many_undelivered_commands() {
-    let test = start_hub(|config| {
-        config.max_queued = 3;
-        config.max_undelivered_per_device = 2;
-    })
-    .await;
-    let (mut machine, first) = paired(&test).await;
-    let mut second = phone(&test).await;
-    pair_both(&mut machine, &mut second, true).await.0.unwrap();
+async fn an_account_holds_only_so_many_undelivered_commands_per_machine() {
+    let test = start_hub(|config| config.max_undelivered_per_account = 2).await;
+    let (mut machine, mut person) = commanding(&test).await;
     let target = machine.machine.clone();
-    send(&first, &target).await.unwrap();
-    send(&first, &target).await.unwrap();
+    send(&mut person, &target).await.unwrap();
+    send(&mut person, &target).await.unwrap();
     assert_eq!(
-        hub_refusal(send(&first, &target).await),
+        refusal_of(send(&mut person, &target).await),
         (429, "queue-full".to_string())
     );
-    send(&second, &target).await.unwrap();
-    assert_eq!(
-        hub_refusal(send(&second, &target).await),
-        (429, "queue-full".to_string())
-    );
-
     machine.poll_once(0).await.unwrap();
     machine.poll_once(0).await.unwrap();
-    send(&first, &target).await.unwrap();
+    send(&mut person, &target).await.unwrap();
 }
 
 #[tokio::test]
-async fn result_positions_count_per_device() {
+async fn a_machine_holds_only_so_many_queued_messages() {
+    let test = start_hub(|config| config.max_queued = 2).await;
+    let (machine, mut person) = commanding(&test).await;
+    let target = machine.machine.clone();
+    send(&mut person, &target).await.unwrap();
+    send(&mut person, &target).await.unwrap();
+    assert_eq!(
+        refusal_of(send(&mut person, &target).await),
+        (429, "queue-full".to_string())
+    );
+}
+
+#[tokio::test]
+async fn result_positions_rise_and_list_only_the_accounts_own() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, first) = paired(&test).await;
-    let mut second = phone(&test).await;
-    pair_both(&mut machine, &mut second, true).await.0.unwrap();
-    first
-        .command(&machine.machine, &answer(Some(0), ""))
-        .await
-        .unwrap();
-    second
-        .command(&machine.machine, &answer(Some(1), ""))
-        .await
-        .unwrap();
+    let (mut machine, mut person) = commanding(&test).await;
+    let (mut theirs, mut other) = commanding(&test).await;
+    let first = person.command(&machine.machine, &answer(Some(0), "")).await.unwrap();
+    let elsewhere = other.command(&theirs.machine, &answer(Some(0), "")).await.unwrap();
+    let second = person.command(&machine.machine, &answer(Some(1), "")).await.unwrap();
     machine.apply_once(0, None).await.unwrap();
-    for phone in [&first, &second] {
-        let (cursor, received) = phone.results(0, 0).await.unwrap();
-        assert_eq!((cursor, received.len(), received[0].seq), (1, 1, 1));
-    }
-}
-
-#[tokio::test]
-async fn a_last_event_id_past_what_sqlite_holds_is_refused_with_400() {
-    let test = start_hub(|_| {}).await;
-    let registered = signed_up(&test).await.register_device().await;
-    for id in ["9223372036854775808", "soon"] {
-        let response = reqwest::Client::new()
-            .get(format!("{}/v1/d/events", test.url))
-            .bearer_auth(&registered.token)
-            .header("last-event-id", id)
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(
-            refusal(response).await,
-            (400, "bad-last-event-id".to_string())
-        );
-    }
+    theirs.apply_once(0, None).await.unwrap();
+    let listing = person.results(0, 0).await.unwrap();
+    let commands: Vec<&Id> = listing.results.iter().map(|entry| &entry.command).collect();
+    assert_eq!(commands, [&first.header.id, &second.header.id]);
+    assert!(listing.results[0].seq < listing.results[1].seq);
+    assert_eq!(listing.cursor, listing.results[1].seq);
+    assert!(person.results(listing.cursor, 0).await.unwrap().results.is_empty());
+    let theirs_listed = other.results(0, 0).await.unwrap();
+    assert_eq!(theirs_listed.results.len(), 1);
+    assert_eq!(theirs_listed.results[0].command, elsewhere.header.id);
 }
 
 #[tokio::test]
 async fn a_second_result_for_a_command_must_be_the_same_envelope() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    let sent = phone
+    let (mut machine, mut person) = commanding(&test).await;
+    let account = account_of(&person);
+    let sent = person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
     machine.poll_once(0).await.unwrap();
-    let device = trusted(&machine, phone.device.as_ref().unwrap());
     let command = sent.header.id.clone();
-    let envelope = machine.seal_result(&device, &done(&command)).unwrap();
+    let envelope = machine.seal_result(&account, &done(&command)).unwrap();
     let post = |envelope: Envelope| {
         let client = machine.client();
         async move {
@@ -747,7 +656,7 @@ async fn a_second_result_for_a_command_must_be_the_same_envelope() {
     };
     let first = post(envelope.clone()).await.unwrap();
     assert_eq!(post(envelope).await.unwrap(), first);
-    let other = machine.seal_result(&device, &done(&command)).unwrap();
+    let other = machine.seal_result(&account, &done(&command)).unwrap();
     assert_eq!(
         post(other).await.unwrap_err(),
         HubError::Status {
@@ -761,20 +670,15 @@ async fn a_second_result_for_a_command_must_be_the_same_envelope() {
 #[tokio::test]
 async fn a_resend_with_a_changed_body_is_checked_like_a_new_command() {
     let test = start_hub(|_| {}).await;
-    let (machine, phone) = paired(&test).await;
-    let genuine = phone
-        .seal_command(
-            &machine.machine,
-            &answer(Some(0), ""),
-            kebbie_hub::now(),
-            None,
-        )
+    let (machine, mut person) = commanding(&test).await;
+    let genuine = person
+        .seal_command(&machine.machine, &answer(Some(0), ""), kebbie_hub::now(), None)
         .unwrap();
-    phone.send_command(&genuine).await.unwrap();
+    person.send_command(&genuine).await.unwrap();
     let mut changed = genuine;
     changed.header.exp -= 1;
     assert_eq!(
-        hub_refusal(phone.send_command(&changed).await),
+        refusal_of(person.send_command(&changed).await),
         (400, "bad-signature".to_string())
     );
     assert_eq!(rows(&test, "queue"), 1);
@@ -783,55 +687,48 @@ async fn a_resend_with_a_changed_body_is_checked_like_a_new_command() {
 #[tokio::test]
 async fn each_kind_has_its_own_ciphertext_cap() {
     let test = start_hub(|_| {}).await;
-    let (machine, phone) = paired(&test).await;
-    let padded = |payload: &Payload, chars: usize| {
-        let mut envelope = phone
+    let (machine, mut person) = commanding(&test).await;
+    let padded = |person: &Browser, payload: &Payload, chars: usize| {
+        let mut envelope = person
             .seal_command(&machine.machine, payload, kebbie_hub::now(), None)
             .unwrap();
         envelope.ct = "A".repeat(chars);
         envelope
     };
-    let refused_with = async |envelope: Envelope| hub_refusal(phone.send_command(&envelope).await);
-    assert_eq!(
-        refused_with(padded(&push(HEAD), 5_000)).await,
-        (413, "too-large".to_string())
-    );
-    assert_eq!(
-        refused_with(padded(&answer(Some(0), ""), 5_000)).await,
-        (400, "bad-signature".to_string())
-    );
-    assert_eq!(
-        refused_with(padded(&start("big-task", "x"), 37 * 1024)).await,
-        (413, "too-large".to_string())
-    );
+    let pushed = padded(&person, &push(HEAD), 5_000);
+    assert_eq!(refusal_of(person.send_command(&pushed).await), (413, "too-large".to_string()));
+    let answered = padded(&person, &answer(Some(0), ""), 5_000);
+    assert_eq!(refusal_of(person.send_command(&answered).await), (400, "bad-signature".to_string()));
+    let started = padded(&person, &start("big-task", "x"), 37 * 1024);
+    assert_eq!(refusal_of(person.send_command(&started).await), (413, "too-large".to_string()));
     assert_eq!(rows(&test, "queue"), 0);
 }
 
 #[tokio::test]
-async fn a_device_cannot_reuse_another_devices_command_id() {
+async fn a_command_id_once_used_cannot_carry_another_command() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, first) = paired(&test).await;
-    let mut second = phone(&test).await;
-    pair_both(&mut machine, &mut second, true).await.0.unwrap();
-    let taken = first
+    let (machine, mut person) = commanding(&test).await;
+    let account = account_of(&person);
+    let taken = person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
+    let (signing, encryption) = person.account_secret().unwrap();
     let reused = seal(
         Header::new(
             taken.header.id.clone(),
             Kind::Answer,
-            second.device.clone().unwrap(),
+            account.account.clone(),
             machine.machine.clone(),
             kebbie_hub::now(),
         ),
         &answer(Some(1), ""),
-        &second.secret(),
-        &[(machine.machine.clone(), machine.public())],
+        &SecretKeys::from_bytes(signing, encryption),
+        &[(machine.machine.clone(), machine.public()), account.recipient()],
     )
     .unwrap();
     assert_eq!(
-        hub_refusal(second.send_command(&reused).await),
+        refusal_of(person.send_command(&reused).await),
         (409, "command-id-taken".to_string())
     );
     assert_eq!(rows(&test, "queue"), 1);
@@ -840,7 +737,8 @@ async fn a_device_cannot_reuse_another_devices_command_id() {
 #[tokio::test]
 async fn the_results_endpoint_takes_only_results_about_the_posting_machine() {
     let test = start_hub(|_| {}).await;
-    let (machine, phone) = paired(&test).await;
+    let (machine, person) = commanding(&test).await;
+    let account = account_of(&person);
     let stranger = joined_machine(&test).await;
     let post = |envelope: Envelope| {
         let client = machine.client();
@@ -871,7 +769,7 @@ async fn the_results_endpoint_takes_only_results_about_the_posting_machine() {
         ),
         &Payload::Result(done(&command)),
         &machine.secret(),
-        &[(phone.device.clone().unwrap(), phone.public())],
+        &[account.recipient()],
     )
     .unwrap();
     assert_eq!(
@@ -886,13 +784,13 @@ async fn the_results_endpoint_takes_only_results_about_the_posting_machine() {
 #[tokio::test]
 async fn the_sweep_forgets_commands_and_results_after_their_week() {
     let test = start_hub(|_| {}).await;
-    let (mut machine, phone) = paired(&test).await;
-    let sent = phone
+    let (mut machine, mut person) = commanding(&test).await;
+    let sent = person
         .command(&machine.machine, &answer(Some(0), ""))
         .await
         .unwrap();
     machine.apply_once(0, None).await.unwrap();
-    result_of(&phone, &sent).await;
+    result_of(&mut person, &sent).await;
     assert_eq!((rows(&test, "commands"), rows(&test, "results")), (1, 1));
     test.hub
         .store()
@@ -901,4 +799,46 @@ async fn the_sweep_forgets_commands_and_results_after_their_week() {
     for table in ["queue", "commands", "results"] {
         assert_eq!(rows(&test, table), 0, "{table}");
     }
+}
+
+#[tokio::test]
+async fn the_device_routes_answer_404() {
+    let test = start_hub(|_| {}).await;
+    let (machine, person) = commanding(&test).await;
+    let client = reqwest::Client::new();
+    let cookie = person.cookie.clone().unwrap();
+    let removed = [
+        ("POST", "/v1/d/commands"),
+        ("GET", "/v1/d/results"),
+        ("PUT", "/v1/d/name"),
+        ("POST", "/v1/d/pairings"),
+        ("GET", "/v1/d/pairings/p_x"),
+        ("POST", "/v1/d/pairings/p_x/reveal"),
+        ("GET", "/v1/d/events"),
+        ("PUT", "/v1/d/push"),
+        ("DELETE", "/v1/d/push"),
+        ("GET", "/v1/push/vapid"),
+        ("GET", "/v1/a/devices"),
+        ("POST", "/v1/a/devices"),
+        ("DELETE", "/v1/a/devices/dev_x"),
+        ("GET", "/v1/a/device-list"),
+        ("PUT", "/v1/a/device-list"),
+    ];
+    for (method, path) in removed {
+        let response = client
+            .request(method.parse().unwrap(), format!("{}{path}", test.url))
+            .header("cookie", &cookie)
+            .header("origin", kebbie_hub::DEV_ORIGIN)
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 404, "{method} {path}");
+    }
+    let on_the_machine = machine.client();
+    assert_eq!(status_of(on_the_machine.get::<Value>("/v1/m/device-list", &[]).await), 404);
+    assert_eq!(status_of(on_the_machine.get::<Value>("/v1/m/devices", &[]).await), 404);
+    assert_eq!(status_of(on_the_machine.delete("/v1/m/devices/dev_x").await), 404);
+    assert_eq!(status_of(on_the_machine.post::<_, Value>("/v1/m/pairings", &()).await), 404);
+    assert_eq!(status_of(on_the_machine.post::<_, Value>("/v1/m/notices", &serde_json::json!({})).await), 404);
 }

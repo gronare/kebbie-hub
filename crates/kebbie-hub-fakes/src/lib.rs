@@ -2,8 +2,6 @@ pub mod browser;
 pub mod client;
 pub mod machine;
 pub mod passkey;
-pub mod phone;
-pub mod push;
 
 use std::fmt;
 use std::fs;
@@ -69,9 +67,7 @@ impl From<HubError> for Error {
 #[derive(Debug)]
 pub enum PairError {
     Hub(HubError),
-    BadCode,
     Mismatch,
-    Declined,
     Timeout,
     Ended {
         state: PairingState,
@@ -85,11 +81,9 @@ impl fmt::Display for PairError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PairError::Hub(error) => error.fmt(formatter),
-            PairError::BadCode => formatter.write_str("that is not a pairing code"),
             PairError::Mismatch => formatter.write_str(
-                "pairing refused: the device revealed keys it did not commit to; start again",
+                "the handoff refused: the hub revealed an account key the browser did not commit to; start again",
             ),
-            PairError::Declined => formatter.write_str("pairing refused: the digits did not match"),
             PairError::Timeout => formatter.write_str("pairing timed out; start again"),
             PairError::Ended { state, reason } => match reason {
                 Some(reason) => write!(formatter, "pairing {}: {}", state.name(), reason.name()),

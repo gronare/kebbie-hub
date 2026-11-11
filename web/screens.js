@@ -373,13 +373,18 @@ export function emailSection(address, { busy = false, codes = false, changing = 
   return `<section class="task"><div class="name">Email</div>${state}${field}${send}${remove}${cancel}</section>`;
 }
 
-export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false }) {
+export function thisDevice(allowed) {
+  const state = allowed ? "Changes go to each machine that takes them." : "View only";
+  return `<h2 class="group g-muted">This device</h2><section class="task"><label class="row switch-row"><div><div class="name" id="allow-name">Allow changes from this device</div><div class="meta" id="allow-state">${state}</div></div><input type="checkbox" role="switch" class="switch" name="allow-changes" aria-labelledby="allow-name" aria-describedby="allow-state" aria-checked="${allowed ? "true" : "false"}"${allowed ? " checked" : ""}></label></section>`;
+}
+
+export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null }) {
   const linked = me.github
     ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed)) + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {

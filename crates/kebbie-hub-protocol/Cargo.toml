@@ -1,6 +1,6 @@
 [package]
 name = "kebbie-hub-protocol"
-description = "Envelopes, messages and end-to-end encryption between kebbie machines and their devices"
+description = "Envelopes, messages and end-to-end encryption between kebbie machines and their account"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

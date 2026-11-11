@@ -7,13 +7,15 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use hmac::{Hmac, KeyInit, Mac};
 use kebbie_hub_api::{
     AccountKeySetup, AccountReveal, AccountView, Boards, Bytes32, Bytes64, ConnectApproval,
-    ConnectApproved, ConnectDenial, ConnectRequestView, CreationCeremony, DeviceListView,
-    DeviceRegistered, DeviceRequest, SignedDeviceList, LoginBegin, LoginFinish, PairingState, PairingView, PasskeyView,
-    RegisterBegin, RegisterFinish, RequestCeremony, SignedIn, SignedMachineList, WrapperUpload,
+    CommandQueued, CommandUpload, ConnectApproved, ConnectDenial, ConnectRequestView,
+    CreationCeremony, LoginBegin, LoginFinish, PairingState, PairingView, PasskeyView,
+    RegisterBegin, RegisterFinish, RequestCeremony, ResultEntry, Results, SignedIn,
+    SignedMachineList, WrapperUpload,
 };
 use kebbie_hub_protocol::{
-    AccountHandoff, AccountKey, Board, ConnectSecret, DeviceList, Envelope, Id, ListedDevice,
-    MachineList, OpenError, Payload, PublicKeys, Role, SecretKeys, Unlock, open, sign_wrapper,
+    AccountHandoff, AccountKey, Board, CommandResult, ConnectSecret, Envelope, Header, Id,
+    MachineList, OpenError, Payload, Prefix, PublicKeys, SecretKeys, Unlock, open, seal,
+    sign_wrapper,
 };
 use reqwest::{Method, RequestBuilder, Response};
 use serde::Serialize;
@@ -24,7 +26,6 @@ use webauthn_authenticator_rs::WebauthnAuthenticator;
 use webauthn_authenticator_rs::prelude::Url;
 
 use crate::passkey::DiscoverablePasskey;
-use crate::phone::PhoneState;
 use crate::{HubError, PairError, now};
 
 const SESSION_COOKIES: [&str; 2] = ["__Host-kebbie_session=", "kebbie_session="];
@@ -43,7 +44,7 @@ pub struct Browser {
     pub handle: String,
     pub cookie: Option<String>,
     pub passkey: WebauthnAuthenticator<DiscoverablePasskey>,
-    pub device: Option<PhoneState>,
+    pub machines: BTreeMap<Id, PublicKeys>,
     pub prf_capable: bool,
     pub lock: Lock,
     pub last_credential: Option<Vec<u8>>,
@@ -141,7 +142,7 @@ impl Browser {
             handle: String::new(),
             cookie: None,
             passkey: WebauthnAuthenticator::new(DiscoverablePasskey::new(true)),
-            device: None,
+            machines: BTreeMap::new(),
             prf_capable: true,
             lock: Lock::Locked,
             last_credential: None,
@@ -454,62 +455,101 @@ impl Browser {
         self.get("/v1/a/account").await
     }
 
-    pub async fn ensure_device(&mut self) -> Result<&mut PhoneState, HubError> {
-        if self.device.is_none() {
-            let phone = PhoneState::new(&self.hub);
-            let registered: DeviceRegistered = self
-                .post(
-                    "/v1/a/devices",
-                    &DeviceRequest {
-                        name: Some("browser".to_string()),
-                        keys: Some(phone.public()),
-                    },
-                )
-                .await?;
-            self.device = Some(phone.signed_in(registered.device, &registered.token));
-        }
-        Ok(self.device.as_mut().expect("the device was just set"))
+    pub fn knows(&mut self, machine: &Id, keys: PublicKeys) {
+        self.machines.insert(machine.clone(), keys);
     }
 
-    pub async fn device_list(&mut self) -> Result<DeviceList, HubError> {
-        let (key, _) = self.unlocked.clone().ok_or_else(|| status("locked"))?;
-        let view: DeviceListView = self.get("/v1/a/device-list").await?;
-        match view.list {
-            None => Ok(DeviceList::default()),
-            Some(signed) if key.verifies_device_list(&signed.list, &signed.signature.0) => {
-                Ok(signed.list)
-            }
-            Some(_) => Err(status("bad-device-list")),
-        }
+    fn machine_keys(&self, machine: &Id) -> Result<PublicKeys, HubError> {
+        self.machines
+            .get(machine)
+            .copied()
+            .ok_or_else(|| status("unknown-machine-keys"))
     }
 
-    pub async fn publish_devices(&mut self, list: &DeviceList) -> Result<(), HubError> {
+    pub fn seal_command(
+        &self,
+        machine: &Id,
+        payload: &Payload,
+        at: u64,
+        ttl: Option<u64>,
+    ) -> Result<Envelope, HubError> {
         let (key, secret) = self.unlocked.clone().ok_or_else(|| status("locked"))?;
-        let signature = list
-            .sign(&secret, &key.account)
-            .ok_or_else(|| status("bad-list"))?;
-        self.put::<_, Option<()>>(
-            "/v1/a/device-list",
-            &SignedDeviceList {
-                list: list.clone(),
-                signature: Bytes64(signature),
+        let mut header = Header::new(
+            Id::new(Prefix::Command).expect("a fresh command id is valid"),
+            payload.kind(),
+            key.account.clone(),
+            machine.clone(),
+            at,
+        );
+        if let Some(ttl) = ttl {
+            header.exp = at + ttl;
+        }
+        seal(
+            header,
+            payload,
+            &secret,
+            &[(machine.clone(), self.machine_keys(machine)?), key.recipient()],
+        )
+        .map_err(|error| status(&error.to_string()))
+    }
+
+    pub async fn send_command(&mut self, envelope: &Envelope) -> Result<CommandQueued, HubError> {
+        self.post(
+            "/v1/a/commands",
+            &CommandUpload {
+                envelope: envelope.clone(),
             },
         )
         .await
-        .map(drop)
     }
 
-    pub async fn enable_device(&mut self) -> Result<PhoneState, HubError> {
-        let phone = self.ensure_device().await?.clone();
-        let device = phone.device.clone().ok_or_else(|| status("no-device"))?;
-        let list = self.device_list().await?.with(ListedDevice {
-            device,
-            name: "browser".to_string(),
-            keys: phone.public(),
-            role: Role::Control,
-        });
-        self.publish_devices(&list).await?;
-        Ok(phone)
+    pub async fn command(&mut self, machine: &Id, payload: &Payload) -> Result<Envelope, HubError> {
+        let envelope = self.seal_command(machine, payload, now(), None)?;
+        self.send_command(&envelope).await?;
+        Ok(envelope)
+    }
+
+    pub async fn results(&mut self, after: u64, wait: u64) -> Result<Results, HubError> {
+        self.get(&format!("/v1/a/results?after={after}&wait={wait}"))
+            .await
+    }
+
+    pub fn open_result(&self, entry: &ResultEntry) -> Result<CommandResult, String> {
+        let (key, secret) = self.unlocked.clone().ok_or("locked")?;
+        let keys = self.machine_keys(&entry.machine).map_err(|error| error.to_string())?;
+        let envelope = &entry.envelope;
+        if envelope.header.machine != entry.machine || envelope.header.id != entry.command {
+            return Err("the hub filed this result under another command".into());
+        }
+        let payload = open(envelope, &key.account, &secret, &entry.machine, &keys, now())
+            .map_err(|error| format!("does not open: {error}"))?;
+        match payload {
+            Payload::Result(result) if result.command == entry.command => Ok(result),
+            Payload::Result(_) => Err("the result names another command".into()),
+            _ => Err("is not a result".into()),
+        }
+    }
+
+    pub async fn await_result(
+        &mut self,
+        command: &Id,
+        within: Duration,
+    ) -> Result<Option<CommandResult>, HubError> {
+        let deadline = Instant::now() + within;
+        let mut after = 0;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Ok(None);
+            }
+            let listing = self
+                .results(after, remaining.as_secs().clamp(1, 25))
+                .await?;
+            after = listing.cursor;
+            if let Some(found) = listing.results.iter().find(|entry| &entry.command == command) {
+                return self.open_result(found).map(Some).map_err(|error| status(&error));
+            }
+        }
     }
 
     pub async fn connect_request(&mut self, code: &str) -> Result<ConnectRequestView, HubError> {

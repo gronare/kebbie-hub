@@ -8,11 +8,11 @@ use sha2::{Digest, Sha256};
 
 use crate::account::{
     ACCOUNT_COMMIT_DOMAIN, AccountHandoff, AccountKey, ENCRYPTION_FINGERPRINT_DOMAIN,
-    DEVICE_LIST_DOMAIN, DeviceList, HUB_PRF_SALT_DOMAIN, ListedDevice, MACHINE_LIST_DOMAIN, MachineList, SIGNING_FINGERPRINT_DOMAIN, Unlock,
+    HUB_PRF_SALT_DOMAIN, MACHINE_LIST_DOMAIN, MachineList, SIGNING_FINGERPRINT_DOMAIN, Unlock,
     WRAP_AD_DOMAIN, WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPER_SIGN_DOMAIN, hub_prf_salt, pin_account,
     sign_wrapper, wrap_associated_data, wrap_key as account_wrap_key, wrapper_statement,
 };
-use crate::authorize::{AppliedCommands, Machine, Refusal, Role, TrustedDevice, authorize};
+use crate::authorize::{AppliedCommands, Machine, Refusal, authorize};
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
 use crate::board::{
     Agent, BlobRef, AgentStatus, Board, Checkout, Counts, Git, Group, Item, Later, LaterState, NextPart,
@@ -30,7 +30,6 @@ use crate::message::{
     Answer, CommandResult, Event, Notice, Outcome, Payload, PromptAnswer, PushApproval, Reason,
     RunRoutine, StartTask,
 };
-use crate::pairing::{DevicePairing, MachinePairing};
 
 pub const NOW: u64 = 1_761_070_000;
 const AT: u64 = 1_761_069_600;
@@ -84,6 +83,7 @@ struct Parties {
     tablet: Party,
     intruder: Party,
     account: Party,
+    other_account: Party,
 }
 
 impl Parties {
@@ -95,10 +95,11 @@ impl Parties {
             tablet: Party::new("tablet", Prefix::Device),
             intruder: Party::new("intruder", Prefix::Device),
             account: Party::new("account", Prefix::Account),
+            other_account: Party::new("other-account", Prefix::Account),
         }
     }
 
-    fn all(&self) -> [&Party; 6] {
+    fn all(&self) -> [&Party; 7] {
         [
             &self.machine,
             &self.other_machine,
@@ -106,24 +107,12 @@ impl Parties {
             &self.tablet,
             &self.intruder,
             &self.account,
+            &self.other_account,
         ]
     }
 
-    fn trusted(&self) -> Vec<TrustedDevice> {
-        vec![
-            TrustedDevice {
-                id: self.phone.id.clone(),
-                name: "iPhone".into(),
-                keys: self.phone.public(),
-                role: Role::Control,
-            },
-            TrustedDevice {
-                id: self.tablet.id.clone(),
-                name: "iPad".into(),
-                keys: self.tablet.public(),
-                role: Role::Read,
-            },
-        ]
+    fn account_key(&self) -> AccountKey {
+        AccountKey::new(self.account.id.clone(), 1, self.account.public()).unwrap()
     }
 }
 
@@ -587,7 +576,8 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         tablet,
         intruder,
         other_machine,
-        ..
+        account,
+        other_account,
     } = parties;
     let mut cases = Vec::new();
 
@@ -620,7 +610,6 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         board(),
     ));
 
-    let account = &parties.account;
     let account_board = seal_case(
         "account-board",
         machine_header("account-board", Kind::Board, machine),
@@ -685,38 +674,38 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
 
     let answer_sealed = seal_case(
         "answer",
-        command_header("answer", Kind::Answer, phone, machine),
+        command_header("answer", Kind::Answer, account, machine),
         &answer(),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
     cases.push(opens(
         "answer-opened-by-the-machine",
         &answer_sealed,
         machine,
-        phone,
+        account,
         answer(),
     ));
     cases.push(opens(
-        "answer-opened-by-its-own-device",
+        "answer-opened-by-its-own-account",
         &answer_sealed,
-        phone,
-        phone,
+        account,
+        account,
         answer(),
     ));
 
     let prompt_sealed = seal_case(
         "prompt-answer",
-        command_header("prompt-answer", Kind::PromptAnswer, phone, machine),
+        command_header("prompt-answer", Kind::PromptAnswer, account, machine),
         &prompt_answer("y"),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
     cases.push(opens(
         "prompt-answer-opened-by-the-machine",
         &prompt_sealed,
         machine,
-        phone,
+        account,
         prompt_answer("y"),
     ));
 
@@ -767,12 +756,12 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine_header("answer", Kind::Result, machine),
         &result(),
         machine,
-        &[machine, phone],
+        &[machine, account],
     );
     cases.push(opens(
-        "result-opened-by-the-device",
+        "result-opened-by-the-account",
         &result_sealed,
-        phone,
+        account,
         machine,
         result(),
     ));
@@ -791,7 +780,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
             name,
             envelope,
             machine,
-            phone,
+            account,
             OpenError::BadSignature,
             Some(OpenError::Undecryptable),
         )
@@ -816,35 +805,35 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
 
     let expired = seal_case(
         "expired",
-        stale(command_header("expired", Kind::Answer, phone, machine)),
+        stale(command_header("expired", Kind::Answer, account, machine)),
         &answer(),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
     cases.push(fails(
         "expired",
         expired.envelope,
         machine,
-        phone,
+        account,
         OpenError::Expired,
         None,
     ));
 
-    let mut early_header = command_header("not-yet-valid", Kind::Answer, phone, machine);
+    let mut early_header = command_header("not-yet-valid", Kind::Answer, account, machine);
     early_header.at = NOW + 3_600;
     early_header.exp = NOW + 7_200;
     let early = seal_case(
         "not-yet-valid",
         early_header,
         &answer(),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
     cases.push(fails(
         "not-yet-valid",
         early.envelope,
         machine,
-        phone,
+        account,
         OpenError::NotYetValid,
         None,
     ));
@@ -900,16 +889,16 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
 
     let forged = seal_case(
         "forged",
-        command_header("forged", Kind::Answer, phone, machine),
+        command_header("forged", Kind::Answer, account, machine),
         &answer(),
-        intruder,
+        other_account,
         &[machine],
     );
     cases.push(fails(
         "signed-by-another-key",
         forged.envelope,
         machine,
-        phone,
+        account,
         OpenError::BadSignature,
         None,
     ));
@@ -917,7 +906,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         "sender-is-not-who-the-header-says",
         answer_sealed.envelope.clone(),
         machine,
-        tablet,
+        other_account,
         OpenError::WrongSender,
         None,
     ));
@@ -928,14 +917,14 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         "unsupported-version",
         future,
         machine,
-        phone,
+        account,
         OpenError::UnsupportedVersion,
         Some(OpenError::Undecryptable),
     ));
 
     let answer_bytes = serde_json::to_vec(&answer()).unwrap();
     let board_bytes = serde_json::to_vec(&board()).unwrap();
-    let mut long_lived = command_header("over-long-ttl", Kind::Answer, phone, machine);
+    let mut long_lived = command_header("over-long-ttl", Kind::Answer, account, machine);
     long_lived.exp = long_lived.at + Kind::Answer.max_ttl() + 1;
     cases.push(fails(
         "over-long-ttl",
@@ -943,11 +932,11 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
             "over-long-ttl",
             long_lived,
             &answer_bytes,
-            phone,
-            &[phone, machine],
+            account,
+            &[account, machine],
         ),
         machine,
-        phone,
+        account,
         OpenError::Malformed,
         None,
     ));
@@ -964,6 +953,20 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
             "device-board",
             device_board,
             &board_bytes,
+            phone,
+            &[phone, machine],
+        ),
+        machine,
+        phone,
+        OpenError::Malformed,
+        None,
+    ));
+    cases.push(fails(
+        "device-as-command-sender",
+        seal_bypassing_checks(
+            "device-answer",
+            command_header("device-answer", Kind::Answer, phone, machine),
+            &answer_bytes,
             phone,
             &[phone, machine],
         ),
@@ -993,7 +996,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         OpenError::Malformed,
         None,
     ));
-    let mut urgent_answer = command_header("urgent-answer", Kind::Answer, phone, machine);
+    let mut urgent_answer = command_header("urgent-answer", Kind::Answer, account, machine);
     urgent_answer.urgency = Some(Urgency::High);
     cases.push(fails(
         "urgency-on-an-answer",
@@ -1001,11 +1004,11 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
             "urgent-answer",
             urgent_answer,
             &answer_bytes,
-            phone,
-            &[phone, machine],
+            account,
+            &[account, machine],
         ),
         machine,
-        phone,
+        account,
         OpenError::Malformed,
         None,
     ));
@@ -1029,16 +1032,16 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     let push_bytes = serde_json::to_vec(&push(HEAD)).unwrap();
     let mismatched = seal_bypassing_checks(
         "kind-mismatch",
-        command_header("kind-mismatch", Kind::Answer, phone, machine),
+        command_header("kind-mismatch", Kind::Answer, account, machine),
         &push_bytes,
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
     cases.push(fails(
         "payload-type-differs-from-kind",
         mismatched,
         machine,
-        phone,
+        account,
         OpenError::KindMismatch,
         Some(OpenError::KindMismatch),
     ));
@@ -1178,12 +1181,12 @@ fn authorize_json(parties: &Parties) -> Value {
     let Parties {
         machine,
         phone,
-        tablet,
-        intruder,
         other_machine,
+        account,
+        other_account,
         ..
     } = parties;
-    let trusted = parties.trusted();
+    let account_key = parties.account_key();
     let all = vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer];
     let start = |prompt: String| {
         Payload::Start(StartTask {
@@ -1192,13 +1195,13 @@ fn authorize_json(parties: &Parties) -> Value {
             prompt,
         })
     };
-    let from_phone = |case: &str, kind: Kind, payload: &Payload| {
+    let from_account = |case: &str, kind: Kind, payload: &Payload| {
         seal_case(
             case,
-            command_header(case, kind, phone, machine),
+            command_header(case, kind, account, machine),
             payload,
-            phone,
-            &[phone, machine],
+            account,
+            &[account, machine],
         )
         .envelope
     };
@@ -1210,10 +1213,10 @@ fn authorize_json(parties: &Parties) -> Value {
         expect,
     };
 
-    let answered = from_phone("authorize/answer", Kind::Answer, &answer());
+    let answered = from_account("authorize/answer", Kind::Answer, &answer());
     let mut applied = AppliedCommands::default();
     applied.record(
-        &phone.id,
+        &account.id,
         NOW - 60,
         CommandResult {
             command: answered.header.id.clone(),
@@ -1224,31 +1227,31 @@ fn authorize_json(parties: &Parties) -> Value {
     let routine = Payload::Routine(RunRoutine {
         id: "nightly-deps".into(),
     });
-    let mut long_lived = command_header("authorize/over-long-ttl", Kind::Answer, phone, machine);
+    let mut long_lived = command_header("authorize/over-long-ttl", Kind::Answer, account, machine);
     long_lived.exp = long_lived.at + Kind::Answer.max_ttl() + 1;
     let long_lived = seal_bypassing_checks(
         "authorize/over-long-ttl",
         long_lived,
         &serde_json::to_vec(&answer()).unwrap(),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
-    let mut lingering = command_header("authorize/prompt-over-ten-minutes", Kind::PromptAnswer, phone, machine);
+    let mut lingering = command_header("authorize/prompt-over-ten-minutes", Kind::PromptAnswer, account, machine);
     lingering.exp = lingering.at + 601;
     let lingering = seal_bypassing_checks(
         "authorize/prompt-over-ten-minutes",
         lingering,
         &serde_json::to_vec(&prompt_answer("y")).unwrap(),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     );
     let mut future = answered.clone();
     future.header.v = 2;
     let forged_replay = seal_case(
         "authorize/forged-replay",
-        command_header("authorize/answer", Kind::Answer, phone, machine),
+        command_header("authorize/answer", Kind::Answer, account, machine),
         &answer(),
-        intruder,
+        other_account,
         &[machine],
     )
     .envelope;
@@ -1257,17 +1260,17 @@ fn authorize_json(parties: &Parties) -> Value {
         stale(command_header(
             "authorize/expired-replay",
             Kind::Answer,
-            phone,
+            account,
             machine,
         )),
         &answer(),
-        phone,
-        &[phone, machine],
+        account,
+        &[account, machine],
     )
     .envelope;
     let mut expired_applied = AppliedCommands::default();
     expired_applied.record(
-        &phone.id,
+        &account.id,
         NOW - 4_000,
         CommandResult {
             command: expired_answer.header.id.clone(),
@@ -1276,12 +1279,12 @@ fn authorize_json(parties: &Parties) -> Value {
         },
     );
     let expired_result = expired_applied
-        .result(&phone.id, &expired_answer.header.id)
+        .result(&account.id, &expired_answer.header.id)
         .unwrap()
         .clone();
 
     let cases = vec![
-        case("control-device-answers", answered.clone(), Ok(answer())),
+        case("account-answers", answered.clone(), Ok(answer())),
         AuthorizeCase {
             name: "same-command-twice-replays-the-stored-result",
             accepts: all.clone(),
@@ -1289,7 +1292,7 @@ fn authorize_json(parties: &Parties) -> Value {
             envelope: answered.clone(),
             expect: Err(Refusal::Replay(
                 applied
-                    .result(&phone.id, &answered.header.id)
+                    .result(&account.id, &answered.header.id)
                     .unwrap()
                     .clone(),
             )),
@@ -1309,25 +1312,25 @@ fn authorize_json(parties: &Parties) -> Value {
             expect: Err(Refusal::Replay(expired_result)),
         },
         case(
-            "control-device-approves-a-push",
-            from_phone("authorize/push", Kind::Push, &push(HEAD)),
+            "account-approves-a-push",
+            from_account("authorize/push", Kind::Push, &push(HEAD)),
             Ok(push(HEAD)),
         ),
         case(
-            "control-device-runs-a-routine",
-            from_phone("authorize/routine", Kind::Routine, &routine),
+            "account-runs-a-routine",
+            from_account("authorize/routine", Kind::Routine, &routine),
             Ok(routine.clone()),
         ),
         case(
-            "control-device-answers-an-agents-prompt",
-            from_phone("authorize/prompt", Kind::PromptAnswer, &prompt_answer("y")),
+            "account-answers-an-agents-prompt",
+            from_account("authorize/prompt", Kind::PromptAnswer, &prompt_answer("y")),
             Ok(prompt_answer("y")),
         ),
         AuthorizeCase {
             name: "prompt-answer-to-a-machine-that-does-not-take-it-is-refused",
             accepts: vec![Kind::Answer, Kind::Push],
             applied: AppliedCommands::default(),
-            envelope: from_phone("authorize/prompt", Kind::PromptAnswer, &prompt_answer("y")),
+            envelope: from_account("authorize/prompt", Kind::PromptAnswer, &prompt_answer("y")),
             expect: Err(Refusal::Answer(Reason::NotAllowed)),
         },
         case(
@@ -1337,21 +1340,23 @@ fn authorize_json(parties: &Parties) -> Value {
         ),
         case(
             "prompt-answer-with-keystrokes-for-a-key-is-refused",
-            from_phone("authorize/prompt-keys", Kind::PromptAnswer, &prompt_answer("y enter")),
+            from_account("authorize/prompt-keys", Kind::PromptAnswer, &prompt_answer("y enter")),
             Err(Refusal::Answer(Reason::BadRequest)),
         ),
-        case(
-            "read-device-is-refused",
-            seal_case(
-                "authorize/read",
-                command_header("authorize/read", Kind::Answer, tablet, machine),
-                &answer(),
-                tablet,
-                &[tablet, machine],
-            )
-            .envelope,
-            Err(Refusal::Answer(Reason::NotAllowed)),
-        ),
+        AuthorizeCase {
+            name: "push-to-a-machine-that-takes-answers-only-is-refused",
+            accepts: vec![Kind::Answer, Kind::PromptAnswer],
+            applied: AppliedCommands::default(),
+            envelope: from_account("authorize/push-to-answers", Kind::Push, &push(HEAD)),
+            expect: Err(Refusal::Answer(Reason::NotAllowed)),
+        },
+        AuthorizeCase {
+            name: "answer-to-a-machine-that-takes-nothing-is-refused",
+            accepts: Vec::new(),
+            applied: AppliedCommands::default(),
+            envelope: from_account("authorize/answer-to-nothing", Kind::Answer, &answer()),
+            expect: Err(Refusal::Answer(Reason::NotAllowed)),
+        },
         case(
             "expired-command-is-refused",
             seal_case(
@@ -1359,12 +1364,12 @@ fn authorize_json(parties: &Parties) -> Value {
                 stale(command_header(
                     "authorize/expired",
                     Kind::Answer,
-                    phone,
+                    account,
                     machine,
                 )),
                 &answer(),
-                phone,
-                &[phone, machine],
+                account,
+                &[account, machine],
             )
             .envelope,
             Err(Refusal::Answer(Reason::Expired)),
@@ -1373,7 +1378,7 @@ fn authorize_json(parties: &Parties) -> Value {
             name: "kind-the-machine-does-not-take-is-refused",
             accepts: vec![Kind::Answer],
             applied: AppliedCommands::default(),
-            envelope: from_phone(
+            envelope: from_account(
                 "authorize/start",
                 Kind::Start,
                 &start("Fix the rounding in invoices.".into()),
@@ -1382,7 +1387,7 @@ fn authorize_json(parties: &Parties) -> Value {
         },
         case(
             "over-long-prompt-is-refused",
-            from_phone(
+            from_account(
                 "authorize/long",
                 Kind::Start,
                 &start("x".repeat(crate::MAX_PROMPT_CHARS + 1)),
@@ -1391,17 +1396,17 @@ fn authorize_json(parties: &Parties) -> Value {
         ),
         case(
             "address-that-is-not-task-at-repo-is-refused",
-            from_phone("authorize/address", Kind::Answer, &answer_to("refunds")),
+            from_account("authorize/address", Kind::Answer, &answer_to("refunds")),
             Err(Refusal::Answer(Reason::BadRequest)),
         ),
         case(
             "push-with-a-short-sha-is-refused",
-            from_phone("authorize/short-sha", Kind::Push, &push("9f3c2a1")),
+            from_account("authorize/short-sha", Kind::Push, &push("9f3c2a1")),
             Err(Refusal::Answer(Reason::BadRequest)),
         ),
         case(
             "start-in-a-path-is-refused",
-            from_phone(
+            from_account(
                 "authorize/path",
                 Kind::Start,
                 &Payload::Start(StartTask {
@@ -1414,7 +1419,7 @@ fn authorize_json(parties: &Parties) -> Value {
         ),
         case(
             "routine-id-with-spaces-is-refused",
-            from_phone(
+            from_account(
                 "authorize/routine-id",
                 Kind::Routine,
                 &Payload::Routine(RunRoutine {
@@ -1427,33 +1432,44 @@ fn authorize_json(parties: &Parties) -> Value {
             "command-not-sealed-to-the-machine-is-refused",
             seal_case(
                 "authorize/unsealed",
-                command_header("authorize/unsealed", Kind::Answer, phone, machine),
+                command_header("authorize/unsealed", Kind::Answer, account, machine),
                 &answer(),
-                phone,
-                &[phone],
+                account,
+                &[account],
             )
             .envelope,
             Err(Refusal::Answer(Reason::Undecryptable)),
         ),
         case(
-            "unknown-device-is-dropped",
+            "command-another-account-signed-is-dropped",
             seal_case(
-                "authorize/unknown",
-                command_header("authorize/unknown", Kind::Answer, intruder, machine),
+                "authorize/other-account",
+                command_header("authorize/other-account", Kind::Answer, other_account, machine),
                 &answer(),
-                intruder,
-                &[intruder, machine],
+                other_account,
+                &[other_account, machine],
             )
             .envelope,
-            Err(Refusal::Drop(crate::Dropped::UnknownDevice)),
+            Err(Refusal::Drop(crate::Dropped::WrongAccount)),
+        ),
+        case(
+            "command-from-a-device-is-dropped",
+            seal_bypassing_checks(
+                "authorize/device",
+                command_header("authorize/device", Kind::Answer, phone, machine),
+                &serde_json::to_vec(&answer()).unwrap(),
+                phone,
+                &[phone, machine],
+            ),
+            Err(Refusal::Drop(crate::Dropped::Malformed)),
         ),
         case(
             "forged-signature-is-dropped",
             seal_case(
                 "authorize/forged",
-                command_header("authorize/forged", Kind::Answer, phone, machine),
+                command_header("authorize/forged", Kind::Answer, account, machine),
                 &answer(),
-                intruder,
+                other_account,
                 &[machine],
             )
             .envelope,
@@ -1463,10 +1479,10 @@ fn authorize_json(parties: &Parties) -> Value {
             "command-for-another-machine-is-dropped",
             seal_case(
                 "authorize/other",
-                command_header("authorize/other", Kind::Answer, phone, other_machine),
+                command_header("authorize/other", Kind::Answer, account, other_machine),
                 &answer(),
-                phone,
-                &[phone, other_machine],
+                account,
+                &[account, other_machine],
             )
             .envelope,
             Err(Refusal::Drop(crate::Dropped::WrongMachine)),
@@ -1497,12 +1513,11 @@ fn authorize_json(parties: &Parties) -> Value {
     let rendered: Vec<Value> = cases
         .into_iter()
         .map(|case| {
-            let gate = Machine { id: &machine.id, keys: &machine.keys, devices: &trusted, accepts: &case.accepts };
-            let decided = authorize(&gate, &case.applied, &case.envelope, NOW).map(|accepted| (accepted.device.id.clone(), accepted.payload));
-            let expected = case.expect.map(|payload| (case.envelope.header.from.clone(), payload));
-            assert_eq!(decided, expected, "{}", case.name);
-            let expect = match expected {
-                Ok((device, payload)) => json!({ "accepted": device, "payload": payload }),
+            let gate = Machine { id: &machine.id, keys: &machine.keys, account: &account_key, accepts: &case.accepts };
+            let decided = authorize(&gate, &case.applied, &case.envelope, NOW);
+            assert_eq!(decided, case.expect, "{}", case.name);
+            let expect = match case.expect {
+                Ok(payload) => json!({ "payload": payload }),
                 Err(Refusal::Answer(reason)) => json!({ "answer": reason.key() }),
                 Err(Refusal::Drop(dropped)) => json!({ "drop": dropped.key() }),
                 Err(Refusal::Replay(result)) => json!({ "replay": result }),
@@ -1510,7 +1525,7 @@ fn authorize_json(parties: &Parties) -> Value {
             json!({ "name": case.name, "accepts": case.accepts, "applied": case.applied, "envelope": case.envelope, "expect": expect })
         })
         .collect();
-    json!({ "now": NOW, "machine": machine.name, "trusted": trusted, "cases": rendered })
+    json!({ "now": NOW, "machine": machine.name, "account": account_key, "cases": rendered })
 }
 
 fn signatures_json(parties: &Parties) -> Value {
@@ -1525,146 +1540,17 @@ fn signatures_json(parties: &Parties) -> Value {
     json!({ "cases": cases })
 }
 
-struct PairingCase<'a> {
-    name: &'static str,
-    machine: &'a Party,
-    device: &'a Party,
-    revealed: &'a Party,
-    code: &'static str,
-    machine_code: &'static str,
-    other_nonce: bool,
-}
-
-fn pairing_json(parties: &Parties) -> Value {
-    let Parties {
-        machine,
-        phone,
-        tablet,
-        intruder,
-        other_machine,
-        ..
-    } = parties;
-    let flow = |name, machine, device, code| PairingCase {
-        name,
-        machine,
-        device,
-        revealed: device,
-        code,
-        machine_code: code,
-        other_nonce: false,
-    };
-    let flows = [
-        flow("phone-pairs", machine, phone, "K7QF-M2XD"),
-        flow("tablet-pairs", machine, tablet, "K7QF-M2XD"),
-        flow(
-            "pairs-with-another-machine",
-            other_machine,
-            phone,
-            "Q2ZR-8HWN",
-        ),
-        PairingCase {
-            other_nonce: true,
-            ..flow(
-                "reveal-with-another-nonce-is-refused",
-                machine,
-                phone,
-                "K7QF-M2XD",
-            )
-        },
-        PairingCase {
-            revealed: intruder,
-            ..flow(
-                "reveal-of-substituted-keys-is-refused",
-                machine,
-                phone,
-                "K7QF-M2XD",
-            )
-        },
-        PairingCase {
-            machine_code: "Q2ZR-8HWN",
-            ..flow(
-                "machine-with-another-code-is-refused",
-                machine,
-                phone,
-                "K7QF-M2XD",
-            )
-        },
-    ];
-    let cases: Vec<Value> = flows
-        .into_iter()
-        .map(|case| {
-            let name = case.name;
-            let device_nonce = seed(&format!("pairing/{name}/device-nonce"));
-            let device_side =
-                DevicePairing::with_nonce(case.device.public(), device_nonce, case.code);
-            let commitment = device_side.commitment();
-            let machine_side = MachinePairing::with_nonce(
-                case.machine.public(),
-                commitment,
-                seed(&format!("pairing/{name}/machine-nonce")),
-                case.machine_code,
-            );
-            let (_, machine_nonce) = machine_side.reply();
-            let revealed_nonce = if case.other_nonce {
-                seed(&format!("pairing/{name}/other-nonce"))
-            } else {
-                device_nonce
-            };
-            let expect =
-                match machine_side.comparison_code(&case.revealed.public(), &revealed_nonce) {
-                    Ok(sas) => {
-                        assert_eq!(
-                            device_side.comparison_code(&case.machine.public(), &machine_nonce),
-                            sas,
-                            "{name}"
-                        );
-                        json!({ "sas": sas })
-                    }
-                    Err(_) => json!({ "error": "commitment-mismatch" }),
-                };
-            json!({
-                "name": name,
-                "machine": case.machine.name,
-                "device": case.device.name,
-                "code": case.code,
-                "machine_code": case.machine_code,
-                "device_nonce": b64(&device_nonce),
-                "commitment": b64(&commitment),
-                "machine_nonce": b64(&machine_nonce),
-                "revealed": { "device": case.revealed.name, "nonce": b64(&revealed_nonce) },
-                "expect": expect,
-            })
-        })
-        .collect();
+fn connect_json(parties: &Parties) -> Value {
+    let Parties { machine, intruder, .. } = parties;
     let connect = ConnectSecret::with_secret(&machine.public(), seed("connect/secret"));
-    let code = connect.pairing_code();
-    let device_nonce = seed("connect/device-nonce");
-    let browser = DevicePairing::with_nonce(phone.public(), device_nonce, &code);
-    let answering = MachinePairing::with_nonce(
-        machine.public(),
-        browser.commitment(),
-        seed("connect/machine-nonce"),
-        &code,
-    );
-    let (_, machine_nonce) = answering.reply();
-    assert!(
-        answering
-            .comparison_code(&phone.public(), &device_nonce)
-            .is_ok()
-    );
-    let connect = json!({
+    json!({
         "domain": String::from_utf8_lossy(CONNECT_FINGERPRINT_DOMAIN),
         "machine": machine.name,
-        "device": phone.name,
         "fingerprint": b64(&machine_fingerprint(&machine.public())),
         "other_fingerprint": b64(&machine_fingerprint(&intruder.public())),
         "link": connect.link("https://hub.example.com/connect?code=K7QF-M2XD"),
-        "code": code,
-        "device_nonce": b64(&device_nonce),
-        "commitment": b64(&browser.commitment()),
-        "machine_nonce": b64(&machine_nonce),
-    });
-    json!({ "commit_domain": "kebbie-pair-commit-v1", "sas_domain": "kebbie-pair-v1", "cases": cases, "connect": connect })
+        "code": connect.pairing_code(),
+    })
 }
 
 fn accounts_json(parties: &Parties) -> Value {
@@ -1718,18 +1604,6 @@ fn accounts_json(parties: &Parties) -> Value {
     let list_signature = list.sign(&account.keys, &account.id).unwrap();
     let removed = list.without(&parties.other_machine.id);
     let removed_signature = removed.sign(&account.keys, &account.id).unwrap();
-    let listed = |party: &Party, name: &str, role| ListedDevice {
-        device: party.id.clone(),
-        name: name.into(),
-        keys: party.public(),
-        role,
-    };
-    let devices = DeviceList::default()
-        .with(listed(&parties.tablet, "iPad", Role::Read))
-        .with(listed(&parties.phone, "iPhone", Role::Control));
-    let devices_signature = devices.sign(&account.keys, &account.id).unwrap();
-    let devices_removed = devices.without(&parties.tablet.id);
-    let devices_removed_signature = devices_removed.sign(&account.keys, &account.id).unwrap();
     let connect = ConnectSecret::with_secret(&machine.public(), seed("connect/secret"));
     let code = connect.pairing_code();
     let handoff_nonce = seed("account/handoff-nonce");
@@ -1789,16 +1663,6 @@ fn accounts_json(parties: &Parties) -> Value {
             "removed_signature": b64(&removed_signature),
             "trusted": machine.name,
             "removed_machine": parties.other_machine.name,
-        },
-        "devices": {
-            "domain": String::from_utf8_lossy(DEVICE_LIST_DOMAIN),
-            "list": devices,
-            "statement": b64(&devices.statement(&account.id).unwrap()),
-            "signature": b64(&devices_signature),
-            "removed": devices_removed,
-            "removed_signature": b64(&devices_removed_signature),
-            "trusted": parties.phone.name,
-            "removed_device": parties.tablet.name,
         },
         "handoff": {
             "code": code,
@@ -1893,7 +1757,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("envelopes.json", envelopes_json(&parties)),
         ("authorize.json", authorize_json(&parties)),
         ("signatures.json", signatures_json(&parties)),
-        ("pairing.json", pairing_json(&parties)),
+        ("connect.json", connect_json(&parties)),
         ("accounts.json", accounts_json(&parties)),
         ("blobs.json", blobs_json()),
     ]

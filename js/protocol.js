@@ -5,14 +5,11 @@ const text = new TextEncoder();
 const HEADER_DOMAIN = text.encode("kebbie-hub envelope\0");
 const HPKE_INFO = text.encode("kebbie-hub content key v1");
 const KEY_COMMIT_DOMAIN = text.encode("kebbie-hub key commit v1");
-const PAIR_COMMIT_DOMAIN = text.encode("kebbie-pair-commit-v1");
-const SAS_DOMAIN = text.encode("kebbie-pair-v1");
 const CONNECT_DOMAIN = text.encode("kebbie-connect-machine-v1");
 const WRAP_KEY_INFO = text.encode("kebbie-hub account key v1");
 const WRAP_AD_DOMAIN = text.encode("kebbie-hub account key wrap v1");
 const WRAPPER_SIGN_DOMAIN = text.encode("kebbie-hub account key wrapper v1");
 const MACHINE_LIST_DOMAIN = text.encode("kebbie-hub account machines v1");
-const DEVICE_LIST_DOMAIN = text.encode("kebbie-hub account devices v1");
 const SIGNING_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account signing key v1");
 const ENCRYPTION_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account encryption key v1");
 const ACCOUNT_COMMIT_DOMAIN = text.encode("kebbie-connect-account-commit-v1");
@@ -110,7 +107,7 @@ export function checkShape(envelope) {
     kind !== null &&
     prefixOf(envelope.id) === kind.prefix &&
     prefixOf(envelope.machine) === "mch" &&
-    (kind.command ? prefixOf(envelope.from) === "dev" : envelope.from === envelope.machine) &&
+    (kind.command ? prefixOf(envelope.from) === "acc" : envelope.from === envelope.machine) &&
     isTime(envelope.at) &&
     isTime(envelope.exp) &&
     envelope.exp > envelope.at &&
@@ -344,21 +341,7 @@ export async function sealEnvelope(header, plaintext, sender, recipients, random
 
 const publicBytes = (keys) => concat(fromB64(keys.signing), fromB64(keys.encryption));
 
-export const pairingNonce = () => random(32);
-
-export const pairingCommitment = async (device, deviceNonce, code) => sha256(PAIR_COMMIT_DOMAIN, publicBytes(device), deviceNonce, text.encode(code));
-
-export async function comparisonCode(machine, device, machineNonce, deviceNonce, code) {
-  const digest = await sha256(SAS_DOMAIN, publicBytes(machine), publicBytes(device), machineNonce, deviceNonce, text.encode(code));
-  const digits = String(new DataView(digest.buffer).getUint32(0) % 1_000_000).padStart(6, "0");
-  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
-}
-
-export async function machineComparisonCode(commitment, machine, machineNonce, device, deviceNonce, code) {
-  const revealed = await pairingCommitment(device, deviceNonce, code);
-  if (toB64(revealed) !== toB64(commitment)) throw new ProtocolError("commitment-mismatch");
-  return comparisonCode(machine, device, machineNonce, deviceNonce, code);
-}
+export const handoffNonce = () => random(32);
 
 export const machineFingerprint = async (machine) => toB64(await sha256(CONNECT_DOMAIN, publicBytes(machine)));
 
@@ -500,39 +483,6 @@ export async function accountFingerprints(key) {
 
 export const accountCommitment = async (key, nonce, code) => sha256(ACCOUNT_COMMIT_DOMAIN, field(key.account), u32(key.version), accountKeyBytes(key), nonce, text.encode(code));
 
-const DEVICE_ROLES = ["read", "control"];
-const canonicalDevices = (list) => list.devices.every((listed, index) => prefixOf(listed?.device) === "dev" && typeof listed.name === "string" && DEVICE_ROLES.includes(listed.role) && (index === 0 || list.devices[index - 1].device < listed.device));
-
-export function deviceListStatement(account, list) {
-  if (!Number.isSafeInteger(list?.counter) || list.counter < 0 || !Array.isArray(list.devices) || !canonicalDevices(list)) throw new ProtocolError("malformed");
-  return concat(DEVICE_LIST_DOMAIN, field(account), u64(list.counter), u32(list.devices.length), ...list.devices.map((listed) => concat(field(listed.device), field(listed.name), publicBytes(listed.keys), field(listed.role))));
-}
-
-export const emptyDeviceList = () => ({ counter: 0, devices: [] });
-
-export const deviceListWithout = (list, device) => ({ counter: list.counter + 1, devices: list.devices.filter((listed) => listed.device !== device) });
-
-export function deviceListWith(list, listed) {
-  const next = deviceListWithout(list, listed.device);
-  next.devices = [...next.devices, structuredClone(listed)].sort((a, b) => (a.device < b.device ? -1 : 1));
-  return next;
-}
-
-export const deviceListTrusts = (list, device, keys) => list.devices.some((listed) => listed.device === device && listed.keys.signing === keys?.signing && listed.keys.encryption === keys?.encryption);
-
-export async function signDeviceList(identity, list) {
-  return toB64(await signStatement(identity, deviceListStatement(identity.id, list)));
-}
-
-export async function verifyDeviceList(identity, signed) {
-  try {
-    const bytes = fromB64(signed?.signature ?? "");
-    return bytes.length === 64 && (await subtle.verify({ name: "Ed25519" }, identity.verifying, bytes, deviceListStatement(identity.id, signed.list)));
-  } catch {
-    return false;
-  }
-}
-
 export function commandId(millis = Date.now(), randomBytes = random(10)) {
   const bytes = new Uint8Array(16);
   new DataView(bytes.buffer).setBigUint64(0, BigInt(millis) << 16n);
@@ -543,16 +493,9 @@ export function commandId(millis = Date.now(), randomBytes = random(10)) {
   return `cmd_${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function newDeviceKeys() {
-  const signing = await subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
-  const encryption = await subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
-  const raw = async (key) => toB64(new Uint8Array(await subtle.exportKey("raw", key)));
-  return { signing: signing.privateKey, verifying: signing.publicKey, encryption, public: { signing: await raw(signing.publicKey), encryption: await raw(encryption.publicKey) } };
-}
-
-export async function sealCommand({ device, machine, payload, at, id = commandId(at * 1000) }) {
+export async function sealCommand({ identity, machine, payload, at, id = commandId(at * 1000) }) {
   checkPayload(payload);
-  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: device.id, machine: machine.id, at, exp: at + KINDS[payload.type].ttl, schema: SCHEMA };
-  const recipients = [{ id: machine.id, encryption: machine.keys.encryption }, { id: device.id, encryption: device.public.encryption }];
-  return sealEnvelope(header, text.encode(JSON.stringify(payload)), device, recipients);
+  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: identity.id, machine: machine.id, at, exp: at + KINDS[payload.type].ttl, schema: SCHEMA };
+  const recipients = [{ id: machine.id, encryption: machine.keys.encryption }, { id: identity.id, encryption: identity.key.keys.encryption }];
+  return sealEnvelope(header, text.encode(JSON.stringify(payload)), identity, recipients);
 }

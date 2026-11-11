@@ -27,7 +27,7 @@ pub fn set_account_active(
     } else {
         "account.deactivated"
     };
-    store.log(at, kind, None, None, Some(&format!("{account} by={by}")))?;
+    store.log(at, kind, None, Some(&format!("{account} by={by}")))?;
     Ok(AccountSwitch::Switched)
 }
 
@@ -40,13 +40,6 @@ impl Hub {
     ) -> store::Result<AccountSwitch> {
         let switched = set_account_active(&self.store(), account, active, by)?;
         if switched == AccountSwitch::Switched && !active {
-            let devices = self
-                .store()
-                .devices_of_account(account)?
-                .into_iter()
-                .map(|row| row.id)
-                .collect::<Vec<_>>();
-            self.wake_devices(&devices);
             self.wake_account(account);
         }
         Ok(switched)

@@ -27,6 +27,15 @@
       },
       "signing_secret": "4OD_BDxGgz_ydnp-SVON4labpef_JURWjPMyFD9Dv_o"
     },
+    "other-account": {
+      "encryption_secret": "oMdlaucxY_EktE4-bhfnZe3-q6cy34sPVy75hVGXFAQ",
+      "id": "acc_wwinuTTLNoHZqTLt7pXHbA",
+      "public": {
+        "encryption": "9xVrukBaxZ7AgUEyG_hD6uFBHi7bZm5RKPzuJh62ZnE",
+        "signing": "sQLN1XIuX_n79ib82iIcyiYNdq0c4twpOPDX83HVwPk"
+      },
+      "signing_secret": "h5JWt17jdPnSECNvvc12JV-qShTeIQ2Go5GcNHw16yw"
+    },
     "other-machine": {
       "encryption_secret": "sHcvJ_lj8hFv7yxSlkiaQuS4eVmTVMJPa71yNSeea7U",
       "id": "mch_01K83YV3806W105VXP4AF1F8RM",

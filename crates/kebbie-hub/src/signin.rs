@@ -31,7 +31,7 @@ pub fn sign_in_without_key(hub: &Hub, account: &str, via: &str) -> Result<Keyles
             return Err(ApiError::forbidden("deactivated"));
         }
         store.create_session(&digest(&session), account, at, at + hub.config().session_ttl, Access::AccountOnly)?;
-        store.log(at, "account.logged-in", None, None, Some(&format!("{account} via={via}")))?;
+        store.log(at, "account.logged-in", None, Some(&format!("{account} via={via}")))?;
     }
     opened(hub, account, &session, false)
 }
@@ -60,7 +60,7 @@ pub fn sign_up_without_key(hub: &Hub, connect_code: &str, via: &str) -> Result<K
         })?;
         match outcome {
             SignUpOutcome::Created(kind) => {
-                store.log(at, "account.created", None, None, Some(&format!("{account} by={} via={via}", kind.name())))?;
+                store.log(at, "account.created", None, Some(&format!("{account} by={} via={via}", kind.name())))?;
             }
             SignUpOutcome::InviteSpent => return Err(ApiError::new(axum::http::StatusCode::NOT_FOUND, "unknown-code")),
             _ => return Err(ApiError::internal()),

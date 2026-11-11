@@ -7,9 +7,8 @@ export class HubError extends Error {
   }
 }
 
-async function call(method, path, { body, token } = {}) {
+async function call(method, path, { body } = {}) {
   const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: "same-origin" });
   if (!response.ok) {
@@ -48,15 +47,8 @@ export const account = {
   askCode: (email, connect = null) => call("POST", "/v1/a/email/code", { body: connect ? { email, connect } : { email } }),
   enterCode: (email, code, connect = null) => call("POST", "/v1/a/email/verify", { body: connect ? { email, code, connect } : { email, code } }),
   confirmEmail: (code) => call("POST", "/v1/a/email/confirm", { body: { code } }),
-  registerDevice: (request) => call("POST", "/v1/a/devices", { body: request }),
-  deviceList: () => call("GET", "/v1/a/device-list"),
-  putDeviceList: (signed) => call("PUT", "/v1/a/device-list", { body: signed }),
-  removeDevice: (device) => call("DELETE", `/v1/a/devices/${query(device)}`),
-};
-
-export const deviceCalls = {
-  command: (token, envelope) => call("POST", "/v1/d/commands", { body: { envelope }, token }),
-  results: (token, after, wait = 0) => call("GET", `/v1/d/results?after=${after}&wait=${wait}`, { token }),
+  command: (envelope) => call("POST", "/v1/a/commands", { body: { envelope } }),
+  results: (after, wait = 0) => call("GET", `/v1/a/results?after=${after}&wait=${wait}`),
 };
 
 export const connectCalls = {
@@ -91,9 +83,9 @@ export function parseEvents(buffer) {
   return { events, rest };
 }
 
-export async function follow(onEvent, signal, { path = "/v1/a/events", token = null, lastEventId = null } = {}) {
-  const headers = { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(lastEventId ? { "Last-Event-ID": String(lastEventId) } : {}) };
-  const response = await fetch(path, { headers, credentials: "same-origin", signal });
+export async function follow(onEvent, signal) {
+  const headers = { Accept: "text/event-stream" };
+  const response = await fetch("/v1/a/events", { headers, credentials: "same-origin", signal });
   if (!response.ok) throw new HubError(response.status, (await response.json().catch(() => ({}))).error ?? "unknown");
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";

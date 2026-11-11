@@ -420,7 +420,7 @@ pub async fn callback(
             if let Some(email) = &user.email {
                 hub.verified_email(&account, email);
             }
-            hub.store().log(now(), "account.logged-in", None, None, Some(&format!("{account} via=github")))?;
+            hub.store().log(now(), "account.logged-in", None, Some(&format!("{account} via=github")))?;
             let cookie = session_set_cookie(&hub, &session, hub.config().session_ttl);
             redirect(&pending.next, &[cleared, cookie])
         }
@@ -428,7 +428,7 @@ pub async fn callback(
             if let Some(email) = &user.email {
                 hub.verified_email(&account, email);
             }
-            hub.store().log(now(), "account.github-linked", None, None, Some(&account))?;
+            hub.store().log(now(), "account.github-linked", None, Some(&account))?;
             redirect(&pending.next, &[cleared])
         }
         Outcome::Refused(code) => redirect(&with_error(&pending.next, code), &[cleared]),
@@ -498,9 +498,7 @@ fn sign_in_or_up(
         at,
         "account.created",
         None,
-        None,
-        Some(&format!("{account} by={} via=github", kind.name())),
-    )?;
+        Some(&format!("{account} by={} via=github", kind.name())),)?;
     drop(store);
     if kind == Ticket::Owner {
         hub.forget_setup();

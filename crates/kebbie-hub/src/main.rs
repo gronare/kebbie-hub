@@ -9,7 +9,7 @@ use kebbie_hub::cli::{Admin, HubArgs, exit_code, run_admin, serve_until_stopped}
 #[command(
     name = "kebbie-hub",
     version,
-    about = "The kebbie hub: relays sealed boards between machines and devices"
+    about = "The kebbie hub: relays sealed boards and commands between machines and your account"
 )]
 struct Cli {
     #[command(flatten)]

@@ -5,15 +5,8 @@ use std::time::Duration;
 
 use common::*;
 use kebbie_hub::{DEV_SESSION_COOKIE, SESSION_COOKIE};
-use kebbie_hub_api::{
-    AccountView, BoardChanged, Bytes32, CommitRequest, Committed, CreationCeremony, DeviceRequest,
-    Devices, EVENT_BOARD, EVENT_MACHINES, EVENT_MACHINE_REMOVED, EVENT_PAIRING, MachineRemoved, PairingChanged,
-    PairingOpened, PairingState, Passkeys,
-};
+use kebbie_hub_api::{AccountView, BoardChanged, CreationCeremony, EVENT_BOARD, EVENT_MACHINES, Passkeys};
 use kebbie_hub_api::{LoginFinish, RegisterFinish};
-use kebbie_hub_fakes::phone::PhoneState;
-use kebbie_hub_fakes::{HubClient, PairError};
-use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use webauthn_authenticator_rs::WebauthnAuthenticator;
 use kebbie_hub_fakes::passkey::DiscoverablePasskey;
@@ -204,18 +197,9 @@ async fn a_session_expires_and_the_sweep_deletes_it() {
     assert_eq!(person.get("/v1/a/account").await.status(), 200);
     tokio::time::sleep(Duration::from_millis(2100)).await;
     assert_eq!(person.get("/v1/a/account").await.status(), 401);
-    assert_eq!(register_device_status(&person).await, 401);
     assert_eq!(rows(&test, "sessions"), 1);
     assert_eq!(test.hub.sweep().unwrap().sessions, 1);
     assert_eq!(rows(&test, "sessions"), 0);
-}
-
-async fn register_device_status(person: &Person) -> u16 {
-    person
-        .post("/v1/a/devices", &DeviceRequest::default())
-        .await
-        .status()
-        .as_u16()
 }
 
 #[tokio::test]
@@ -225,7 +209,7 @@ async fn state_changing_account_calls_need_the_hub_origin() {
     for origin in [Some("https://evil.example"), Some("null"), None] {
         person.origin = origin.map(str::to_string);
         for path in [
-            "/v1/a/devices",
+            "/v1/a/commands",
             "/v1/a/logout",
             "/v1/a/passkeys/begin",
             "/v1/a/login/begin",
@@ -241,53 +225,14 @@ async fn state_changing_account_calls_need_the_hub_origin() {
                 "{path} {origin:?}"
             );
         }
-        for path in ["/v1/a/devices/dev_x", "/v1/a/passkeys/AAAA"] {
+        for path in ["/v1/a/machines/mch_x", "/v1/a/passkeys/AAAA"] {
             assert_eq!(person.delete(path).await.status(), 403, "{path} {origin:?}");
         }
     }
     person.origin = None;
-    assert_eq!(person.get("/v1/a/devices").await.status(), 200);
+    assert_eq!(person.get("/v1/a/passkeys").await.status(), 200);
     person.origin = Some(kebbie_hub::DEV_ORIGIN.to_string());
     assert_eq!(person.get("/v1/a/account").await.status(), 200);
-}
-
-#[tokio::test]
-async fn a_device_token_comes_only_from_a_logged_in_account() {
-    let test = start_hub(|_| {}).await;
-    let anonymous = Person::new(&test.url);
-    assert_eq!(register_device_status(&anonymous).await, 401);
-
-    let machine = joined_machine(&test).await;
-    let opened: PairingOpened = machine.client().post("/v1/m/pairings", &()).await.unwrap();
-    let commit = CommitRequest {
-        code: opened.code.clone(),
-        commitment: Bytes32([1; 32]),
-    };
-    let without_token = HubClient::new(&test.url, None)
-        .post::<_, Committed>("/v1/d/pairings", &commit)
-        .await;
-    assert_eq!(status_of(without_token), 401);
-
-    let person = signed_up(&test).await;
-    let registered = person.register_device().await;
-    let committed: Committed = device_client(&test, &registered)
-        .post("/v1/d/pairings", &commit)
-        .await
-        .unwrap();
-    assert_eq!(committed.device, registered.device);
-    let devices: Devices = body(person.get("/v1/a/devices").await).await;
-    assert_eq!(devices.devices.len(), 1);
-    assert_eq!(devices.devices[0].name.as_deref(), Some("phone"));
-}
-
-#[tokio::test]
-async fn a_dev_hub_still_lets_a_pairing_code_create_a_device() {
-    let test = start_hub(|config| config.anonymous_devices = true).await;
-    let mut machine = joined_machine(&test).await;
-    let mut phone = PhoneState::new(&test.url);
-    let (admitted, paired) = pair_both(&mut machine, &mut phone, true).await;
-    assert_eq!(phone.device, Some(admitted.unwrap()));
-    paired.unwrap();
 }
 
 #[tokio::test]
@@ -328,28 +273,6 @@ async fn an_account_adds_and_removes_passkeys_but_never_its_last() {
         401,
         "the removed passkey no longer signs in"
     );
-}
-
-#[tokio::test]
-async fn the_device_feed_announces_pairings_without_content_and_no_boards() {
-    let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let registered = signed_up(&test).await.register_device().await;
-    let mut events = EventStream::open(&test.url, &registered.token).await;
-    assert_eq!(events.next(QUIET).await, Next::Quiet);
-
-    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    let mut states = Vec::new();
-    while states.last() != Some(&PairingState::Admitted) {
-        let data = events.until(EVENT_PAIRING, SOON).await;
-        let changed: PairingChanged = serde_json::from_value(data).unwrap();
-        states.push(changed.state);
-    }
-    assert!(states.iter().all(|state| *state != PairingState::Open));
-
-    machine.post_board(board(MARKER)).await.unwrap();
-    assert_eq!(events.next(QUIET).await, Next::Quiet);
 }
 
 #[tokio::test]
@@ -399,75 +322,6 @@ async fn a_board_wakes_only_the_account_of_its_machine() {
 }
 
 #[tokio::test]
-async fn a_machine_removing_a_device_announces_it_on_the_device_feed() {
-    let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let registered = signed_up(&test).await.register_device().await;
-    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
-    let device = pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    let mut events = EventStream::open(&test.url, &registered.token).await;
-    events.until(EVENT_PAIRING, SOON).await;
-
-    machine.remove_device(&device).await.unwrap();
-    let removed: MachineRemoved =
-        serde_json::from_value(events.until(EVENT_MACHINE_REMOVED, SOON).await).unwrap();
-    assert_eq!(removed.machine, machine.machine);
-    assert!(machine.listed_devices().await.unwrap().is_empty());
-
-    machine.post_board(board("after")).await.unwrap();
-    assert_eq!(events.next(QUIET).await, Next::Quiet);
-    let again = machine
-        .client()
-        .delete(&format!("/v1/m/devices/{device}"))
-        .await;
-    assert_eq!(status_of(again), 404);
-}
-
-#[tokio::test]
-async fn a_machine_cannot_remove_a_device_another_machine_admitted() {
-    let test = start_hub(|_| {}).await;
-    let mut owner = joined_machine(&test).await;
-    let other = joined_machine(&test).await;
-    let mut phone = phone(&test).await;
-    let device = pair_both(&mut owner, &mut phone, true).await.0.unwrap();
-    let refused = other
-        .client()
-        .delete(&format!("/v1/m/devices/{device}"))
-        .await;
-    assert_eq!(status_of(refused), 404);
-    assert_eq!(owner.listed_devices().await.unwrap()[0].device, device);
-}
-
-#[tokio::test]
-async fn an_account_removing_its_device_ends_the_token_and_the_feed() {
-    let test = start_hub(|_| {}).await;
-    let mut machine = joined_machine(&test).await;
-    let person = signed_up(&test).await;
-    let registered = person.register_device().await;
-    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
-    let mut events = EventStream::open(&test.url, &registered.token).await;
-    events.until(EVENT_PAIRING, SOON).await;
-
-    let stranger = signed_up(&test).await;
-    let path = format!("/v1/a/devices/{}", registered.device);
-    assert_eq!(stranger.delete(&path).await.status(), 404);
-    assert_eq!(person.delete(&path).await.status(), 204);
-    assert_eq!(events.next(SOON).await, Next::Ended);
-    assert_eq!(
-        status_of(
-            device_client(&test, &registered)
-                .get::<Value>("/v1/d/results", &[])
-                .await
-        ),
-        401
-    );
-    let devices: Devices = body(person.get("/v1/a/devices").await).await;
-    assert!(devices.devices.is_empty());
-    machine.post_board(board(MARKER)).await.unwrap();
-}
-
-#[tokio::test]
 async fn the_admin_cli_mints_invites_and_removes_machines() {
     let test = start_hub(|_| {}).await;
     let admin = |args: &[&str]| {
@@ -486,9 +340,6 @@ async fn the_admin_cli_mints_invites_and_removes_machines() {
     assert!(person.sign_up(invite.trim()).await.status().is_success());
 
     let mut machine = joined_machine(&test).await;
-    let registered = person.register_device().await;
-    let mut phone = PhoneState::registered(&test.url, registered.device.clone(), &registered.token);
-    pair_both(&mut machine, &mut phone, true).await.0.unwrap();
     machine.post_board(board(MARKER)).await.unwrap();
     assert!(admin(&["machines"]).contains(machine.machine.as_str()));
 
@@ -497,69 +348,7 @@ async fn the_admin_cli_mints_invites_and_removes_machines() {
         Err(kebbie_hub_fakes::Error::Hub(error)) => assert_eq!(error.status(), Some(401)),
         other => panic!("the removed machine still polls: {other:?}"),
     }
-    let devices: Devices = body(person.get("/v1/a/devices").await).await;
-    assert!(devices.devices[0].machines.is_empty());
-}
-
-#[tokio::test]
-async fn the_sweep_drops_devices_no_account_holds_and_no_machine_admits() {
-    let test = start_hub(|config| config.anonymous_devices = true).await;
-    let mut machine = joined_machine(&test).await;
-    let mut refused = PhoneState::new(&test.url);
-    let outcome = pair_both(&mut machine, &mut refused, false).await.0;
-    assert!(matches!(outcome, Err(PairError::Declined)), "{outcome:?}");
-    let mut admitted = PhoneState::new(&test.url);
-    let device = pair_both(&mut machine, &mut admitted, true)
-        .await
-        .0
-        .unwrap();
-    let held = signed_up(&test).await.register_device().await;
-
-    assert_eq!(test.hub.sweep().unwrap().devices, 1);
-    assert_eq!(
-        status_of(refused.client().get::<Value>("/v1/d/results", &[]).await),
-        401
-    );
-    admitted
-        .client()
-        .get::<Value>("/v1/d/results", &[])
-        .await
-        .unwrap();
-    device_client(&test, &held)
-        .get::<Value>("/v1/d/results", &[])
-        .await
-        .unwrap();
-
-    machine.remove_device(&device).await.unwrap();
-    assert_eq!(test.hub.sweep().unwrap().devices, 1);
-    assert_eq!(
-        status_of(admitted.client().get::<Value>("/v1/d/results", &[]).await),
-        401
-    );
-    device_client(&test, &held)
-        .get::<Value>("/v1/d/results", &[])
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn a_device_mid_pairing_is_not_swept() {
-    let test = start_hub(|config| config.anonymous_devices = true).await;
-    let machine = joined_machine(&test).await;
-    let opened: PairingOpened = machine.client().post("/v1/m/pairings", &()).await.unwrap();
-    let committed: Committed = HubClient::new(&test.url, None)
-        .post(
-            "/v1/d/pairings",
-            &CommitRequest {
-                code: opened.code,
-                commitment: Bytes32([7; 32]),
-            },
-        )
-        .await
-        .unwrap();
-    assert_eq!(test.hub.sweep().unwrap().devices, 0);
-    let device = HubClient::new(&test.url, committed.token.as_deref());
-    device.get::<Value>("/v1/d/results", &[]).await.unwrap();
+    assert!(!admin(&["machines"]).contains(machine.machine.as_str()));
 }
 
 #[tokio::test]
@@ -568,7 +357,7 @@ async fn a_half_sent_request_is_dropped_after_the_header_timeout() {
     let address = test.url.trim_start_matches("http://");
     let mut stream = tokio::net::TcpStream::connect(address).await.unwrap();
     stream
-        .write_all(b"GET /v1/d/results HTTP/1.1\r\nHost: hub\r\n")
+        .write_all(b"GET /v1/m/inbox HTTP/1.1\r\nHost: hub\r\n")
         .await
         .unwrap();
     let started = std::time::Instant::now();
@@ -579,10 +368,10 @@ async fn a_half_sent_request_is_dropped_after_the_header_timeout() {
 }
 
 #[tokio::test]
-async fn the_session_cookie_opens_no_device_or_machine_call() {
+async fn the_session_cookie_opens_no_machine_call() {
     let test = start_hub(|_| {}).await;
     let person = signed_up(&test).await;
-    for path in ["/v1/d/results", "/v1/d/events", "/v1/d/pairings/any", "/v1/m/inbox"] {
+    for path in ["/v1/m/inbox", "/v1/m/pairings/any"] {
         assert_eq!(person.get(path).await.status(), 401, "{path}");
     }
 }
@@ -720,27 +509,26 @@ async fn a_counter_that_goes_backwards_is_refused_as_a_clone() {
 }
 
 #[tokio::test]
-async fn a_device_holds_at_most_eight_feeds_and_a_closed_one_frees_its_slot() {
+async fn an_account_holds_at_most_eight_feeds_and_a_closed_one_frees_its_slot() {
     let test = start_hub(|config| config.feed_keep_alive = Duration::from_millis(100)).await;
-    let registered = signed_up(&test).await.register_device().await;
+    let person = member(&test).await;
+    let account = person.account_key().unwrap().account.to_string();
     let mut feeds = Vec::new();
     for _ in 0..8 {
-        feeds.push(EventStream::open(&test.url, &registered.token).await);
+        feeds.push(EventStream::of_account(&person).await);
     }
-    let ninth = device_client(&test, &registered)
-        .get::<Value>("/v1/d/events", &[])
-        .await;
-    assert_eq!(status_of(ninth), 429);
+    let ninth = EventStream::account_request(&person).send().await.unwrap();
+    assert_eq!(ninth.status(), 429);
     drop(feeds.pop());
     let deadline = std::time::Instant::now() + SOON;
-    while test.hub.open_feeds(&registered.device) == 8 {
+    while test.hub.open_feeds(&account) == 8 {
         assert!(
             std::time::Instant::now() < deadline,
             "the closed feed kept its slot"
         );
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    feeds.push(EventStream::open(&test.url, &registered.token).await);
+    feeds.push(EventStream::of_account(&person).await);
 }
 
 #[tokio::test]
@@ -771,7 +559,7 @@ async fn the_hub_serves_no_more_connections_than_its_cap() {
     let waiting = tokio::spawn({
         let url = test.url.clone();
         async move {
-            reqwest::get(format!("{url}/v1/d/results"))
+            reqwest::get(format!("{url}/v1/m/inbox"))
                 .await
                 .unwrap()
                 .status()
@@ -833,7 +621,7 @@ fn a_hub_without_dev_refuses_a_plain_http_origin() {
     let data = tempfile::tempdir().unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_kebbie-hub"))
         .args(["--listen", "127.0.0.1:0", "--rp-id", "localhost", "--origin", "http://localhost:8470"])
-        .args(["--vapid-subject", "mailto:hub@example.com", "--data"])
+        .args(["--data"])
         .arg(data.path())
         .output()
         .unwrap();

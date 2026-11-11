@@ -8,13 +8,11 @@ mod crypto;
 mod envelope;
 mod ids;
 mod message;
-mod pairing;
 #[cfg(any(test, feature = "test-vectors"))]
 pub mod vectors;
 
 pub use account::{
-    ACCOUNT_COMMIT_DOMAIN, AccountFingerprints, AccountHandoff, AccountKey, DEVICE_LIST_DOMAIN,
-    DeviceList, ListedDevice,
+    ACCOUNT_COMMIT_DOMAIN, AccountFingerprints, AccountHandoff, AccountKey, CommitmentMismatch,
     ENCRYPTION_FINGERPRINT_DOMAIN, FieldTooLong, HUB_PRF_SALT_DOMAIN, ListedMachine, MACHINE_LIST_DOMAIN, MachineList,
     SIGNING_FINGERPRINT_DOMAIN, Unlock,
     WRAP_AD_DOMAIN, WRAP_KEY_INFO, WRAP_NONCE_LEN, WRAPPED_LEN, WRAPPER_SIGN_DOMAIN, WrongAccountKey,
@@ -22,9 +20,7 @@ pub use account::{
     wrap_associated_data, wrap_key, wrapper_statement,
 };
 pub use alert::{Alert, AlertKind, AlertState};
-pub use authorize::{
-    Accepted, Applied, AppliedCommands, Dropped, Machine, Refusal, Role, TrustedDevice, authorize,
-};
+pub use authorize::{Applied, AppliedCommands, Dropped, Machine, Refusal, authorize};
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
     Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, Git, Group, Item,
@@ -43,7 +39,6 @@ pub use message::{
     Answer, CommandResult, Event, MAX_OPTIONS, MAX_PROMPT_CHARS, Notice, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartTask,
 };
-pub use pairing::{CommitmentMismatch, DevicePairing, MachinePairing, commitment, comparison_code};
 
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const SCHEMA: u16 = 1;

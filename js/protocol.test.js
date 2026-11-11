@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, deviceListStatement, deviceListTrusts, deviceListWith, deviceListWithout, emptyDeviceList, newDeviceKeys, sealCommand, signDeviceList, verifyDeviceList, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, comparisonCode, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineComparisonCode, machineFingerprint, openBlob, openEnvelope, pairingCommitment, pairingNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -70,12 +70,12 @@ test("the web seals byte for byte what Rust sealed", async () => {
 
 test("a command sealed with fresh randomness opens on the other side", async () => {
   const vector = envelopes.cases.find((candidate) => candidate.name === "answer-opened-by-the-machine");
-  const phone = await identity("phone");
-  const recipients = ["phone", "machine"].map((name) => ({ id: parties[name].id, encryption: parties[name].public.encryption }));
+  const account = await identity("account");
+  const recipients = ["account", "machine"].map((name) => ({ id: parties[name].id, encryption: parties[name].public.encryption }));
   const plaintext = new TextEncoder().encode(JSON.stringify(vector.expect.payload));
-  const sealed = await sealEnvelope(headerOf(vector.envelope), plaintext, phone, recipients);
+  const sealed = await sealEnvelope(headerOf(vector.envelope), plaintext, account, recipients);
   assert.notEqual(sealed.ct, vector.envelope.ct);
-  assert.deepEqual(await openEnvelope(sealed, await identity("machine"), await sender("phone"), envelopes.now), vector.expect.payload);
+  assert.deepEqual(await openEnvelope(sealed, await identity("machine"), await sender("account"), envelopes.now), vector.expect.payload);
 });
 
 test("signatures verify and reproduce", async () => {
@@ -88,38 +88,18 @@ test("signatures verify and reproduce", async () => {
   }
 });
 
-test("pairing commits before the comparison code and refuses a different reveal", async () => {
-  for (const vector of load("pairing.json").cases) {
-    const machine = parties[vector.machine].public;
-    const device = parties[vector.device].public;
-    const deviceNonce = fromB64(vector.device_nonce);
-    const machineNonce = fromB64(vector.machine_nonce);
-    const commitment = await pairingCommitment(device, deviceNonce, vector.code);
-    assert.equal(toB64(commitment), vector.commitment, vector.name);
-    const revealed = machineComparisonCode(commitment, machine, machineNonce, parties[vector.revealed.device].public, fromB64(vector.revealed.nonce), vector.machine_code);
-    if (vector.expect.sas) {
-      assert.equal(await revealed, vector.expect.sas, vector.name);
-      assert.equal(await comparisonCode(machine, device, machineNonce, deviceNonce, vector.code), vector.expect.sas, vector.name);
-    } else {
-      assert.equal(await failure(revealed), vector.expect.error, vector.name);
-    }
-  }
-});
-
-test("a connect link names its machine and the browser commits to its secret", async () => {
-  const vector = load("pairing.json").connect;
+test("a connect link names its machine", async () => {
+  const vector = load("connect.json");
   const machine = parties[vector.machine].public;
   assert.equal(await machineFingerprint(machine), vector.fingerprint);
   assert.equal(await machineFingerprint(parties.intruder.public), vector.other_fingerprint);
   const parsed = parseConnectFragment(new URL(vector.link).hash);
   assert.deepEqual(parsed, { code: vector.code, fingerprint: vector.fingerprint });
-  const commitment = await pairingCommitment(parties[vector.device].public, fromB64(vector.device_nonce), parsed.code);
-  assert.equal(toB64(commitment), vector.commitment);
   for (const broken of ["", "#k=AAAA&m=BBBB", `#k=${vector.code}`, `#m=${vector.fingerprint}`, "#k=!!&m=??"]) assert.equal(parseConnectFragment(broken), null, broken);
 });
 
-test("a pairing nonce is 32 fresh bytes", () => {
-  const [first, second] = [pairingNonce(), pairingNonce()];
+test("a handoff nonce is 32 fresh bytes", () => {
+  const [first, second] = [handoffNonce(), handoffNonce()];
   assert.equal(first.length, 32);
   assert.notDeepEqual(first, second);
 });
@@ -127,8 +107,8 @@ test("a pairing nonce is 32 fresh bytes", () => {
 test("sealing refuses a recipient listed twice", async () => {
   const vector = envelopes.cases.find((candidate) => candidate.name === "answer-opened-by-the-machine");
   const machine = { id: parties.machine.id, encryption: parties.machine.public.encryption };
-  const phone = await identity("phone");
-  assert.equal(await failure(sealEnvelope(headerOf(vector.envelope), new Uint8Array([123, 125]), phone, [machine, machine])), "duplicate-recipient");
+  const account = await identity("account");
+  assert.equal(await failure(sealEnvelope(headerOf(vector.envelope), new Uint8Array([123, 125]), account, [machine, machine])), "duplicate-recipient");
 });
 
 test("decrypted payloads with unknown fields or wrong types are refused", () => {
@@ -356,39 +336,6 @@ async function unlockedAccount() {
   return { vectors, account: await accountIdentity(vectors.key, secrets, vectors.key.account) };
 }
 
-test("a device list signs and verifies as the Rust vectors say, and nothing else verifies", async () => {
-  const { vectors, account } = await unlockedAccount();
-  const lists = vectors.devices;
-  assert.equal(new TextDecoder().decode(fromB64(lists.statement).slice(0, lists.domain.length)), lists.domain);
-  assert.equal(toB64(deviceListStatement(account.id, lists.list)), lists.statement);
-  assert.equal(await signDeviceList(account, lists.list), lists.signature);
-  assert.equal(await verifyDeviceList(account, { list: lists.list, signature: lists.signature }), true);
-  assert.equal(await verifyDeviceList(account, { list: lists.removed, signature: lists.removed_signature }), true);
-  assert.equal(await verifyDeviceList(account, { list: lists.removed, signature: lists.signature }), false, "another list's signature");
-  assert.equal(await verifyDeviceList(account, { list: { ...lists.list, counter: lists.removed.counter }, signature: lists.signature }), false, "the counter is signed");
-  assert.equal(await verifyDeviceList(account, { list: { ...lists.list, devices: [...lists.list.devices].reverse() }, signature: lists.signature }), false, "out of order");
-  const promoted = structuredClone(lists.list);
-  promoted.devices[0].role = "control";
-  assert.equal(await verifyDeviceList(account, { list: promoted, signature: lists.signature }), false, "the role is signed");
-  const renamed = structuredClone(lists.list);
-  renamed.devices[1].name = "Intruder";
-  assert.equal(await verifyDeviceList(account, { list: renamed, signature: lists.signature }), false, "the name is signed");
-  const other = await accountIdentity(vectors.key, { signing: fromB64(parties.intruder.signing_secret), encryption: fromB64(parties.intruder.encryption_secret) }, vectors.key.account).catch(() => null);
-  assert.equal(other, null, "another key is not this account's identity");
-  const intruder = { id: account.id, verifying: (await importSender(parties.intruder.id, parties.intruder.public)).signing };
-  assert.equal(await verifyDeviceList(intruder, { list: lists.list, signature: lists.signature }), false);
-  const trusted = parties[lists.trusted];
-  const gone = parties[lists.removed_device];
-  assert.ok(deviceListTrusts(lists.list, gone.id, gone.public) && !deviceListTrusts(lists.removed, gone.id, gone.public));
-  assert.ok(!deviceListTrusts(lists.removed, trusted.id, parties.intruder.public));
-  const [tablet, phone] = lists.list.devices;
-  const rebuilt = deviceListWith(deviceListWith(emptyDeviceList(), phone), tablet);
-  assert.deepEqual(rebuilt, lists.list);
-  assert.deepEqual(deviceListWithout(rebuilt, gone.id), lists.removed);
-  assert.throws(() => deviceListStatement(account.id, { counter: 1, devices: [{ ...phone, device: parties.machine.id }] }));
-  assert.throws(() => deviceListStatement(account.id, { counter: 1, devices: [{ ...phone, role: "admin" }] }));
-});
-
 test("a command id is a UUIDv7 with the time it was sealed", () => {
   const id = commandId(1_761_069_600_000, new Uint8Array(10).fill(0xff));
   assert.match(id, /^cmd_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -397,26 +344,30 @@ test("a command id is a UUIDv7 with the time it was sealed", () => {
   assert.equal(commandId(vector.envelope.at * 1000).slice(0, 17), vector.envelope.id.slice(0, 17));
 });
 
-test("a command sealed by a fresh device key opens for the machine and for the device, and for nobody else", async () => {
-  const keys = await newDeviceKeys();
-  assert.equal(keys.signing.extractable, false);
-  assert.equal(keys.encryption.privateKey.extractable, false);
-  const device = { id: parties.phone.id, ...keys };
+test("a command sealed by the account opens for the machine and for the account, and for nobody else", async () => {
+  const { account } = await unlockedAccount();
   const machine = { id: parties.machine.id, keys: parties.machine.public };
   const at = envelopes.now;
   const payload = { type: "push", address: "refunds@shop", head: "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a", card_sha: null };
-  const envelope = await sealCommand({ device, machine, payload, at });
+  const envelope = await sealCommand({ identity: account, machine, payload, at });
   checkShape(envelope);
-  assert.deepEqual([envelope.kind, envelope.from, envelope.machine, envelope.at, envelope.exp], ["push", device.id, machine.id, at, at + COMMAND_TTL]);
+  assert.deepEqual([envelope.kind, envelope.from, envelope.machine, envelope.at, envelope.exp], ["push", account.id, machine.id, at, at + COMMAND_TTL]);
   assert.equal(COMMAND_TTL, 3600);
   assert.match(envelope.id, /^cmd_[0-9a-f]{8}-[0-9a-f]{4}-7/);
-  assert.deepEqual(Object.keys(envelope.keys).sort(), [device.id, machine.id].sort());
-  const fromDevice = { id: device.id, signing: keys.verifying };
-  assert.deepEqual(await openEnvelope(envelope, await identity("machine"), fromDevice, at), payload);
-  assert.deepEqual(await openEnvelope(envelope, device, fromDevice, at), payload);
-  assert.equal(await failure(openEnvelope(envelope, await identity("tablet"), fromDevice, at)), "not-a-recipient");
-  assert.equal(await failure(openEnvelope(envelope, await identity("machine"), await sender("phone"), at)), "bad-signature");
-  assert.equal(await failure(sealCommand({ device, machine, payload: { type: "answer", address: "a@b", question: "q", choice: "first", comment: "" }, at })), "malformed");
+  assert.deepEqual(Object.keys(envelope.keys).sort(), [account.id, machine.id].sort());
+  const fromAccount = await sender("account");
+  assert.deepEqual(await openEnvelope(envelope, await identity("machine"), fromAccount, at), payload);
+  assert.deepEqual(await openEnvelope(envelope, account, fromAccount, at), payload);
+  assert.equal(await failure(openEnvelope(envelope, await identity("phone"), fromAccount, at)), "not-a-recipient");
+  assert.equal(await failure(openEnvelope(envelope, await identity("machine"), await sender("other-account"), at)), "wrong-sender");
+  assert.equal(await failure(openEnvelope(envelope, await identity("machine"), { id: account.id, signing: (await sender("other-account")).signing }, at)), "bad-signature");
+  assert.equal(await failure(sealCommand({ identity: account, machine, payload: { type: "answer", address: "a@b", question: "q", choice: "first", comment: "" }, at })), "malformed");
+});
+
+test("a command from a device id no longer has a valid shape", () => {
+  const vector = envelopes.cases.find((candidate) => candidate.name === "device-as-command-sender");
+  assert.equal(vector.expect.error, "malformed");
+  assert.throws(() => checkShape(vector.envelope), (error) => error.code === "malformed");
 });
 
 test("an answer to an agent's prompt lives ten minutes, as Rust's limit for its kind says", async () => {
@@ -426,9 +377,9 @@ test("an answer to an agent's prompt lives ten minutes, as Rust's limit for its 
   checkPayload(sealed.expect.payload);
   checkShape(sealed.envelope);
   assert.throws(() => checkShape({ ...sealed.envelope, exp: sealed.envelope.at + 601 }), (error) => error.code === "malformed");
-  const keys = await newDeviceKeys();
+  const { account } = await unlockedAccount();
   const payload = { type: "prompt-answer", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y" };
-  const envelope = await sealCommand({ device: { id: parties.phone.id, ...keys }, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
+  const envelope = await sealCommand({ identity: account, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
   assert.equal(envelope.exp - envelope.at, 600);
   assert.throws(() => checkPayload({ ...payload, choice: 0 }), (error) => error.code === "malformed");
 });

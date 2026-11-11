@@ -494,7 +494,7 @@ mod tests {
     #[test]
     fn seal_holds_the_ttl_cap_and_needs_distinct_recipients() {
         let machine = Id::ulid(Prefix::Machine, 1, [1; 10]).unwrap();
-        let device = Id::ulid(Prefix::Device, 1, [2; 10]).unwrap();
+        let account = Id::account([2; 16]);
         let keys = SecretKeys::generate();
         let payload = Payload::Routine(RunRoutine {
             id: "nightly-deps".into(),
@@ -503,7 +503,7 @@ mod tests {
             let mut header = Header::new(
                 Id::new(Prefix::Command).unwrap(),
                 Kind::Routine,
-                device.clone(),
+                account.clone(),
                 machine.clone(),
                 1_000,
             );

@@ -10,12 +10,11 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use std::collections::BTreeMap;
 
 use kebbie_hub_api::{
-    AccountKeySetup, AccountView, Bytes32, Bytes64, CreationCeremony, DeviceListView,
-    DeviceRegistered, DeviceRequest, DeviceView, Devices, SignedDeviceList, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys,
+    AccountKeySetup, AccountView, Bytes32, CreationCeremony, HubInfo, LoginBegin, LoginFinish, PasskeyView, Passkeys,
     RegisterBegin, RegisterFinish, RequestCeremony, SignedIn, SignupMode, Unlocking,
     WrapperUpload, normalize_code,
 };
-use kebbie_hub_protocol::{Id, Prefix, WRAPPED_LEN, hub_prf_salt};
+use kebbie_hub_protocol::{WRAPPED_LEN, hub_prf_salt};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use webauthn_rs::prelude::{
@@ -28,13 +27,13 @@ use webauthn_rs_proto::{
 };
 
 use crate::auth::{
-    AccountAuth, Anonymous, DEVICE_TOKEN_PREFIX, FreshAccount, KeyAccount, SESSION_TOKEN_PREFIX,
+    AccountAuth, Anonymous, FreshAccount, KeyAccount, SESSION_TOKEN_PREFIX,
     SETUP_TOKEN_PREFIX, SameOrigin, SessionAuth, digest, new_token, passkey_required, random,
     session_cookie,
 };
 use crate::error::ApiError;
 use crate::store::{
-    Access, Ceremony, DeviceListWrite, GitHubUnlink, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey,
+    Access, Ceremony, GitHubUnlink, KeySet, Purpose, Removal, SignUp, SignUpOutcome, StoredPasskey,
     Ticket,
 };
 use crate::{Hub, clean_name, now};
@@ -338,9 +337,7 @@ pub async fn register_finish(
         at,
         "account.created",
         None,
-        None,
-        Some(&format!("{account} by={}", kind.name())),
-    )?;
+        Some(&format!("{account} by={}", kind.name())),)?;
     drop(store);
     if kind == Ticket::Owner {
         hub.forget_setup();
@@ -502,7 +499,7 @@ pub async fn login_finish(
             .find(|stored| stored.credential_id == used)
             .ok_or_else(ApiError::unauthorized)?;
         if counter_regressed(stored.counter, result.counter()) {
-            store.log(at, "passkey.clone-suspected", None, None, Some(&account))?;
+            store.log(at, "passkey.clone-suspected", None, Some(&account))?;
             return Err(ApiError::unauthorized());
         }
         let mut passkey: Passkey = from_json(&stored.passkey)?;
@@ -518,7 +515,7 @@ pub async fn login_finish(
             at + hub.config().session_ttl,
             Access::Key,
         )?;
-        store.log(at, "account.logged-in", None, None, Some(&account))?;
+        store.log(at, "account.logged-in", None, Some(&account))?;
         if let Some(code_hash) = &ceremony.invite_hash {
             store.grant_connect(code_hash, &account, at + hub.config().ceremony_ttl, at)?;
         }
@@ -672,7 +669,7 @@ pub async fn passkey_finish(
             store.refresh_session(token, at)?;
         }
     }
-    store.log(at, "passkey.added", None, None, Some(&account))?;
+    store.log(at, "passkey.added", None, Some(&account))?;
     Ok(Json(PasskeyView {
         passkey: URL_SAFE_NO_PAD.encode(credential_id),
         name,
@@ -724,7 +721,7 @@ pub async fn remove_github(
         GitHubUnlink::NotLinked => return Err(ApiError::not_found()),
         GitHubUnlink::LastSignIn => return Err(ApiError::conflict("last-sign-in")),
     }
-    store.log(at, "account.github-removed", None, None, Some(&account))?;
+    store.log(at, "account.github-removed", None, Some(&account))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -755,7 +752,7 @@ pub async fn set_key(
         KeySet::KeyExists => return Err(ApiError::conflict("key-exists")),
         KeySet::UnknownPasskey => return Err(unknown_passkey_here()),
     }
-    store.log(at, "account.key-set", None, None, Some(&account))?;
+    store.log(at, "account.key-set", None, Some(&account))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -796,124 +793,7 @@ pub async fn set_wrapper(
     )? {
         return Err(unknown_passkey_here());
     }
-    store.log(at, "passkey.wrapper-set", None, None, Some(&account))?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn register_device(
-    State(hub): State<Arc<Hub>>,
-    _: SameOrigin,
-    KeyAccount(account): KeyAccount,
-    Json(request): Json<DeviceRequest>,
-) -> Result<Json<DeviceRegistered>, ApiError> {
-    let name = optional_name(request.name.as_deref())?;
-    let device = Id::new(Prefix::Device).expect("a fresh device id is valid");
-    let token = new_token(DEVICE_TOKEN_PREFIX);
-    let at = now();
-    let store = hub.store();
-    store.create_device(
-        &device,
-        &digest(&token),
-        Some(&account),
-        name.as_deref(),
-        request.keys.as_ref(),
-        at,
-    )?;
-    store.log(at, "device.registered", None, Some(&device), Some(&account))?;
-    Ok(Json(DeviceRegistered { device, token }))
-}
-
-pub async fn devices(
-    State(hub): State<Arc<Hub>>,
-    KeyAccount(account): KeyAccount,
-) -> Result<Json<Devices>, ApiError> {
-    let devices = hub
-        .store()
-        .devices_of_account(&account)?
-        .into_iter()
-        .map(|row| DeviceView {
-            device: row.id,
-            name: row.name,
-            created_at: row.created_at,
-            last_seen: row.last_seen,
-            machines: row.machines,
-        })
-        .collect();
-    Ok(Json(Devices { devices }))
-}
-
-pub async fn remove_device(
-    State(hub): State<Arc<Hub>>,
-    _: SameOrigin,
-    KeyAccount(account): KeyAccount,
-    Path(id): Path<String>,
-) -> Result<StatusCode, ApiError> {
-    let device = Id::parse(&id).map_err(|_| ApiError::not_found())?;
-    let at = now();
-    {
-        let store = hub.store();
-        let listed = store
-            .device_list(&account)?
-            .is_some_and(|(list, _)| list.listed(&device).is_some());
-        if listed {
-            return Err(ApiError::conflict("still-listed"));
-        }
-        if !store.remove_account_device(&account, &device)? {
-            return Err(ApiError::not_found());
-        }
-        store.log(at, "device.removed", None, Some(&device), Some(&account))?;
-    }
-    hub.wake_device(&device);
-    Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn device_list(
-    State(hub): State<Arc<Hub>>,
-    KeyAccount(account): KeyAccount,
-) -> Result<Json<DeviceListView>, ApiError> {
-    Ok(Json(signed_device_list(&hub, &account)?))
-}
-
-pub(crate) fn signed_device_list(hub: &Hub, account: &str) -> Result<DeviceListView, ApiError> {
-    let list = hub
-        .store()
-        .device_list(account)?
-        .map(|(list, signature)| SignedDeviceList {
-            list,
-            signature: Bytes64(signature),
-        });
-    Ok(DeviceListView { list })
-}
-
-pub async fn put_device_list(
-    State(hub): State<Arc<Hub>>,
-    _: SameOrigin,
-    FreshAccount(account): FreshAccount,
-    Json(request): Json<SignedDeviceList>,
-) -> Result<StatusCode, ApiError> {
-    let mut store = hub.store();
-    let key = store
-        .account_key(&account)?
-        .ok_or(ApiError::conflict("no-key"))?;
-    if !key.verifies_device_list(&request.list, &request.signature.0) {
-        return Err(ApiError::bad_request("bad-signature"));
-    }
-    match store.set_device_list(&account, &request.list, &request.signature.0)? {
-        DeviceListWrite::Stored => {}
-        DeviceListWrite::Stale => return Err(ApiError::conflict("stale-list")),
-        DeviceListWrite::UnknownDevice => return Err(ApiError::bad_request("unknown-device")),
-    }
-    store.log(
-        now(),
-        "devices.signed",
-        None,
-        None,
-        Some(&format!("{account} counter={}", request.list.counter)),
-    )?;
-    let machines = store.machines_of_account(&account)?;
-    drop(store);
-    hub.wake_machines(&machines);
-    hub.wake_account(&account);
+    store.log(at, "passkey.wrapper-set", None, Some(&account))?;
     Ok(StatusCode::NO_CONTENT)
 }
 

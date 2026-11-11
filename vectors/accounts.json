@@ -1,51 +1,6 @@
 {
   "account": "account",
   "commit_domain": "kebbie-connect-account-commit-v1",
-  "devices": {
-    "domain": "kebbie-hub account devices v1",
-    "list": {
-      "counter": 2,
-      "devices": [
-        {
-          "device": "dev_01K83YV3800E98GTJMKEDT10QK",
-          "keys": {
-            "encryption": "U55cJGGoBMjJYzwS3FI2syNmATqAdAGKza09tKejpk8",
-            "signing": "RBsZHnPUbnlHAF68ROvO4tIjUvE1dMzTmYjsdHuA5Fo"
-          },
-          "name": "iPad",
-          "role": "read"
-        },
-        {
-          "device": "dev_01K83YV380329ARS69J86ZB9PB",
-          "keys": {
-            "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
-            "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
-          },
-          "name": "iPhone",
-          "role": "control"
-        }
-      ]
-    },
-    "removed": {
-      "counter": 3,
-      "devices": [
-        {
-          "device": "dev_01K83YV380329ARS69J86ZB9PB",
-          "keys": {
-            "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
-            "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
-          },
-          "name": "iPhone",
-          "role": "control"
-        }
-      ]
-    },
-    "removed_device": "tablet",
-    "removed_signature": "I86gOKLkKy2QYY3GUjzJ9bEuozoR82JdFhdEa9XInqTuZEmgYZC7Bl1HSZmKcA94eInj6wNi-VOFRpI45_WpCQ",
-    "signature": "m7031zwAFzfCHQliejQFDroAP4DVb_rrYt4Cto15B595WEXLiNL3M-84JoRUq9RDrYXgOITFXoYahorOapFVDg",
-    "statement": "a2ViYmllLWh1YiBhY2NvdW50IGRldmljZXMgdjEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAAAAAAAAAAIAAAACAB5kZXZfMDFLODNZVjM4MDBFOThHVEpNS0VEVDEwUUsABGlQYWREGxkec9RueUcAXrxE687i0iNS8TV0zNOZiOx0e4DkWlOeXCRhqATIyWM8EtxSNrMjZgE6gHQBis2tPbSno6ZPAARyZWFkAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIABmlQaG9uZeMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2QAB2NvbnRyb2w",
-    "trusted": "phone"
-  },
   "encryption_fingerprint_domain": "kebbie-hub account encryption key v1",
   "fingerprints": {
     "encryption": "vLdSXbxm2t23vU8zOHzMaL8yWxb1HCdLOpYOe1GL1Ks",

@@ -16,7 +16,6 @@ use crate::store::{Access, Session};
 use crate::{Hub, TrustedProxy};
 
 pub const MACHINE_TOKEN_PREFIX: &str = "khm_";
-pub const DEVICE_TOKEN_PREFIX: &str = "khd_";
 pub const SESSION_TOKEN_PREFIX: &str = "khs_";
 pub const SETUP_TOKEN_PREFIX: &str = "kho_";
 pub const DEVICE_CODE_PREFIX: &str = "khc_";
@@ -84,8 +83,6 @@ pub fn client_address(parts: &Parts, hub: &Hub) -> String {
 
 pub struct MachineAuth(pub Id);
 
-pub struct DeviceAuth(pub Id);
-
 pub struct AccountAuth(pub String);
 
 pub struct SameOrigin;
@@ -122,34 +119,6 @@ impl FromRequestParts<Arc<Hub>> for MachineAuth {
         hub.limit(&format!("token:{machine}"))?;
         hub.store().touch_machine(&machine, crate::now())?;
         Ok(MachineAuth(machine))
-    }
-}
-
-impl FromRequestParts<Arc<Hub>> for DeviceAuth {
-    type Rejection = ApiError;
-
-    async fn from_request_parts(parts: &mut Parts, hub: &Arc<Hub>) -> Result<DeviceAuth, ApiError> {
-        let address = client_address(parts, hub);
-        hub.check_anonymous(&address)?;
-        let token = bearer(&parts.headers);
-        let Some(device) = device_for(hub, token)? else {
-            let presented = token.is_some_and(|token| token.starts_with(DEVICE_TOKEN_PREFIX));
-            return Err(if presented {
-                hub.refuse_device(&address)
-            } else {
-                hub.refuse_anonymous(&address)
-            });
-        };
-        hub.limit(&format!("token:{device}"))?;
-        hub.store().touch_device(&device, crate::now())?;
-        Ok(DeviceAuth(device))
-    }
-}
-
-pub fn device_for(hub: &Hub, token: Option<&str>) -> Result<Option<Id>, ApiError> {
-    match token.filter(|token| token.starts_with(DEVICE_TOKEN_PREFIX)) {
-        Some(token) => Ok(hub.store().device_by_token(&digest(token))?),
-        None => Ok(None),
     }
 }
 

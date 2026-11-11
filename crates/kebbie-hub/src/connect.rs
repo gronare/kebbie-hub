@@ -57,7 +57,7 @@ pub async fn start(
         now: at,
         expires_at: at + ttl,
     })?;
-    store.log(at, "connect.started", None, None, None)?;
+    store.log(at, "connect.started", None, None)?;
     let verification_uri = format!("{}/connect", hub.origin());
     Ok(Json(ConnectStarted {
         verification_uri_complete: format!("{verification_uri}?code={user_code}"),
@@ -115,9 +115,7 @@ pub async fn token(
                 at,
                 "machine.joined",
                 Some(&machine),
-                None,
-                Some("by=connect"),
-            )?;
+                Some("by=connect"),)?;
             Ok(Json(Connected {
                 machine,
                 token,
@@ -203,10 +201,8 @@ pub async fn approve(
     }
     let machine = Id::new(Prefix::Machine).expect("a fresh machine id is valid");
     let pairing_id = URL_SAFE_NO_PAD.encode(random::<16>());
-    let unusable = digest(&new_token("unused_"));
     let pairing = request.commitment.map(|commitment| ConnectPairing {
         id: &pairing_id,
-        code_hash: &unusable,
         commitment: commitment.0,
         expires_at: at + hub.config().pairing_ttl,
     });
@@ -230,9 +226,7 @@ pub async fn approve(
         at,
         "connect.approved",
         Some(&machine),
-        None,
-        Some(&account),
-    )?;
+        Some(&account),)?;
     Ok(Json(ConnectApproved {
         machine,
         name: approved.name,
@@ -251,14 +245,14 @@ pub async fn deny(
     let store = hub.store();
     let (code, _) = pending(&store, &request.code, at)?;
     store.deny_connect(&digest(&code), at)?;
-    store.log(at, "connect.denied", None, None, Some(&account))?;
+    store.log(at, "connect.denied", None, Some(&account))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 fn account_pairing(store: &Store, account: &str, id: &str) -> Result<Pairing, ApiError> {
     store
         .pairing(id)?
-        .filter(|pairing| pairing.account.as_deref() == Some(account))
+        .filter(|pairing| pairing.account.as_str() == account)
         .ok_or_else(ApiError::not_found)
 }
 
@@ -275,7 +269,7 @@ pub async fn pairing(
             Ok((pairing, changed))
         })
         .await?;
-    let mut shown = pairing_view(&pairing, Side::Device, now());
+    let mut shown = pairing_view(&pairing, Side::Account, now());
     shown.machine_name = hub.store().machine_name(&pairing.machine)?;
     Ok(Json(shown))
 }
@@ -296,13 +290,13 @@ pub async fn reveal(
     if store.account_key(&account)?.as_ref() != Some(&reveal.key) {
         return Err(ApiError::conflict("keys-differ"));
     }
-    pairing.device_keys = Some(reveal.key.keys);
+    pairing.account_keys = Some(reveal.key.keys);
     pairing.account_key_version = Some(reveal.key.version);
-    pairing.device_nonce = Some(reveal.nonce.0);
+    pairing.account_nonce = Some(reveal.nonce.0);
     pairing.state = PairingState::Revealed;
     store.save_pairing(&pairing)?;
-    store.log(at, "pairing.revealed", Some(&pairing.machine), None, Some(&account))?;
+    store.log(at, "pairing.revealed", Some(&pairing.machine), Some(&account))?;
     drop(store);
     hub.wake_pairing(&pairing);
-    Ok(Json(pairing_view(&pairing, Side::Device, at)))
+    Ok(Json(pairing_view(&pairing, Side::Account, at)))
 }

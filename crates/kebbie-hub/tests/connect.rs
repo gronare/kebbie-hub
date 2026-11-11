@@ -362,7 +362,6 @@ async fn the_browser_that_connects_hands_over_the_account_key_and_reads_the_boar
     assert_eq!(opened.items[0].summary, format!("{MARKER} summary"));
     let sealed = test.hub.store().events().unwrap();
     assert!(sealed.iter().any(|(kind, _)| kind == "account.pinned"));
-    assert!(machine.devices.is_empty());
 }
 
 #[tokio::test]

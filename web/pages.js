@@ -4,6 +4,7 @@ import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
+import { allowsChanges, keepAllowsChanges } from "./device.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
@@ -50,7 +51,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -143,7 +144,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
   function accountPage() {
     if (!state.me) return accountSignIn();
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
-    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy });
+    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null });
   }
 
   function draw() {
@@ -158,6 +159,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     try {
       if (path === "/connect") await loadConnect();
       if (state.me && keepsEmail()) state.address = await account.email().catch(() => null);
+      if (state.me && path === "/account") state.allowed = await allowsChanges({ get }, state.me.account);
     } catch (error) {
       state.view = null;
       state.notice = message(error);
@@ -447,6 +449,14 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     }
   }, { signal: listening.signal });
 
+  root.addEventListener("change", async (event) => {
+    if (state.left || event.target.name !== "allow-changes" || !state.me) return;
+    state.allowed = event.target.checked;
+    await keepAllowsChanges({ put }, state.me.account, state.allowed).catch(() => (state.notice = "This browser can't keep the setting; it lasts until you close the page."));
+    draw();
+    root.querySelector('input[name="allow-changes"]')?.focus({ preventScroll: true });
+  }, { signal: listening.signal });
+
   root.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || !event.target.matches?.("#email, #code")) return;
     event.preventDefault();
@@ -475,7 +485,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       state.left = true;
       unlockEnds.watch(null);
       listening.abort();
-      return { session: state.session, me: state.me, address: state.address };
+      return { session: state.session, me: state.me, address: state.address, allowed: state.allowed };
     },
   };
 }

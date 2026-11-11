@@ -2,46 +2,17 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{self, OpenError, PublicKeys, SecretKeys};
+use crate::account::AccountKey;
+use crate::crypto::{self, OpenError, SecretKeys};
 use crate::envelope::{Envelope, Kind, ShapeError};
 use crate::ids::Id;
 use crate::message::{CommandResult, Payload, Reason};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Role {
-    Read,
-    Control,
-}
-
-impl Role {
-    pub fn key(self) -> &'static str {
-        match self {
-            Role::Read => "read",
-            Role::Control => "control",
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TrustedDevice {
-    pub id: Id,
-    pub name: String,
-    pub keys: PublicKeys,
-    pub role: Role,
-}
-
 pub struct Machine<'a> {
     pub id: &'a Id,
     pub keys: &'a SecretKeys,
-    pub devices: &'a [TrustedDevice],
+    pub account: &'a AccountKey,
     pub accepts: &'a [Kind],
-}
-
-#[derive(Debug)]
-pub struct Accepted<'a> {
-    pub device: &'a TrustedDevice,
-    pub payload: Payload,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,7 +21,7 @@ pub enum Dropped {
     Malformed,
     NotACommand,
     WrongMachine,
-    UnknownDevice,
+    WrongAccount,
     BadSignature,
 }
 
@@ -61,7 +32,7 @@ impl Dropped {
             Dropped::Malformed => "malformed",
             Dropped::NotACommand => "not-a-command",
             Dropped::WrongMachine => "wrong-machine",
-            Dropped::UnknownDevice => "unknown-device",
+            Dropped::WrongAccount => "wrong-account",
             Dropped::BadSignature => "bad-signature",
         }
     }
@@ -74,12 +45,12 @@ pub enum Refusal {
     Replay(CommandResult),
 }
 
-pub fn authorize<'a>(
-    machine: &Machine<'a>,
+pub fn authorize(
+    machine: &Machine<'_>,
     applied: &AppliedCommands,
     envelope: &Envelope,
     now: u64,
-) -> Result<Accepted<'a>, Refusal> {
+) -> Result<Payload, Refusal> {
     let header = &envelope.header;
     match header.check_shape() {
         Err(ShapeError::UnsupportedVersion | ShapeError::UnsupportedSchema) => {
@@ -94,18 +65,17 @@ pub fn authorize<'a>(
     if &header.machine != machine.id {
         return Err(Refusal::Drop(Dropped::WrongMachine));
     }
-    let device = machine
-        .devices
-        .iter()
-        .find(|device| device.id == header.from)
-        .ok_or(Refusal::Drop(Dropped::UnknownDevice))?;
-    crypto::verify_signature(envelope, &device.id, &device.keys)
+    let account = machine.account;
+    if header.from != account.account {
+        return Err(Refusal::Drop(Dropped::WrongAccount));
+    }
+    crypto::verify_signature(envelope, &account.account, &account.keys)
         .map_err(|_| Refusal::Drop(Dropped::BadSignature))?;
-    if let Some(result) = applied.result(&device.id, &header.id) {
+    if let Some(result) = applied.result(&account.account, &header.id) {
         return Err(Refusal::Replay(result.clone()));
     }
     crypto::check_time(header, now).map_err(|_| Refusal::Answer(Reason::Expired))?;
-    if device.role != Role::Control || !machine.accepts.contains(&header.kind) {
+    if !machine.accepts.contains(&header.kind) {
         return Err(Refusal::Answer(Reason::NotAllowed));
     }
     let payload = crypto::decrypt(envelope, machine.id, machine.keys)
@@ -113,7 +83,7 @@ pub fn authorize<'a>(
     payload
         .validate()
         .map_err(|_| Refusal::Answer(Reason::BadRequest))?;
-    Ok(Accepted { device, payload })
+    Ok(payload)
 }
 
 fn undecrypted(error: OpenError) -> Reason {
@@ -137,16 +107,16 @@ pub struct Applied {
 impl AppliedCommands {
     pub const KEEP_SECONDS: u64 = 7 * 86_400;
 
-    pub fn result(&self, device: &Id, command: &Id) -> Option<&CommandResult> {
+    pub fn result(&self, sender: &Id, command: &Id) -> Option<&CommandResult> {
         self.applied
-            .get(device)?
+            .get(sender)?
             .get(command)
             .map(|applied| &applied.result)
     }
 
-    pub fn record(&mut self, device: &Id, at: u64, result: CommandResult) {
+    pub fn record(&mut self, sender: &Id, at: u64, result: CommandResult) {
         self.applied
-            .entry(device.clone())
+            .entry(sender.clone())
             .or_default()
             .insert(result.command.clone(), Applied { at, result });
     }
@@ -170,17 +140,16 @@ impl AppliedCommands {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ids::Prefix;
     use crate::message::Outcome;
 
     #[test]
-    fn applied_commands_replay_per_device_and_forget_after_a_week() {
+    fn applied_commands_replay_per_sender_and_forget_after_a_week() {
         let mut applied = AppliedCommands::default();
-        let phone = Id::ulid(Prefix::Device, 1, [1; 10]).unwrap();
-        let tablet = Id::ulid(Prefix::Device, 1, [2; 10]).unwrap();
+        let account = Id::account([1; 16]);
+        let other = Id::account([2; 16]);
         let command = Id::command(1, [7; 10]);
         applied.record(
-            &phone,
+            &account,
             1_000,
             CommandResult {
                 command: command.clone(),
@@ -190,11 +159,11 @@ mod tests {
         );
         assert_eq!(
             applied
-                .result(&phone, &command)
+                .result(&account, &command)
                 .map(|result| result.outcome),
             Some(Outcome::Done)
         );
-        assert_eq!(applied.result(&tablet, &command), None);
+        assert_eq!(applied.result(&other, &command), None);
         let stored: AppliedCommands =
             serde_json::from_str(&serde_json::to_string(&applied).unwrap()).unwrap();
         assert_eq!(stored, applied);

@@ -4,8 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AppliedCommands, BlobRef, CommandResult, CommitmentMismatch, DevicePairing, Envelope, Id, Kind, Machine,
-    MachinePairing, Payload, PublicKeys, Refusal, SecretKeys, TrustedDevice, authorize, open, open_blob,
+    AppliedCommands, BlobRef, CommandResult, Envelope, Id, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, authorize, open, open_blob,
 };
 use serde_json::Value;
 
@@ -98,7 +97,7 @@ fn commands_are_authorised_as_the_vectors_say() {
     let parties = parties();
     let vectors = load("authorize.json");
     let machine = &parties[vectors["machine"].as_str().unwrap()];
-    let trusted: Vec<TrustedDevice> = serde_json::from_value(vectors["trusted"].clone()).unwrap();
+    let account: kebbie_hub_protocol::AccountKey = serde_json::from_value(vectors["account"].clone()).unwrap();
     for case in vectors["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let accepts: Vec<Kind> = serde_json::from_value(case["accepts"].clone()).unwrap();
@@ -107,20 +106,15 @@ fn commands_are_authorised_as_the_vectors_say() {
         let gate = Machine {
             id: &machine.id,
             keys: &machine.secret,
-            devices: &trusted,
+            account: &account,
             accepts: &accepts,
         };
         let decided = authorize(&gate, &applied, &envelope, vectors["now"].as_u64().unwrap());
         let expect = &case["expect"];
         match decided {
-            Ok(accepted) => {
+            Ok(payload) => {
                 assert_eq!(
-                    accepted.device.id.as_str(),
-                    expect["accepted"].as_str().unwrap(),
-                    "{name}"
-                );
-                assert_eq!(
-                    accepted.payload,
+                    payload,
                     serde_json::from_value::<Payload>(expect["payload"].clone()).unwrap(),
                     "{name}"
                 );
@@ -140,59 +134,13 @@ fn commands_are_authorised_as_the_vectors_say() {
     }
 }
 
-fn bytes32_of(case: &Value, key: &str) -> [u8; 32] {
-    bytes32(&case[key])
-}
-
 #[test]
-fn pairing_flows_end_as_the_vectors_say() {
-    let parties = parties();
-    for case in load("pairing.json")["cases"].as_array().unwrap() {
-        let name = case["name"].as_str().unwrap();
-        let text = |key: &str| case[key].as_str().unwrap().to_string();
-        let machine = &parties[&text("machine")];
-        let device = &parties[&text("device")];
-        let revealed = &parties[case["revealed"]["device"].as_str().unwrap()];
-        let device_side = DevicePairing::with_nonce(
-            device.public,
-            bytes32_of(case, "device_nonce"),
-            &text("code"),
-        );
-        assert_eq!(
-            device_side.commitment(),
-            bytes32_of(case, "commitment"),
-            "{name}"
-        );
-        let machine_side = MachinePairing::with_nonce(
-            machine.public,
-            device_side.commitment(),
-            bytes32_of(case, "machine_nonce"),
-            &text("machine_code"),
-        );
-        let decided =
-            machine_side.comparison_code(&revealed.public, &bytes32(&case["revealed"]["nonce"]));
-        match case["expect"].get("sas") {
-            Some(sas) => {
-                assert_eq!(decided.as_deref(), Ok(sas.as_str().unwrap()), "{name}");
-                assert_eq!(
-                    device_side.comparison_code(&machine.public, &machine_side.reply().1),
-                    sas.as_str().unwrap(),
-                    "{name}"
-                );
-            }
-            None => assert_eq!(decided, Err(CommitmentMismatch), "{name}"),
-        }
-    }
-}
-
-#[test]
-fn a_connect_link_names_its_machine_and_binds_the_browser_commitment() {
+fn a_connect_link_names_its_machine() {
     use kebbie_hub_protocol::{ConnectSecret, machine_fingerprint};
     let parties = parties();
-    let vector = &load("pairing.json")["connect"];
+    let vector = load("connect.json");
     let text = |key: &str| vector[key].as_str().unwrap().to_string();
     let machine = &parties[&text("machine")];
-    let device = &parties[&text("device")];
     assert_eq!(
         URL_SAFE_NO_PAD.encode(machine_fingerprint(&machine.public)),
         text("fingerprint")
@@ -202,23 +150,6 @@ fn a_connect_link_names_its_machine_and_binds_the_browser_commitment() {
     assert!(secret.names(&machine.public));
     assert!(!secret.names(&parties["intruder"].public));
     assert_eq!(secret.pairing_code(), text("code"));
-    let browser = DevicePairing::with_nonce(
-        device.public,
-        bytes32(&vector["device_nonce"]),
-        &text("code"),
-    );
-    assert_eq!(browser.commitment(), bytes32(&vector["commitment"]));
-    let answering = MachinePairing::with_nonce(
-        machine.public,
-        browser.commitment(),
-        bytes32(&vector["machine_nonce"]),
-        &text("code"),
-    );
-    assert!(
-        answering
-            .comparison_code(&device.public, &bytes32(&vector["device_nonce"]))
-            .is_ok()
-    );
 }
 
 fn bytes(value: &Value) -> Vec<u8> {
@@ -228,7 +159,7 @@ fn bytes(value: &Value) -> Vec<u8> {
 #[test]
 fn account_keys_wrap_sign_and_pin_as_the_vectors_say() {
     use kebbie_hub_protocol::{
-        AccountFingerprints, AccountHandoff, AccountKey, DEVICE_LIST_DOMAIN, DeviceList, HUB_PRF_SALT_DOMAIN,
+        AccountFingerprints, AccountHandoff, AccountKey, HUB_PRF_SALT_DOMAIN,
         MachineList, Unlock,
         hub_prf_salt, pin_account, sign_wrapper, wrap_associated_data, wrap_key, wrapper_statement,
     };
@@ -304,22 +235,6 @@ fn account_keys_wrap_sign_and_pin_as_the_vectors_say() {
     let gone = &parties[lists["removed_machine"].as_str().unwrap()];
     assert!(list.trusts(&gone.id, &gone.public) && !removed.trusts(&gone.id, &gone.public));
     assert!(removed.trusts(&trusted.id, &trusted.public));
-    let devices = &vectors["devices"];
-    assert_eq!(devices["domain"].as_str().unwrap().as_bytes(), DEVICE_LIST_DOMAIN);
-    let list: DeviceList = serde_json::from_value(devices["list"].clone()).unwrap();
-    assert_eq!(list.statement(&key.account).unwrap(), bytes(&devices["statement"]));
-    let signature: [u8; 64] = bytes(&devices["signature"]).try_into().unwrap();
-    assert_eq!(list.sign(&account.secret, &key.account).unwrap(), signature);
-    assert!(key.verifies_device_list(&list, &signature));
-    let removed: DeviceList = serde_json::from_value(devices["removed"].clone()).unwrap();
-    let removed_signature: [u8; 64] = bytes(&devices["removed_signature"]).try_into().unwrap();
-    assert!(key.verifies_device_list(&removed, &removed_signature));
-    assert!(!key.verifies_device_list(&removed, &signature));
-    assert!(removed.counter > list.counter);
-    let kept = &parties[devices["trusted"].as_str().unwrap()];
-    let gone = &parties[devices["removed_device"].as_str().unwrap()];
-    assert!(list.listed(&gone.id).is_some() && removed.listed(&gone.id).is_none());
-    assert_eq!(removed.listed(&kept.id).map(|listed| listed.keys), Some(kept.public));
     let handoff = &vectors["handoff"];
     let code = handoff["code"].as_str().unwrap();
     let nonce = bytes32(&handoff["nonce"]);

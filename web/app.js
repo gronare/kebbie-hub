@@ -3,10 +3,10 @@ import { markdown } from "./markdown.js";
 import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
-import { account, connectCalls, deviceCalls, follow, HubError } from "./hub.js";
+import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
-import { collectResults, DeviceListProblem, enableDevice, forgetDevice, keepSent, loadDevice, loadSent, removeListedDevice, sendCommand, trustedDeviceList } from "./device.js";
-import { answerBlock, answerReady, choosable, COMMAND_TEXT, deviceRows, gate, latestSent, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, setupBlock, takesPromptAnswers } from "./decide.js";
+import { allowsChanges, collectResults, CommandProblem, keepSent, loadSent, sendCommand } from "./device.js";
+import { answerBlock, answerReady, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
@@ -22,7 +22,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, device: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), devices: null, pro: { busy: false, error: null }, refused: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
 const cameraAtBottom = () => globalThis.screen?.orientation?.angle === (Math.max(innerWidth, innerHeight) > 800 ? 90 : 270);
@@ -282,7 +282,7 @@ function uiOf(machine, address) {
   return state.ui.get(key);
 }
 
-const commandGate = () => gate({ info: state.info, refused: state.refused, device: state.device });
+const commandGate = () => gate({ info: state.info, refused: state.refused, allowed: state.allowed });
 const decide = (found, html) => `<div class="decide" data-machine="${esc(found.machine)}" data-address="${esc(found.item.address)}">${html}</div>`;
 
 function sentFor(found, kind, question = null, prompt = null) {
@@ -297,14 +297,19 @@ function answerArea(found) {
   const access = commandGate();
   if (access === "off") return optionCards(question.options, question.recommend) + machineAnswerNote();
   if (access === "refused") return optionCards(question.options, question.recommend) + refusedBlock(state.refused.url);
-  if (access === "setup") return optionCards(question.options, question.recommend) + setupBlock(state.pro);
+  if (access === "view-only") return optionCards(question.options, question.recommend) + viewOnlyBlock();
+  if (!takes(found.accepts, "answer")) return optionCards(question.options, question.recommend) + notTakenBlock("answer", found.name, found.accepts);
   const { sent, state: shown } = sentFor(found, "answer", question.id);
   return decide(found, answerBlock({ key: uiKey(found.machine, found.item.address), question, ui: uiOf(found.machine, found.item.address), sent, state: shown }));
 }
 
 function promptArea(found) {
   const prompt = found.item.prompt;
-  if (commandGate() !== "ready" || !takesPromptAnswers(found)) return promptCards(prompt) + (state.info?.commands ? `<div class="pro">Answer Codex prompts at the machine.</div>` : machineAnswerNote());
+  const access = commandGate();
+  if (access === "off") return promptCards(prompt) + machineAnswerNote();
+  if (access === "refused") return promptCards(prompt) + refusedBlock(state.refused.url);
+  if (access === "view-only") return promptCards(prompt) + viewOnlyBlock();
+  if (!takesPromptAnswers(found)) return promptCards(prompt) + notTakenBlock("prompt-answer", found.name, found.accepts);
   const ui = uiOf(found.machine, found.item.address);
   if (ui.prompt !== prompt.id && !ui.busy) Object.assign(ui, freshUi(), { prompt: prompt.id });
   const { sent, state: shown } = sentFor(found, "prompt-answer", null, prompt.id);
@@ -318,7 +323,8 @@ function pushArea(found) {
   const access = commandGate();
   if (access === "off" || !pushReady(item)) return `<button type="button" class="btn primary off" disabled>Push ${esc(short(item.head))} · coming in a later version</button>`;
   if (access === "refused") return refusedBlock(state.refused.url);
-  if (access === "setup") return setupBlock(state.pro);
+  if (access === "view-only") return viewOnlyBlock();
+  if (!takes(found.accepts, "push")) return notTakenBlock("push", found.name, found.accepts);
   const { sent, state: shown } = sentFor(found, "push");
   const current = sent && sent.head !== item.head && settled(shown) ? null : sent;
   return decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null }));
@@ -394,18 +400,11 @@ function machinesScreen() {
   const rows = awakeFirst(state.opened, now).map((opened) => {
     const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
     const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kebbie}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
-    return machineRow({ machine: opened.machine, name: opened.name, awake, facts });
+    const policy = state.info?.commands && opened.board && !opened.problem ? [machinePolicy(opened.board.accepts)] : [];
+    return machineRow({ machine: opened.machine, name: opened.name, awake, facts: [...policy, ...facts] });
   });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  return `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}${rows.join("")}${devicesSection()}<a class="btn phone-only" href="/account">Account</a></div>`;
-}
-
-function devicesSection() {
-  if (!state.info?.commands) return "";
-  const view = state.devices;
-  const body = !view ? `<div class="center">Loading the devices that answer and push…</div>` : view.problem ? `<div class="center warn" role="alert">${esc(COMMAND_TEXT[view.problem] ?? view.problem)}</div>` : deviceRows(view.list, state.device?.id ?? null);
-  const add = commandGate() === "setup" ? setupBlock(state.pro) : state.pro.error ? `<div class="center warn" role="alert">${esc(state.pro.error)}</div>` : "";
-  return `<h2 class="group g-muted">Devices that answer and push</h2>${body}${add}`;
+  return `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}${rows.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
 }
 
 function lockedScreen() {
@@ -524,7 +523,7 @@ async function refresh() {
   state.opened = result.opened;
   state.marks = result.marks;
   state.keys = new Map((result.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
-  await refreshDevices(session);
+  await loadCommands(session);
   blobs.retryFailed();
   await keepMarks();
   if (result.gone.length && !state.offline) {
@@ -561,30 +560,19 @@ async function removeMachine(machine, name) {
 }
 
 function commandText(error) {
-  if (error instanceof DeviceListProblem) return COMMAND_TEXT[error.reason] ?? error.reason;
+  if (error instanceof CommandProblem) return COMMAND_TEXT[error.reason] ?? error.reason;
   if (error instanceof HubError && COMMAND_TEXT[error.code]) return COMMAND_TEXT[error.code];
   return hubMessage(error);
 }
 
-async function loadDeviceState(account) {
-  state.device = await loadDevice(deviceStore, account);
-  state.kept = await loadSent(deviceStore, account, nowSeconds());
-}
-
-async function refreshDevices(session) {
+async function loadCommands(session) {
   if (!state.info?.commands || session?.state !== "unlocked") return;
-  if (state.device?.account !== session.identity.id) await loadDeviceState(session.identity.id);
-  try {
-    const trusted = await trustedDeviceList(await account.deviceList(), session.identity, state.device?.listed ?? 0);
-    state.devices = trusted;
-    if (trusted.list && state.device?.listed && !trusted.list.devices.some((listed) => listed.device === state.device.id)) {
-      await forgetDevice(deviceStore, session.identity.id);
-      state.device = null;
-    }
-  } catch (error) {
-    state.devices = { problem: error instanceof HubError ? error.code : "unreachable" };
+  const id = session.identity.id;
+  if (state.keptFor !== id) {
+    state.kept = await loadSent(deviceStore, id, nowSeconds());
+    state.allowed = await allowsChanges(deviceStore, id);
+    state.keptFor = id;
   }
-  startDeviceFeed();
   collect();
 }
 
@@ -592,90 +580,21 @@ const keysOf = (machine) => state.keys.get(machine) ?? null;
 let collecting = null;
 
 function collect() {
-  const device = state.device;
-  if (!device?.listed || collecting) return collecting;
+  const identity = state.session?.identity;
+  if (!identity || !state.info?.commands || collecting || state.kept.sent.every((one) => one.result)) return collecting;
   collecting = (async () => {
     try {
-      const kept = await collectResults({ calls: deviceCalls, device, kept: state.kept, keysOf, now: nowSeconds() });
-      if (state.device !== device) return;
+      const kept = await collectResults({ calls: account, identity, kept: state.kept, keysOf, now: nowSeconds() });
+      if (state.session?.identity !== identity) return;
       state.kept = kept;
-      await keepSent(deviceStore, device.account, kept);
+      await keepSent(deviceStore, identity.id, kept);
       render();
-    } catch (error) {
-      if (error instanceof HubError && error.status === 401) await dropDevice();
+    } catch {
     } finally {
       collecting = null;
     }
   })();
   return collecting;
-}
-
-async function dropDevice() {
-  if (!state.device) return;
-  await forgetDevice(deviceStore, state.device.account);
-  state.device = null;
-  deviceFeed?.abort();
-  deviceFeed = null;
-  render();
-}
-
-let deviceFeed = null;
-function startDeviceFeed() {
-  const device = state.device;
-  if (!device?.listed || deviceFeed) return;
-  const controller = new AbortController();
-  deviceFeed = controller;
-  (async () => {
-    let delay = 2000;
-    while (!controller.signal.aborted) {
-      try {
-        await follow((name) => {
-          delay = 2000;
-          if (name === "result") collect();
-        }, controller.signal, { path: "/v1/d/events", token: device.token, lastEventId: state.kept.cursor || null });
-      } catch (error) {
-        if (error instanceof HubError && error.status === 401) return dropDevice();
-      }
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay = Math.min(delay * 2, 60_000);
-    }
-  })();
-}
-
-async function freshPasskey() {
-  const session = await unlockAfter(hub, await signingIn.withPasskey(rememberedCredential()));
-  if (session.state !== "unlocked") throw new Error(STATE_TEXT[session.state] ?? "Your account did not unlock.");
-  state.session = session;
-  state.me = session.me;
-  return session.identity;
-}
-
-async function enableThisDevice() {
-  state.pro = { busy: true, error: null };
-  render();
-  try {
-    const { device, list } = await enableDevice({ hub: account, store: deviceStore, identity: state.session.identity, name: proposedName(navigator.userAgent), reauth: freshPasskey, seen: state.devices?.list?.counter ?? 0 });
-    state.device = device;
-    state.devices = { list };
-    state.pro = { busy: false, error: null };
-    startDeviceFeed();
-  } catch (error) {
-    state.pro = { busy: false, error: commandText(error) };
-  }
-  render();
-}
-
-async function removeDevice(device, name) {
-  if (!confirm(`Remove ${name}? It stops answering and pushing, and your machines stop trusting it.`)) return;
-  state.pro = { busy: false, error: null };
-  try {
-    const list = await removeListedDevice({ hub: account, store: deviceStore, identity: state.session.identity, device, reauth: freshPasskey, seen: state.devices?.list?.counter ?? 0 });
-    state.devices = { list };
-    if (state.device?.id === device) await dropDevice();
-  } catch (error) {
-    state.pro = { busy: false, error: commandText(error) };
-  }
-  render();
 }
 
 async function send(target, payload, meta) {
@@ -687,15 +606,15 @@ async function send(target, payload, meta) {
   render();
   try {
     if (!keys) throw new Error("Your account doesn't list this machine's keys.");
-    const sent = await sendCommand({ calls: deviceCalls, device: state.device, machine: { id: machine, keys }, payload, at: nowSeconds(), meta: { ...meta, device: state.device.name } });
+    const identity = state.session.identity;
+    const sent = await sendCommand({ calls: account, identity, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta });
     state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
-    await keepSent(deviceStore, state.device.account, state.kept);
+    await keepSent(deviceStore, identity.id, state.kept);
     state.ui.set(uiKey(machine, address), freshUi());
   } catch (error) {
     ui.busy = false;
     ui.error = commandText(error);
     if (error instanceof HubError && error.status === 402) state.refused = { url: error.url };
-    if (error instanceof HubError && error.status === 401) await dropDevice();
   }
   render();
   collect();
@@ -748,11 +667,9 @@ function decideAction(action, target, element) {
   render();
 }
 
-function stopDevice() {
-  deviceFeed?.abort();
-  deviceFeed = null;
-  state.device = null;
-  state.devices = null;
+function stopCommands() {
+  state.allowed = false;
+  state.keptFor = null;
   state.kept = { cursor: 0, sent: [] };
   state.ui = new Map();
   state.keys = new Map();
@@ -760,7 +677,7 @@ function stopDevice() {
 
 function lockBoards() {
   blobs.forget();
-  stopDevice();
+  stopCommands();
   following?.abort();
   following = null;
   state.opened = [];
@@ -770,7 +687,7 @@ function lockBoards() {
 
 function signedOut(message) {
   blobs.forget();
-  stopDevice();
+  stopCommands();
   forgetUnlock();
   following?.abort();
   following = null;
@@ -797,6 +714,7 @@ function startFeed() {
         await follow((name) => {
           delay = 2000;
           if (name === "board" || name === "machine-removed" || name === "machines") refresh();
+          if (name === "result") collect();
         }, controller.signal);
       } catch (error) {
         if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
@@ -1040,6 +958,7 @@ function leaveAccount() {
   if (left.session) state.session = left.session;
   if (left.me) state.me = left.me;
   state.address = left.address;
+  if (left.allowed !== null) state.allowed = left.allowed;
   render();
 }
 
@@ -1066,8 +985,6 @@ root.addEventListener("click", (event) => {
   const action = target.dataset.action;
   const decided = target.closest(".decide");
   if (decided) return decideAction(action, decided, target);
-  if (action === "enable-device") return enableThisDevice();
-  if (action === "remove-device") return removeDevice(target.dataset.id, target.dataset.name);
   if (action === "dismiss-hint") {
     state.hint = false;
     try {

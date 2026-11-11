@@ -5,14 +5,13 @@ use std::time::Duration;
 use axum::Router;
 use kebbie_hub::{CommandGate, Config, DEV_ORIGIN, Hooks, Hub, serve_with};
 use kebbie_hub_api::{
-    CreationCeremony, DeviceRegistered, DeviceRequest, LoginBegin, LoginFinish, PasskeyView,
+    CreationCeremony, LoginBegin, LoginFinish, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony,
 };
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{MachineState, connect, join};
-use kebbie_hub_fakes::phone::PhoneState;
-use kebbie_hub_fakes::{HubClient, HubError, PairError};
-use kebbie_hub_protocol::{Board, Id};
+use kebbie_hub_fakes::HubError;
+use kebbie_hub_protocol::Board;
 use reqwest::{Method, RequestBuilder, Response};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -26,7 +25,6 @@ use webauthn_rs::prelude::Url;
 
 pub const EXAMPLE_BOARD: &str = include_str!("../../../../examples/board.json");
 pub const MARKER: &str = "zebra-umbrella-7f3a";
-pub const PAIRING_TIMEOUT: Duration = Duration::from_secs(10);
 pub const WAIT: Duration = Duration::from_secs(10);
 
 pub struct TestHub {
@@ -84,41 +82,6 @@ pub fn board(marker: &str) -> Board {
         question.text = format!("{marker} question");
     }
     board
-}
-
-pub async fn pair_both(
-    machine: &mut MachineState,
-    phone: &mut PhoneState,
-    accept_if_same: bool,
-) -> (Result<Id, PairError>, Result<Id, PairError>) {
-    let (code_out, code_in) = oneshot::channel::<String>();
-    let (digits_out, digits_in) = oneshot::channel::<String>();
-    let (machine_digits_out, machine_digits_in) = oneshot::channel::<String>();
-    let machine_side = machine.pair(
-        PAIRING_TIMEOUT,
-        move |code| {
-            let _ = code_out.send(code.to_string());
-        },
-        async move |machine_digits: String| {
-            let _ = machine_digits_out.send(machine_digits.clone());
-            accept_if_same
-                && digits_in
-                    .await
-                    .is_ok_and(|phone_digits| phone_digits == machine_digits)
-        },
-    );
-    let phone_side = async {
-        let code = code_in.await.unwrap();
-        phone
-            .pair(&code, PAIRING_TIMEOUT, async move |digits: String| {
-                let _ = digits_out.send(digits.clone());
-                machine_digits_in
-                    .await
-                    .map_or(true, |machine_digits| machine_digits == digits)
-            })
-            .await
-    };
-    tokio::join!(machine_side, phone_side)
 }
 
 pub fn status_of<T: std::fmt::Debug>(result: Result<T, HubError>) -> u16 {
@@ -301,20 +264,6 @@ impl Person {
         )
         .await
     }
-
-    pub async fn register_device(&self) -> DeviceRegistered {
-        body(
-            self.post(
-                "/v1/a/devices",
-                &DeviceRequest {
-                    name: Some("phone".to_string()),
-                    keys: None,
-                },
-            )
-            .await,
-        )
-        .await
-    }
 }
 
 pub async fn signed_up(test: &TestHub) -> Person {
@@ -323,19 +272,6 @@ pub async fn signed_up(test: &TestHub) -> Person {
     let response = person.sign_up(&invite).await;
     assert!(response.status().is_success(), "{}", response.status());
     person
-}
-
-pub async fn phone_at(test: &TestHub, hub: &str) -> PhoneState {
-    let registered = signed_up(test).await.register_device().await;
-    PhoneState::registered(hub, registered.device, &registered.token)
-}
-
-pub async fn phone(test: &TestHub) -> PhoneState {
-    phone_at(test, &test.url).await
-}
-
-pub fn device_client(test: &TestHub, registered: &DeviceRegistered) -> HubClient {
-    HubClient::new(&test.url, Some(&registered.token))
 }
 
 pub fn database_bytes(test: &TestHub) -> Vec<u8> {
@@ -374,29 +310,19 @@ pub struct EventStream {
 }
 
 impl EventStream {
-    pub async fn open(url: &str, token: &str) -> EventStream {
-        EventStream::connect(url, token, None).await
-    }
-
-    pub async fn open_after(url: &str, token: &str, last_event: u64) -> EventStream {
-        EventStream::connect(url, token, Some(last_event)).await
-    }
-
-    async fn connect(url: &str, token: &str, last_event: Option<u64>) -> EventStream {
-        let mut request = reqwest::Client::new()
-            .get(format!("{url}/v1/d/events"))
-            .bearer_auth(token);
-        if let Some(last_event) = last_event {
-            request = request.header("last-event-id", last_event.to_string());
-        }
-        EventStream::opened(request).await
-    }
-
     pub async fn of_account(person: &Browser) -> EventStream {
-        let request = reqwest::Client::new()
-            .get(format!("{}/v1/a/events", person.hub))
-            .header("cookie", person.cookie.clone().expect("signed in"));
+        EventStream::opened(EventStream::account_request(person)).await
+    }
+
+    pub async fn of_account_after(person: &Browser, last_event: u64) -> EventStream {
+        let request = EventStream::account_request(person).header("last-event-id", last_event.to_string());
         EventStream::opened(request).await
+    }
+
+    pub fn account_request(person: &Browser) -> RequestBuilder {
+        reqwest::Client::new()
+            .get(format!("{}/v1/a/events", person.hub))
+            .header("cookie", person.cookie.clone().expect("signed in"))
     }
 
     async fn opened(request: RequestBuilder) -> EventStream {

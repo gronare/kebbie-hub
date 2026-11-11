@@ -1,4 +1,4 @@
-import { accountCommitment, machineFingerprint, machineListWith, machineListWithout, pairingNonce, parseConnectFragment, signMachineList, toB64 } from "../js/protocol.js";
+import { accountCommitment, machineFingerprint, machineListWith, machineListWithout, handoffNonce, parseConnectFragment, signMachineList, toB64 } from "../js/protocol.js";
 import { emptyMarks, trustedList } from "./board.js";
 import { HubError } from "./hub.js";
 
@@ -46,7 +46,7 @@ export async function withReauth(act, reauth) {
   }
 }
 
-export async function connectCommitment(key, fragment, nonce = pairingNonce()) {
+export async function connectCommitment(key, fragment, nonce = handoffNonce()) {
   return { nonce, commitment: toB64(await accountCommitment(key, nonce, fragment.code)) };
 }
 

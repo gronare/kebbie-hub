@@ -6,20 +6,17 @@ mod boards;
 pub mod cli;
 mod command;
 mod connect;
-mod device;
 mod error;
 mod events;
 mod github;
 mod limit;
 mod machine;
 mod pairing;
-mod push;
 mod server;
 mod signin;
 pub mod store;
 mod wake;
 pub mod web;
-pub mod webpush;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -44,11 +41,9 @@ pub use github::{GITHUB_API_URL, GITHUB_WEB_URL, Secret};
 use github::GitHub;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
-use push::Pusher;
 pub use server::{serve, serve_with};
 use store::{Pairing, Store};
-use wake::{Wakeups, account_key, device_key, machine_key, pairing_key};
-use webpush::{Vapid, check_subject};
+use wake::{Wakeups, account_key, machine_key, pairing_key};
 
 pub const DATABASE_FILE: &str = "hub.sqlite3";
 const REQUEST_BODY_LIMIT: usize = 16 * 1024;
@@ -59,8 +54,6 @@ const MAX_NAME_CHARS: usize = 64;
 pub const MAX_STORED_INTEGER: u64 = i64::MAX as u64;
 pub const DEV_ORIGIN: &str = "http://localhost:8470";
 pub const DEV_RP_ID: &str = "localhost";
-pub const DEV_VAPID_SUBJECT: &str = "https://github.com/gronare/kebbie-hub";
-pub const VAPID_KEY_FILE: &str = "vapid.key";
 const SETUP_TTL: u64 = 30 * 86_400;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -104,23 +97,12 @@ pub struct Config {
     pub header_read_timeout: Duration,
     pub body_frame_timeout: Duration,
     pub max_connections: usize,
-    pub max_feeds_per_device: usize,
+    pub max_feeds_per_account: usize,
     pub feed_keep_alive: Duration,
-    pub anonymous_devices: bool,
     pub command_rate: RateLimit,
     pub start_push_rate: RateLimit,
     pub max_queued: u64,
-    pub max_undelivered_per_device: u64,
-    pub vapid_subject: String,
-    pub vapid_key: PathBuf,
-    pub push_allow_hosts: Vec<String>,
-    pub notice_rate: RateLimit,
-    pub device_push_rate: RateLimit,
-    pub push_in_flight: usize,
-    pub push_pending: usize,
-    pub push_retries: u32,
-    pub push_backoff: Duration,
-    pub push_timeout: Duration,
+    pub max_undelivered_per_account: u64,
     pub signup: SignupMode,
     pub commands: bool,
     pub github_client_id: Option<String>,
@@ -138,7 +120,6 @@ impl Config {
     pub fn new(data_dir: impl Into<PathBuf>) -> Config {
         let data_dir = data_dir.into();
         Config {
-            vapid_key: data_dir.join(VAPID_KEY_FILE),
             data_dir,
             rate: RateLimit::default(),
             join_code_ttl: 600,
@@ -154,9 +135,8 @@ impl Config {
             header_read_timeout: Duration::from_secs(10),
             body_frame_timeout: Duration::from_secs(30),
             max_connections: 4096,
-            max_feeds_per_device: 8,
+            max_feeds_per_account: 8,
             feed_keep_alive: Duration::from_secs(15),
-            anonymous_devices: false,
             command_rate: RateLimit {
                 burst: 30,
                 per_minute: 30,
@@ -166,22 +146,7 @@ impl Config {
                 per_minute: 5,
             },
             max_queued: 1_000,
-            max_undelivered_per_device: 100,
-            vapid_subject: DEV_VAPID_SUBJECT.to_string(),
-            push_allow_hosts: Vec::new(),
-            notice_rate: RateLimit {
-                burst: 30,
-                per_minute: 30,
-            },
-            device_push_rate: RateLimit {
-                burst: 30,
-                per_minute: 30,
-            },
-            push_in_flight: 256,
-            push_pending: 4096,
-            push_retries: 3,
-            push_backoff: Duration::from_secs(1),
-            push_timeout: Duration::from_secs(30),
+            max_undelivered_per_account: 100,
             signup: SignupMode::Invite,
             commands: false,
             github_client_id: None,
@@ -242,7 +207,7 @@ pub fn mint_invite(store: &Store, ttl: u64) -> store::Result<String> {
 pub enum OpenError {
     Store(rusqlite::Error),
     RelyingParty(String),
-    Push(String),
+    DataDir(String),
     GitHub(String),
 }
 
@@ -251,7 +216,7 @@ impl std::fmt::Display for OpenError {
         match self {
             OpenError::Store(error) => error.fmt(formatter),
             OpenError::RelyingParty(message)
-            | OpenError::Push(message)
+            | OpenError::DataDir(message)
             | OpenError::GitHub(message) => formatter.write_str(message),
         }
     }
@@ -303,12 +268,9 @@ pub struct Hub {
     limiter: Limiter,
     command_limiter: Limiter,
     start_push_limiter: Limiter,
-    notice_limiter: Limiter,
-    device_push_limiter: Limiter,
     connect_limiter: Limiter,
     code_limiter: Limiter,
     setup_url: Mutex<Option<String>>,
-    pusher: Pusher,
     wakeups: Wakeups,
     closing: watch::Sender<bool>,
     webauthn: Webauthn,
@@ -353,15 +315,8 @@ impl Hub {
 
     pub fn open_with_hooks(config: Config, hooks: Hooks) -> Result<Arc<Hub>, OpenError> {
         let (webauthn, origin) = relying_party(&config.rp_id, &config.origin)?;
-        check_subject(&config.vapid_subject).map_err(OpenError::Push)?;
-        let vapid = Vapid::load_or_create(&config.vapid_key).map_err(OpenError::Push)?;
-        let pusher = Pusher::new(
-            vapid,
-            config.push_timeout,
-            config.push_in_flight,
-            config.push_pending,
-        )
-        .map_err(OpenError::Push)?;
+        std::fs::create_dir_all(&config.data_dir)
+            .map_err(|error| OpenError::DataDir(format!("{}: {error}", config.data_dir.display())))?;
         let github = match (&config.github_client_id, &config.github_client_secret) {
             (Some(id), Some(secret)) => Some(
                 GitHub::new(id, secret.clone(), &config.github_api_url, &config.github_web_url)
@@ -390,9 +345,6 @@ impl Hub {
             limiter: Limiter::new(config.rate, config.max_buckets),
             command_limiter: Limiter::new(config.command_rate, config.max_buckets),
             start_push_limiter: Limiter::new(config.start_push_rate, config.max_buckets),
-            notice_limiter: Limiter::new(config.notice_rate, config.max_buckets),
-            device_push_limiter: Limiter::new(config.device_push_rate, config.max_buckets),
-            pusher,
             wakeups: Wakeups::new(),
             closing: watch::Sender::new(false),
             webauthn,
@@ -409,7 +361,7 @@ impl Hub {
     pub fn open_feed(self: &Arc<Hub>, key: &str) -> Option<FeedPermit> {
         let mut feeds = self.feeds.lock().expect("the feeds lock is never poisoned");
         let count = feeds.entry(key.to_string()).or_insert(0);
-        if *count >= self.config.max_feeds_per_device {
+        if *count >= self.config.max_feeds_per_account {
             return None;
         }
         *count += 1;
@@ -419,11 +371,11 @@ impl Hub {
         })
     }
 
-    pub fn open_feeds(&self, device: &Id) -> usize {
+    pub fn open_feeds(&self, account: &str) -> usize {
         self.feeds
             .lock()
             .expect("the feeds lock is never poisoned")
-            .get(&device_key(device))
+            .get(&account_key(account))
             .copied()
             .unwrap_or(0)
     }
@@ -458,14 +410,6 @@ impl Hub {
 
     pub fn config(&self) -> &Config {
         &self.config
-    }
-
-    pub fn vapid_public_key(&self) -> &str {
-        self.pusher.vapid.public_key()
-    }
-
-    pub fn pushes_in_flight(&self) -> usize {
-        self.pusher.pending()
     }
 
     pub fn mint_join_code(&self) -> store::Result<String> {
@@ -531,31 +475,12 @@ impl Hub {
         Ok(seq)
     }
 
-    fn wake_device(&self, device: &Id) {
-        self.wakeups.wake(&device_key(device));
-    }
-
     fn wake_pairing(&self, pairing: &Pairing) {
         self.wakeups.wake(&pairing_key(&pairing.id));
-        if let Some(device) = &pairing.device {
-            self.wake_device(device);
-        }
     }
 
     fn wake_account(&self, account: &str) {
         self.wakeups.wake(&account_key(account));
-    }
-
-    fn wake_machines(&self, machines: &[Id]) {
-        for machine in machines {
-            self.wakeups.wake(&machine_key(machine));
-        }
-    }
-
-    fn wake_devices(&self, devices: &[Id]) {
-        for device in devices {
-            self.wake_device(device);
-        }
     }
 
     fn limit(&self, key: &str) -> Result<(), ApiError> {
@@ -566,12 +491,12 @@ impl Hub {
         }
     }
 
-    fn limit_command(&self, device: &Id, kind: Kind) -> Result<(), ApiError> {
+    fn limit_command(&self, account: &str, kind: Kind) -> Result<(), ApiError> {
         let limiter = match kind {
             Kind::Start | Kind::Push => &self.start_push_limiter,
             _ => &self.command_limiter,
         };
-        if limiter.allow(&format!("{device}:{}", kind.name())) {
+        if limiter.allow(&format!("{account}:{}", kind.name())) {
             Ok(())
         } else {
             Err(ApiError::rate_limited())
@@ -587,13 +512,6 @@ impl Hub {
             Err(ApiError::rate_limited())
         } else {
             Ok(())
-        }
-    }
-
-    fn refuse_device(&self, address: &str) -> ApiError {
-        match self.limit_anonymous(address) {
-            Ok(()) => ApiError::unknown_device(),
-            Err(limited) => limited,
         }
     }
 
@@ -636,8 +554,6 @@ impl Hub {
         self.limiter.forget_idle();
         self.command_limiter.forget_idle();
         self.start_push_limiter.forget_idle();
-        self.notice_limiter.forget_idle();
-        self.device_push_limiter.forget_idle();
         self.connect_limiter.forget_idle();
         self.code_limiter.forget_idle();
         self.wakeups.forget_idle();
@@ -687,26 +603,15 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         .route("/v1/m/leave", post(machine::leave))
         .route("/v1/m/inbox", get(machine::inbox))
         .route("/v1/m/results", post(command::post_result))
-        .route("/v1/m/notices", post(push::post_notice))
-        .route("/v1/d/push", put(push::subscribe).delete(push::unsubscribe))
-        .route("/v1/push/vapid", get(push::vapid))
         .route(
-            "/v1/d/commands",
+            "/v1/a/commands",
             post(command::post_command).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
         )
-        .route("/v1/d/results", get(command::results))
-        .route("/v1/m/pairings", post(machine::open_pairing))
+        .route("/v1/a/results", get(command::results))
         .route("/v1/m/pairings/{id}", get(machine::pairing))
         .route("/v1/m/pairings/{id}/reply", post(machine::reply))
         .route("/v1/m/pairings/{id}/admit", post(machine::admit))
         .route("/v1/m/pairings/{id}/refuse", post(machine::refuse))
-        .route("/v1/d/pairings", post(device::commit))
-        .route("/v1/d/pairings/{id}", get(device::pairing))
-        .route("/v1/d/pairings/{id}/reveal", post(device::reveal))
-        .route("/v1/m/devices", get(machine::devices))
-        .route("/v1/m/devices/{id}", delete(machine::remove_device))
-        .route("/v1/d/name", put(device::rename))
-        .route("/v1/d/events", get(events::events))
         .route("/v1/a/register/begin", post(account::register_begin))
         .route("/v1/a/register/finish", post(account::register_finish))
         .route("/v1/a/login/begin", post(account::login_begin))
@@ -718,16 +623,6 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         .route("/v1/a/passkeys/finish", post(account::passkey_finish))
         .route("/v1/a/passkeys/{id}", delete(account::remove_passkey))
         .route("/v1/a/passkeys/{id}/wrapper", put(account::set_wrapper))
-        .route(
-            "/v1/a/devices",
-            get(account::devices).post(account::register_device),
-        )
-        .route("/v1/a/devices/{id}", delete(account::remove_device))
-        .route(
-            "/v1/a/device-list",
-            get(account::device_list).put(account::put_device_list),
-        )
-        .route("/v1/m/device-list", get(machine::device_list))
         .merge(extra)
         .fallback(web::asset)
         .layer(DefaultBodyLimit::max(REQUEST_BODY_LIMIT))

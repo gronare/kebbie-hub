@@ -2,50 +2,24 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_api::{
-    AdmittedDevices, BoardStored, BoardUpload, DeviceListView, Bytes32, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING,
+    BoardStored, BoardUpload, Bytes32, CONNECT_DENIED, CONNECT_EXPIRED, CONNECT_PENDING,
     CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, Inbox,
-    JoinRequest, Joined, MachineName, NoticePosted, NoticeUpload, PairingFailure, PairingOpened,
+    JoinRequest, Joined, MachineName, PairingFailure,
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
 };
 use kebbie_hub_protocol::{
-    AccountFingerprints, AccountKey, AppliedCommands, Board, CommandResult, ConnectSecret, DeviceList, Dropped, Envelope, Event, Header, Id,
-    Kind, Machine, MachinePairing, Notice, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal,
-    Role, SecretKeys, TrustedDevice, Urgency, authorize, pin_account, seal,
+    AccountFingerprints, AccountKey, AppliedCommands, Board, CommandResult, ConnectSecret, Dropped, Envelope, Header, Id,
+    Kind, Machine, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal,
+    SecretKeys, authorize, pin_account, seal,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tokio::time::Instant;
 
 use crate::{Error, HubClient, HubError, KeyFile, PairError, now, save};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdmittedDevice {
-    pub id: Id,
-    pub keys: PublicKeys,
-    #[serde(default = "control")]
-    pub role: Role,
-}
-
-fn control() -> Role {
-    Role::Control
-}
-
 fn every_command() -> Vec<Kind> {
     vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer]
-}
-
-impl AdmittedDevice {
-    fn trusted(&self) -> TrustedDevice {
-        TrustedDevice {
-            id: self.id.clone(),
-            name: self.id.to_string(),
-            keys: self.keys,
-            role: self.role,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -91,7 +65,6 @@ pub struct MachineState {
     pub name: String,
     token: String,
     secret: KeyFile,
-    pub devices: Vec<AdmittedDevice>,
     pub last_rev: u64,
     pub inbox_seq: u64,
     #[serde(default)]
@@ -102,8 +75,6 @@ pub struct MachineState {
     pub applied: AppliedCommands,
     #[serde(default)]
     pub account: Option<AccountKey>,
-    #[serde(default)]
-    pub listed: DeviceList,
 }
 
 pub async fn join(hub: &str, code: &str, name: &str) -> Result<MachineState, Error> {
@@ -255,14 +226,12 @@ impl MachineState {
             name: name.to_string(),
             token,
             secret,
-            devices: Vec::new(),
             last_rev: 0,
             inbox_seq: 0,
             board: None,
             accepts: every_command(),
             applied: AppliedCommands::default(),
             account: None,
-            listed: DeviceList::default(),
         }
     }
 
@@ -276,21 +245,6 @@ impl MachineState {
 
     pub fn client(&self) -> HubClient {
         HubClient::new(&self.hub, Some(&self.token))
-    }
-
-    pub async fn pair<C>(
-        &mut self,
-        timeout: Duration,
-        show_code: impl FnOnce(&str),
-        confirm: C,
-    ) -> Result<Id, PairError>
-    where
-        C: AsyncFnOnce(String) -> bool,
-    {
-        let opened: PairingOpened = self.client().post("/v1/m/pairings", &()).await?;
-        show_code(&opened.code);
-        self.run_pairing(&opened.pairing, &opened.code, timeout, confirm)
-            .await
     }
 
     pub async fn finish_connect(
@@ -342,85 +296,6 @@ impl MachineState {
         }
         self.account = Some(key);
         Ok(pinned)
-    }
-
-    async fn run_pairing<C>(
-        &mut self,
-        pairing_id: &str,
-        code: &str,
-        timeout: Duration,
-        confirm: C,
-    ) -> Result<Id, PairError>
-    where
-        C: AsyncFnOnce(String) -> bool,
-    {
-        let client = self.client();
-        let path = format!("/v1/m/pairings/{pairing_id}");
-        let deadline = Instant::now() + timeout;
-        let committed = self
-            .next_state(&client, &path, PairingState::Open, deadline)
-            .await?;
-        let commitment = committed
-            .commitment
-            .ok_or(PairError::Incomplete("the commitment"))?;
-        let pairing = MachinePairing::answer(self.public(), commitment.0, code);
-        let (keys, nonce) = pairing.reply();
-        let _: PairingView = client
-            .post(
-                &format!("{path}/reply"),
-                &PairingReply {
-                    keys,
-                    nonce: Bytes32(nonce),
-                },
-            )
-            .await?;
-        let revealed = self
-            .next_state(&client, &path, PairingState::Replied, deadline)
-            .await?;
-        let device = revealed
-            .device
-            .ok_or(PairError::Incomplete("the device id"))?;
-        let device_keys = revealed
-            .device_keys
-            .ok_or(PairError::Incomplete("the device keys"))?;
-        let device_nonce = revealed
-            .device_nonce
-            .ok_or(PairError::Incomplete("the device nonce"))?;
-        let Ok(code) = pairing.comparison_code(&device_keys, &device_nonce.0) else {
-            refuse(&client, &path, PairingFailure::Mismatch).await?;
-            return Err(PairError::Mismatch);
-        };
-        if !confirm(code).await {
-            refuse(&client, &path, PairingFailure::Declined).await?;
-            return Err(PairError::Declined);
-        }
-        let admitted: PairingView = client.post(&format!("{path}/admit"), &()).await?;
-        if admitted.state != PairingState::Admitted {
-            return Err(PairError::Ended {
-                state: admitted.state,
-                reason: admitted.reason,
-            });
-        }
-        self.devices.retain(|known| known.id != device);
-        self.devices.push(AdmittedDevice {
-            id: device.clone(),
-            keys: device_keys,
-            role: Role::Control,
-        });
-        Ok(device)
-    }
-
-    pub async fn listed_devices(&self) -> Result<Vec<kebbie_hub_api::AdmittedDevice>, Error> {
-        let listed: AdmittedDevices = self.client().get("/v1/m/devices", &[]).await?;
-        Ok(listed.devices)
-    }
-
-    pub async fn remove_device(&mut self, device: &Id) -> Result<(), Error> {
-        self.client()
-            .delete(&format!("/v1/m/devices/{device}"))
-            .await?;
-        self.devices.retain(|known| &known.id != device);
-        Ok(())
     }
 
     async fn next_state(
@@ -478,35 +353,12 @@ impl MachineState {
     }
 
     pub async fn post_board_at(&mut self, mut board: Board, rev: u64) -> Result<u64, Error> {
+        board.accepts = Some(self.accepts.clone());
         let envelope = self.seal_board(board.clone(), rev, now())?;
         let stored = self.upload_board(rev, envelope).await?;
         board.rev = stored;
         self.board = Some(board);
         Ok(stored)
-    }
-
-    pub async fn sync_devices(&mut self) -> Result<u64, Error> {
-        let account = self
-            .account
-            .clone()
-            .ok_or_else(|| Error::Protocol("no pinned account key".into()))?;
-        let view: DeviceListView = self.client().get("/v1/m/device-list", &[]).await?;
-        let Some(signed) = view.list else {
-            return Ok(self.listed.counter);
-        };
-        if !account.verifies_device_list(&signed.list, &signed.signature.0) {
-            return Err(Error::Protocol("the device list is not signed by the account".into()));
-        }
-        if signed.list.counter < self.listed.counter {
-            return Err(Error::Protocol("the device list rolled back".into()));
-        }
-        self.listed = signed.list;
-        Ok(self.listed.counter)
-    }
-
-    pub fn set_role(&mut self, device: &Id, role: Role) -> bool {
-        let known = self.devices.iter_mut().find(|known| &known.id == device);
-        known.map(|known| known.role = role).is_some()
     }
 
     pub async fn apply_once(
@@ -550,23 +402,25 @@ impl MachineState {
         let at = now();
         self.applied.prune(at);
         let secret = self.secret();
-        let mut trusted: Vec<TrustedDevice> =
-            self.devices.iter().map(AdmittedDevice::trusted).collect();
-        trusted.extend(
-            self.listed
-                .trusted()
-                .into_iter()
-                .filter(|listed| !self.devices.iter().any(|paired| paired.id == listed.id)),
-        );
+        let Some(account) = self.account.clone() else {
+            return Ok(Handled {
+                seq,
+                command: header.id.clone(),
+                from: header.from.clone(),
+                kind: header.kind,
+                handling: Handling::Dropped(Dropped::WrongAccount),
+                posted: None,
+            });
+        };
         let machine = Machine {
             id: &self.machine,
             keys: &secret,
-            devices: &trusted,
+            account: &account,
             accepts: &self.accepts,
         };
         let handling = match authorize(&machine, &self.applied, envelope, at) {
-            Ok(accepted) => {
-                let (did, result) = self.execute(&header.id, &accepted.payload);
+            Ok(payload) => {
+                let (did, result) = self.execute(&header.id, &payload);
                 Handling::Applied { did, result }
             }
             Err(Refusal::Answer(reason)) => Handling::Refused(refusal(&header.id, reason)),
@@ -580,13 +434,7 @@ impl MachineState {
             }
         }
         let posted = match handling.result() {
-            Some(result) => {
-                let device = trusted
-                    .iter()
-                    .find(|device| device.id == header.from)
-                    .ok_or_else(|| Error::Protocol("the device left the trusted list".into()))?;
-                Some(self.deliver_result(device, result).await?)
-            }
+            Some(result) => Some(self.deliver_result(&account, result).await?),
             None => None,
         };
         Ok(Handled {
@@ -660,7 +508,7 @@ impl MachineState {
 
     pub fn seal_result(
         &self,
-        device: &TrustedDevice,
+        account: &AccountKey,
         result: &CommandResult,
     ) -> Result<Envelope, Error> {
         let header = Header::new(
@@ -674,20 +522,17 @@ impl MachineState {
             header,
             &Payload::Result(result.clone()),
             &self.secret(),
-            &[
-                (device.id.clone(), device.keys),
-                (self.machine.clone(), self.public()),
-            ],
+            &[account.recipient(), (self.machine.clone(), self.public())],
         )
         .map_err(|error| Error::Protocol(error.to_string()))
     }
 
     async fn deliver_result(
         &self,
-        device: &TrustedDevice,
+        account: &AccountKey,
         result: &CommandResult,
     ) -> Result<Posted, Error> {
-        match self.post_result(device, result).await {
+        match self.post_result(account, result).await {
             Ok(stored) => Ok(Posted::Stored(stored.seq)),
             Err(Error::Hub(HubError::Status { status: 404, code }))
                 if code == "unknown-command" =>
@@ -703,10 +548,10 @@ impl MachineState {
 
     pub async fn post_result(
         &self,
-        device: &TrustedDevice,
+        account: &AccountKey,
         result: &CommandResult,
     ) -> Result<ResultStored, Error> {
-        let envelope = self.seal_result(device, result)?;
+        let envelope = self.seal_result(account, result)?;
         Ok(self
             .client()
             .post("/v1/m/results", &ResultUpload { envelope })
@@ -735,64 +580,6 @@ impl MachineState {
             .await?;
         self.last_rev = self.last_rev.max(stored.rev);
         Ok(stored.rev)
-    }
-
-    pub fn collapse_tag(&self, event: Event, address: &str) -> String {
-        let event = serde_json::to_value(event).expect("an event serializes");
-        let (_, encryption) = self.secret().to_bytes();
-        let digest = Sha256::new()
-            .chain_update(b"kebbie-hub fake collapse\0")
-            .chain_update(encryption)
-            .chain_update(format!("{}:{address}", event.as_str().unwrap_or_default()))
-            .finalize();
-        URL_SAFE_NO_PAD.encode(digest)
-    }
-
-    pub fn seal_notice(
-        &self,
-        notice: &Notice,
-        urgency: Urgency,
-        collapse: Option<String>,
-        at: u64,
-    ) -> Result<Envelope, Error> {
-        let mut header = Header::new(
-            Id::new(Prefix::Notice).expect("a fresh notice id is valid"),
-            Kind::Notice,
-            self.machine.clone(),
-            self.machine.clone(),
-            at,
-        );
-        header.urgency = Some(urgency);
-        header.collapse = collapse;
-        let recipients: Vec<(Id, PublicKeys)> = self
-            .devices
-            .iter()
-            .map(|device| (device.id.clone(), device.keys))
-            .collect();
-        seal(
-            header,
-            &Payload::Notice(notice.clone()),
-            &self.secret(),
-            &recipients,
-        )
-        .map_err(|error| Error::Protocol(error.to_string()))
-    }
-
-    pub async fn post_notice(&self, envelope: Envelope) -> Result<NoticePosted, Error> {
-        Ok(self
-            .client()
-            .post("/v1/m/notices", &NoticeUpload { envelope })
-            .await?)
-    }
-
-    pub async fn notice(
-        &self,
-        notice: &Notice,
-        urgency: Urgency,
-        collapse: Option<String>,
-    ) -> Result<NoticePosted, Error> {
-        let envelope = self.seal_notice(notice, urgency, collapse, now())?;
-        self.post_notice(envelope).await
     }
 
     pub async fn poll_once(&mut self, wait: u64) -> Result<Inbox, Error> {

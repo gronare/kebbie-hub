@@ -6,14 +6,14 @@ use axum::http::StatusCode;
 use kebbie_hub_api::{
     CommandQueued, CommandUpload, ResultEntry, ResultStored, ResultUpload, Results,
 };
-use kebbie_hub_protocol::{Envelope, Kind, OpenError, Prefix, verify};
+use kebbie_hub_protocol::{Envelope, Id, Kind, OpenError, Prefix, verify};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::auth::{DeviceAuth, MachineAuth};
+use crate::auth::{KeyAccount, MachineAuth, SameOrigin};
 use crate::error::ApiError;
 use crate::store::{CommandWrite, NewCommand, NewResult, ResultWrite};
-use crate::wake::{device_key, machine_key};
+use crate::wake::{account_key, machine_key};
 use crate::{Hub, MAX_STORED_INTEGER, now};
 
 const MAX_TEXT_COMMAND_CT: usize = 36 * 1024;
@@ -32,7 +32,8 @@ fn refused(error: OpenError) -> ApiError {
 
 pub async fn post_command(
     State(hub): State<Arc<Hub>>,
-    DeviceAuth(device): DeviceAuth,
+    _: SameOrigin,
+    KeyAccount(account): KeyAccount,
     Json(upload): Json<CommandUpload>,
 ) -> Result<(StatusCode, Json<CommandQueued>), ApiError> {
     if !hub.config().commands {
@@ -46,7 +47,7 @@ pub async fn post_command(
     if !header.kind.is_command() {
         return Err(ApiError::bad_request("not-a-command"));
     }
-    if header.from != device {
+    if header.from.as_str() != account {
         return Err(refused(OpenError::WrongSender));
     }
     if envelope.ct.len() > max_ciphertext(header.kind) {
@@ -57,7 +58,7 @@ pub async fn post_command(
         && envelope
             .keys
             .keys()
-            .all(|recipient| recipient == machine || recipient == &device);
+            .all(|recipient| recipient == machine || recipient == &header.from);
     if !addressed {
         return Err(ApiError::bad_request("bad-recipients"));
     }
@@ -74,25 +75,27 @@ pub async fn post_command(
     };
     let at = now();
     let mut store = hub.store();
-    if !store.is_admitted(machine, &device)? {
+    if store.machine_owner(machine)?.as_deref() != Some(account.as_str()) {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "unknown-machine"));
     }
     hub.check_command_gate(&store, machine)?;
-    if let Some((held, seq)) = store.resent_command(&device, &header.id)?
+    if let Some((held, seq)) = store.resent_command(&account, &header.id)?
         && held == digest
     {
         return Ok(queued(seq));
     }
-    let keys = store.device_keys(&device)?.ok_or_else(ApiError::internal)?;
-    verify(envelope, &device, &keys, at).map_err(refused)?;
-    hub.limit_command(&device, header.kind)?;
+    let key = store
+        .account_key(&account)?
+        .ok_or(ApiError::conflict("no-key"))?;
+    verify(envelope, &header.from, &key.keys, at).map_err(refused)?;
+    hub.limit_command(&account, header.kind)?;
     if store.queued_count(machine)? >= hub.config().max_queued
-        || store.undelivered_count(machine, &device)? >= hub.config().max_undelivered_per_device
+        || store.undelivered_count(machine, &account)? >= hub.config().max_undelivered_per_account
     {
         return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "queue-full"));
     }
     let written = store.queue_command(&NewCommand {
-        device: &device,
+        account: &account,
         command: &header.id,
         machine,
         kind: header.kind.name(),
@@ -110,9 +113,7 @@ pub async fn post_command(
         at,
         "command.queued",
         Some(machine),
-        Some(&device),
-        Some(&format!("kind={} bytes={}", header.kind.name(), text.len())),
-    )?;
+        Some(&format!("kind={} bytes={}", header.kind.name(), text.len())),)?;
     drop(store);
     hub.wakeups.wake(&machine_key(machine));
     Ok(queued(seq))
@@ -131,12 +132,12 @@ pub async fn post_result(
     if header.machine != machine {
         return Err(ApiError::bad_request("wrong-machine"));
     }
-    let mut devices = envelope
+    let mut others = envelope
         .keys
         .keys()
         .filter(|recipient| **recipient != machine);
-    let device = match (devices.next(), devices.next()) {
-        (Some(device), None) if device.prefix() == Prefix::Device => device.clone(),
+    let account = match (others.next(), others.next()) {
+        (Some(account), None) if account.prefix() == Prefix::Account => account.clone(),
         _ => return Err(ApiError::bad_request("bad-recipients")),
     };
     let at = now();
@@ -147,14 +148,14 @@ pub async fn post_result(
     verify(envelope, &machine, &keys, at).map_err(refused)?;
     let command = store
         .delivered_command(&machine, &header.id)?
-        .filter(|command| command.device == device)
+        .filter(|command| command.account == account.as_str())
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown-command"))?;
     if !command.delivered {
         return Err(ApiError::conflict("not-delivered"));
     }
     let text = envelope.to_json();
     let written = store.store_result(&NewResult {
-        device: &device,
+        account: account.as_str(),
         machine: &machine,
         command: &header.id,
         digest: &Sha256::digest(text.as_bytes()),
@@ -172,9 +173,9 @@ pub async fn post_result(
         }
         ResultWrite::Differs => return Err(ApiError::conflict("result-differs")),
     };
-    store.log(at, "result.stored", Some(&machine), Some(&device), None)?;
+    store.log(at, "result.stored", Some(&machine), None)?;
     drop(store);
-    hub.wakeups.wake(&device_key(&device));
+    hub.wakeups.wake(&account_key(account.as_str()));
     Ok(Json(ResultStored {
         command: header.id.clone(),
         seq,
@@ -191,15 +192,16 @@ pub struct ResultsQuery {
 
 pub async fn results(
     State(hub): State<Arc<Hub>>,
-    DeviceAuth(device): DeviceAuth,
+    KeyAccount(account): KeyAccount,
     Query(query): Query<ResultsQuery>,
 ) -> Result<Json<Results>, ApiError> {
     if query.after > MAX_STORED_INTEGER {
         return Err(ApiError::bad_request("after-out-of-range"));
     }
+    let recipient = Id::parse(&account).map_err(|_| ApiError::internal())?;
     let stored = hub
-        .wait_until(&device_key(&device), query.wait, || {
-            let stored = hub.store().results_after(&device, query.after, now())?;
+        .wait_until(&account_key(&account), query.wait, || {
+            let stored = hub.store().results_after(&account, query.after, now())?;
             let ready = !stored.is_empty();
             Ok((stored, ready))
         })
@@ -209,7 +211,7 @@ pub async fn results(
         .map(|result| {
             let envelope = Envelope::from_json(&result.envelope)
                 .ok()
-                .and_then(|envelope| envelope.for_recipient(&device))
+                .and_then(|envelope| envelope.for_recipient(&recipient))
                 .ok_or_else(ApiError::internal)?;
             Ok(ResultEntry {
                 seq: result.seq,

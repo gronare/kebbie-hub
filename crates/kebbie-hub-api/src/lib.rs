@@ -3,7 +3,7 @@ use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kebbie_hub_protocol::{AccountKey, DeviceList, Envelope, Id, MachineList, PublicKeys};
+use kebbie_hub_protocol::{AccountKey, Envelope, Id, MachineList, PublicKeys};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 pub use webauthn_rs_proto::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
@@ -141,8 +141,6 @@ pub struct Inbox {
     pub seq: u64,
     pub messages: Vec<QueuedMessage>,
     pub board_rev: Option<u64>,
-    #[serde(default)]
-    pub device_list_rev: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,7 +202,6 @@ pub enum PairingFailure {
     Mismatch,
     Declined,
     Timeout,
-    SecondCommitment,
 }
 
 impl PairingFailure {
@@ -213,7 +210,6 @@ impl PairingFailure {
             PairingFailure::Mismatch => "mismatch",
             PairingFailure::Declined => "declined",
             PairingFailure::Timeout => "timeout",
-            PairingFailure::SecondCommitment => "second-commitment",
         }
     }
 
@@ -222,18 +218,10 @@ impl PairingFailure {
             PairingFailure::Mismatch,
             PairingFailure::Declined,
             PairingFailure::Timeout,
-            PairingFailure::SecondCommitment,
         ]
         .into_iter()
         .find(|failure| failure.name() == name)
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PairingOpened {
-    pub pairing: String,
-    pub code: String,
-    pub expires_at: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -243,19 +231,12 @@ pub struct PairingView {
     pub reason: Option<PairingFailure>,
     pub expires_at: u64,
     pub machine: Id,
-    pub device: Option<Id>,
     pub commitment: Option<Bytes32>,
     pub machine_keys: Option<PublicKeys>,
     pub machine_nonce: Option<Bytes32>,
-    pub device_keys: Option<PublicKeys>,
-    pub device_nonce: Option<Bytes32>,
-    #[serde(default)]
     pub machine_name: Option<String>,
-    #[serde(default)]
-    pub account: Option<Id>,
-    #[serde(default)]
+    pub account: Id,
     pub account_key: Option<AccountKey>,
-    #[serde(default)]
     pub account_nonce: Option<Bytes32>,
 }
 
@@ -268,26 +249,6 @@ pub struct PairingReply {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PairingRefusal {
     pub reason: PairingFailure,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CommitRequest {
-    pub code: String,
-    pub commitment: Bytes32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Committed {
-    pub pairing: String,
-    pub device: Id,
-    pub token: Option<String>,
-    pub expires_at: u64,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RevealRequest {
-    pub keys: PublicKeys,
-    pub nonce: Bytes32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -311,17 +272,6 @@ pub struct BoardEntry {
 pub struct SignedMachineList {
     pub list: MachineList,
     pub signature: Bytes64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SignedDeviceList {
-    pub list: DeviceList,
-    pub signature: Bytes64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DeviceListView {
-    pub list: Option<SignedDeviceList>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -499,53 +449,6 @@ pub struct Passkeys {
     pub passkeys: Vec<PasskeyView>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct DeviceRequest {
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub keys: Option<PublicKeys>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DeviceRegistered {
-    pub device: Id,
-    pub token: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DeviceView {
-    pub device: Id,
-    pub name: Option<String>,
-    pub created_at: u64,
-    pub last_seen: Option<u64>,
-    pub machines: Vec<Id>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Devices {
-    pub devices: Vec<DeviceView>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdmittedDevice {
-    pub device: Id,
-    pub name: Option<String>,
-    pub paired_at: u64,
-    pub last_seen: Option<u64>,
-    pub notifications: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AdmittedDevices {
-    pub devices: Vec<AdmittedDevice>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DeviceName {
-    pub name: String,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommandUpload {
     pub envelope: Envelope,
@@ -581,34 +484,6 @@ pub struct ResultEntry {
 pub struct Results {
     pub cursor: u64,
     pub results: Vec<ResultEntry>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PushKeys {
-    pub p256dh: String,
-    pub auth: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PushSubscription {
-    pub endpoint: String,
-    pub keys: PushKeys,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VapidKey {
-    pub key: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NoticeUpload {
-    pub envelope: Envelope,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NoticePosted {
-    pub notice: Id,
-    pub pushes: usize,
 }
 
 pub const CONNECT_PENDING: &str = "authorization_pending";
@@ -701,7 +576,6 @@ pub struct ConnectDenial {
 }
 
 pub const EVENT_BOARD: &str = "board";
-pub const EVENT_PAIRING: &str = "pairing";
 pub const EVENT_MACHINE_REMOVED: &str = "machine-removed";
 pub const EVENT_RESULT: &str = "result";
 pub const EVENT_MACHINES: &str = "machines";
@@ -724,13 +598,6 @@ pub struct ResultReady {
 pub struct BoardChanged {
     pub machine: Id,
     pub rev: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PairingChanged {
-    pub pairing: String,
-    pub state: PairingState,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

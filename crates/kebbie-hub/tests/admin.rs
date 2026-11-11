@@ -1,12 +1,9 @@
 #[allow(dead_code)]
 mod common;
 
-use std::time::Duration;
 
 use common::*;
 use kebbie_hub::store::Store;
-use kebbie_hub_fakes::PairError;
-use tokio::sync::oneshot;
 
 const WEB_ADMIN: [&str; 11] = [
     "/v1/a/admin/overview",
@@ -38,37 +35,6 @@ async fn the_hub_has_no_web_admin_for_its_owner() {
     assert_eq!(page.status(), 404, "no /admin page");
 }
 
-#[tokio::test]
-async fn another_account_cannot_pair_a_device_with_my_machine() {
-    let test = start_hub(|config| config.connect_interval = 0).await;
-    let mut person = member(&test).await;
-    let mut machine = connected(&test, &mut person).await;
-    let mut stranger = member(&test).await;
-    let (code_out, code_in) = oneshot::channel::<String>();
-    let machine_side = machine.pair(
-        Duration::from_secs(2),
-        move |code| {
-            let _ = code_out.send(code.to_string());
-        },
-        async |_: String| true,
-    );
-    let stranger_side = async {
-        let code = code_in.await.unwrap();
-        let device = stranger.ensure_device().await.unwrap();
-        device
-            .pair(&code, Duration::from_secs(2), async |_: String| true)
-            .await
-    };
-    let (admitted, paired) = tokio::join!(machine_side, stranger_side);
-    assert!(admitted.is_err());
-    match paired {
-        Err(PairError::Hub(error)) => {
-            assert_eq!(hub_code(error), (403, "not-your-machine".to_string()))
-        }
-        other => panic!("a stranger paired: {other:?}"),
-    }
-}
-
 fn user_version(path: &std::path::Path) -> i64 {
     rusqlite::Connection::open(path)
         .unwrap()
@@ -77,17 +43,73 @@ fn user_version(path: &std::path::Path) -> i64 {
 }
 
 #[test]
-fn a_fresh_database_starts_at_schema_14() {
+fn a_fresh_database_starts_at_schema_15() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 14);
+    assert_eq!(user_version(&path), 15);
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 14);
+    assert_eq!(user_version(&path), 15);
+}
+
+fn columns(connection: &rusqlite::Connection, table: &str) -> Vec<String> {
+    connection
+        .prepare(&format!("SELECT name FROM pragma_table_info('{table}')"))
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
 }
 
 #[test]
-fn a_schema_13_database_opens_as_14_and_keeps_what_an_embedding_binary_added() {
+fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    drop(Store::open(&path).unwrap());
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "DROP TABLE commands;
+             DROP TABLE results;
+             DROP TABLE pairings;
+             DROP TABLE events;
+             CREATE TABLE devices (id TEXT PRIMARY KEY, token_hash BLOB NOT NULL, account_id TEXT);
+             CREATE TABLE admissions (machine_id TEXT NOT NULL, device_id TEXT NOT NULL);
+             CREATE TABLE push_subscriptions (device_id TEXT PRIMARY KEY, endpoint TEXT NOT NULL);
+             CREATE TABLE notices (machine_id TEXT NOT NULL, notice_id TEXT NOT NULL);
+             CREATE TABLE device_lists (account_id TEXT PRIMARY KEY, counter INTEGER NOT NULL);
+             CREATE TABLE commands (device_id TEXT NOT NULL, command_id TEXT NOT NULL);
+             CREATE TABLE results (device_id TEXT NOT NULL, seq INTEGER NOT NULL);
+             CREATE TABLE pairings (id TEXT PRIMARY KEY, device_id TEXT, code_hash BLOB);
+             CREATE TABLE events (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, device_id TEXT);
+             INSERT INTO devices VALUES ('dev_old', x'01', NULL);
+             INSERT INTO commands VALUES ('dev_old', 'cmd_old');
+             INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
+             PRAGMA user_version = 14;",
+        )
+        .unwrap();
+    let store = Store::open(&path).unwrap();
+    assert_eq!(store.account("acc_kept").unwrap().unwrap().handle, "alice");
+    drop(store);
+    assert_eq!(user_version(&path), 15);
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    for gone in ["devices", "admissions", "push_subscriptions", "notices", "device_lists"] {
+        let tables: i64 = connection
+            .query_row("SELECT count(*) FROM sqlite_master WHERE name = ?1", [gone], |row| row.get(0))
+            .unwrap();
+        assert_eq!(tables, 0, "{gone}");
+    }
+    assert!(columns(&connection, "commands").contains(&"account_id".to_string()));
+    assert!(columns(&connection, "results").contains(&"account_id".to_string()));
+    assert!(columns(&connection, "pairings").contains(&"account_nonce".to_string()));
+    for table in ["commands", "results", "pairings", "events"] {
+        assert!(!columns(&connection, table).iter().any(|column| column.starts_with("device")), "{table}");
+    }
+}
+
+#[test]
+fn a_schema_13_database_opens_as_15_and_keeps_what_an_embedding_binary_added() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");
     drop(Store::open(&path).unwrap());
@@ -122,7 +144,7 @@ fn a_schema_13_database_opens_as_14_and_keeps_what_an_embedding_binary_added() {
         .unwrap();
     assert!(matches!(outcome, kebbie_hub::store::SignUpOutcome::Created(_)));
     drop(store);
-    assert_eq!(user_version(&path), 14);
+    assert_eq!(user_version(&path), 15);
     let connection = rusqlite::Connection::open(&path).unwrap();
     let tiers: Vec<String> = connection
         .prepare("SELECT tier FROM accounts ORDER BY created_at")
@@ -139,8 +161,8 @@ fn a_schema_13_database_opens_as_14_and_keeps_what_an_embedding_binary_added() {
 }
 
 #[test]
-fn a_database_from_before_schema_13_or_after_14_is_refused() {
-    for version in [4, 12, 15] {
+fn a_database_from_before_schema_13_or_after_15_is_refused() {
+    for version in [4, 12, 16] {
         let data = tempfile::tempdir().unwrap();
         let path = data.path().join("hub.sqlite3");
         rusqlite::Connection::open(&path)

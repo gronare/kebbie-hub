@@ -81,10 +81,8 @@ async fn a_session_without_key_access_reaches_the_account_and_nothing_the_key_gu
     let wrapper = json!({ "key_version": 1, "wrapped": "AA", "signature": "AA" });
     let refused = [
         keyless.get::<Value>("/v1/a/boards").await.map(drop),
-        keyless.get::<Value>("/v1/a/device-list").await.map(drop),
-        keyless.get::<Value>("/v1/a/devices").await.map(drop),
-        keyless.post::<_, Value>("/v1/a/devices", &json!({ "name": "attacker" })).await.map(drop),
-        keyless.put::<_, Value>("/v1/a/device-list", &json!({})).await.map(drop),
+        keyless.post::<_, Value>("/v1/a/commands", &json!({ "envelope": {} })).await.map(drop),
+        keyless.get::<Value>("/v1/a/results").await.map(drop),
         keyless.post::<_, Value>("/v1/a/key", &json!({})).await.map(drop),
         keyless.put::<_, Value>(&format!("/v1/a/passkeys/{passkey}/wrapper"), &wrapper).await.map(drop),
         keyless.post::<_, Value>("/v1/a/passkeys/begin", &()).await.map(drop),
@@ -96,7 +94,7 @@ async fn a_session_without_key_access_reaches_the_account_and_nothing_the_key_gu
         let (status, code) = hub_code(result.expect_err("a keyless session is refused"));
         assert_eq!((status, code.as_str()), (403, "passkey-required"), "call {index}");
     }
-    assert_eq!(rows(&test, "devices"), 0, "no device was registered");
+    assert_eq!(rows(&test, "commands"), 0, "no command was queued");
     assert_eq!(person.get::<Value>("/v1/a/passkeys").await.unwrap()["passkeys"].as_array().unwrap().len(), 1);
     keyless.get::<Value>("/v1/a/passkeys").await.unwrap();
 }

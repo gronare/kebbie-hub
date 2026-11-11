@@ -170,7 +170,7 @@ impl Header {
             return Err(ShapeError::Malformed("machine is not a machine id"));
         }
         let sender_fits = if self.kind.is_command() {
-            self.from.prefix() == Prefix::Device
+            self.from.prefix() == Prefix::Account
         } else {
             self.from == self.machine
         };

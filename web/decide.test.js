@@ -1,21 +1,38 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { answerBlock, answerReady, answerStatus, choosable, gate, latestSent, promptAnswerBlock, promptStatus, pushBlock, pushReady, refusedBlock, sentState, takesPromptAnswers } from "./decide.js";
+import { answerBlock, answerReady, answerStatus, choosable, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, promptStatus, pushBlock, pushReady, refusedBlock, sentState, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 
 const HEAD = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
 const AT = 1_761_069_600;
 const question = { id: "q1", text: "Keep the old endpoint?", recommend: 1, options: [{ label: "Keep it", meaning: "deprecate now" }, { label: "Remove it", meaning: "drop it", comment: true }] };
 const idle = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null });
-const answer = (extra = {}) => ({ id: "cmd_1", kind: "answer", machine: "mch_1", machineName: "mac", device: "iPhone Duo", address: "refunds@shop", question: "q1", choice: 0, label: "Keep it", at: AT, exp: AT + 3600, result: null, ...extra });
+const answer = (extra = {}) => ({ id: "cmd_1", kind: "answer", machine: "mch_1", machineName: "mac", address: "refunds@shop", question: "q1", choice: 0, label: "Keep it", at: AT, exp: AT + 3600, result: null, ...extra });
 
-test("the gate shows nothing new when the hub has commands off, the hub's refusal once it refused a command, setup until this device is listed", () => {
-  assert.equal(gate({ info: { commands: false }, refused: null, device: { listed: 3 } }), "off");
-  assert.equal(gate({ info: null, refused: null, device: null }), "off");
-  assert.equal(gate({ info: { commands: true }, refused: { url: null }, device: { listed: 3 } }), "refused");
-  assert.equal(gate({ info: { commands: true }, refused: null, device: null }), "setup");
-  assert.equal(gate({ info: { commands: true }, refused: null, device: { listed: 0 } }), "setup");
-  assert.equal(gate({ info: { commands: true }, refused: null, device: { listed: 2 } }), "ready");
+test("the gate is off when the hub takes no commands, refused once the hub refused one, view only until this device allows changes", () => {
+  assert.equal(gate({ info: { commands: false }, refused: null, allowed: true }), "off");
+  assert.equal(gate({ info: null, refused: null, allowed: true }), "off");
+  assert.equal(gate({ info: { commands: true }, refused: { url: null }, allowed: true }), "refused");
+  assert.equal(gate({ info: { commands: true }, refused: null, allowed: false }), "view-only");
+  assert.equal(gate({ info: { commands: true }, refused: null }), "view-only", "off until this device allows changes");
+  assert.equal(gate({ info: { commands: true }, refused: null, allowed: true }), "ready");
+});
+
+test("a machine says what it takes from the hub through its board's accepts", () => {
+  assert.equal(machinePolicy(["answer", "push", "prompt-answer"]), "takes answers and pushes");
+  assert.equal(machinePolicy(["answer", "prompt-answer"]), "takes answers, not pushes");
+  assert.equal(machinePolicy([]), "takes nothing from the hub");
+  assert.equal(machinePolicy(null), "takes nothing from the hub");
+  assert.equal(takes(["answer"], "push"), false);
+  assert.equal(takes(undefined, "answer"), false);
+});
+
+test("a view-only device and a machine that does not take a kind say so in the owner's words", () => {
+  assert.equal(viewOnlyBlock(), `<div class="pro">View only on this device. Allow changes in <a class="link inline" href="/account">Account</a></div>`);
+  assert.equal(notTakenBlock("push", "devbox", ["answer", "prompt-answer"]), `<div class="pro">Not pushed: devbox takes answers, not pushes. Push at the machine, or allow pushes in its kebbie settings.</div>`);
+  assert.match(notTakenBlock("push", "mac<mini>", []), /Not pushed: mac&#60;mini&#62; takes nothing from the hub\. Push at the machine/);
+  assert.match(notTakenBlock("answer", "devbox", []), /Not answered: devbox takes nothing from the hub\. Answer at the machine, or allow answers in its kebbie settings\./);
+  assert.match(notTakenBlock("prompt-answer", "devbox", []), /Not chosen: devbox takes nothing from the hub/);
 });
 
 test("a refused account reads that answering is not enabled, with the hub's link when it sent one", () => {
@@ -36,11 +53,11 @@ test("the status lines say what happened in the owner's words", () => {
   const waiting = answerStatus(answer(), "waiting");
   assert.match(waiting, /class="sent wait"/);
   assert.match(waiting, /Waiting for mac/);
-  assert.match(waiting, /Sent from iPhone Duo at \d\d:\d\d · expires \d\d:\d\d/);
+  assert.match(waiting, /Sent from this device at \d\d:\d\d · expires \d\d:\d\d/);
   const done = answerStatus(answer({ result: { outcome: "done", text: "Answered." } }), "done");
   assert.match(done, /class="sent done"/);
   assert.match(done, /✓ Answered: Keep it/);
-  assert.match(done, /from iPhone Duo at \d\d:\d\d · the lead got a copy/);
+  assert.match(done, /from this device at \d\d:\d\d · the lead got a copy/);
   assert.match(answerStatus(answer(), "expired"), /Not delivered: mac stayed asleep past the hour/);
   assert.match(answerStatus(answer({ result: { outcome: "refused", text: "Already answered <here>." } }), "refused"), /Already answered &#60;here&#62;\./);
 });
@@ -89,19 +106,21 @@ test("a ready task offers a push, asks once, then reports the machine's result",
   assert.match(confirm, /Push 9f3c2a1 to main\?/);
   assert.match(confirm, /3 commits, reviewer passed\. mac rebases onto the latest main first; on a conflict its Claude resolves it before pushing\./);
   assert.match(confirm, /data-action="push-cancel"/);
-  const pushed = { id: "cmd_p", kind: "push", machine: "mch_1", machineName: "mac", device: "iPhone Duo", address: item.address, head: HEAD, short: "9f3c2a1", at: AT, exp: AT + 3600 };
+  const pushed = { id: "cmd_p", kind: "push", machine: "mch_1", machineName: "mac", address: item.address, head: HEAD, short: "9f3c2a1", at: AT, exp: AT + 3600 };
   const done = pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: { outcome: "done", text: "CI on main is running." } }, state: "done" });
   assert.match(done, /✓ Pushed 9f3c2a1 to main/);
   assert.doesNotMatch(done, /push-ask/);
   const refused = pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: { outcome: "refused", text: "Not pushed yet: conflicts with main in app/models/refund.rb; its Claude resolves it" } }, state: "refused" });
   assert.match(refused, /<b>Not pushed yet: conflicts with main in app\/models\/refund\.rb; its Claude resolves it<\/b>/, "the machine's own words head the block, once");
   assert.match(pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: { outcome: "failed", text: "git crashed" } }, state: "refused" }), /<b>Not pushed<\/b><span>git crashed<\/span>/);
+  const policy = pushBlock({ item, machineName: "devbox", ui: idle(), sent: { ...pushed, result: { outcome: "refused", reason: "not-allowed", text: "Not pushed: devbox takes answers, not pushes. Push at the machine, or allow pushes in its kebbie settings." } }, state: "refused" });
+  assert.match(policy, /<b>Not pushed: devbox takes answers, not pushes\.<\/b><span>Push at the machine, or allow pushes in its kebbie settings\.<\/span>/, "a machine that refused a push heads the block with what it takes");
   assert.match(refused, /push-ask/, "a refused push can be asked again");
   assert.match(pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: null }, state: "waiting" }), /Waiting for mac/);
 });
 
 const prompt = { id: "3f2a9c1d", question: "Run it?", options: [{ label: "Yes, proceed (y)", takes_text: false, key: "y" }, { label: "No, and tell Codex what to do differently (esc)", takes_text: false, key: "esc" }, { label: "Type something", takes_text: true, key: "3" }] };
-const chose = (extra = {}) => ({ id: "cmd_q", kind: "prompt-answer", machine: "mch_1", machineName: "mac", device: "iPhone Duo", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y", label: "Yes, proceed (y)", at: AT, exp: AT + 600, result: null, ...extra });
+const chose = (extra = {}) => ({ id: "cmd_q", kind: "prompt-answer", machine: "mch_1", machineName: "mac", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y", label: "Yes, proceed (y)", at: AT, exp: AT + 600, result: null, ...extra });
 
 test("a prompt is answered from here only on a machine whose board says it takes prompt answers", () => {
   assert.equal(takesPromptAnswers({ accepts: ["answer", "push", "prompt-answer"] }), true);
@@ -140,7 +159,7 @@ test("a prompt answer expires after ten minutes and its status lines say what ha
   assert.match(promptStatus(chose(), "expired"), /Not delivered: mac didn't take it within ten minutes/);
   const done = promptStatus(chose({ result: { outcome: "done", text: "Chose it." } }), "done");
   assert.match(done, /✓ Chose: Yes, proceed \(y\)/);
-  assert.match(done, /from iPhone Duo at \d\d:\d\d · the lead got a copy/);
+  assert.match(done, /from this device at \d\d:\d\d · the lead got a copy/);
   assert.match(promptStatus(chose(), "waiting"), /Waiting for mac/);
 });
 

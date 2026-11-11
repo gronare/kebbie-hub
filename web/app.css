@@ -178,9 +178,6 @@ a.task:active { background: var(--sel); }
 .tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .pro { background: var(--note); border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--muted); }
 .pro b { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
-.pro.setup { display: grid; gap: 8px; }
-.pro.setup b { display: block; }
-.pro.setup .btn { margin-top: 2px; font-size: 15px; }
 .decide { display: grid; gap: inherit; min-width: 0; }
 .opt.pick { cursor: pointer; position: relative; padding-right: 40px; }
 .opt.pick::after { content: ""; position: absolute; right: 14px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; border: 1.5px solid var(--line); }
@@ -317,6 +314,13 @@ code { font: 500 13px var(--mono); background: var(--sel); color: var(--ink); pa
 
 .pair-answer { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-width: 0; }
+.switch-row { min-height: 44px; gap: 14px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.switch { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 51px; height: 31px; margin: 0; border-radius: 16px; background: color-mix(in srgb, var(--muted) 40%, var(--card)); cursor: pointer; transition: background 0.15s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(20px); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
 .page { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 
 .title { font: 700 30px/1.08 var(--display); margin: 18px 2px 0; overflow-wrap: anywhere; }

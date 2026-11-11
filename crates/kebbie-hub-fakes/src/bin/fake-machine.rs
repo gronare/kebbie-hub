@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
@@ -8,19 +7,18 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kebbie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, connect, join};
 use kebbie_hub_fakes::{load, save};
-use kebbie_hub_protocol::{Board, Event, Id, Notice, Outcome, Role, Urgency};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use kebbie_hub_protocol::{Board, Kind, Outcome};
 
 #[derive(Parser)]
 #[command(
     name = "fake-machine",
-    about = "Stands in for kebbie on a machine: joins a hub, pins its account, pairs devices, posts boards, applies commands"
+    about = "Stands in for kebbie on a machine: joins a hub, pins its account, posts boards, applies commands"
 )]
 struct Cli {
     #[arg(
         long,
         default_value = "fake-machine.json",
-        help = "File holding the machine's id, token, keys and paired devices"
+        help = "File holding the machine's id, token, keys and pinned account"
     )]
     state: PathBuf,
     #[command(subcommand)]
@@ -46,11 +44,6 @@ enum Command {
         #[arg(long, default_value_t = 600)]
         timeout: u64,
     },
-    #[command(about = "Pair one device: show a code, then confirm the six digits")]
-    Pair {
-        #[arg(long, default_value_t = 600)]
-        timeout: u64,
-    },
     #[command(about = "Seal a board JSON file to the account the machine pinned and post it")]
     PostBoard {
         file: PathBuf,
@@ -71,73 +64,25 @@ enum Command {
         #[arg(long, help = "Poll once and stop")]
         once: bool,
     },
-    #[command(
-        about = "Seal a notice to every paired device and post it; the hub pushes it to the subscribed ones"
-    )]
-    Notice {
-        body: String,
-        #[arg(long, default_value = "kebbie")]
-        title: String,
-        #[arg(long, value_enum, default_value_t = EventName::NeedsYou)]
-        event: EventName,
-        #[arg(long, value_enum, default_value_t = UrgencyName::Normal)]
-        urgency: UrgencyName,
-        #[arg(
-            long,
-            value_name = "TASK@REPO",
-            help = "The task the notice is about; its next notice replaces this one"
-        )]
-        collapse: Option<String>,
-        #[arg(
-            long,
-            requires = "collapse",
-            help = "Take back the earlier notice for this task instead"
-        )]
-        retract: bool,
-    },
-    #[command(about = "Set what a paired device may do")]
-    Role { device: String, role: RoleName },
+    #[command(about = "Set what this machine takes from the account's commands; boards posted after say so")]
+    Takes { takes: Takes },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum UrgencyName {
-    High,
-    Normal,
+enum Takes {
+    AnswerAndPush,
+    Answer,
+    Off,
 }
 
-#[derive(Clone, Copy, ValueEnum)]
-enum EventName {
-    NeedsYou,
-    Ready,
-    Question,
-    Summary,
-    CiFailed,
-    CiGreen,
-    ApiError,
-    RoutineFindings,
-    RoutineFailed,
-}
-
-impl EventName {
-    fn event(self) -> Event {
+impl Takes {
+    fn kinds(self) -> Vec<Kind> {
         match self {
-            EventName::NeedsYou => Event::NeedsYou,
-            EventName::Ready => Event::Ready,
-            EventName::Question => Event::Question,
-            EventName::Summary => Event::Summary,
-            EventName::CiFailed => Event::CiFailed,
-            EventName::CiGreen => Event::CiGreen,
-            EventName::ApiError => Event::ApiError,
-            EventName::RoutineFindings => Event::RoutineFindings,
-            EventName::RoutineFailed => Event::RoutineFailed,
+            Takes::AnswerAndPush => vec![Kind::Answer, Kind::Push, Kind::PromptAnswer],
+            Takes::Answer => vec![Kind::Answer, Kind::PromptAnswer],
+            Takes::Off => Vec::new(),
         }
     }
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum RoleName {
-    Read,
-    Control,
 }
 
 fn describe(handled: &Handled) -> String {
@@ -169,14 +114,6 @@ fn outcome(outcome: Outcome) -> String {
         Outcome::Failed => "failed".to_string(),
         Outcome::Refused { reason } => format!("refused {}", reason.key()),
     }
-}
-
-async fn ask(prompt: &str) -> bool {
-    print!("{prompt}");
-    let _ = std::io::stdout().flush();
-    let mut line = String::new();
-    let mut input = BufReader::new(tokio::io::stdin());
-    input.read_line(&mut line).await.is_ok() && line.trim().eq_ignore_ascii_case("y")
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
@@ -223,21 +160,6 @@ async fn run(cli: Cli) -> Result<(), String> {
                 );
             }
         }
-        Command::Pair { timeout } => {
-            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
-            let outcome = state
-                .pair(
-                    Duration::from_secs(timeout),
-                    |code| println!("Enter this code on the phone: {code}"),
-                    async |digits: String| {
-                        ask(&format!("Same six digits on the phone? {digits} [y/N] ")).await
-                    },
-                )
-                .await;
-            save(&cli.state, &state).map_err(|e| text(&e))?;
-            let device = outcome.map_err(|e| text(&e))?;
-            println!("paired {device}; its commands are trusted");
-        }
         Command::PostBoard { file, rev } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
             let board: Board = load(&file).map_err(|e| text(&e))?;
@@ -247,10 +169,7 @@ async fn run(cli: Cli) -> Result<(), String> {
             }
             .map_err(|e| text(&e))?;
             save(&cli.state, &state).map_err(|e| text(&e))?;
-            println!(
-                "posted board rev {posted} sealed to {} device(s)",
-                state.devices.len()
-            );
+            println!("posted board rev {posted} sealed to the account");
         }
         Command::Poll { wait } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
@@ -280,63 +199,12 @@ async fn run(cli: Cli) -> Result<(), String> {
                 }
             }
         }
-        Command::Notice {
-            body,
-            title,
-            event,
-            urgency,
-            collapse,
-            retract,
-        } => {
-            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
-            let event = event.event();
-            let tag = collapse
-                .as_deref()
-                .map(|address| state.collapse_tag(event, address));
-            let notice = Notice {
-                event,
-                address: collapse,
-                title,
-                body,
-                question: None,
-                options: Vec::new(),
-                recommend: None,
-                board_rev: state.last_rev,
-                retract: tag.clone().filter(|_| retract),
-            };
-            let urgency = match urgency {
-                UrgencyName::High => Urgency::High,
-                UrgencyName::Normal => Urgency::Normal,
-            };
-            let posted = state
-                .notice(&notice, urgency, tag)
-                .await
-                .map_err(|e| text(&e))?;
-            println!(
-                "posted notice {} sealed to {} device(s); the hub pushes it to {}",
-                posted.notice,
-                state.devices.len(),
-                posted.pushes
-            );
-        }
-        Command::Role { device, role } => {
+        Command::Takes { takes } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
-            let device = Id::parse(&device).map_err(|e| text(&e))?;
-            let role = match role {
-                RoleName::Read => Role::Read,
-                RoleName::Control => Role::Control,
-            };
-            if !state.set_role(&device, role) {
-                return Err(format!("{device} is not a paired device"));
-            }
+            state.accepts = takes.kinds();
             save(&cli.state, &state).map_err(|e| text(&e))?;
-            println!(
-                "{device} may now {}",
-                match role {
-                    Role::Read => "only read",
-                    Role::Control => "send commands",
-                }
-            );
+            let kinds: Vec<&str> = state.accepts.iter().map(|kind| kind.name()).collect();
+            println!("takes: {}", if kinds.is_empty() { "nothing".to_string() } else { kinds.join(", ") });
         }
     }
     Ok(())

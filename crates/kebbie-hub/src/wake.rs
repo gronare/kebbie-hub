@@ -41,10 +41,6 @@ pub fn machine_key(machine: &Id) -> String {
     format!("machine:{machine}")
 }
 
-pub fn device_key(device: &Id) -> String {
-    format!("device:{device}")
-}
-
 pub fn account_key(account: &str) -> String {
     format!("account:{account}")
 }
@@ -141,9 +137,9 @@ mod tests {
     #[test]
     fn keys_nobody_waits_on_are_forgotten() {
         let wakeups = Wakeups::new();
-        let kept = wakeups.subscribe("device:kept");
-        drop(wakeups.subscribe("device:gone"));
-        wakeups.wake("device:nobody");
+        let kept = wakeups.subscribe("account:kept");
+        drop(wakeups.subscribe("account:gone"));
+        wakeups.wake("account:nobody");
         wakeups.forget_idle();
         assert_eq!(wakeups.len(), 1);
         drop(kept);

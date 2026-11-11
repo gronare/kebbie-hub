@@ -73,9 +73,7 @@ pub async fn put_machines(
         now(),
         "machines.signed",
         None,
-        None,
-        Some(&format!("{account} counter={}", request.list.counter)),
-    )?;
+        Some(&format!("{account} counter={}", request.list.counter)),)?;
     drop(store);
     hub.wake_account(&account);
     Ok(StatusCode::NO_CONTENT)
@@ -88,7 +86,7 @@ pub async fn remove_machine(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let machine = Id::parse(&id).map_err(|_| ApiError::not_found())?;
-    let readers = {
+    {
         let store = hub.store();
         if store.machine_owner(&machine)?.as_deref() != Some(account.as_str()) {
             return Err(ApiError::not_found());
@@ -99,18 +97,13 @@ pub async fn remove_machine(
         if listed {
             return Err(ApiError::conflict("still-listed"));
         }
-        let readers = store.admitted_devices(&machine)?;
         store.remove_machine(&machine)?;
         store.log(
             now(),
             "machine.removed",
             Some(&machine),
-            None,
-            Some(&account),
-        )?;
-        readers
-    };
-    hub.wake_devices(&readers);
+            Some(&account),)?;
+    }
     hub.wake_account(&account);
     Ok(StatusCode::NO_CONTENT)
 }
