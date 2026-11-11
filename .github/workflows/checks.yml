@@ -1,0 +1,63 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Every commit signed off by its author
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for sha in $(git rev-list --no-merges "${BASE}..${HEAD}"); do
+            author=$(git log -1 --format='%an <%ae>' "$sha")
+            if ! git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$sha" | grep -qxF "$author"; then
+              echo "::error::$(git log -1 --format='%h %s' "$sha") has no 'Signed-off-by: ${author}'. Sign it off with git commit -s (or git rebase --signoff)."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+  licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install cargo-deny
+        env:
+          VERSION: 0.20.2
+          SHA256: 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f
+        run: |
+          set -euo pipefail
+          name="cargo-deny-${VERSION}-x86_64-unknown-linux-musl"
+          curl -fsSLO "https://github.com/EmbarkStudios/cargo-deny/releases/download/${VERSION}/${name}.tar.gz"
+          echo "${SHA256}  ${name}.tar.gz" | sha256sum -c -
+          tar xzf "${name}.tar.gz"
+          install "${name}/cargo-deny" "$HOME/.cargo/bin/cargo-deny"
+
+      - name: Rust crates
+        run: cargo deny --locked check licenses
+
+      - name: Install the locked npm packages
+        run: npm ci --ignore-scripts
+
+      - name: npm packages
+        run: npx --yes license-checker-rseidelsohn@5.0.1 --excludePrivatePackages --onlyAllow 'MIT;MIT-0;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;Unlicense'

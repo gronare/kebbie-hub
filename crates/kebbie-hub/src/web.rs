@@ -1,0 +1,165 @@
+use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE, HeaderName};
+use axum::http::{HeaderValue, Method, StatusCode, Uri};
+use axum::response::{IntoResponse, Response};
+
+use crate::error::ApiError;
+
+macro_rules! asset {
+    ($path:literal, $file:literal, $type:expr) => {
+        (
+            $path,
+            $type,
+            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../", $file)).as_slice(),
+        )
+    };
+}
+
+const HTML: &str = "text/html; charset=utf-8";
+const JS: &str = "text/javascript; charset=utf-8";
+const WOFF2: &str = "font/woff2";
+const TEXT: &str = "text/plain; charset=utf-8";
+
+pub const ASSETS: &[(&str, &str, &[u8])] = &[
+    asset!("/", "web/index.html", HTML),
+    asset!("/setup", "web/index.html", HTML),
+    asset!("/signup", "web/index.html", HTML),
+    asset!("/connect", "web/index.html", HTML),
+    asset!("/account", "web/index.html", HTML),
+    asset!("/app.css", "web/app.css", "text/css; charset=utf-8"),
+    asset!("/app.js", "web/app.js", JS),
+    asset!("/blobs.js", "web/blobs.js", JS),
+    asset!("/board.js", "web/board.js", JS),
+    asset!("/connect.js", "web/connect.js", JS),
+    asset!("/decide.js", "web/decide.js", JS),
+    asset!("/device.js", "web/device.js", JS),
+    asset!("/device-name.js", "web/device-name.js", JS),
+    asset!("/signin.js", "web/signin.js", JS),
+    asset!("/markdown.js", "web/markdown.js", JS),
+    asset!("/pages.js", "web/pages.js", JS),
+    asset!("/screens.js", "web/screens.js", JS),
+    asset!("/sections.js", "web/sections.js", JS),
+    asset!("/pose.js", "web/pose.js", JS),
+    asset!("/scroll.js", "web/scroll.js", JS),
+    asset!("/hub.js", "web/hub.js", JS),
+    asset!("/passkey.js", "web/passkey.js", JS),
+    asset!("/store.js", "web/store.js", JS),
+    asset!("/unlock.js", "web/unlock.js", JS),
+    asset!("/sw.js", "web/sw.js", JS),
+    asset!(
+        "/manifest.webmanifest",
+        "web/manifest.webmanifest",
+        "application/manifest+json"
+    ),
+    asset!("/icon.svg", "web/icon.svg", "image/svg+xml"),
+    asset!("/icon-192.png", "web/icon-192.png", "image/png"),
+    asset!("/icon-512.png", "web/icon-512.png", "image/png"),
+    asset!(
+        "/apple-touch-icon.png",
+        "web/apple-touch-icon.png",
+        "image/png"
+    ),
+    asset!(
+        "/fonts/bricolage-grotesque-latin-opsz.woff2",
+        "web/fonts/bricolage-grotesque-latin-opsz.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-sans-latin-400.woff2",
+        "web/fonts/ibm-plex-sans-latin-400.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-sans-latin-500.woff2",
+        "web/fonts/ibm-plex-sans-latin-500.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-sans-latin-600.woff2",
+        "web/fonts/ibm-plex-sans-latin-600.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/ibm-plex-mono-latin-500.woff2",
+        "web/fonts/ibm-plex-mono-latin-500.woff2",
+        WOFF2
+    ),
+    asset!(
+        "/fonts/OFL-bricolage-grotesque.txt",
+        "web/fonts/OFL-bricolage-grotesque.txt",
+        TEXT
+    ),
+    asset!(
+        "/fonts/OFL-ibm-plex-sans.txt",
+        "web/fonts/OFL-ibm-plex-sans.txt",
+        TEXT
+    ),
+    asset!(
+        "/fonts/OFL-ibm-plex-mono.txt",
+        "web/fonts/OFL-ibm-plex-mono.txt",
+        TEXT
+    ),
+    asset!("/js/protocol.js", "js/protocol.js", JS),
+    asset!("/js/hpke.js", "js/hpke.js", JS),
+];
+
+const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+pub fn find(path: &str) -> Option<(&'static str, &'static [u8])> {
+    let path = if path == "/index.html" { "/" } else { path };
+    ASSETS
+        .iter()
+        .find(|(served, _, _)| *served == path)
+        .map(|(_, content_type, bytes)| (*content_type, *bytes))
+}
+
+pub async fn asset(method: Method, uri: Uri) -> Response {
+    let found = (method == Method::GET || method == Method::HEAD)
+        .then(|| find(uri.path()))
+        .flatten();
+    let Some((content_type, bytes)) = found else {
+        return ApiError::not_found().into_response();
+    };
+    let headers = [
+        (CONTENT_TYPE, HeaderValue::from_static(content_type)),
+        (CACHE_CONTROL, HeaderValue::from_static("no-cache")),
+        (
+            HeaderName::from_static("content-security-policy"),
+            HeaderValue::from_static(CONTENT_SECURITY_POLICY),
+        ),
+        (
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ),
+        (
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("no-referrer"),
+        ),
+    ];
+    let body = if method == Method::HEAD {
+        &[][..]
+    } else {
+        bytes
+    };
+    (StatusCode::OK, headers, body).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scripts_and_pages_carry_their_types() {
+        assert_eq!(find("/index.html").map(|(kind, _)| kind), Some(HTML));
+        assert_eq!(find("/js/protocol.js").map(|(kind, _)| kind), Some(JS));
+        assert_eq!(
+            find("/fonts/ibm-plex-sans-latin-400.woff2").map(|(kind, _)| kind),
+            Some(WOFF2)
+        );
+        assert_eq!(find("/v1/a/boards"), None);
+        assert_eq!(find("/add"), None);
+        assert_eq!(find("/admin"), None);
+        for page in ["/setup", "/signup", "/connect", "/account"] {
+            assert_eq!(find(page), find("/"), "{page}");
+        }
+    }
+}

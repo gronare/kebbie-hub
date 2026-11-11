@@ -1,0 +1,50 @@
+{
+  "cases": [
+    {
+      "blob": {
+        "bytes": 1136,
+        "id": "blb_d7a07e78266f3d9e10e22329512f65687f7001af79133f49d4935fb63c935aaa",
+        "key": "CBLciaREt8OqT44Ch4AhtPa7PyABQ695QaSNBMQl_W0",
+        "media_type": "text/markdown"
+      },
+      "ciphertext": "atibgsooMDICJtJ-q_ebcVDW_iIYKoaJJCTbIAfE2VzFpqSxf7oKEsFuUSVnQzY7cdrxDIpzAKlAajA1IEOeBh19pyh7ttkqJb3bgOtkM3lhH2dYKbOqYIkgAbCgyx61upt316s5IzswBsmzJT3WB2ixmTklrJ9ec8IJbplAGOuFq6t3vGSP3ovl5MUWdL1BYkAZj7LKi0ftGjlh8MJKVS6blnyCLcX0I2TM--DXYIJ91Digmp-wbGRebMsaEk5cmzlmvwJBdswkY1DPsnnBYhKrq2w8g0IegCI9m7AJ7VS-LZvsidMYNq-pwDcJsfXBPOBhKZrDCIZOYTpm6bAMX3qr8_3sPNyAxWza-q6Ij2tXnULB5nxFpyLnAkK-UMZ-Bn0VnqfarRJ6FXioN_SzffvYtZuRZa-7Y4qcxTMWjx-seDFp7BAyH7q4PyVd05qOIBrXD_TpnXaqMenqBesLUtag7CzQWTqbPmzoCFJ91zwl-OD_vtVk3TKtLB21jmcZ1GeHikTaQr3U-QSaLNz8ZT3JIx67TH5wvOTt-r7pMop8U2q_-nTLysJfdCUcoN2rnGAGwQoE7AC3uxcMCFrGCuEjnIY1qHkuaNhbM0CMDl2atL5oh55HbTxyPNSqHHVHJq9rat8BtWRNMXKozKP_S4MwHAHAXZy6L5em7FiLA-WjLoULjy0KCGT7GymuZfrqE5tveKyYSOheFBaMb1ondiRyX_iOxHIEtANehRF5UciqIZoiwLdd3sZDd4OPM4bMN-tYldEWOQM_ol82-6Xtkgj_X9JfiA8G45VY6PW05RM2gFqn-5y9PxQmG2V6Vk2aBN_c7HzMVI5vGJLq08vUi9C1ipt6g9LahfDIOYrIQUnVKBB4q27kucOfA0B3eLjGwYegbCARo6cwJlot_rY6lEHAfWBtU2YumapOH3C0twqv-xTUa_8t-tSYbupxFmw4K-5PLwxa7-4_rDaBSWC4ShHh2daNbcrnOu2ByLn_uQVMQfQPi5_3fnhnrpo263sckE0C4Xyh0CcEV8rD91WHoarSNugY9nKwRwa-J8sM-mJdX9EjBuYmutBiak8FN8m1UAcgDY4od6aH9b2kSfP0E1hzVxo_KBGYmmwWZW6yYV2l-Sngi0FwjllWegUv4-AV6BOS-vmBqrhiEE0_BHgtEnTWPc38MamHc66PpAHKrpYoVZtw5Lgbw7LS56nMmi8GYR-Og79M2kNlaco_cNmR2U8xosFTTi_SgNl30-Bkr5O0P73BE2nLfv8T7lr4WI_v_hFmBWqsCM21kOJIysTMTTiu4vVF0vQULov-STBu2aZ9TMbK56O9aiJOaxKsA0mQAWDfcJJxe9jTjrIygwjgUFRNe7iaiBlLVcLG_LkgOkSuhciyGnOnA1FqMadqXRvaRlVKk7Whu5S9vqtNGjoQN1oE-orJrWBbM0oUtSC18Ho18w2CkB1uufzi4P9CSIVc79z-khi3ia27xUIsIsuPNs1Xg9XanHoI7dUJ9mR8vO4v0jgFK2GmKetTpKaXYB3duf5UF9M9P3YbqwnZ",
+      "error": null,
+      "name": "opens"
+    },
+    {
+      "blob": {
+        "bytes": 1136,
+        "id": "blb_d7a07e78266f3d9e10e22329512f65687f7001af79133f49d4935fb63c935aaa",
+        "key": "CBLciaREt8OqT44Ch4AhtPa7PyABQ695QaSNBMQl_W0",
+        "media_type": "text/markdown"
+      },
+      "ciphertext": "atibgsooMDICJtJ-q_ebcVDW_iIZKoaJJCTbIAfE2VzFpqSxf7oKEsFuUSVnQzY7cdrxDIpzAKlAajA1IEOeBh19pyh7ttkqJb3bgOtkM3lhH2dYKbOqYIkgAbCgyx61upt316s5IzswBsmzJT3WB2ixmTklrJ9ec8IJbplAGOuFq6t3vGSP3ovl5MUWdL1BYkAZj7LKi0ftGjlh8MJKVS6blnyCLcX0I2TM--DXYIJ91Digmp-wbGRebMsaEk5cmzlmvwJBdswkY1DPsnnBYhKrq2w8g0IegCI9m7AJ7VS-LZvsidMYNq-pwDcJsfXBPOBhKZrDCIZOYTpm6bAMX3qr8_3sPNyAxWza-q6Ij2tXnULB5nxFpyLnAkK-UMZ-Bn0VnqfarRJ6FXioN_SzffvYtZuRZa-7Y4qcxTMWjx-seDFp7BAyH7q4PyVd05qOIBrXD_TpnXaqMenqBesLUtag7CzQWTqbPmzoCFJ91zwl-OD_vtVk3TKtLB21jmcZ1GeHikTaQr3U-QSaLNz8ZT3JIx67TH5wvOTt-r7pMop8U2q_-nTLysJfdCUcoN2rnGAGwQoE7AC3uxcMCFrGCuEjnIY1qHkuaNhbM0CMDl2atL5oh55HbTxyPNSqHHVHJq9rat8BtWRNMXKozKP_S4MwHAHAXZy6L5em7FiLA-WjLoULjy0KCGT7GymuZfrqE5tveKyYSOheFBaMb1ondiRyX_iOxHIEtANehRF5UciqIZoiwLdd3sZDd4OPM4bMN-tYldEWOQM_ol82-6Xtkgj_X9JfiA8G45VY6PW05RM2gFqn-5y9PxQmG2V6Vk2aBN_c7HzMVI5vGJLq08vUi9C1ipt6g9LahfDIOYrIQUnVKBB4q27kucOfA0B3eLjGwYegbCARo6cwJlot_rY6lEHAfWBtU2YumapOH3C0twqv-xTUa_8t-tSYbupxFmw4K-5PLwxa7-4_rDaBSWC4ShHh2daNbcrnOu2ByLn_uQVMQfQPi5_3fnhnrpo263sckE0C4Xyh0CcEV8rD91WHoarSNugY9nKwRwa-J8sM-mJdX9EjBuYmutBiak8FN8m1UAcgDY4od6aH9b2kSfP0E1hzVxo_KBGYmmwWZW6yYV2l-Sngi0FwjllWegUv4-AV6BOS-vmBqrhiEE0_BHgtEnTWPc38MamHc66PpAHKrpYoVZtw5Lgbw7LS56nMmi8GYR-Og79M2kNlaco_cNmR2U8xosFTTi_SgNl30-Bkr5O0P73BE2nLfv8T7lr4WI_v_hFmBWqsCM21kOJIysTMTTiu4vVF0vQULov-STBu2aZ9TMbK56O9aiJOaxKsA0mQAWDfcJJxe9jTjrIygwjgUFRNe7iaiBlLVcLG_LkgOkSuhciyGnOnA1FqMadqXRvaRlVKk7Whu5S9vqtNGjoQN1oE-orJrWBbM0oUtSC18Ho18w2CkB1uufzi4P9CSIVc79z-khi3ia27xUIsIsuPNs1Xg9XanHoI7dUJ9mR8vO4v0jgFK2GmKetTpKaXYB3duf5UF9M9P3YbqwnZ",
+      "error": "wrong-id",
+      "name": "a flipped byte no longer matches the id"
+    },
+    {
+      "blob": {
+        "bytes": 1136,
+        "id": "blb_d7a07e78266f3d9e10e22329512f65687f7001af79133f49d4935fb63c935aaa",
+        "key": "-1gUAeXB3x80REJcYGNYxtzvLm3nB6EnwY11UxinSFc",
+        "media_type": "text/markdown"
+      },
+      "ciphertext": "atibgsooMDICJtJ-q_ebcVDW_iIYKoaJJCTbIAfE2VzFpqSxf7oKEsFuUSVnQzY7cdrxDIpzAKlAajA1IEOeBh19pyh7ttkqJb3bgOtkM3lhH2dYKbOqYIkgAbCgyx61upt316s5IzswBsmzJT3WB2ixmTklrJ9ec8IJbplAGOuFq6t3vGSP3ovl5MUWdL1BYkAZj7LKi0ftGjlh8MJKVS6blnyCLcX0I2TM--DXYIJ91Digmp-wbGRebMsaEk5cmzlmvwJBdswkY1DPsnnBYhKrq2w8g0IegCI9m7AJ7VS-LZvsidMYNq-pwDcJsfXBPOBhKZrDCIZOYTpm6bAMX3qr8_3sPNyAxWza-q6Ij2tXnULB5nxFpyLnAkK-UMZ-Bn0VnqfarRJ6FXioN_SzffvYtZuRZa-7Y4qcxTMWjx-seDFp7BAyH7q4PyVd05qOIBrXD_TpnXaqMenqBesLUtag7CzQWTqbPmzoCFJ91zwl-OD_vtVk3TKtLB21jmcZ1GeHikTaQr3U-QSaLNz8ZT3JIx67TH5wvOTt-r7pMop8U2q_-nTLysJfdCUcoN2rnGAGwQoE7AC3uxcMCFrGCuEjnIY1qHkuaNhbM0CMDl2atL5oh55HbTxyPNSqHHVHJq9rat8BtWRNMXKozKP_S4MwHAHAXZy6L5em7FiLA-WjLoULjy0KCGT7GymuZfrqE5tveKyYSOheFBaMb1ondiRyX_iOxHIEtANehRF5UciqIZoiwLdd3sZDd4OPM4bMN-tYldEWOQM_ol82-6Xtkgj_X9JfiA8G45VY6PW05RM2gFqn-5y9PxQmG2V6Vk2aBN_c7HzMVI5vGJLq08vUi9C1ipt6g9LahfDIOYrIQUnVKBB4q27kucOfA0B3eLjGwYegbCARo6cwJlot_rY6lEHAfWBtU2YumapOH3C0twqv-xTUa_8t-tSYbupxFmw4K-5PLwxa7-4_rDaBSWC4ShHh2daNbcrnOu2ByLn_uQVMQfQPi5_3fnhnrpo263sckE0C4Xyh0CcEV8rD91WHoarSNugY9nKwRwa-J8sM-mJdX9EjBuYmutBiak8FN8m1UAcgDY4od6aH9b2kSfP0E1hzVxo_KBGYmmwWZW6yYV2l-Sngi0FwjllWegUv4-AV6BOS-vmBqrhiEE0_BHgtEnTWPc38MamHc66PpAHKrpYoVZtw5Lgbw7LS56nMmi8GYR-Og79M2kNlaco_cNmR2U8xosFTTi_SgNl30-Bkr5O0P73BE2nLfv8T7lr4WI_v_hFmBWqsCM21kOJIysTMTTiu4vVF0vQULov-STBu2aZ9TMbK56O9aiJOaxKsA0mQAWDfcJJxe9jTjrIygwjgUFRNe7iaiBlLVcLG_LkgOkSuhciyGnOnA1FqMadqXRvaRlVKk7Whu5S9vqtNGjoQN1oE-orJrWBbM0oUtSC18Ho18w2CkB1uufzi4P9CSIVc79z-khi3ia27xUIsIsuPNs1Xg9XanHoI7dUJ9mR8vO4v0jgFK2GmKetTpKaXYB3duf5UF9M9P3YbqwnZ",
+      "error": "undecryptable",
+      "name": "another blob's key does not open it"
+    },
+    {
+      "blob": {
+        "bytes": 3,
+        "id": "blb_d7a07e78266f3d9e10e22329512f65687f7001af79133f49d4935fb63c935aaa",
+        "key": "CBLciaREt8OqT44Ch4AhtPa7PyABQ695QaSNBMQl_W0",
+        "media_type": "text/markdown"
+      },
+      "ciphertext": "atibgsooMDICJtJ-q_ebcVDW_iIYKoaJJCTbIAfE2VzFpqSxf7oKEsFuUSVnQzY7cdrxDIpzAKlAajA1IEOeBh19pyh7ttkqJb3bgOtkM3lhH2dYKbOqYIkgAbCgyx61upt316s5IzswBsmzJT3WB2ixmTklrJ9ec8IJbplAGOuFq6t3vGSP3ovl5MUWdL1BYkAZj7LKi0ftGjlh8MJKVS6blnyCLcX0I2TM--DXYIJ91Digmp-wbGRebMsaEk5cmzlmvwJBdswkY1DPsnnBYhKrq2w8g0IegCI9m7AJ7VS-LZvsidMYNq-pwDcJsfXBPOBhKZrDCIZOYTpm6bAMX3qr8_3sPNyAxWza-q6Ij2tXnULB5nxFpyLnAkK-UMZ-Bn0VnqfarRJ6FXioN_SzffvYtZuRZa-7Y4qcxTMWjx-seDFp7BAyH7q4PyVd05qOIBrXD_TpnXaqMenqBesLUtag7CzQWTqbPmzoCFJ91zwl-OD_vtVk3TKtLB21jmcZ1GeHikTaQr3U-QSaLNz8ZT3JIx67TH5wvOTt-r7pMop8U2q_-nTLysJfdCUcoN2rnGAGwQoE7AC3uxcMCFrGCuEjnIY1qHkuaNhbM0CMDl2atL5oh55HbTxyPNSqHHVHJq9rat8BtWRNMXKozKP_S4MwHAHAXZy6L5em7FiLA-WjLoULjy0KCGT7GymuZfrqE5tveKyYSOheFBaMb1ondiRyX_iOxHIEtANehRF5UciqIZoiwLdd3sZDd4OPM4bMN-tYldEWOQM_ol82-6Xtkgj_X9JfiA8G45VY6PW05RM2gFqn-5y9PxQmG2V6Vk2aBN_c7HzMVI5vGJLq08vUi9C1ipt6g9LahfDIOYrIQUnVKBB4q27kucOfA0B3eLjGwYegbCARo6cwJlot_rY6lEHAfWBtU2YumapOH3C0twqv-xTUa_8t-tSYbupxFmw4K-5PLwxa7-4_rDaBSWC4ShHh2daNbcrnOu2ByLn_uQVMQfQPi5_3fnhnrpo263sckE0C4Xyh0CcEV8rD91WHoarSNugY9nKwRwa-J8sM-mJdX9EjBuYmutBiak8FN8m1UAcgDY4od6aH9b2kSfP0E1hzVxo_KBGYmmwWZW6yYV2l-Sngi0FwjllWegUv4-AV6BOS-vmBqrhiEE0_BHgtEnTWPc38MamHc66PpAHKrpYoVZtw5Lgbw7LS56nMmi8GYR-Og79M2kNlaco_cNmR2U8xosFTTi_SgNl30-Bkr5O0P73BE2nLfv8T7lr4WI_v_hFmBWqsCM21kOJIysTMTTiu4vVF0vQULov-STBu2aZ9TMbK56O9aiJOaxKsA0mQAWDfcJJxe9jTjrIygwjgUFRNe7iaiBlLVcLG_LkgOkSuhciyGnOnA1FqMadqXRvaRlVKk7Whu5S9vqtNGjoQN1oE-orJrWBbM0oUtSC18Ho18w2CkB1uufzi4P9CSIVc79z-khi3ia27xUIsIsuPNs1Xg9XanHoI7dUJ9mR8vO4v0jgFK2GmKetTpKaXYB3duf5UF9M9P3YbqwnZ",
+      "error": "wrong-size",
+      "name": "a size that differs from the ciphertext"
+    }
+  ],
+  "domain": "kebbie-hub blob v1",
+  "plaintext": "Move refunds from the old charge endpoint to the gateway's `refunds.create`, so each refund books its own ledger entry when the gateway confirms it.\n\n## Steps\n\n1. Add `Gateway#refund` with one idempotency key per refund.\n2. Book the refund ledger entry on the gateway's confirmation, not on the request.\n3. Point the portal's refund button at the new path.\n4. Keep `/charges/:id/refund` answering for one release and log every call.\n\n## What the customer sees\n\nNothing new. A refund shows on the billing page the minute the gateway confirms it.\n\n## Risks\n\n- An app version older than 2.14 still calls the old endpoint.\n- A double tap sends two requests; the idempotency key stops the second refund.\n\n## Paths\n\n| Path | Today | After |\n| --- | --- | --- |\n| `/charges/:id/refund` | books on request | logs, then forwards |\n| `/refunds` | none | books on confirm |\n\n## Request\n\n```\nPOST /v1/refunds\n{ \"charge\": \"ch_3P9xQ2\", \"amount\": 12500,\n  \"idempotency_key\": \"refund-8812-1\" }\n```\n\n## Tests\n\n- [ ] A second refund with the same key books nothing\n- [ ] The old endpoint logs and forwards\n- [ ] The ledger entry is dated on confirmation\n"
+}

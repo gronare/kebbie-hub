@@ -1,0 +1,100 @@
+export class HubError extends Error {
+  constructor(status, code, url = null) {
+    super(`${status} ${code}`);
+    this.status = status;
+    this.code = code;
+    this.url = url;
+  }
+}
+
+async function call(method, path, { body, token } = {}) {
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: "same-origin" });
+  if (!response.ok) {
+    const refusal = await response.json().catch(() => ({}));
+    throw new HubError(response.status, refusal.error ?? "unknown", refusal.url ?? null);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+const query = (value) => encodeURIComponent(value ?? "");
+
+async function bytes(path) {
+  const response = await fetch(path, { credentials: "same-origin" });
+  if (!response.ok) throw new HubError(response.status, (await response.json().catch(() => ({}))).error ?? "unknown");
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+export const account = {
+  hub: () => call("GET", "/v1/hub"),
+  me: () => call("GET", "/v1/a/account"),
+  registerBegin: (ticket) => call("POST", "/v1/a/register/begin", { body: ticket }),
+  registerFinish: (ceremony, credential, name) => call("POST", "/v1/a/register/finish", { body: { ceremony, credential, name } }),
+  loginBegin: (request = {}) => call("POST", "/v1/a/login/begin", { body: request }),
+  loginFinish: (ceremony, credential) => call("POST", "/v1/a/login/finish", { body: { ceremony, credential } }),
+  passkeyBegin: () => call("POST", "/v1/a/passkeys/begin", { body: {} }),
+  passkeyFinish: (ceremony, credential, name) => call("POST", "/v1/a/passkeys/finish", { body: { ceremony, credential, name } }),
+  setKey: (setup) => call("POST", "/v1/a/key", { body: setup }),
+  putWrapper: (passkey, wrapper) => call("PUT", `/v1/a/passkeys/${query(passkey)}/wrapper`, { body: wrapper }),
+  boards: () => call("GET", "/v1/a/boards"),
+  blob: (id) => bytes(`/v1/a/blobs/${query(id)}`),
+  removeGitHub: () => call("DELETE", "/v1/a/github"),
+  registerDevice: (request) => call("POST", "/v1/a/devices", { body: request }),
+  deviceList: () => call("GET", "/v1/a/device-list"),
+  putDeviceList: (signed) => call("PUT", "/v1/a/device-list", { body: signed }),
+  removeDevice: (device) => call("DELETE", `/v1/a/devices/${query(device)}`),
+};
+
+export const deviceCalls = {
+  command: (token, envelope) => call("POST", "/v1/d/commands", { body: { envelope }, token }),
+  results: (token, after, wait = 0) => call("GET", `/v1/d/results?after=${after}&wait=${wait}`, { token }),
+};
+
+export const connectCalls = {
+  peek: (code) => call("GET", `/v1/connect?code=${query(code)}`),
+  view: (code) => call("GET", `/v1/a/connect?code=${query(code)}`),
+  approve: (approval) => call("POST", "/v1/a/connect/approve", { body: approval }),
+  deny: (code) => call("POST", "/v1/a/connect/deny", { body: { code } }),
+  watch: (pairing, seen, wait) => call("GET", `/v1/a/pairings/${query(pairing)}?seen=${seen}&wait=${wait}`),
+  reveal: (pairing, key, nonce) => call("POST", `/v1/a/pairings/${query(pairing)}/reveal`, { body: { key, nonce } }),
+  boards: () => call("GET", "/v1/a/boards"),
+  putMachines: (signed) => call("PUT", "/v1/a/machines", { body: signed }),
+  removeMachine: (machine) => call("DELETE", `/v1/a/machines/${query(machine)}`),
+};
+
+export function parseEvents(buffer) {
+  const events = [];
+  const blocks = buffer.split(/\r?\n\r?\n/);
+  const rest = blocks.pop();
+  for (const block of blocks) {
+    const event = { name: "message", data: "", id: null };
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith(":")) continue;
+      const colon = line.indexOf(":");
+      const field = colon < 0 ? line : line.slice(0, colon);
+      const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
+      if (field === "event") event.name = value;
+      else if (field === "data") event.data += (event.data ? "\n" : "") + value;
+      else if (field === "id") event.id = value;
+    }
+    if (event.data) events.push(event);
+  }
+  return { events, rest };
+}
+
+export async function follow(onEvent, signal, { path = "/v1/a/events", token = null, lastEventId = null } = {}) {
+  const headers = { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(lastEventId ? { "Last-Event-ID": String(lastEventId) } : {}) };
+  const response = await fetch(path, { headers, credentials: "same-origin", signal });
+  if (!response.ok) throw new HubError(response.status, (await response.json().catch(() => ({}))).error ?? "unknown");
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    const parsed = parseEvents(buffer + value);
+    buffer = parsed.rest;
+    for (const event of parsed.events) onEvent(event.name, JSON.parse(event.data));
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "parties": {
+    "account": {
+      "encryption_secret": "MG1itJbHVk_RAdObXTY5bvVGEBPInEp4Zz4WJ8IY2EU",
+      "id": "acc_z-BiJIkbeoXcLA526_0PrQ",
+      "public": {
+        "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+        "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
+      },
+      "signing_secret": "GMfCHXjWcq696Ng8lm2eDWuSJ6QjaDSuTav5phj-OMg"
+    },
+    "intruder": {
+      "encryption_secret": "-KWjPtBXHI7fo9z598R5g3JwCcvcFGV52yUuYZsr3Uk",
+      "id": "dev_01K83YV38015DVZR43PPEYEZPC",
+      "public": {
+        "encryption": "wEZaNo05NZo-jVZJBp5eInS86QuDWEPCJ6KeLbkQ1Bk",
+        "signing": "8RQtjyFGDUD0D_ibaFHK4erqZdnHqk9Q6tl-4vQQqQ4"
+      },
+      "signing_secret": "yeQAVRArinBUQ--4R3ub4WN7p9ufEvDEZtHypuZlRG4"
+    },
+    "machine": {
+      "encryption_secret": "DJ9uO_WZEVWZBDvInF_GSu5R2JOfIN6L3hbCsFnmC0o",
+      "id": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+      "public": {
+        "encryption": "bAD9TeLZaUy3FjFNmZ56Yvv_cuHf7mF91gqnlvqggTg",
+        "signing": "KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dw"
+      },
+      "signing_secret": "4OD_BDxGgz_ydnp-SVON4labpef_JURWjPMyFD9Dv_o"
+    },
+    "other-machine": {
+      "encryption_secret": "sHcvJ_lj8hFv7yxSlkiaQuS4eVmTVMJPa71yNSeea7U",
+      "id": "mch_01K83YV3806W105VXP4AF1F8RM",
+      "public": {
+        "encryption": "sZILUSCUf-lZqo6SZkihBKrogr1Yh21xB4aS3u8r0C4",
+        "signing": "L9sICBYCmzxJyXQ7OT9ALXOXzFf0rm_9SaSL6wmGhRc"
+      },
+      "signing_secret": "zJdmxHDT_21eKnl65ctp-kn-K1ZWXlsIpUcgf8xG8ns"
+    },
+    "phone": {
+      "encryption_secret": "tlLmIotAuH8-mnfPaJDJ1YVqg7e5Mm9Z5c1u64u0mtY",
+      "id": "dev_01K83YV380329ARS69J86ZB9PB",
+      "public": {
+        "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+        "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+      },
+      "signing_secret": "5HLuXg4K2xrj4Svc4jhYqmaxaRnU9xjQ_yRgczxVgyg"
+    },
+    "tablet": {
+      "encryption_secret": "U8B6S8O11mi7cTkvRTbcXTvGXeN8zD7T7t22M7Okhvw",
+      "id": "dev_01K83YV3800E98GTJMKEDT10QK",
+      "public": {
+        "encryption": "U55cJGGoBMjJYzwS3FI2syNmATqAdAGKza09tKejpk8",
+        "signing": "RBsZHnPUbnlHAF68ROvO4tIjUvE1dMzTmYjsdHuA5Fo"
+      },
+      "signing_secret": "OurDFlm3mfcG_nKgRzM_gSi4GqKCJb_jB9FOZA0MVck"
+    }
+  }
+}

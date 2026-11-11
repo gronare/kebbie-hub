@@ -1,0 +1,120 @@
+{
+  "cases": [
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "ftZYDw8Qqt1K9fHlpwqEGabF3YLZooksZfpflMb5l3I",
+      "device": "phone",
+      "device_nonce": "FPwWVyGNxcxLk956TZtWSTglCYHOvLwdtnKzE477gm0",
+      "expect": {
+        "sas": "560 270"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "ERrI1xvPdWxBKYl0xgjdZxv2_abTKHWvNiVY5qyBgYc",
+      "name": "phone-pairs",
+      "revealed": {
+        "device": "phone",
+        "nonce": "FPwWVyGNxcxLk956TZtWSTglCYHOvLwdtnKzE477gm0"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "7ljYFFIB1QlC2Nh042krSf8MDyMe2Rmu6RgLUBdgI3E",
+      "device": "tablet",
+      "device_nonce": "BEG457FmYTOT7imn2r3yTcfgD22UV6-nq9rOO_dnRiM",
+      "expect": {
+        "sas": "016 099"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "5vsiN_AXvk6q6FHwCNuUCVqK1BgGeFuJNrS4-IhsAcI",
+      "name": "tablet-pairs",
+      "revealed": {
+        "device": "tablet",
+        "nonce": "BEG457FmYTOT7imn2r3yTcfgD22UV6-nq9rOO_dnRiM"
+      }
+    },
+    {
+      "code": "Q2ZR-8HWN",
+      "commitment": "Vx27JNHGhWV9K6dx6i6rMihqQfza47TODAMTz0P7BAw",
+      "device": "phone",
+      "device_nonce": "f8N8LQ5aDS2TYfU9N_ndtqymiRccCzEwPaxi1c33jj8",
+      "expect": {
+        "sas": "996 359"
+      },
+      "machine": "other-machine",
+      "machine_code": "Q2ZR-8HWN",
+      "machine_nonce": "tZbFzQhoXoi1Hepk8rizRz7E85wn17W1qj_mWYWTqk0",
+      "name": "pairs-with-another-machine",
+      "revealed": {
+        "device": "phone",
+        "nonce": "f8N8LQ5aDS2TYfU9N_ndtqymiRccCzEwPaxi1c33jj8"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "Wm23WjHKU9zMBPP8HRacPcKroyhsp1WMrQHPWj_98A0",
+      "device": "phone",
+      "device_nonce": "LqlLB6c7hNuxKTNbazDxxQj6-pr5Zoo9NeLpmzhxcxM",
+      "expect": {
+        "error": "commitment-mismatch"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "u4ZSjnkp-phcOU6twn7nbhU_wwdJEY-RCD4L9A0s4PQ",
+      "name": "reveal-with-another-nonce-is-refused",
+      "revealed": {
+        "device": "phone",
+        "nonce": "vCKVS4C4_JHmvgNYZ3X1fbPFyL07yes6ksZL8FjCJFE"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "IsWRKzKNmawHHO0fhUloPbZA_qwu7uLt8slWIMSE3L8",
+      "device": "phone",
+      "device_nonce": "skhD-aTc2ldTgLPWHGdxvB675TroER1oKBgu0HifGdw",
+      "expect": {
+        "error": "commitment-mismatch"
+      },
+      "machine": "machine",
+      "machine_code": "K7QF-M2XD",
+      "machine_nonce": "0wXBNHMl_IlQ1zNKwzaNGbkq6BnUWD-3EChezYmCqkg",
+      "name": "reveal-of-substituted-keys-is-refused",
+      "revealed": {
+        "device": "intruder",
+        "nonce": "skhD-aTc2ldTgLPWHGdxvB675TroER1oKBgu0HifGdw"
+      }
+    },
+    {
+      "code": "K7QF-M2XD",
+      "commitment": "k2bd7-wlagSG35UV3EgzeaxHw0uEDre-_KX32fyqiGE",
+      "device": "phone",
+      "device_nonce": "FQMtTysy0QIiwFAxrpSaU3MbD6owbZlJ5Vh_7vRpJm0",
+      "expect": {
+        "error": "commitment-mismatch"
+      },
+      "machine": "machine",
+      "machine_code": "Q2ZR-8HWN",
+      "machine_nonce": "mEqd2EroaYSA46F2466k_8J25--yjFbH5U6yGE-76Ko",
+      "name": "machine-with-another-code-is-refused",
+      "revealed": {
+        "device": "phone",
+        "nonce": "FQMtTysy0QIiwFAxrpSaU3MbD6owbZlJ5Vh_7vRpJm0"
+      }
+    }
+  ],
+  "commit_domain": "kebbie-pair-commit-v1",
+  "connect": {
+    "code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
+    "commitment": "-__I4Kt_KFP1hrHN9zbv0tMHbaMtaNOdI6lkpBMEz_Q",
+    "device": "phone",
+    "device_nonce": "dmaQzJohDl_n_pZYFF4kVXBbRuVcNH3dzXpgfAYqyOo",
+    "domain": "kebbie-connect-machine-v1",
+    "fingerprint": "GTAwC_GeWWd7RrYvnQibnVtoEpKUuYRG6TaE6d-CJhk",
+    "link": "https://hub.example.com/connect?code=K7QF-M2XD#k=5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA&m=GTAwC_GeWWd7RrYvnQibnVtoEpKUuYRG6TaE6d-CJhk",
+    "machine": "machine",
+    "machine_nonce": "6cCDwdOkf6u5qqZxR53sG_HGngd61dxYwlnM1JNGQuk",
+    "other_fingerprint": "0WZkmZCj3ZhNAczxQbcgauxyvMYmi0nnYjL36LdsSEg"
+  },
+  "sas_domain": "kebbie-pair-v1"
+}

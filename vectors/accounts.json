@@ -1,0 +1,226 @@
+{
+  "account": "account",
+  "commit_domain": "kebbie-connect-account-commit-v1",
+  "devices": {
+    "domain": "kebbie-hub account devices v1",
+    "list": {
+      "counter": 2,
+      "devices": [
+        {
+          "device": "dev_01K83YV3800E98GTJMKEDT10QK",
+          "keys": {
+            "encryption": "U55cJGGoBMjJYzwS3FI2syNmATqAdAGKza09tKejpk8",
+            "signing": "RBsZHnPUbnlHAF68ROvO4tIjUvE1dMzTmYjsdHuA5Fo"
+          },
+          "name": "iPad",
+          "role": "read"
+        },
+        {
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "keys": {
+            "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+            "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+          },
+          "name": "iPhone",
+          "role": "control"
+        }
+      ]
+    },
+    "removed": {
+      "counter": 3,
+      "devices": [
+        {
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "keys": {
+            "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+            "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+          },
+          "name": "iPhone",
+          "role": "control"
+        }
+      ]
+    },
+    "removed_device": "tablet",
+    "removed_signature": "I86gOKLkKy2QYY3GUjzJ9bEuozoR82JdFhdEa9XInqTuZEmgYZC7Bl1HSZmKcA94eInj6wNi-VOFRpI45_WpCQ",
+    "signature": "m7031zwAFzfCHQliejQFDroAP4DVb_rrYt4Cto15B595WEXLiNL3M-84JoRUq9RDrYXgOITFXoYahorOapFVDg",
+    "statement": "a2ViYmllLWh1YiBhY2NvdW50IGRldmljZXMgdjEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAAAAAAAAAAIAAAACAB5kZXZfMDFLODNZVjM4MDBFOThHVEpNS0VEVDEwUUsABGlQYWREGxkec9RueUcAXrxE687i0iNS8TV0zNOZiOx0e4DkWlOeXCRhqATIyWM8EtxSNrMjZgE6gHQBis2tPbSno6ZPAARyZWFkAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIABmlQaG9uZeMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2QAB2NvbnRyb2w",
+    "trusted": "phone"
+  },
+  "encryption_fingerprint_domain": "kebbie-hub account encryption key v1",
+  "fingerprints": {
+    "encryption": "vLdSXbxm2t23vU8zOHzMaL8yWxb1HCdLOpYOe1GL1Ks",
+    "signing": "umzH5AU8YXSr4lM5CnVXK3ALPhsmpmt651WjgyLwInE"
+  },
+  "handoff": {
+    "code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
+    "commitment": "xb4XvcUuM9bflqpMKDdEYFRbkYf8IaC1XPOA-13Bzoo",
+    "nonce": "qfVl27YBeLDL7cqN-dwvrM4WsbbXoosQ02NnathOZFA",
+    "reveals": [
+      {
+        "expect": {
+          "pinned": {
+            "encryption": "vLdSXbxm2t23vU8zOHzMaL8yWxb1HCdLOpYOe1GL1Ks",
+            "signing": "umzH5AU8YXSr4lM5CnVXK3ALPhsmpmt651WjgyLwInE"
+          }
+        },
+        "machine_code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
+        "name": "pins-the-committed-keys",
+        "revealed": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "keys": {
+            "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+            "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
+          },
+          "version": 1
+        }
+      },
+      {
+        "expect": {
+          "error": "commitment-mismatch"
+        },
+        "machine_code": "5KViGdSAmbQEe6koLp_S9Ekte5SLlVvYoVLgoGSmFLA",
+        "name": "swapped-keys-are-refused",
+        "revealed": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "keys": {
+            "encryption": "wEZaNo05NZo-jVZJBp5eInS86QuDWEPCJ6KeLbkQ1Bk",
+            "signing": "8RQtjyFGDUD0D_ibaFHK4erqZdnHqk9Q6tl-4vQQqQ4"
+          },
+          "version": 1
+        }
+      },
+      {
+        "expect": {
+          "error": "commitment-mismatch"
+        },
+        "machine_code": "guessed-code",
+        "name": "another-code-is-refused",
+        "revealed": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "keys": {
+            "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+            "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
+          },
+          "version": 1
+        }
+      }
+    ]
+  },
+  "hub_prf_salt": {
+    "domain": "kebbie-hub prf salt v1",
+    "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+    "salt": "hVzZtm6z_D2YvHm-gs92gzscDhSyQt1mfzuODmaPHTE",
+    "wrap_key": "fo7lFfqJE8IbA1uP3XiDukwk28678Myj3pMq1wwRYiM"
+  },
+  "key": {
+    "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+    "keys": {
+      "encryption": "C2BUl6iqHeKEppyy1-G9wx3ycbEqOVlzaYPdZxMBvgg",
+      "signing": "ofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9E"
+    },
+    "version": 1
+  },
+  "machine_list_domain": "kebbie-hub account machines v1",
+  "machines": {
+    "list": {
+      "counter": 2,
+      "machines": [
+        {
+          "keys": {
+            "encryption": "sZILUSCUf-lZqo6SZkihBKrogr1Yh21xB4aS3u8r0C4",
+            "signing": "L9sICBYCmzxJyXQ7OT9ALXOXzFf0rm_9SaSL6wmGhRc"
+          },
+          "machine": "mch_01K83YV3806W105VXP4AF1F8RM"
+        },
+        {
+          "keys": {
+            "encryption": "bAD9TeLZaUy3FjFNmZ56Yvv_cuHf7mF91gqnlvqggTg",
+            "signing": "KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dw"
+          },
+          "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4"
+        }
+      ]
+    },
+    "removed": {
+      "counter": 3,
+      "machines": [
+        {
+          "keys": {
+            "encryption": "bAD9TeLZaUy3FjFNmZ56Yvv_cuHf7mF91gqnlvqggTg",
+            "signing": "KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dw"
+          },
+          "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4"
+        }
+      ]
+    },
+    "removed_machine": "other-machine",
+    "removed_signature": "NESI4jXBvhXQc_SNeVo1kMmN1v3yAHHinTmvO1oOg6V7NtNZQnseK7pqQQamEzh_geu-A38DEK4m6nBU5_PRBA",
+    "signature": "w61mx2ASlgLM_ygX7caRq4_whJqR8n-zwPcoaQPEb90FtjlrR9gn8BJrl4QSOV7P2Zx2ic3j99KyuyAm7cOGAw",
+    "statement": "a2ViYmllLWh1YiBhY2NvdW50IG1hY2hpbmVzIHYxABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAAAAAAAAACAAAAAgAebWNoXzAxSzgzWVYzODA2VzEwNVZYUDRBRjFGOFJNL9sICBYCmzxJyXQ7OT9ALXOXzFf0rm_9SaSL6wmGhRexkgtRIJR_6VmqjpJmSKEEquiCvViHbXEHhpLe7yvQLgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0KzXxZf404GZhMCze54nxbxdqvcV5jozOJpmJGpEm0dxsAP1N4tlpTLcWMU2Znnpi-_9y4d_uYX3WCqeW-qCBOA",
+    "trusted": "machine"
+  },
+  "signing_fingerprint_domain": "kebbie-hub account signing key v1",
+  "wrap": {
+    "associated_data": "a2ViYmllLWh1YiBhY2NvdW50IGtleSB3cmFwIHYxABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAUrJzkLqyrg4RUOS3UjGyS6Xssm2YAAAAB",
+    "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
+    "nonce": "81zetjPc5abEcGr_",
+    "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+    "refusals": [
+      {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
+        "expect": "wrong-account-key",
+        "key_version": 1,
+        "name": "another-prf-output",
+        "prf_output": "vftykOv9gG_gzneAwAq8CNDSU5CPWwxGXcEukBhGVkM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
+      },
+      {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
+        "expect": "wrong-account-key",
+        "key_version": 1,
+        "name": "another-salt",
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "_EHfSe3deoWqiz4WasWxhOYvmkCSfVpXWwXaxC3UyFM"
+      },
+      {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "lCtR6cmPhZ2O8CwG68kDzLRnLPU",
+        "expect": "wrong-account-key",
+        "key_version": 1,
+        "name": "another-credential",
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
+      },
+      {
+        "account": "acc_ETEolyOEmutVBFE5Ztvgrg",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
+        "expect": "wrong-account-key",
+        "key_version": 1,
+        "name": "another-account",
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
+      },
+      {
+        "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "credential": "rJzkLqyrg4RUOS3UjGyS6Xssm2Y",
+        "expect": "wrong-account-key",
+        "key_version": 2,
+        "name": "another-key-version",
+        "prf_output": "Hdng71ms2-khFNuyZroDV62CKa8A3ZpyOLuBG5jINFM",
+        "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4"
+      }
+    ],
+    "salt": "QPFif-qrhvORK5UCsZVltPm7mQ78fWadcQWNW8yjQc4",
+    "wrap_key": "uK5Y6DwyTGK9qw4hfNOvBbO4FGXoZTaCN5IUbvuFfWg",
+    "wrapped": "81zetjPc5abEcGr_GhNrasgXuWX1TICBSt860doHQXHjNTLIOxFms8C64NTH_yPOo1sav36yuM45WY-55T6uLFY8fbVMwzQ7Pn6SU_DiHI0NTscJy4IaQXt2dR8"
+  },
+  "wrap_ad_domain": "kebbie-hub account key wrap v1",
+  "wrap_key_info": "kebbie-hub account key v1",
+  "wrapper": {
+    "signature": "MCtYF_eFmG1ec5pqBKDK55XXnHKJN3piB-3J_OPhlVBEuqZYpTe5ZrCc5JQL7TE4IQSw6TaqoCG8BsWuSaWwBw",
+    "statement": "a2ViYmllLWh1YiBhY2NvdW50IGtleSB3cmFwcGVyIHYxABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAUrJzkLqyrg4RUOS3UjGyS6Xssm2YAAAABofsetXsF_38rf9wk-qnXFe0_jI5IJ0dCkGqAf3Ld-9ELYFSXqKod4oSmnLLX4b3DHfJxsSo5WXNpg91nEwG-CFe3cIq0dzBtF-60eEfl24Tx86-k1rCVctI-6bweLaG2"
+  },
+  "wrapper_sign_domain": "kebbie-hub account key wrapper v1"
+}
