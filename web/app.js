@@ -10,7 +10,7 @@ import { answerBlock, answerReady, choosable, COMMAND_TEXT, deviceRows, gate, la
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
-import { PAGES, startPage } from "./pages.js";
+import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -393,7 +393,7 @@ function machinesScreen() {
   const now = nowSeconds();
   const rows = awakeFirst(state.opened, now).map((opened) => {
     const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
-    const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kebbie}`, `board rev ${opened.rev}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
+    const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kebbie}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
     return machineRow({ machine: opened.machine, name: opened.name, awake, facts });
   });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
@@ -1022,6 +1022,38 @@ function closeSheet(after = render) {
   setTimeout(finish, 400);
 }
 
+let accountPage = null;
+
+// The account page opens inside the running app so the unlocked session outlives it: a fresh load can only resume the unlock the device store kept.
+function openAccount() {
+  history.pushState(null, "", "/account");
+  pageMode = true;
+  state.sheet = false;
+  scrollTo(0, 0);
+  accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address }, back: () => history.back() });
+}
+
+function leaveAccount() {
+  const left = accountPage.leave();
+  accountPage = null;
+  pageMode = false;
+  if (left.session) state.session = left.session;
+  if (left.me) state.me = left.me;
+  state.address = left.address;
+  render();
+}
+
+addEventListener("popstate", () => {
+  if (accountPage && location.pathname !== "/account") leaveAccount();
+});
+
+root.addEventListener("click", (event) => {
+  const link = event.target.closest?.('a[href="/account"]');
+  if (!link || pageMode || state.session?.state !== "unlocked" || event.metaKey || event.ctrlKey || event.shiftKey) return;
+  event.preventDefault();
+  openAccount();
+});
+
 root.addEventListener("click", (event) => {
   if (pageMode) return;
   const picked = event.target.closest(".sheet a.item");
@@ -1083,9 +1115,10 @@ root.addEventListener("input", (event) => {
 });
 
 root.addEventListener("keydown", (event) => {
+  if (pageMode) return;
   if (event.key === "Enter" && event.target.matches?.("#email, #code")) {
     event.preventDefault();
-    return root.querySelector(".actions .btn.primary")?.click();
+    return root.querySelector(SUBMIT)?.click();
   }
   const pick = event.target.closest?.('[data-action="pick"]');
   if (!pick || (event.key !== "Enter" && event.key !== " ")) return;

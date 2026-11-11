@@ -6,13 +6,14 @@ import { account, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { accountScreen, connectScreen, esc, githubErrorText, nav, setupScreen, signupScreen } from "./screens.js";
+import { accountScreen, authScreen, connectScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/account"];
 
+export const SUBMIT = '.auth-actions .btn.primary, [data-action="save-email"]';
+
 const top = (title, aside = "") => `<header class="top"><b>${esc(title)}</b><span>${esc(aside)}</span></header>`;
-const say = (text, tone = "") => `<div class="center${tone ? ` ${tone}` : ""}"${tone === "warn" ? ' role="alert"' : ""}>${text}</div>`;
 const deviceName = () => proposedName(navigator.userAgent);
 
 const EMAIL_ERRORS = {
@@ -31,7 +32,8 @@ function message(error) {
   return error?.message ?? String(error);
 }
 
-export function startPage(root, { showBoard = () => location.assign("/#/board") } = {}) {
+export function startPage(root, { showBoard = () => location.assign("/#/board"), given = null, back = null } = {}) {
+  const listening = new AbortController();
   const params = new URLSearchParams(location.search);
   const sessionStore = (() => {
     try {
@@ -48,7 +50,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -108,7 +110,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     } catch {}
   }
 
-  const signInBlock = (purpose) => `${say(esc(purpose))}<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${state.notice ? say(esc(state.notice), "warn") : ""}`;
+  const accountSignIn = () =>
+    authScreen({
+      intro: heading("See your account", emailSignIn() ? "Sign in to see your account." : "Sign in with your passkey to see your account."),
+      actions: emailSignIn() ? `<a class="btn primary" href="/?next=%2Faccount">Sign in</a>` : `<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>`,
+      notice: state.notice,
+    });
 
   const keepsEmail = () => Boolean(state.info?.email);
   const emailSignIn = () => Boolean(state.info?.email_signin);
@@ -134,10 +141,9 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
   }
 
   function accountPage() {
-    if (!state.me && emailSignIn()) return top("Account") + say("Sign in to see your account.") + `<a class="btn primary" href="/?next=%2Faccount">Sign in</a>`;
-    if (!state.me) return top("Account") + signInBlock("Sign in to see your account.");
+    if (!state.me) return accountSignIn();
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
-    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), address: state.address, notice: state.notice, busy: state.busy });
+    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy });
   }
 
   function draw() {
@@ -319,6 +325,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
         const asked = await account.setEmail(email);
         if (asked.verified) state.address = asked;
         else state.emailStep = { email: asked.email };
+        state.changingEmail = false;
       });
     }
     state.busy = true;
@@ -326,6 +333,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     draw();
     try {
       state.address = email ? await account.setEmail(email) : (await account.removeEmail(), { email: null, verified: false, sent: false });
+      state.changingEmail = false;
       state.busy = false;
       draw();
     } catch (error) {
@@ -383,6 +391,13 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     }
   }
 
+  root.addEventListener("click", (event) => {
+    const home = back && event.target.closest?.('a[href="/"]');
+    if (!home || state.left) return;
+    event.preventDefault();
+    back();
+  }, { signal: listening.signal });
+
   root.addEventListener("click", async (event) => {
     if (state.left) return;
     const target = event.target.closest("[data-action]");
@@ -401,10 +416,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
         state.me = await account.me();
       }
       if (action === "create-passkey") return await createPasskey();
-      if (action === "copy-account") {
-        await navigator.clipboard.writeText(target.dataset.copy);
-        state.notice = "Account id copied.";
-        return draw();
+      if (action === "change-email" || action === "keep-email") {
+        state.changingEmail = action === "change-email";
+        state.notice = null;
+        draw();
+        if (state.changingEmail) root.querySelector("#email")?.focus();
+        return;
       }
       if (action === "save-email" || action === "remove-email") return await saveEmail(action === "save-email" ? typedEmail() : "");
       if (action === "connect") return await connect();
@@ -428,23 +445,37 @@ export function startPage(root, { showBoard = () => location.assign("/#/board") 
     } catch (error) {
       fail(error);
     }
-  });
+  }, { signal: listening.signal });
 
   root.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || !event.target.matches?.("#email, #code")) return;
     event.preventDefault();
-    root.querySelector(".actions .btn.primary")?.click();
-  });
+    root.querySelector(SUBMIT)?.click();
+  }, { signal: listening.signal });
 
-  (async () => {
-    render(top("kebbie hub"));
-    state.info = await account.hub().catch(() => null);
-    state.me = await signedInAccount(account);
-    const onward = state.me ? signedInDestination(path, params) : null;
-    if (onward) return location.assign(onward);
-    const kept = await keptUnlock(state.me);
-    state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
+  const started = (async () => {
+    if (given) {
+      Object.assign(state, { info: given.info, me: given.me, session: given.session, address: given.address ?? null });
+    } else {
+      render(top("kebbie hub"));
+      state.info = await account.hub().catch(() => null);
+      state.me = await signedInAccount(account);
+      const onward = state.me ? signedInDestination(path, params) : null;
+      if (onward) return location.assign(onward);
+      const kept = await keptUnlock(state.me);
+      state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
+    }
     await loadView();
     draw();
   })();
+
+  return {
+    started,
+    leave() {
+      state.left = true;
+      unlockEnds.watch(null);
+      listening.abort();
+      return { session: state.session, me: state.me, address: state.address };
+    },
+  };
 }

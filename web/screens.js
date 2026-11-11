@@ -352,7 +352,9 @@ export const needsFirstPasskey = (me, session) => Boolean(me?.github && !me.key 
 
 export const EMAIL_LABEL = "Email, so we can tell who you are (optional)";
 
-export const emailField = (value = "") => `<div class="note-field"><label for="email">${esc(EMAIL_LABEL)}</label><input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" value="${esc(value)}"></div>`;
+const emailInput = (label, value) => `<div class="note-field"><label for="email">${esc(label)}</label><input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" value="${esc(value)}"></div>`;
+
+export const emailField = (value = "") => emailInput(EMAIL_LABEL, value);
 
 function emailState(address) {
   if (!address?.email) return "No email yet";
@@ -360,21 +362,24 @@ function emailState(address) {
   return address.sent ? `${address.email} · not confirmed yet. We sent a link; open it to confirm.` : `${address.email} · not confirmed`;
 }
 
-export function emailSection(address, busy = false, codes = false) {
-  if (codes) return `<section class="task"><div class="name">Email</div><div class="meta${address?.verified ? " ok" : ""}">${esc(emailState({ ...address, sent: false }))}</div><div class="note-field"><label for="email">Change email</label><input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" value="${esc(address?.email ?? "")}"></div><button type="button" class="btn small" data-action="save-email"${disabled(busy)}>Send code</button></section>`;
-  const remove = address?.email ? `<button type="button" class="link" data-action="remove-email"${disabled(busy)}>Remove email</button>` : "";
-  return `<section class="task"><div class="name">Email</div><div class="meta${address?.verified ? " ok" : ""}">${esc(emailState(address))}</div>${emailField(address?.email ?? "")}<button type="button" class="btn small" data-action="save-email"${disabled(busy)}>Save email</button>${remove}</section>`;
+export function emailSection(address, { busy = false, codes = false, changing = false } = {}) {
+  const shown = address?.email ? { ...address, sent: codes ? false : address.sent } : address;
+  const state = `<div class="meta${address?.verified ? " ok" : ""}">${esc(emailState(shown))}</div>`;
+  if (address?.email && !changing) return `<section class="task"><div class="row"><div><div class="name">Email</div>${state}</div><button type="button" class="btn small" data-action="change-email"${disabled(busy)}>Change</button></div></section>`;
+  const field = codes ? emailInput(address?.email ? "New email" : "Email", "") : address?.email ? emailInput("New email", "") : emailField("");
+  const send = `<button type="button" class="btn small" data-action="save-email"${disabled(busy)}>${codes ? "Send code" : "Save email"}</button>`;
+  const remove = !codes && address?.email ? `<button type="button" class="link" data-action="remove-email"${disabled(busy)}>Remove email</button>` : "";
+  const cancel = address?.email ? `<button type="button" class="link" data-action="keep-email"${disabled(busy)}>Cancel</button>` : "";
+  return `<section class="task"><div class="name">Email</div>${state}${field}${send}${remove}${cancel}</section>`;
 }
 
-const accountId = (id) => `<div class="row"><span class="mono">${esc(id)}</span><button type="button" class="btn small" data-action="copy-account" data-copy="${esc(id)}" aria-label="Copy account id">Copy</button></div>`;
-
-export function accountScreen({ me, github, email = false, codes = false, address = null, notice = null, busy = false }) {
+export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false }) {
   const linked = me.github
     ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + accountId(me.account) + linked + (email ? emailSection(address, busy, codes) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {

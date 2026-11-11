@@ -204,8 +204,8 @@ test("the connect link after GitHub asks for a passkey first, and Not now says h
 
 test("the account page connects GitHub or removes it", () => {
   const linked = accountScreen({ me: { ...me, github: "octocat" }, github: true });
-  assert.equal(text(linked), "kebbie hub Account acc_1 Copy GitHub Signed in with GitHub as octocat Remove Back to your boards Sign out");
-  assert.deepEqual(buttons(linked)[1], { label: "Remove", disabled: false });
+  assert.equal(text(linked), "kebbie hub Account GitHub Signed in with GitHub as octocat Remove Back to your boards Sign out");
+  assert.deepEqual(buttons(linked)[0], { label: "Remove", disabled: false });
   const unlinked = accountScreen({ me, github: true });
   assert.deepEqual(hrefs(unlinked)[0], { label: "Connect GitHub", href: "/auth/github?link=1&next=%2Faccount" });
   assert.doesNotMatch(text(accountScreen({ me, github: false })), /GitHub/);
@@ -386,9 +386,8 @@ test("the account page signs out from a plain button, held while busy", () => {
   assert.match(accountScreen({ me, busy: true }), /data-action="sign-out" disabled>Sign out</);
 });
 
-test("the account page copies the account id on every hub", () => {
-  const page = accountScreen({ me, github: false });
-  assert.match(page, /data-action="copy-account" data-copy="acc_1"/);
+test("the account page keeps the account id out of sight", () => {
+  assert.doesNotMatch(accountScreen({ me, github: true, email: true, codes: true, address: { email: "ada@example.com", verified: true } }), /acc_1|copy/i);
 });
 
 test("a hub that does not keep email never asks for one", () => {
@@ -407,8 +406,20 @@ test("a hub that keeps email asks for it at passkey sign-up and shows its state 
   assert.match(connectScreen({ view, signupOpen: true, email: true }), /type="email"/);
   assert.match(text(signupScreen({ invite: "K7QF-M2XD", email: true })), new RegExp(EMAIL_LABEL.replace(/[()]/g, "\\$&")));
   assert.match(text(accountScreen({ me, github: false, email: true })), /Email No email yet .* Save email/);
-  assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: true } })), /Email ada@example\.com · confirmed .*Save email Remove email/);
+  const ada = { email: "ada@example.com", verified: true };
+  assert.equal(text(accountScreen({ me, github: false, email: true, address: ada })), "kebbie hub Account Email ada@example.com · confirmed Change Back to your boards Sign out");
+  assert.doesNotMatch(accountScreen({ me, github: false, email: true, address: ada }), /type="email"/);
+  assert.match(text(accountScreen({ me, github: false, email: true, changing: true, address: ada })), /Email ada@example\.com · confirmed New email Save email Remove email Cancel/);
   assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: false, sent: true } })), /not confirmed yet\. We sent a link/);
-  assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: false } })), /Email ada@example\.com · not confirmed Email, so/);
-  assert.match(accountScreen({ me, github: false, email: true, address: { email: "a\"<b>@example.com", verified: false } }), /value="a&#34;&#60;b&#62;@example\.com"/);
+  assert.match(accountScreen({ me, github: false, email: true, address: { email: "a\"<b>@example.com", verified: false } }), /a&#34;&#60;b&#62;@example\.com · not confirmed/);
+});
+
+test("on a hub that signs in by email the account page shows the address and opens a field only on Change", () => {
+  const ada = { email: "ada@example.com", verified: true };
+  const closed = accountScreen({ me, github: false, email: true, codes: true, address: ada });
+  assert.equal(text(closed), "kebbie hub Account Email ada@example.com · confirmed Change Back to your boards Sign out");
+  assert.doesNotMatch(closed, /type="email"|Send code/);
+  const open = accountScreen({ me, github: false, email: true, codes: true, changing: true, address: ada });
+  assert.match(text(open), /Email ada@example\.com · confirmed New email Send code Cancel Back to your boards Sign out$/);
+  assert.match(open, /<input id="email"[^>]* value="">/);
 });
