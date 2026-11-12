@@ -674,10 +674,12 @@ function render() {
   const auth = isAuthScreen(html);
   liftKeyboard(auth && html.includes("<input"));
   const reviewing = name === "review" || name === "diff";
-  const panelTop = reviewing && rendered === location.hash ? (root.querySelector(".panel")?.scrollTop ?? 0) : 0;
+  const listTop = listPane()?.scrollTop ?? (twoColumns() ? scrollY : 0);
+  const anchor = twoColumns() && !listPane() ? rowTop(location.hash) : null;
+  const panelTop = rendered === location.hash ? (root.querySelector(".panel")?.scrollTop ?? 0) : 0;
   root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`;
   rendered = location.hash;
-  if (panelTop) root.querySelector(".panel")?.scrollTo(0, panelTop);
+  document.documentElement.classList.toggle("panes", twoColumns() && Boolean(root.querySelector(".app.with-panel")));
   document.documentElement.classList.toggle("has-send", Boolean(root.querySelector(".rv-sendbar")));
   document.documentElement.classList.toggle("has-fab", Boolean(root.querySelector(".fab, .idea-add")));
   if (reviewing) hangLines(root);
@@ -689,6 +691,18 @@ function render() {
   fillBlobs();
   for (const element of root.querySelectorAll("[data-markdown]")) element.replaceChildren(...markdown(element.textContent));
   document.title = ["task", "plan", "review", "diff"].includes(name) && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
+  if (listTop) listPane()?.scrollTo(0, listTop);
+  const moved = anchor === null ? null : rowTop(location.hash);
+  if (moved !== null) listPane()?.scrollBy(0, moved - anchor);
+  if (panelTop) root.querySelector(".panel")?.scrollTo(0, panelTop);
+}
+
+const rowTop = (hash) => root.querySelector(`.app > main.screen a[href="${CSS.escape(hash)}"]`)?.getBoundingClientRect().top ?? null;
+const listPane = () => (document.documentElement.classList.contains("panes") ? root.querySelector(".app > main.screen") : null);
+
+function scrollListToTop() {
+  scrollTo(0, 0);
+  listPane()?.scrollTo(0, 0);
 }
 
 
@@ -929,7 +943,7 @@ async function requestReview(found) {
 function reveal(selector, offset = null) {
   const element = root.querySelector(selector);
   if (!element) return;
-  const panel = element.closest(".panel");
+  const panel = element.closest(".panel") ?? (listPane()?.contains(element) ? listPane() : null);
   const header = element.querySelector(".rv-fh") ?? element;
   const gap = offset ?? (parseFloat(getComputedStyle(header).top) || 0);
   if (panel) panel.scrollTop += element.getBoundingClientRect().top - panel.getBoundingClientRect().top - gap;
@@ -1430,6 +1444,7 @@ function openAccount() {
   history.pushState(null, "", "/account");
   pageMode = true;
   state.sheet = false;
+  document.documentElement.classList.remove("panes");
   scrollTo(0, 0);
   accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address, device: state.device }, back: () => history.back() });
 }
@@ -1584,7 +1599,7 @@ addEventListener("hashchange", () => {
   if (name === "item") backlogUi(route().params[0]).visit = nowSeconds();
   state.sheet = false;
   render();
-  if (!(twoColumns() && (name === "task" || name === "plan" || name === "item" || name === "idea"))) window.scrollTo(0, 0);
+  if (!(twoColumns() && (name === "task" || name === "plan" || name === "item" || name === "idea"))) scrollListToTop();
   const pending = revealAfter;
   revealAfter = null;
   if (pending) reveal(pending.selector, pending.offset);
