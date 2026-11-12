@@ -13,7 +13,7 @@ use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Handling, MachineState, Posted};
 use kebbie_hub_protocol::{
     AccountKey, Answer, CommandResult, Dropped, Envelope, Header, Id, Kind, Outcome, Payload,
-    DeviceCert, DeviceKey, DeviceKind, Prefix, PromptAnswer, PushApproval, Reason, SecretKeys, StartTask, seal, seal_command,
+    DeviceCert, DeviceKey, DeviceKind, Idea, ItemAnswer, ItemKey, Prefix, PromptAnswer, PushApproval, Reason, SecretKeys, StartItem, StartTask, seal, seal_command,
 };
 use serde_json::Value;
 
@@ -56,6 +56,18 @@ fn start(name: &str, prompt: &str) -> Payload {
         name: name.to_string(),
         prompt: prompt.to_string(),
     })
+}
+
+fn idea(text: &str) -> Payload {
+    Payload::Idea(Idea { text: text.to_string(), repo: Some("shop".to_string()) })
+}
+
+fn item_answer(answer: &str) -> Payload {
+    Payload::ItemAnswer(ItemAnswer { item: ItemKey::vault("Projects/x.md").unwrap(), index: 0, question: "Which?".to_string(), answer: answer.to_string() })
+}
+
+fn start_item(item: &str) -> Payload {
+    Payload::StartItem(StartItem { item: ItemKey::parse(item).unwrap(), anyway: false })
 }
 
 fn refusal_of<T: std::fmt::Debug>(result: Result<T, HubError>) -> (u16, String) {
@@ -375,6 +387,27 @@ async fn starts_past_their_rate_limit_get_429_while_answers_still_go_through() {
         .await
         .unwrap();
     assert_eq!(rows(&test, "queue"), 3);
+}
+
+#[tokio::test]
+async fn starts_from_the_backlog_share_the_start_limit_while_ideas_and_item_answers_still_go_through() {
+    let test = start_hub(|config| {
+        config.start_push_rate = RateLimit {
+            burst: 2,
+            per_minute: 1,
+        }
+    })
+    .await;
+    let (machine, mut person) = commanding(&test).await;
+    for item in ["kept:one", "kept:two"] {
+        person.command(&machine.machine, &start_item(item)).await.unwrap();
+    }
+    assert_eq!(refusal_of(person.command(&machine.machine, &start_item("kept:three")).await), (429, "rate-limited".to_string()));
+    for _ in 0..3 {
+        person.command(&machine.machine, &idea("Mail a weekly summary")).await.unwrap();
+    }
+    person.command(&machine.machine, &item_answer("Half up")).await.unwrap();
+    assert_eq!(rows(&test, "queue"), 6);
 }
 
 #[tokio::test]
@@ -703,6 +736,14 @@ async fn each_kind_has_its_own_ciphertext_cap() {
     assert_eq!(refusal_of(person.send_command(&answered).await), (400, "bad-signature".to_string()));
     let started = padded(&person, &start("big-task", "x"), 37 * 1024);
     assert_eq!(refusal_of(person.send_command(&started).await), (413, "too-large".to_string()));
+    for payload in [idea("x"), item_answer("x")] {
+        let written = padded(&person, &payload, 5_000);
+        assert_eq!(refusal_of(person.send_command(&written).await), (400, "bad-signature".to_string()), "{payload:?}");
+        let long = padded(&person, &payload, 37 * 1024);
+        assert_eq!(refusal_of(person.send_command(&long).await), (413, "too-large".to_string()), "{payload:?}");
+    }
+    let begun = padded(&person, &start_item("kept:one"), 5_000);
+    assert_eq!(refusal_of(person.send_command(&begun).await), (413, "too-large".to_string()));
     assert_eq!(rows(&test, "queue"), 0);
 }
 

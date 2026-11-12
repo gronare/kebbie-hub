@@ -9,9 +9,9 @@ use kebbie_hub_api::{
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
 };
 use kebbie_hub_protocol::{
-    AccountFingerprints, AccountKey, AppliedCommands, Board, CommandResult, ConnectSecret, Dropped, Envelope, Header, Id,
-    Kind, Machine, Outcome, Payload, Prefix, PublicKeys, Reason, Refusal,
-    DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal,
+    AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
+    Idea, ItemAnswer, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
+    DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -19,8 +19,15 @@ use tokio::time::Instant;
 
 use crate::{Error, HubClient, HubError, KeyFile, PairError, now, save};
 
-fn every_command() -> Vec<Kind> {
-    vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer]
+pub fn every_command() -> Vec<Kind> {
+    vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem]
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Backlog {
+    pub rows: Vec<BacklogRow>,
+    #[serde(default)]
+    pub bodies: BTreeMap<ItemKey, BacklogBody>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -83,6 +90,12 @@ pub struct MachineState {
     pub devices: BTreeMap<Id, KnownDevice>,
     #[serde(default)]
     pub held: Vec<Envelope>,
+    #[serde(default)]
+    pub backlog: Backlog,
+    #[serde(default)]
+    pub started: BTreeMap<ItemKey, String>,
+    #[serde(skip)]
+    backlog_changed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -280,6 +293,9 @@ impl MachineState {
             trust_devices: false,
             devices: BTreeMap::new(),
             held: Vec::new(),
+            backlog: Backlog::default(),
+            started: BTreeMap::new(),
+            backlog_changed: false,
         }
     }
 
@@ -441,6 +457,9 @@ impl MachineState {
     pub async fn post_board_at(&mut self, mut board: Board, rev: u64) -> Result<u64, Error> {
         board.accepts = Some(self.accepts.clone());
         board.devices = self.standings();
+        if board.backlog.is_none() && !self.backlog.rows.is_empty() {
+            board.backlog = Some(self.backlog.rows.clone());
+        }
         let envelope = self.seal_board(board.clone(), rev, now())?;
         let stored = self.upload_board(rev, envelope).await?;
         board.rev = stored;
@@ -473,10 +492,85 @@ impl MachineState {
             }
         }
         self.inbox_seq = inbox.seq;
+        if self.backlog_changed {
+            self.publish_backlog().await?;
+        }
         if let Some(path) = state_file {
             save(path, self)?;
         }
         Ok(handled)
+    }
+
+    pub async fn publish_backlog(&mut self) -> Result<u64, Error> {
+        let mut rows = std::mem::take(&mut self.backlog.rows);
+        for row in &mut rows {
+            row.body = None;
+            if let Some(body) = self.backlog.bodies.get(&row.item) {
+                let plaintext = serde_json::to_vec(body).map_err(|error| Error::Protocol(error.to_string()))?;
+                let (blob, ciphertext) = seal_blob(&plaintext, BACKLOG_BODY_MEDIA_TYPE);
+                self.client().put_bytes(&format!("/v1/m/blobs/{}", blob.id), ciphertext).await?;
+                row.body = Some(blob);
+            }
+            row.questions = self.backlog.bodies.get(&row.item).map_or(0, |body| body.questions.len() as u32);
+            row.blocking = self.backlog.bodies.get(&row.item).map_or(0, waiting_on_you);
+        }
+        self.backlog.rows = rows;
+        let mut board = self.board.clone().unwrap_or_else(empty_board);
+        board.backlog = Some(self.backlog.rows.clone());
+        self.backlog_changed = false;
+        self.post_board(board).await
+    }
+
+    fn file_idea(&mut self, idea: &Idea) -> String {
+        let number = self.backlog.rows.len() + self.started.len() + 1;
+        let title: String = idea.text.trim().chars().take(60).collect();
+        self.backlog.rows.insert(0, BacklogRow {
+            item: ItemKey::parse(&format!("kept:idea-{number}")).expect("a numbered kept id is a valid key"),
+            title,
+            priority: Priority::None,
+            repo: idea.repo.clone(),
+            state: BacklogState::ToWrite,
+            filed: now(),
+            home: Home { kind: HomeKind::Kept, label: "kept by kebbie".to_string() },
+            questions: 0,
+            blocking: 0,
+            goal: None,
+            body: None,
+        });
+        self.backlog_changed = true;
+        "Filed the idea; the lead writes it out.".to_string()
+    }
+
+    fn answer_item(&mut self, answer: &ItemAnswer) -> Result<String, Reason> {
+        let body = self.backlog.bodies.get_mut(&answer.item).ok_or(Reason::UnknownItem)?;
+        let question = body.questions.get_mut(answer.index as usize).filter(|question| question.text == answer.question).ok_or(Reason::QuestionChanged)?;
+        if question.pending_answer.is_some() {
+            return Err(Reason::AlreadySettled);
+        }
+        question.pending_answer = Some(answer.answer.clone());
+        self.backlog_changed = true;
+        Ok("The lead has your answer.".to_string())
+    }
+
+    fn start_item(&mut self, start: &StartItem) -> Result<String, Reason> {
+        if self.started.contains_key(&start.item) {
+            return Err(Reason::AlreadyStarted);
+        }
+        let index = self.backlog.rows.iter().position(|row| row.item == start.item).ok_or(Reason::UnknownItem)?;
+        let blocking = self.backlog.bodies.get(&start.item).map_or(0, waiting_on_you);
+        if blocking > 0 && !start.anyway {
+            return Err(Reason::QuestionsOpen { blocking });
+        }
+        let row = self.backlog.rows.remove(index);
+        self.backlog.bodies.remove(&row.item);
+        let task: String = row.title.to_lowercase().split(|char: char| !char.is_ascii_alphanumeric()).filter(|word| !word.is_empty()).take(3).collect::<Vec<_>>().join("-");
+        let address = format!("{}@{}", if task.is_empty() { "task" } else { &task }, row.repo.as_deref().unwrap_or("repo"));
+        self.started.insert(row.item.clone(), address.clone());
+        let board = self.board.get_or_insert_with(empty_board);
+        board.items.retain(|item| item.address != address);
+        board.items.insert(0, started_task(&address, &row.title));
+        self.backlog_changed = true;
+        Ok(format!("Started {address}: the lead chose the recipe small-fix and queued it."))
     }
 
     async fn handle(
@@ -574,7 +668,7 @@ impl MachineState {
         })
     }
 
-    fn execute(&self, command: &Id, device: &Id, payload: &Payload) -> (String, CommandResult) {
+    fn execute(&mut self, command: &Id, device: &Id, payload: &Payload) -> (String, CommandResult) {
         let done = |text: String| CommandResult {
             command: command.clone(),
             device: device.clone(),
@@ -626,6 +720,18 @@ impl MachineState {
                     answer.key, answer.address, answer.prompt
                 ),
                 done(format!("Chose {} in {}'s prompt.", answer.key, answer.address)),
+            ),
+            Payload::Idea(idea) => (
+                format!("file idea in {}: {}", idea.repo.as_deref().unwrap_or("-"), idea.text),
+                done(self.file_idea(idea)),
+            ),
+            Payload::ItemAnswer(answer) => (
+                format!("answer {} question {}: {}", answer.item, answer.index, answer.answer),
+                self.answer_item(answer).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::StartItem(start) => (
+                format!("start {}{}", start.item, if start.anyway { " anyway" } else { "" }),
+                self.start_item(start).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),
@@ -727,11 +833,71 @@ impl MachineState {
 }
 
 fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
+    let text = match reason {
+        Reason::QuestionsOpen { blocking: 1 } => "Not started: 1 question waits on you.".to_string(),
+        Reason::QuestionsOpen { blocking } => format!("Not started: {blocking} questions wait on you."),
+        Reason::AlreadyStarted => "Not started: it was started already.".to_string(),
+        Reason::UnknownItem => "It is no longer in the backlog.".to_string(),
+        Reason::QuestionChanged => "Not answered: the question changed since you saw it.".to_string(),
+        _ => format!("refused: {}", reason.key()),
+    };
     CommandResult {
         command: command.clone(),
         device: device.clone(),
         outcome: Outcome::Refused { reason },
-        text: format!("refused: {}", reason.key()),
+        text,
+    }
+}
+
+fn waiting_on_you(body: &BacklogBody) -> u32 {
+    body.questions.iter().filter(|question| question.blocks && question.pending_answer.is_none()).count() as u32
+}
+
+fn empty_board() -> Board {
+    Board {
+        rev: 0,
+        kebbie: "fake".to_string(),
+        away_since: None,
+        checkouts: Vec::new(),
+        routines: Vec::new(),
+        items: Vec::new(),
+        sessions_outside_tasks: 0,
+        next: None,
+        counts: None,
+        later: None,
+        accepts: None,
+        devices: None,
+        backlog: None,
+    }
+}
+
+fn started_task(address: &str, title: &str) -> Item {
+    Item {
+        address: address.to_string(),
+        group: Group::Working,
+        urgency: 3,
+        summary: "queued by the lead".to_string(),
+        next_for_you: None,
+        agent: None,
+        report: None,
+        question: None,
+        prompt: None,
+        git: None,
+        head: None,
+        verdict: None,
+        push_permission: None,
+        push_waits: None,
+        follows_main: false,
+        ci: None,
+        recover: None,
+        routine: None,
+        card: None,
+        steps: None,
+        title: Some(title.to_string()),
+        profile: None,
+        recipe: Some("small-fix".to_string()),
+        assessment: None,
+        second_opinion: None,
     }
 }
 

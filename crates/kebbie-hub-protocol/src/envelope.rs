@@ -21,6 +21,9 @@ pub enum Kind {
     Start,
     Routine,
     PromptAnswer,
+    Idea,
+    ItemAnswer,
+    StartItem,
 }
 
 impl Kind {
@@ -34,13 +37,23 @@ impl Kind {
             Kind::Start => "start",
             Kind::Routine => "routine",
             Kind::PromptAnswer => "prompt-answer",
+            Kind::Idea => "idea",
+            Kind::ItemAnswer => "item-answer",
+            Kind::StartItem => "start-item",
         }
     }
 
     pub fn is_command(self) -> bool {
         matches!(
             self,
-            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::PromptAnswer
+            Kind::Answer
+                | Kind::Push
+                | Kind::Start
+                | Kind::Routine
+                | Kind::PromptAnswer
+                | Kind::Idea
+                | Kind::ItemAnswer
+                | Kind::StartItem
         )
     }
 
@@ -57,8 +70,9 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push => 3_600,
+            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
+            Kind::StartItem => 86_400,
         }
     }
 
@@ -67,7 +81,8 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine => 86_400,
+            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem => 86_400,
+            Kind::Idea | Kind::ItemAnswer => 3_600,
             Kind::PromptAnswer => 600,
         }
     }

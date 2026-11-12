@@ -1,5 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
+import { backlogList, chip, chooseMachine, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
 import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
@@ -22,7 +23,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
 const cameraAtBottom = () => globalThis.screen?.orientation?.angle === (Math.max(innerWidth, innerHeight) > 800 ? 90 : 270);
@@ -380,6 +381,108 @@ function wideTaskScreen(params, panel = taskPanel) {
   return shell(state.from === "questions" ? "questions" : "board", list, panel(params));
 }
 
+function shownOf(sent) {
+  const opened = state.opened.find((machine) => machine.machine === sent.machine);
+  const standing = standingOn(opened?.board, state.device?.id === sent.device ? state.device : null);
+  const shown = sentState(sent, { now: nowSeconds(), asleep: isAsleep({ lastSeen: opened?.lastSeen ?? null }, nowSeconds()), standing });
+  return { sent, state: shown, standing, live: !settled(shown) };
+}
+
+function backlogEntries() {
+  const now = nowSeconds();
+  const merged = mergeBacklog(state.opened, now);
+  return [...ideaEntries(state.kept.sent, state.opened, now, (sent) => shownOf(sent).state), ...merged];
+}
+
+function backlogUi(id) {
+  if (!state.backlogUi.has(id)) state.backlogUi.set(id, { picked: null, text: "", busy: false, error: null, choosing: false, machine: null, visit: nowSeconds() });
+  return state.backlogUi.get(id);
+}
+
+const candidatesOf = (entry, kind) => entry.machines.filter((one) => takes(one.accepts, kind));
+
+function chosenFor(entry, kind) {
+  const ui = backlogUi(entry.id);
+  return chooseMachine(candidatesOf(entry, kind), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine });
+}
+
+function latestFor(entry, kind, match = () => true) {
+  const machines = new Set(entry.machines.map((one) => one.machine));
+  const mine = state.kept.sent.filter((sent) => sent.kind === kind && sent.address === entry.key && machines.has(sent.machine) && match(sent));
+  const sent = mine.sort((a, b) => b.at - a.at)[0];
+  return sent ? shownOf(sent) : null;
+}
+
+function taskHrefFor(entry, start) {
+  const opened = state.opened.find((machine) => machine.machine === start?.sent.machine);
+  const task = opened?.board?.items.find((item) => item.title === entry.row.title);
+  return task ? `#/task/${encodeURIComponent(opened.machine)}/${encodeURIComponent(task.address)}` : "#/board";
+}
+
+function bodyOf(entry) {
+  const ref = entry.row.body;
+  if (!ref) return { body: null, bodyState: null };
+  const held = blobs.peek(ref.id);
+  if (!held) {
+    blobs.load(ref).then((loaded) => loaded && render());
+    return { body: null, bodyState: "loading" };
+  }
+  return held.body ? { body: held.body, bodyState: "ready" } : { body: null, bodyState: "failed" };
+}
+
+function itemCardHtml(entry) {
+  const ui = backlogUi(entry.id);
+  const candidates = candidatesOf(entry, "start-item");
+  const chosen = chosenFor(entry, "start-item");
+  const start = entry.key ? latestFor(entry, "start-item") : null;
+  const sentFor = (index) => latestFor(entry, "item-answer", (sent) => sent.index === index);
+  const idea = entry.idea ? { ...entry.idea, standing: shownOf(entry.idea.sent).standing } : null;
+  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start) });
+}
+
+function findEntry(id) {
+  const entries = backlogEntries();
+  const found = entries.find((entry) => entry.id === id);
+  if (found) return { entries, entry: found };
+  const started = state.kept.sent.filter((sent) => sent.kind === "start-item" && sent.result?.outcome === "done" && (sent.address === id || id.endsWith(`|${sent.address}`))).sort((a, b) => b.at - a.at)[0];
+  return { entries, entry: started ? startedEntry(id, started) : null };
+}
+
+function ideaCandidates() {
+  const now = nowSeconds();
+  return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea")).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo) }));
+}
+
+const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine });
+
+function backlogListHtml(entries, selected, composing = false) {
+  const action = listAction({ access: commandGate(), refusedUrl: state.refused?.url ?? null, ideaMachines: ideaCandidates(), composing });
+  return backlogList({ entries, selected, now: nowSeconds(), top, action });
+}
+
+const itemPanel = (entry) => `<span class="machine">${esc(chip(entry))}</span><h2>${esc(entry.row.title)}</h2>${itemCardHtml(entry)}`;
+const missingItem = `<div class="center left">This item is no longer in the backlog.</div>`;
+
+function backlogRoute() {
+  const entries = backlogEntries();
+  if (twoColumns() && entries.length) return shell("backlog", backlogListHtml(entries, entries[0].id), itemPanel(entries[0]));
+  return shell("backlog", backlogListHtml(entries, null));
+}
+
+function itemRoute(id) {
+  const { entries, entry } = findEntry(id);
+  if (twoColumns()) return shell("backlog", backlogListHtml(entries, id), entry ? itemPanel(entry) : `<h2>Backlog</h2>${missingItem}`);
+  const back = backButton("#/backlog");
+  if (!entry) return shell("backlog", back + top("Backlog") + missingItem);
+  return shell("backlog", back + top(entry.row.title, `<span class="machine">${esc(chip(entry))}</span>`) + itemCardHtml(entry));
+}
+
+function ideaRoute() {
+  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice() });
+  if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
+  return shell("backlog", backButton("#/backlog") + top("New idea") + form);
+}
+
 function boardRoute() {
   if (splitLike()) return splitScreen("next");
   return shell("board", overview() ? boardOverview() : boardScreen());
@@ -458,6 +561,9 @@ function render() {
   else if (name === "task") html = twoColumns() ? wideTaskScreen(params) : taskScreen(params);
   else if (name === "plan") html = twoColumns() ? wideTaskScreen(params, planPanel) : planScreen(params);
   else if (name === "section") html = sectionRoute(params[0]);
+  else if (name === "backlog") html = backlogRoute();
+  else if (name === "item") html = itemRoute(params[0]);
+  else if (name === "idea") html = ideaRoute();
   else html = boardRoute();
   const focused = document.activeElement?.id && root.contains(document.activeElement) ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
   const auth = isAuthScreen(html);
@@ -469,6 +575,7 @@ function render() {
     if (focused.start !== null && focused.start !== undefined) refocus.setSelectionRange(focused.start, focused.end);
   }
   fillBlobs();
+  for (const element of root.querySelectorAll("[data-markdown]")) element.replaceChildren(...markdown(element.textContent));
   document.title = (name === "task" || name === "plan") && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
 }
 
@@ -573,6 +680,7 @@ async function loadCommands(session) {
     state.kept = await loadSent(deviceStore, id, nowSeconds());
     state.allowed = await allowsChanges(deviceStore, id);
     state.device = await loadDevice(deviceStore, id);
+    state.lastMachine = (await get(`backlog-machine:${id}`).catch(() => null)) ?? null;
     state.keptFor = id;
   }
   collect();
@@ -653,6 +761,86 @@ function sendPush(target) {
   send(target, { type: "push", address, head: item.head, card_sha: item.card?.sha ?? null }, { head: item.head, short: short(item.head), machineName: found.name });
 }
 
+const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
+
+async function sendBacklog({ machine, payload, meta, ui }) {
+  const keys = keysOf(machine.machine);
+  ui.busy = true;
+  ui.error = null;
+  render();
+  try {
+    if (!keys) throw new Error("Your account doesn't list this machine's keys.");
+    const identity = state.session.identity;
+    if (state.allowed !== true) throw new CommandProblem("view-only");
+    state.device = await ensureDevice({ store: deviceStore, calls: account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: state.device });
+    const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine.machine, keys }, payload, at: nowSeconds(), meta: { machineName: machine.name, ...meta } });
+    state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
+    await keepSent(deviceStore, identity.id, state.kept);
+    state.lastMachine = machine.machine;
+    await put(lastMachineKey(), machine.machine).catch(() => undefined);
+    ui.busy = false;
+    return sent;
+  } catch (error) {
+    ui.busy = false;
+    ui.error = commandText(error);
+    if (error instanceof HubError && error.status === 402) state.refused = { url: error.url };
+    render();
+    return null;
+  } finally {
+    collect();
+  }
+}
+
+async function addIdea() {
+  const chosen = ideaChoice();
+  const text = state.idea.text.trim();
+  if (!chosen || !text || state.idea.busy) return;
+  const sent = await sendBacklog({ machine: chosen, payload: { type: "idea", text, repo: null }, meta: { address: null, text, label: text }, ui: state.idea });
+  if (!sent) return;
+  state.idea = { text: "", machine: null, choosing: false, busy: false, error: null };
+  go(twoColumns() ? entryHref(`idea:${sent.id}`) : "#/backlog");
+}
+
+async function sendItemAnswer(entry) {
+  const ui = backlogUi(entry.id);
+  const question = blobs.peek(entry.row.body?.id ?? "")?.body?.questions[ui.picked];
+  const chosen = chooseMachine(candidatesOf(entry, "item-answer"), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine });
+  const answer = ui.text.trim();
+  if (!question || !chosen || !answer || ui.busy) return;
+  const sent = await sendBacklog({ machine: chosen, payload: { type: "item-answer", item: entry.key, index: ui.picked, question: question.text, answer }, meta: { address: entry.key, index: ui.picked, text: answer, label: entry.row.title }, ui });
+  if (sent) Object.assign(ui, { picked: null, text: "" });
+  render();
+}
+
+async function startItem(entry) {
+  const ui = backlogUi(entry.id);
+  const chosen = chosenFor(entry, "start-item");
+  if (!chosen || ui.busy) return;
+  const anyway = startsAnyway(latestFor(entry, "start-item"), ui.visit);
+  await sendBacklog({ machine: chosen, payload: { type: "start-item", item: entry.key, anyway }, meta: { address: entry.key, label: entry.row.title, anyway }, ui });
+  render();
+}
+
+const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "start-item"]);
+
+function backlogAction(action, target) {
+  const id = target.closest("[data-item]")?.dataset.item ?? null;
+  const entry = id ? findEntry(id).entry : null;
+  const ui = entry ? backlogUi(entry.id) : state.idea;
+  if (ui.busy) return;
+  if (action === "add-idea") return addIdea();
+  if (action === "send-item-answer" && entry) return sendItemAnswer(entry);
+  if (action === "start-item" && entry) return startItem(entry);
+  if (action === "backlog-choose") ui.choosing = !ui.choosing;
+  else if (action === "backlog-machine") Object.assign(ui, { machine: target.dataset.machine, choosing: false });
+  else if (action === "pick-question") {
+    const index = Number(target.dataset.index);
+    if (ui.picked !== index) ui.text = "";
+    Object.assign(ui, { picked: index, error: null });
+  }
+  render();
+}
+
 function decideAction(action, target, element) {
   const { machine, address } = target.dataset;
   const ui = uiOf(machine, address);
@@ -678,6 +866,9 @@ function stopCommands() {
   state.kept = { cursor: 0, sent: [] };
   state.ui = new Map();
   state.keys = new Map();
+  state.backlogUi = new Map();
+  state.idea = { text: "", machine: null, choosing: false, busy: false, error: null };
+  state.lastMachine = null;
 }
 
 function lockBoards() {
@@ -989,6 +1180,7 @@ root.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
+  if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
   const decided = target.closest(".decide");
   if (decided) return decideAction(action, decided, target);
   if (action === "dismiss-hint") {
@@ -1026,6 +1218,15 @@ root.addEventListener("click", (event) => {
 root.addEventListener("input", (event) => {
   if (event.target.id === "email") state.draft.email = event.target.value;
   if (event.target.id === "code") state.draft.code = event.target.value;
+  const draft = event.target.dataset?.draft;
+  if (draft === "idea" || draft === "item-answer") {
+    const id = event.target.closest("[data-item]")?.dataset.item;
+    const ui = draft === "idea" ? state.idea : backlogUi(id);
+    ui.text = event.target.value;
+    const button = root.querySelector(draft === "idea" ? '[data-action="add-idea"]' : '[data-action="send-item-answer"]');
+    if (button) button.disabled = ui.busy || ui.text.trim() === "";
+    return;
+  }
   const field = event.target.closest("textarea[data-draft]");
   const decided = field?.closest(".decide");
   if (!decided) return;
@@ -1043,7 +1244,7 @@ root.addEventListener("keydown", (event) => {
     event.preventDefault();
     return root.querySelector(SUBMIT)?.click();
   }
-  const pick = event.target.closest?.('[data-action="pick"]');
+  const pick = event.target.closest?.('[data-action="pick"], [data-action="pick-question"], [data-action="backlog-machine"]');
   if (!pick || (event.key !== "Enter" && event.key !== " ")) return;
   event.preventDefault();
   pick.click();
@@ -1055,9 +1256,10 @@ addEventListener("hashchange", () => {
   if (name !== "board") state.connected = null;
   if (name === "board" || name === "questions") state.from = name;
   if (name === "section") state.from = `section/${route().params[0]}`;
+  if (name === "item") backlogUi(route().params[0]).visit = nowSeconds();
   state.sheet = false;
   render();
-  if (!(twoColumns() && (name === "task" || name === "plan"))) window.scrollTo(0, 0);
+  if (!(twoColumns() && (name === "task" || name === "plan" || name === "item"))) window.scrollTo(0, 0);
 });
 
 let settleUntil = 0;
@@ -1089,6 +1291,7 @@ addEventListener("keydown", (event) => {
   if (state.sheet) closeSheet();
   else if (twoColumns() && route().name === "plan") go(`#/task/${route().params.map(encodeURIComponent).join("/")}`);
   else if (twoColumns() && route().name === "task") go(`#/${state.from}`);
+  else if (twoColumns() && (route().name === "item" || route().name === "idea")) go("#/backlog");
 });
 
 document.addEventListener("visibilitychange", () => {

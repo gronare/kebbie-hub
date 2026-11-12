@@ -13,6 +13,10 @@ use crate::account::{
     sign_wrapper, wrap_associated_data, wrap_key as account_wrap_key, wrapper_statement,
 };
 use crate::authorize::{AppliedCommands, Verified, Machine, Refusal, authorize};
+use crate::backlog::{
+    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Home, HomeKind, ItemKey,
+    OpenQuestion, Priority,
+};
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
 use crate::board::{
     Agent, BlobRef, AgentStatus, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
@@ -31,8 +35,8 @@ use crate::device::{
 use crate::envelope::{Envelope, Header, Kind, Urgency};
 use crate::ids::{Id, Prefix};
 use crate::message::{
-    Answer, CommandResult, Event, Notice, Outcome, Payload, PromptAnswer, PushApproval, Reason,
-    RunRoutine, StartTask,
+    Answer, CommandResult, Event, Idea, ItemAnswer, Notice, Outcome, Payload, PromptAnswer,
+    PushApproval, Reason, RunRoutine, StartItem, StartTask,
 };
 
 pub const NOW: u64 = 1_761_070_000;
@@ -267,6 +271,7 @@ fn board() -> Payload {
         later: None,
         accepts: None,
         devices: None,
+        backlog: None,
     })
 }
 
@@ -443,6 +448,141 @@ fn next_board() -> Payload {
         (intruder, DeviceStanding::Denied { fingerprint: intruder_print, at: AT - 60 }),
     ]));
     Payload::Board(board)
+}
+
+const VAULT_ITEM: &str = "Projects/refund-rounding.md";
+const BLOCKING_QUESTION: &str = "Round half up, or to even like the ledger?";
+
+fn backlog_body() -> BacklogBody {
+    BacklogBody {
+        background: "Refunds are rounded per line, invoices on the total, so a refund can differ from its invoice by a cent.".into(),
+        goal: "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds keep rounding per line.".into(),
+        what_we_know: "- Invoices round the total since 2.12.\n- `Refund#amount` sums rounded lines.".into(),
+        questions: vec![
+            OpenQuestion {
+                text: BLOCKING_QUESTION.into(),
+                blocks: true,
+                pending_answer: None,
+            },
+            OpenQuestion {
+                text: "Should old refunds be recomputed?".into(),
+                blocks: true,
+                pending_answer: Some("No, only new ones.".into()),
+            },
+            OpenQuestion {
+                text: "Show the rounding on the receipt?".into(),
+                blocks: false,
+                pending_answer: None,
+            },
+        ],
+        out_of_scope: "Currency conversion.".into(),
+        source: "Support thread about a refund one cent short.".into(),
+    }
+}
+
+fn backlog_blob() -> (BlobRef, Vec<u8>) {
+    seal_blob_with(
+        &serde_json::to_vec(&backlog_body()).unwrap(),
+        BACKLOG_BODY_MEDIA_TYPE,
+        seed("backlog/body/key"),
+        seed("backlog/body/nonce")[..12].try_into().unwrap(),
+    )
+}
+
+fn backlog_kinds() -> Vec<Kind> {
+    vec![Kind::Answer, Kind::Push, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem]
+}
+
+fn backlog_board() -> Payload {
+    let Payload::Board(mut board) = next_board() else {
+        unreachable!()
+    };
+    board.accepts = Some(backlog_kinds());
+    board.backlog = Some(vec![
+        BacklogRow {
+            item: ItemKey::vault(VAULT_ITEM).unwrap(),
+            title: "Refunds round like their invoice".into(),
+            priority: Priority::High,
+            repo: Some("shop".into()),
+            state: BacklogState::Ready,
+            filed: AT - 3 * 86_400,
+            home: Home {
+                kind: HomeKind::Vault,
+                label: VAULT_ITEM.into(),
+            },
+            questions: 3,
+            blocking: 1,
+            goal: Some("A refund of a whole invoice returns exactly what the invoice charged.".into()),
+            body: Some(backlog_blob().0),
+        },
+        BacklogRow {
+            item: ItemKey::parse("local:01JB7Q2M3N8K").unwrap(),
+            title: "Dark mode for the editor".into(),
+            priority: Priority::Low,
+            repo: Some("app".into()),
+            state: BacklogState::Drafting,
+            filed: AT - 86_400,
+            home: Home {
+                kind: HomeKind::Local,
+                label: ".kebbie/backlog/dark-mode.md".into(),
+            },
+            questions: 0,
+            blocking: 0,
+            goal: None,
+            body: None,
+        },
+        BacklogRow {
+            item: ItemKey::parse("kept:idea-4411").unwrap(),
+            title: "Mail the weekly summary".into(),
+            priority: Priority::None,
+            repo: None,
+            state: BacklogState::ToWrite,
+            filed: AT - 600,
+            home: Home {
+                kind: HomeKind::Kept,
+                label: "kept by kebbie".into(),
+            },
+            questions: 0,
+            blocking: 0,
+            goal: None,
+            body: None,
+        },
+    ]);
+    Payload::Board(board)
+}
+
+fn idea(text: String) -> Payload {
+    Payload::Idea(Idea {
+        text,
+        repo: Some("shop".into()),
+    })
+}
+
+fn item_answer(answer: &str) -> Payload {
+    Payload::ItemAnswer(ItemAnswer {
+        item: ItemKey::vault(VAULT_ITEM).unwrap(),
+        index: 0,
+        question: BLOCKING_QUESTION.into(),
+        answer: answer.into(),
+    })
+}
+
+fn start_item(anyway: bool) -> Payload {
+    Payload::StartItem(StartItem {
+        item: ItemKey::vault(VAULT_ITEM).unwrap(),
+        anyway,
+    })
+}
+
+fn questions_open() -> Payload {
+    Payload::Result(CommandResult {
+        command: command_id("start-item"),
+        device: Party::new("phone", Prefix::Device).id,
+        outcome: Outcome::Refused {
+            reason: Reason::QuestionsOpen { blocking: 2 },
+        },
+        text: "Not started: 2 questions wait on you.".into(),
+    })
 }
 
 fn answer_to(address: &str) -> Payload {
@@ -745,6 +885,45 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         phone,
         prompt_answer("y"),
+    ));
+
+    let backlog_sealed = seal_case(
+        "backlog-board",
+        machine_header("backlog-board", Kind::Board, machine),
+        &backlog_board(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens(
+        "board-with-backlog-opened-by-the-account",
+        &backlog_sealed,
+        account,
+        machine,
+        backlog_board(),
+    ));
+    let idea_text = || "Mail a weekly summary of what shipped.".to_string();
+    for (name, case, kind, payload) in [
+        ("idea-opened-by-the-machine", "idea", Kind::Idea, idea(idea_text())),
+        ("item-answer-opened-by-the-machine", "item-answer", Kind::ItemAnswer, item_answer("Half up, like invoices.")),
+        ("start-item-opened-by-the-machine", "start-item", Kind::StartItem, start_item(false)),
+        ("start-item-anyway-opened-by-the-machine", "start-item-anyway", Kind::StartItem, start_item(true)),
+    ] {
+        let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
+        cases.push(opens(name, &sealed, machine, phone, payload));
+    }
+    let refused_start = seal_case(
+        "questions-open",
+        machine_header("start-item", Kind::Result, machine),
+        &questions_open(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens(
+        "start-refused-for-open-questions-opened-by-the-account",
+        &refused_start,
+        account,
+        machine,
+        questions_open(),
     ));
 
     let mut notice_header = machine_header("notice", Kind::Notice, machine);
@@ -1122,7 +1301,31 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     reasonless.as_object_mut().unwrap().remove("reason");
     let mut string_rev = serde_json::to_value(notice(None)).unwrap();
     string_rev["board_rev"] = json!("1842");
-    let strays: [(&'static str, &str, Kind, Value); 4] = [
+    let mut absolute_home = serde_json::to_value(backlog_board()).unwrap();
+    absolute_home["backlog"][0]["home"]["label"] = json!("/Users/someone/vault/Projects/refund-rounding.md");
+    let mut counted_elsewhere = serde_json::to_value(result()).unwrap();
+    counted_elsewhere["blocking"] = json!(2);
+    let mut uncounted = serde_json::to_value(questions_open()).unwrap();
+    uncounted.as_object_mut().unwrap().remove("blocking");
+    let strays: [(&'static str, &str, Kind, Value); 7] = [
+        (
+            "backlog-row-with-an-absolute-home",
+            "stray/backlog",
+            Kind::Board,
+            absolute_home,
+        ),
+        (
+            "result-counting-questions-for-another-reason",
+            "stray/counted",
+            Kind::Result,
+            counted_elsewhere,
+        ),
+        (
+            "open-questions-refusal-without-a-count",
+            "stray/uncounted",
+            Kind::Result,
+            uncounted,
+        ),
         (
             "board-item-with-a-path",
             "stray/board",
@@ -1230,6 +1433,9 @@ fn envelopes_json(parties: &Parties) -> Value {
         Kind::Start,
         Kind::Routine,
         Kind::PromptAnswer,
+        Kind::Idea,
+        Kind::ItemAnswer,
+        Kind::StartItem,
     ]
     .into_iter()
     .map(|kind| (kind.name(), kind.max_ttl()))
@@ -1427,6 +1633,83 @@ fn authorize_json(parties: &Parties) -> Value {
     if let CaseTrust::Devices { approved, .. } = &mut rekeyed_tablet_trust {
         approved.push((rekeyed_tablet.device.clone(), intruder.public().signing));
     }
+
+    let lingering_idea = {
+        let mut header = command_header("authorize/idea-over-an-hour", Kind::Idea, &phone_cert, machine);
+        header.exp = header.at + 3_601;
+        seal_bypassing_checks(
+            "authorize/idea-over-an-hour",
+            header,
+            &serde_json::to_vec(&idea("x".into())).unwrap(),
+            phone,
+            &[account, machine],
+        )
+    };
+    let backlog_case = |name, envelope, expect| AuthorizeCase {
+        name,
+        accepts: backlog_kinds(),
+        trust: CaseTrust::Account,
+        applied: AppliedCommands::default(),
+        envelope,
+        expect,
+    };
+    let start_item_from_phone = from_phone("authorize/start-item", Kind::StartItem, &start_item(false));
+    let backlog_cases = vec![
+        backlog_case(
+            "device-files-an-idea",
+            from_phone("authorize/idea", Kind::Idea, &idea("Mail a weekly summary of what shipped.".into())),
+            applies(idea("Mail a weekly summary of what shipped.".into())),
+        ),
+        backlog_case(
+            "device-answers-an-items-question",
+            from_phone("authorize/item-answer", Kind::ItemAnswer, &item_answer("Half up, like invoices.")),
+            applies(item_answer("Half up, like invoices.")),
+        ),
+        backlog_case(
+            "device-starts-an-item-that-lives-a-day",
+            start_item_from_phone.clone(),
+            applies(start_item(false)),
+        ),
+        backlog_case(
+            "device-starts-an-item-anyway",
+            from_phone("authorize/start-item-anyway", Kind::StartItem, &start_item(true)),
+            applies(start_item(true)),
+        ),
+        AuthorizeCase {
+            name: "start-item-to-a-machine-that-takes-plain-starts-only-is-refused",
+            accepts: all.clone(),
+            trust: CaseTrust::Account,
+            applied: AppliedCommands::default(),
+            envelope: start_item_from_phone,
+            expect: Err(Refusal::Answer(Reason::NotAllowed)),
+        },
+        backlog_case(
+            "idea-over-its-length-is-refused",
+            from_phone("authorize/long-idea", Kind::Idea, &idea("x".repeat(crate::MAX_IDEA_CHARS + 1))),
+            Err(Refusal::Answer(Reason::BadRequest)),
+        ),
+        backlog_case(
+            "blank-answer-to-an-items-question-is-refused",
+            from_phone("authorize/blank-item-answer", Kind::ItemAnswer, &item_answer("  ")),
+            Err(Refusal::Answer(Reason::BadRequest)),
+        ),
+        backlog_case(
+            "start-item-naming-a-path-on-the-machine-is-refused",
+            seal_bypassing_checks(
+                "authorize/start-item-path",
+                command_header("authorize/start-item-path", Kind::StartItem, &phone_cert, machine),
+                &serde_json::to_vec(&json!({ "type": "start-item", "item": "vault:/Users/someone/vault/Projects/x.md" })).unwrap(),
+                phone,
+                &[account, machine],
+            ),
+            Err(Refusal::Answer(Reason::BadRequest)),
+        ),
+        backlog_case(
+            "idea-living-past-an-hour-is-dropped",
+            lingering_idea,
+            Err(Refusal::Drop(crate::Dropped::Malformed)),
+        ),
+    ];
 
     let cases = vec![
         case("device-answers", answered.clone(), applies(answer())),
@@ -1703,6 +1986,7 @@ fn authorize_json(parties: &Parties) -> Value {
     ];
     let rendered: Vec<Value> = cases
         .into_iter()
+        .chain(backlog_cases)
         .map(|case| {
             let gate = Machine { id: &machine.id, keys: &machine.keys, account: &account_key, accepts: &case.accepts, trust: &case.trust };
             let decided = authorize(&gate, &case.applied, &case.envelope, NOW);
@@ -1994,6 +2278,45 @@ POST /v1/refunds
 - [ ] The ledger entry is dated on confirmation
 ";
 
+fn backlog_json() -> Value {
+    let (blob, ciphertext) = backlog_blob();
+    let keys = [
+        ("vault:Projects/refund-rounding.md", true),
+        ("vault:Projects/Två ord.md", true),
+        ("local:01JB7Q2M3N8K", true),
+        ("kept:idea-4411", true),
+        ("Projects/refund-rounding.md", false),
+        ("vault:/Users/someone/vault/Projects/x.md", false),
+        ("vault:~/vault/x.md", false),
+        ("vault:Projects/../../etc/passwd", false),
+        ("vault:Projects//x.md", false),
+        ("vault:C:\\vault\\x.md", false),
+        ("vault:host:/x.md", false),
+        ("vault:Projects/x\n.md", false),
+        ("local:../x", false),
+        ("local:", false),
+        ("kept:a b", false),
+        ("task:refunds", false),
+    ];
+    let keys: Vec<Value> = keys
+        .into_iter()
+        .map(|(key, valid)| {
+            assert_eq!(ItemKey::parse(key).is_ok(), valid, "{key}");
+            json!({ "key": key, "valid": valid })
+        })
+        .collect();
+    json!({
+        "media_type": BACKLOG_BODY_MEDIA_TYPE,
+        "max_label_bytes": crate::MAX_LABEL_BYTES,
+        "max_idea_chars": crate::MAX_IDEA_CHARS,
+        "max_item_answer_chars": crate::MAX_ITEM_ANSWER_CHARS,
+        "body": backlog_body(),
+        "blob": blob,
+        "ciphertext": b64(&ciphertext),
+        "item_keys": keys,
+    })
+}
+
 fn blobs_json() -> Value {
     let sealed = |label: &str| {
         seal_blob_with(
@@ -2033,6 +2356,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("accounts.json", accounts_json(&parties)),
         ("devices.json", devices_json(&parties)),
         ("blobs.json", blobs_json()),
+        ("backlog.json", backlog_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

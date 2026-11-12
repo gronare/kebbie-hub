@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -488,4 +488,85 @@ test("a question option may say it needs a note, and nothing else", () => {
   checkPayload(asked);
   question.options[0].comment = "yes";
   assert.throws(() => checkPayload(asked));
+});
+
+test("a board lists its backlog by item key, each row naming its home and a safe label, and a board without it still passes", () => {
+  const full = envelopes.cases.find((vector) => vector.name === "board-with-backlog-opened-by-the-account").expect.payload;
+  checkPayload(full);
+  assert.deepEqual(full.backlog.map((row) => [row.item, row.home.kind, row.state]), [["vault:Projects/refund-rounding.md", "vault", "ready"], ["local:01JB7Q2M3N8K", "local", "drafting"], ["kept:idea-4411", "kept", "to-write"]]);
+  assert.deepEqual(full.accepts.slice(-3), ["idea", "item-answer", "start-item"]);
+  const plain = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
+  assert.equal(Object.hasOwn(plain, "backlog"), false);
+  const wrong = [
+    (board) => (board.backlog[0].home.label = "/Users/someone/vault/Projects/refund-rounding.md"),
+    (board) => (board.backlog[0].home.kind = "local"),
+    (board) => (board.backlog[0].item = "/Users/someone/vault/Projects/refund-rounding.md"),
+    (board) => (board.backlog[0].blocking = 4),
+    (board) => (board.backlog[0].priority = "urgent"),
+    (board) => (board.backlog[0].state = "started"),
+    (board) => (board.backlog[0].path = "Projects/x.md"),
+    (board) => (board.backlog[0].body.text = "the body in clear"),
+    (board) => board.backlog.push(structuredClone(board.backlog[0])),
+  ];
+  for (const change of wrong) {
+    const payload = structuredClone(full);
+    change(payload);
+    assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", String(change));
+  }
+  const stray = envelopes.cases.find((vector) => vector.name === "backlog-row-with-an-absolute-home");
+  assert.equal(stray.expect.error, "malformed");
+});
+
+test("a backlog item's body opens from its blob as sections and questions, and its keys hold as Rust's do", async () => {
+  const backlog = load("backlog.json");
+  assert.equal(backlog.media_type, BACKLOG_BODY_MEDIA_TYPE);
+  assert.deepEqual([backlog.max_idea_chars, backlog.max_item_answer_chars], [MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS]);
+  const body = JSON.parse(new TextDecoder().decode(await openBlob(backlog.blob, fromB64(backlog.ciphertext))));
+  assert.deepEqual(body, backlog.body);
+  checkBacklogBody(body);
+  assert.deepEqual(body.questions.map((question) => [question.blocks, question.pending_answer]), [[true, null], [true, "No, only new ones."], [false, null]]);
+  for (const wrong of [{ ...body, what_we_know: undefined }, { ...body, notes: "" }, { ...body, questions: [{ text: "Which?", blocks: "yes", pending_answer: null }] }]) {
+    assert.throws(() => checkBacklogBody(wrong), (error) => error.code === "malformed");
+  }
+  for (const { key, valid } of backlog.item_keys) assert.equal(isItemKey(key), valid, key);
+});
+
+test("ideas and answers on an item live an hour and a start from an item a day, as Rust's limits say", async () => {
+  assert.deepEqual([envelopes.max_ttl.idea, envelopes.max_ttl["item-answer"], envelopes.max_ttl["start-item"]], [KINDS.idea.maxTtl, KINDS["item-answer"].maxTtl, KINDS["start-item"].maxTtl]);
+  assert.deepEqual([KINDS.idea.ttl, KINDS["item-answer"].ttl, START_ITEM_TTL], [3600, 3600, 86_400]);
+  const device = await certifiedPhone();
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  assert.equal(envelopes.cases.find((candidate) => candidate.name === "start-item-anyway-opened-by-the-machine").expect.payload.anyway, true);
+  for (const name of ["idea-opened-by-the-machine", "item-answer-opened-by-the-machine", "start-item-opened-by-the-machine", "start-item-anyway-opened-by-the-machine"]) {
+    const vector = envelopes.cases.find((candidate) => candidate.name === name);
+    checkPayload(vector.expect.payload);
+    const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
+    assert.equal(envelope.exp - envelope.at, KINDS[vector.expect.payload.type].ttl, name);
+    assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
+  }
+  const idea = envelopes.cases.find((candidate) => candidate.name === "idea-opened-by-the-machine");
+  assert.throws(() => checkShape({ ...idea.envelope, exp: idea.envelope.at + 3601 }), (error) => error.code === "malformed");
+  const wrong = [
+    { type: "idea", text: "x".repeat(MAX_IDEA_CHARS + 1), repo: null },
+    { type: "idea", text: "  ", repo: null },
+    { type: "item-answer", item: "vault:Projects/refund-rounding.md", index: 0, question: "Which?", answer: "" },
+    { type: "item-answer", item: "vault:Projects/refund-rounding.md", index: -1, question: "Which?", answer: "This" },
+    { type: "start-item", item: "local:../etc" },
+    { type: "start-item", item: "vault:Projects/x.md", recipe: "small fix" },
+    { type: "start-item", item: "vault:Projects/x.md", anyway: "yes" },
+  ];
+  for (const payload of wrong) assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", JSON.stringify(payload));
+});
+
+test("a start refused for open questions says how many wait, and no other result carries a count", () => {
+  const refused = envelopes.cases.find((vector) => vector.name === "start-refused-for-open-questions-opened-by-the-account").expect.payload;
+  assert.deepEqual([refused.reason, refused.blocking], ["questions-open", 2]);
+  checkPayload(refused);
+  checkPayload({ ...refused, reason: "already-started", blocking: undefined });
+  for (const wrong of [{ ...refused, blocking: 0 }, { ...refused, blocking: undefined }, { ...refused, reason: "already-started" }]) {
+    assert.throws(() => checkPayload(wrong), (error) => error.code === "malformed", JSON.stringify(wrong));
+  }
+  for (const name of ["result-counting-questions-for-another-reason", "open-questions-refusal-without-a-count"]) {
+    assert.equal(envelopes.cases.find((vector) => vector.name === name).expect.error, "malformed", name);
+  }
 });

@@ -71,3 +71,11 @@ test("a slot says the plan is loading with its size, and a failure says it is st
   assert.match(blobSlot(opens.blob, { kind: "plan", tag: "article", look: "task md md-read", wait: "task plan" }), /^<article class="task plan" .*<\/article>$/);
   assert.equal(planHref("mch_a", "refunds@shop"), "#/plan/mch_a/refunds%40shop");
 });
+
+test("a backlog item's body opens as checked JSON, and a body that is not one fails", async () => {
+  const backlog = JSON.parse(readFileSync(new URL("../vectors/backlog.json", import.meta.url), "utf8"));
+  const reader = blobReader(hub({ [backlog.blob.id]: backlog.ciphertext }).fetchBytes);
+  assert.deepEqual(await reader.load(backlog.blob), { body: backlog.body });
+  const plan = blobReader(hub({ [opens.blob.id]: opens.ciphertext }).fetchBytes);
+  assert.deepEqual(await plan.load({ ...opens.blob, media_type: backlog.media_type }), { failed: true });
+});

@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::backlog::BacklogRow;
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
 
@@ -25,6 +26,8 @@ pub struct Board {
     pub accepts: Option<Vec<Kind>>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "device_ids")]
     pub devices: Option<BTreeMap<Id, DeviceStanding>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::backlog::backlog_rows")]
+    pub backlog: Option<Vec<BacklogRow>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -426,7 +429,7 @@ mod tests {
     #[test]
     fn a_board_from_a_kebbie_without_next_parses_and_is_written_back_unchanged() {
         let board: Board = serde_json::from_value(plain_board()).unwrap();
-        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref(), board.accepts.as_ref(), board.devices.as_ref()), (None, None, None, None, None));
+        assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref(), board.accepts.as_ref(), board.devices.as_ref(), board.backlog.as_ref()), (None, None, None, None, None, None));
         assert_eq!((board.items[0].title.as_ref(), board.items[0].second_opinion.as_ref()), (None, None));
         assert_eq!(serde_json::to_value(&board).unwrap(), plain_board());
     }

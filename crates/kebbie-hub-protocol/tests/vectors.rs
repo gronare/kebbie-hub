@@ -4,7 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AccountKey, AppliedCommands, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, verify_command,
+    AccountKey, AppliedCommands, BacklogBody, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, verify_command,
 };
 use serde_json::Value;
 
@@ -335,5 +335,19 @@ fn blobs_open_or_fail_as_the_vectors_say() {
             None => assert_eq!(opened.unwrap(), plaintext.as_bytes(), "{name}"),
             Some(error) => assert_eq!(opened.unwrap_err().key(), error, "{name}"),
         }
+    }
+}
+
+#[test]
+fn a_backlog_items_body_opens_from_its_blob_and_its_keys_hold_as_the_vectors_say() {
+    let vectors = load("backlog.json");
+    let blob: BlobRef = serde_json::from_value(vectors["blob"].clone()).unwrap();
+    assert_eq!(blob.media_type, vectors["media_type"].as_str().unwrap());
+    let ciphertext = URL_SAFE_NO_PAD.decode(vectors["ciphertext"].as_str().unwrap()).unwrap();
+    let body: BacklogBody = serde_json::from_slice(&open_blob(&blob, &ciphertext).unwrap()).unwrap();
+    assert_eq!(serde_json::to_value(&body).unwrap(), vectors["body"]);
+    for case in vectors["item_keys"].as_array().unwrap() {
+        let key = case["key"].as_str().unwrap();
+        assert_eq!(ItemKey::parse(key).is_ok(), case["valid"].as_bool().unwrap(), "{key}");
     }
 }

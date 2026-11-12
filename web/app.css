@@ -530,3 +530,17 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .pose-land.rail-left .sheet { padding-left: 14px; }
 .pose-land.rail-left .tabbar:not(.desk-nav) { z-index: 5; background: var(--bg); }
 .pose-land.rail-left .bar .round { z-index: 6; }
+
+.thumb { position: sticky; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px); margin-top: auto; z-index: 1; display: grid; gap: 10px; }
+:root:is(.pose-stack, .pose-split, .pose-land) .thumb { bottom: var(--content-bottom); }
+.thumb .btn { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 14px; margin: 0; font-size: 14px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.opt.bq b { display: flex; gap: 8px; align-items: baseline; }
+.qmark { flex: none; width: 0.8em; text-align: center; font-weight: 700; color: var(--muted); }
+.qmark.warn { color: var(--peach); }
+.opt.plain b { font-weight: 500; color: var(--muted); }
+.opt.plain small { padding-left: calc(0.8em + 8px); }
+.opt.answered { opacity: 0.55; }
+.thumb-end { margin-top: auto; }

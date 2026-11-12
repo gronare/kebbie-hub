@@ -27,6 +27,7 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/account", "web/index.html", HTML),
     asset!("/app.css", "web/app.css", "text/css; charset=utf-8"),
     asset!("/app.js", "web/app.js", JS),
+    asset!("/backlog.js", "web/backlog.js", JS),
     asset!("/blobs.js", "web/blobs.js", JS),
     asset!("/board.js", "web/board.js", JS),
     asset!("/connect.js", "web/connect.js", JS),

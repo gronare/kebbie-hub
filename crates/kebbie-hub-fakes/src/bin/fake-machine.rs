@@ -5,7 +5,7 @@ use std::time::Duration;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kebbie_hub_fakes::machine::{Handled, Handling, MachineState, Posted, connect, join};
+use kebbie_hub_fakes::machine::{Backlog, Handled, Handling, MachineState, Posted, connect, every_command, join};
 use kebbie_hub_fakes::{load, save};
 use kebbie_hub_protocol::{Board, Kind, Outcome};
 
@@ -50,6 +50,8 @@ enum Command {
         #[arg(long, help = "Revision to post instead of the next one")]
         rev: Option<u64>,
     },
+    #[command(about = "Replace the machine's backlog with a JSON file of rows and bodies, seal each body as a blob and post the board")]
+    PostBacklog { file: PathBuf },
     #[command(about = "Long-poll the machine's queue once")]
     Poll {
         #[arg(long, default_value_t = 25)]
@@ -86,6 +88,7 @@ enum TrustMode {
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Takes {
+    All,
     AnswerAndPush,
     Answer,
     Off,
@@ -94,6 +97,7 @@ enum Takes {
 impl Takes {
     fn kinds(self) -> Vec<Kind> {
         match self {
+            Takes::All => every_command(),
             Takes::AnswerAndPush => vec![Kind::Answer, Kind::Push, Kind::PromptAnswer],
             Takes::Answer => vec![Kind::Answer, Kind::PromptAnswer],
             Takes::Off => Vec::new(),
@@ -203,6 +207,13 @@ async fn run(cli: Cli) -> Result<(), String> {
             .map_err(|e| text(&e))?;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("posted board rev {posted} sealed to the account");
+        }
+        Command::PostBacklog { file } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.backlog = load::<Backlog>(&file).map_err(|e| text(&e))?;
+            let posted = state.publish_backlog().await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("posted board rev {posted} with {} backlog items", state.backlog.rows.len());
         }
         Command::Poll { wait } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

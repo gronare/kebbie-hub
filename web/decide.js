@@ -4,6 +4,8 @@ export function clock(seconds) {
   return new Date(seconds * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
+export const until = (seconds, now) => `${clock(seconds)}${new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "" : " tomorrow"}`;
+
 export function gate({ info, refused, allowed }) {
   if (!info?.commands) return "off";
   if (refused) return "refused";
@@ -50,30 +52,30 @@ export function latestSent(sentList, { machine, address, kind, question = null, 
   return mine.sort((a, b) => b.at - a.at)[0] ?? null;
 }
 
-function refusal(fallback, text) {
+export function refusal(fallback, text) {
   const said = String(text ?? "").trim();
   if (!said.toLowerCase().startsWith(fallback.toLowerCase())) return [esc(fallback), esc(said)];
   const cut = said.indexOf(". ");
   return cut < 0 ? [esc(said), ""] : [esc(said.slice(0, cut + 1)), esc(said.slice(cut + 2))];
 }
 
-const from = (sent) => `from ${sent.deviceName ? esc(sent.deviceName) : "this device"} at ${esc(clock(sent.at))}`;
-const hours = (seconds) => `${Math.max(1, Math.floor(seconds / 3600))}\u00a0h`;
+export const from = (sent) => `from ${sent.deviceName ? esc(sent.deviceName) : "this device"} at ${esc(clock(sent.at))}`;
+export const hours = (seconds) => `${Math.max(1, Math.floor(seconds / 3600))}\u00a0h`;
 const thisDevice = (sent) => (sent.deviceName ? esc(sent.deviceName) : "device");
 const approvedAt = (sent, standing) => (standing?.state === "approved" && standing.at >= sent.at ? ` · approved on ${esc(sent.machineName)} at ${esc(clock(standing.at))}` : "");
 
-function approvalStatus(sent, state, { standing, now, what }) {
+export function approvalStatus(sent, state, { standing, now, what }) {
   const machine = esc(sent.machineName);
   const device = thisDevice(sent);
   if (state === "denied") return block("refused", `${machine} doesn't take changes from this ${device}`, `Approve it in kebbie on ${machine}.`, `Sent ${from(sent)}`);
   if (state === "not-approved") return block("refused", `Not delivered: ${machine} didn't approve this ${device} within the hour`, `Approve it in kebbie on ${machine}, then ${what.again}.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
   const auto = standing?.until ? `, or it is approved automatically in ${hours(standing.until - now)}` : ` on ${machine}`;
-  return block("wait", `Waiting for ${machine} to approve this ${device}`, `Approve it in kebbie${auto}. ${what.goes} if ${machine} approves before ${esc(clock(sent.exp))}.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+  return block("wait", `Waiting for ${machine} to approve this ${device}`, `Approve it in kebbie${auto}. ${what.goes} if ${machine} approves before ${esc(until(sent.exp, now))}.`, `Sent ${from(sent)} · expires ${esc(until(sent.exp, now))}`);
 }
 
-const APPROVAL_STATES = ["approval", "not-approved", "denied"];
+export const APPROVAL_STATES = ["approval", "not-approved", "denied"];
 
-function block(tone, title, body, meta) {
+export function block(tone, title, body, meta) {
   return `<div class="sent ${tone}" role="status"><b>${title}</b>${body ? `<span>${body}</span>` : ""}<span class="meta">${meta}</span></div>`;
 }
 

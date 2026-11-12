@@ -1,0 +1,103 @@
+{
+  "blob": {
+    "bytes": 713,
+    "id": "blb_6be6375a5aa5d70d67ff6e18cbb87f9881009dbfc4455bc6a83cb52190c78ffc",
+    "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+    "media_type": "application/vnd.kebbie.backlog-item+json"
+  },
+  "body": {
+    "background": "Refunds are rounded per line, invoices on the total, so a refund can differ from its invoice by a cent.",
+    "goal": "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds keep rounding per line.",
+    "out_of_scope": "Currency conversion.",
+    "questions": [
+      {
+        "blocks": true,
+        "pending_answer": null,
+        "text": "Round half up, or to even like the ledger?"
+      },
+      {
+        "blocks": true,
+        "pending_answer": "No, only new ones.",
+        "text": "Should old refunds be recomputed?"
+      },
+      {
+        "blocks": false,
+        "pending_answer": null,
+        "text": "Show the rounding on the receipt?"
+      }
+    ],
+    "source": "Support thread about a refund one cent short.",
+    "what_we_know": "- Invoices round the total since 2.12.\n- `Refund#amount` sums rounded lines."
+  },
+  "ciphertext": "F344pQ7UomS0VByb0HPCT7RPGFcQO0QhyZa4gwXboxdxyqxsAp88KDnbrrh2dhwlKEDeZ9p6MHbpR02jpEmKMb-SbgeodND02-4emMAL0EkTKBB8_Y9EPUQm_5dkFm5sh6d-nvaZM91ECSbwz3WBqiqybiyhWgV4w1aC1gzPZml4UMZ-iBn4i_2bK63S3OExOo-RikkzlNj6NCqMnQF9NDOKktKPbw8UsBxdjK708PKPUDK-r-xF8BiQqdQYz3QsI3ARIpuiooDNIjsKeItxnoziYGWQ6cMmLrk7MC8eDFhxM9lFuU1DbhY2u2bCCZbQwn0OLG2rD2CtbA8zzGG6VPN197sP_0DZozj1UgLQBslfkZmS6KYy-R245ZjbJ8VwEh_obn0XbM7XTWpZ0L8p2TXFuvtbXjBcRSvOLlk4phWq7ZuAZrVL44SMlujxeR_-4GX7L9R511MDcPGcEPqj0oHRiiWk4PUJ_US00hxi7xyf-76skgIz17qpYR-mha_VmpYDuHSjBjAzAE4NPYj06Iz2xb6NUbDMlpUbgWkZOJZcCqn84gNJeX3qGNwtgiDxeJCXjXYqULfkXf5Ly2T4tv19keQE7Hz1i1ymplG5L7HYna_nv29Z0jwhCvu3llhb80Xz_NKe2Us5sJrxzwBWDwUEVd_sKbw8FF2LgQPxmNw5YSxduQrHa4InWqYe7TAJHkgj1kmxyn-C-s9k8g9R_SPf_xxhnhUJf41hCdZnuD_n1-j8h0iwkwj19IR9prRaxOATqSHWvwdb9bIyMG77w2VtL1QbM5QFBYyncR1AP3bLxEGyolKA3VRbnGVSNHYsizKSofV3I5TjBhy7_0bSpXOYJq6ww6UpWMQbiqby0YNNykj0acARK_eIDdCXLMUlhEnBmZlA14Ma9-zetMlkeYouK-YUYQFCcV9u95J_eqqyldbml3DW6vpuHsJHO7FRpzKGDhYQe6qwJr3DDTL0oeiL9_JW",
+  "item_keys": [
+    {
+      "key": "vault:Projects/refund-rounding.md",
+      "valid": true
+    },
+    {
+      "key": "vault:Projects/Två ord.md",
+      "valid": true
+    },
+    {
+      "key": "local:01JB7Q2M3N8K",
+      "valid": true
+    },
+    {
+      "key": "kept:idea-4411",
+      "valid": true
+    },
+    {
+      "key": "Projects/refund-rounding.md",
+      "valid": false
+    },
+    {
+      "key": "vault:/Users/someone/vault/Projects/x.md",
+      "valid": false
+    },
+    {
+      "key": "vault:~/vault/x.md",
+      "valid": false
+    },
+    {
+      "key": "vault:Projects/../../etc/passwd",
+      "valid": false
+    },
+    {
+      "key": "vault:Projects//x.md",
+      "valid": false
+    },
+    {
+      "key": "vault:C:\\vault\\x.md",
+      "valid": false
+    },
+    {
+      "key": "vault:host:/x.md",
+      "valid": false
+    },
+    {
+      "key": "vault:Projects/x\n.md",
+      "valid": false
+    },
+    {
+      "key": "local:../x",
+      "valid": false
+    },
+    {
+      "key": "local:",
+      "valid": false
+    },
+    {
+      "key": "kept:a b",
+      "valid": false
+    },
+    {
+      "key": "task:refunds",
+      "valid": false
+    }
+  ],
+  "max_idea_chars": 2000,
+  "max_item_answer_chars": 2000,
+  "max_label_bytes": 256,
+  "media_type": "application/vnd.kebbie.backlog-item+json"
+}

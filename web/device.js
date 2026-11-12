@@ -66,7 +66,7 @@ export async function openResult(entry, identity, machineKeys, now) {
   if (entry.envelope?.machine !== entry.machine || entry.envelope?.id !== entry.command) throw new CommandProblem("misfiled-result");
   const payload = await openEnvelope(entry.envelope, identity, await importSender(entry.machine, machineKeys), now);
   if (payload.type !== "result" || payload.command !== entry.command) throw new CommandProblem("misfiled-result");
-  return { outcome: payload.outcome, reason: payload.reason ?? null, text: payload.text, device: payload.device, at: entry.stored_at };
+  return { outcome: payload.outcome, reason: payload.reason ?? null, ...(payload.blocking ? { blocking: payload.blocking } : {}), text: payload.text, device: payload.device, at: entry.stored_at };
 }
 
 export async function openHistory(commands, identity, keysOf) {

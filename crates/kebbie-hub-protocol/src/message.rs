@@ -1,11 +1,14 @@
 use serde::{Deserialize, Serialize};
 
+use crate::backlog::ItemKey;
 use crate::board::Board;
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
+pub const MAX_IDEA_CHARS: usize = 2_000;
+pub const MAX_ITEM_ANSWER_CHARS: usize = 2_000;
 const MAX_PROMPT_ID_CHARS: usize = 64;
 const MAX_OPTION_KEY_CHARS: usize = 16;
 
@@ -20,6 +23,9 @@ pub enum Payload {
     Start(StartTask),
     Routine(RunRoutine),
     PromptAnswer(PromptAnswer),
+    Idea(Idea),
+    ItemAnswer(ItemAnswer),
+    StartItem(StartItem),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,7 +72,9 @@ struct ResultFields {
     device: Id,
     outcome: OutcomeKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    reason: Option<Reason>,
+    reason: Option<ReasonKey>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    blocking: Option<u32>,
     text: String,
 }
 
@@ -85,10 +93,15 @@ impl TryFrom<ResultFields> for CommandResult {
         let outcome = match (fields.outcome, fields.reason) {
             (OutcomeKind::Done, None) => Outcome::Done,
             (OutcomeKind::Failed, None) => Outcome::Failed,
-            (OutcomeKind::Refused, Some(reason)) => Outcome::Refused { reason },
+            (OutcomeKind::Refused, Some(key)) => Outcome::Refused {
+                reason: Reason::from_key(key, fields.blocking)?,
+            },
             (OutcomeKind::Refused, None) => return Err("a refusal needs a reason"),
             (_, Some(_)) => return Err("only a refusal carries a reason"),
         };
+        if fields.blocking.is_some() && !matches!(outcome, Outcome::Refused { reason: Reason::QuestionsOpen { .. } }) {
+            return Err("only a refusal for open questions counts them");
+        }
         if fields.device.prefix() != Prefix::Device {
             return Err("device is not a device id");
         }
@@ -108,11 +121,16 @@ impl From<CommandResult> for ResultFields {
             Outcome::Failed => (OutcomeKind::Failed, None),
             Outcome::Refused { reason } => (OutcomeKind::Refused, Some(reason)),
         };
+        let blocking = match reason {
+            Some(Reason::QuestionsOpen { blocking }) => Some(blocking),
+            _ => None,
+        };
         ResultFields {
             command: result.command,
             device: result.device,
             outcome,
-            reason,
+            reason: reason.map(Reason::to_key),
+            blocking,
             text: result.text,
         }
     }
@@ -125,8 +143,7 @@ pub enum Outcome {
     Failed,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reason {
     AlreadySettled,
     HeadMoved,
@@ -137,6 +154,28 @@ pub enum Reason {
     BadRequest,
     NotApproved,
     Denied,
+    UnknownItem,
+    QuestionChanged,
+    QuestionsOpen { blocking: u32 },
+    AlreadyStarted,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum ReasonKey {
+    AlreadySettled,
+    HeadMoved,
+    UnknownRepo,
+    NotAllowed,
+    Expired,
+    Undecryptable,
+    BadRequest,
+    NotApproved,
+    Denied,
+    UnknownItem,
+    QuestionChanged,
+    QuestionsOpen,
+    AlreadyStarted,
 }
 
 impl Reason {
@@ -151,7 +190,50 @@ impl Reason {
             Reason::BadRequest => "bad-request",
             Reason::NotApproved => "not-approved",
             Reason::Denied => "denied",
+            Reason::UnknownItem => "unknown-item",
+            Reason::QuestionChanged => "question-changed",
+            Reason::QuestionsOpen { .. } => "questions-open",
+            Reason::AlreadyStarted => "already-started",
         }
+    }
+
+    fn to_key(self) -> ReasonKey {
+        match self {
+            Reason::AlreadySettled => ReasonKey::AlreadySettled,
+            Reason::HeadMoved => ReasonKey::HeadMoved,
+            Reason::UnknownRepo => ReasonKey::UnknownRepo,
+            Reason::NotAllowed => ReasonKey::NotAllowed,
+            Reason::Expired => ReasonKey::Expired,
+            Reason::Undecryptable => ReasonKey::Undecryptable,
+            Reason::BadRequest => ReasonKey::BadRequest,
+            Reason::NotApproved => ReasonKey::NotApproved,
+            Reason::Denied => ReasonKey::Denied,
+            Reason::UnknownItem => ReasonKey::UnknownItem,
+            Reason::QuestionChanged => ReasonKey::QuestionChanged,
+            Reason::QuestionsOpen { .. } => ReasonKey::QuestionsOpen,
+            Reason::AlreadyStarted => ReasonKey::AlreadyStarted,
+        }
+    }
+
+    fn from_key(key: ReasonKey, blocking: Option<u32>) -> Result<Reason, &'static str> {
+        Ok(match key {
+            ReasonKey::AlreadySettled => Reason::AlreadySettled,
+            ReasonKey::HeadMoved => Reason::HeadMoved,
+            ReasonKey::UnknownRepo => Reason::UnknownRepo,
+            ReasonKey::NotAllowed => Reason::NotAllowed,
+            ReasonKey::Expired => Reason::Expired,
+            ReasonKey::Undecryptable => Reason::Undecryptable,
+            ReasonKey::BadRequest => Reason::BadRequest,
+            ReasonKey::NotApproved => Reason::NotApproved,
+            ReasonKey::Denied => Reason::Denied,
+            ReasonKey::UnknownItem => Reason::UnknownItem,
+            ReasonKey::QuestionChanged => Reason::QuestionChanged,
+            ReasonKey::QuestionsOpen => match blocking {
+                Some(blocking) if blocking > 0 => Reason::QuestionsOpen { blocking },
+                _ => return Err("a refusal for open questions counts at least one"),
+            },
+            ReasonKey::AlreadyStarted => Reason::AlreadyStarted,
+        })
     }
 }
 
@@ -194,6 +276,31 @@ pub struct PromptAnswer {
     pub key: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Idea {
+    pub text: String,
+    #[serde(default)]
+    pub repo: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ItemAnswer {
+    pub item: ItemKey,
+    pub index: u32,
+    pub question: String,
+    pub answer: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StartItem {
+    pub item: ItemKey,
+    #[serde(default)]
+    pub anyway: bool,
+}
+
 impl Payload {
     pub fn kind(&self) -> Kind {
         match self {
@@ -205,6 +312,9 @@ impl Payload {
             Payload::Start(_) => Kind::Start,
             Payload::Routine(_) => Kind::Routine,
             Payload::PromptAnswer(_) => Kind::PromptAnswer,
+            Payload::Idea(_) => Kind::Idea,
+            Payload::ItemAnswer(_) => Kind::ItemAnswer,
+            Payload::StartItem(_) => Kind::StartItem,
         }
     }
 
@@ -246,7 +356,15 @@ impl Payload {
                 check(is_word(&answer.prompt, MAX_PROMPT_ID_CHARS), "prompt is not a prompt id")?;
                 check(is_word(&answer.key, MAX_OPTION_KEY_CHARS), "key is not an option's key")
             }
-            Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => Ok(()),
+            Payload::Idea(idea) => {
+                check(is_text(&idea.text, MAX_IDEA_CHARS), "the idea is empty or too long")?;
+                check(idea.repo.as_deref().is_none_or(is_token), "repo is not a plain name")
+            }
+            Payload::ItemAnswer(answer) => {
+                check(is_text(&answer.question, MAX_PROMPT_CHARS), "the question is empty or too long")?;
+                check(is_text(&answer.answer, MAX_ITEM_ANSWER_CHARS), "the answer is empty or too long")
+            }
+            Payload::StartItem(_) | Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => Ok(()),
         }
     }
 }
@@ -262,6 +380,10 @@ fn is_token(text: &str) -> bool {
         && bytes.iter().all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
         })
+}
+
+fn is_text(text: &str, max: usize) -> bool {
+    !text.trim().is_empty() && text.chars().count() <= max
 }
 
 fn is_word(text: &str, max: usize) -> bool {
@@ -357,6 +479,54 @@ mod tests {
         assert!(prompt("3f9a1c2e", "").validate().is_err());
         assert!(prompt("3f9a1c2e", "y\n").validate().is_err(), "a key is never keystrokes of its own");
         assert!(prompt("3f9a1c2e", &"y".repeat(17)).validate().is_err());
+    }
+
+    #[test]
+    fn a_refusal_for_open_questions_counts_them_and_no_other_result_does() {
+        let refused = |reason| {
+            Payload::Result(CommandResult {
+                command: Id::command(1, [1; 10]),
+                device: Id::ulid(Prefix::Device, 1, [2; 10]).unwrap(),
+                outcome: Outcome::Refused { reason },
+                text: "Not started".into(),
+            })
+        };
+        let open = refused(Reason::QuestionsOpen { blocking: 2 });
+        let json = serde_json::to_value(&open).unwrap();
+        assert_eq!((json["reason"].as_str(), json["blocking"].as_u64()), (Some("questions-open"), Some(2)));
+        assert_eq!(serde_json::from_value::<Payload>(json.clone()).unwrap(), open);
+        let started = serde_json::to_value(refused(Reason::AlreadyStarted)).unwrap();
+        assert_eq!((started["reason"].as_str(), started.get("blocking")), (Some("already-started"), None));
+        for (key, value) in [("blocking", serde_json::json!(0)), ("blocking", serde_json::json!(null)), ("reason", serde_json::json!("already-started"))] {
+            let mut wrong = json.clone();
+            wrong[key] = value;
+            assert!(serde_json::from_value::<Payload>(wrong.clone()).is_err(), "{wrong}");
+        }
+    }
+
+    #[test]
+    fn backlog_commands_hold_their_limits_and_lifetimes() {
+        let idea = |text: String, repo: Option<&str>| Payload::Idea(Idea { text, repo: repo.map(Into::into) });
+        assert_eq!(idea("x".repeat(MAX_IDEA_CHARS), None).validate(), Ok(()));
+        assert!(idea("x".repeat(MAX_IDEA_CHARS + 1), None).validate().is_err());
+        assert!(idea(" ".into(), None).validate().is_err());
+        assert!(idea("x".into(), Some("../shop")).validate().is_err());
+        let bare = serde_json::json!({ "type": "idea", "text": "Mail a weekly summary" });
+        assert_eq!(serde_json::from_value::<Payload>(bare).unwrap(), idea("Mail a weekly summary".into(), None));
+        let answer = |answer: &str| {
+            Payload::ItemAnswer(ItemAnswer { item: ItemKey::parse("kept:idea-1").unwrap(), index: 0, question: "Which?".into(), answer: answer.into() })
+        };
+        assert_eq!(answer("This one").validate(), Ok(()));
+        assert!(answer("").validate().is_err());
+        assert!(answer(&"x".repeat(MAX_ITEM_ANSWER_CHARS + 1)).validate().is_err());
+        let plain = serde_json::json!({ "type": "start-item", "item": "kept:idea-1" });
+        assert_eq!(serde_json::from_value::<Payload>(plain).unwrap(), Payload::StartItem(StartItem { item: ItemKey::parse("kept:idea-1").unwrap(), anyway: false }));
+        let path = serde_json::json!({ "type": "start-item", "item": "local:../../etc" });
+        assert!(serde_json::from_value::<Payload>(path).is_err());
+        assert_eq!(
+            [Kind::Idea, Kind::ItemAnswer, Kind::StartItem].map(|kind| (kind.is_command(), kind.default_ttl(), kind.max_ttl())),
+            [(true, 3_600, 3_600), (true, 3_600, 3_600), (true, 86_400, 86_400)]
+        );
     }
 
     #[test]

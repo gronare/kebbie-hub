@@ -494,7 +494,7 @@ impl Hub {
 
     fn limit_command(&self, account: &str, kind: Kind) -> Result<(), ApiError> {
         let limiter = match kind {
-            Kind::Start | Kind::Push => &self.start_push_limiter,
+            Kind::Start | Kind::StartItem | Kind::Push => &self.start_push_limiter,
             _ => &self.command_limiter,
         };
         if limiter.allow(&format!("{account}:{}", kind.name())) {

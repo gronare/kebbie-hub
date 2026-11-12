@@ -31,6 +31,12 @@ export const CLOCK_SKEW = 300;
 
 export const COMMAND_TTL = 3600;
 export const PROMPT_ANSWER_TTL = 600;
+export const START_ITEM_TTL = DAY;
+export const MAX_IDEA_CHARS = 2000;
+export const MAX_ITEM_ANSWER_CHARS = 2000;
+export const MAX_QUESTION_CHARS = 4000;
+export const MAX_LABEL_BYTES = 256;
+export const BACKLOG_BODY_MEDIA_TYPE = "application/vnd.kebbie.backlog-item+json";
 const command = { prefix: "cmd", maxTtl: DAY, ttl: COMMAND_TTL, command: true };
 export const KINDS = {
   board: { prefix: "brd", maxTtl: DAY, command: false },
@@ -41,6 +47,9 @@ export const KINDS = {
   start: command,
   routine: command,
   "prompt-answer": { ...command, maxTtl: PROMPT_ANSWER_TTL, ttl: PROMPT_ANSWER_TTL },
+  idea: { ...command, maxTtl: COMMAND_TTL },
+  "item-answer": { ...command, maxTtl: COMMAND_TTL },
+  "start-item": { ...command, ttl: START_ITEM_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -202,6 +211,52 @@ const item = shape({
   assessment: optionalField(string),
   second_opinion: optionalField(shape({ by: string, points: optionalField(u32v), running: bool })),
 });
+export const isHomeLabel = (label) =>
+  typeof label === "string" &&
+  text.encode(label).length >= 1 &&
+  text.encode(label).length <= MAX_LABEL_BYTES &&
+  !/^[/~]/.test(label) &&
+  !/[\p{Cc}\\:]/u.test(label) &&
+  label.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+const LOCAL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const homeOf = (key) => key.slice(0, key.indexOf(":"));
+export function isItemKey(key) {
+  if (typeof key !== "string" || !key.includes(":")) return false;
+  const id = key.slice(key.indexOf(":") + 1);
+  const home = homeOf(key);
+  return home === "vault" ? isHomeLabel(id) : (home === "local" || home === "kept") && LOCAL_ID.test(id);
+}
+const isText = (max) => (value) => typeof value === "string" && value.trim() !== "" && [...value].length <= max;
+const backlogRow = (row) =>
+  shape({
+    item: isItemKey,
+    title: string,
+    priority: oneOf("high", "medium", "low", "none"),
+    repo: optionalField(string),
+    state: oneOf("to-write", "drafting", "ready"),
+    filed: u64v,
+    home: shape({ kind: oneOf("vault", "local", "kept"), label: isHomeLabel }),
+    questions: u32v,
+    blocking: u32v,
+    goal: optionalField(string),
+    body: optionalField(blobRef),
+  })(row) &&
+  homeOf(row.item) === row.home.kind &&
+  row.blocking <= row.questions;
+const backlog = (rows) => list(backlogRow)(rows) && new Set(rows.map((row) => row.item)).size === rows.length;
+const backlogBody = shape({
+  background: string,
+  goal: string,
+  what_we_know: string,
+  questions: list(shape({ text: string, blocks: bool, pending_answer: optionalField(string) })),
+  out_of_scope: string,
+  source: string,
+});
+
+export function checkBacklogBody(body) {
+  if (!backlogBody(body)) throw new ProtocolError("malformed");
+}
+
 const nextRow = shape({ part: oneOf("stopped", "push", "read"), address: string, rank: u32v, line: string, since: optionalField(u64v), waits_behind: u32v });
 const later = shape({ address: string, title: optionalField(string), state: oneOf("queued", "parked"), line: string, until: optionalField(u64v), question: bool });
 const STANDINGS = {
@@ -211,7 +266,7 @@ const STANDINGS = {
 };
 const standing = (value) => isPlainObject(value) && string(value.state) && Object.hasOwn(STANDINGS, value.state) && STANDINGS[value.state](value);
 const devices = (value) => isPlainObject(value) && Object.entries(value).every(([key, entry]) => prefixOf(key) === "dev" && standing(entry));
-const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied"];
+const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started"];
 const EVENTS = ["needs-you", "ready", "question", "summary", "ci-failed", "ci-green", "api-error", "routine-findings", "routine-failed"];
 const typed = (fields) => shape({ type: string, ...fields });
 const PAYLOADS = {
@@ -228,6 +283,7 @@ const PAYLOADS = {
     later: optionalField(list(later)),
     accepts: optionalField(list(string)),
     devices: optionalField(devices),
+    backlog: optionalField(backlog),
   }),
   notice: typed({
     event: oneOf(...EVENTS),
@@ -241,13 +297,17 @@ const PAYLOADS = {
     retract: optionalField(string),
   }),
   result: (value) =>
-    typed({ command: id, device: (value) => prefixOf(value) === "dev", outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), text: string })(value) &&
-    (value.outcome === "refused") === !absent(value.reason),
+    typed({ command: id, device: (value) => prefixOf(value) === "dev", outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), blocking: optionalField(uint(0xffff_ffff)), text: string })(value) &&
+    (value.outcome === "refused") === !absent(value.reason) &&
+    (value.reason === "questions-open") === (!absent(value.blocking) && value.blocking > 0),
   answer: typed({ address: string, question: string, choice: optionalField(u8), comment: string }),
   push: typed({ address: string, head: string, card_sha: optionalField(string) }),
   start: typed({ repo: string, name: string, prompt: string }),
   routine: typed({ id: string }),
   "prompt-answer": typed({ address: string, prompt: string, key: string }),
+  idea: typed({ text: isText(MAX_IDEA_CHARS), repo: optionalField(string) }),
+  "item-answer": typed({ item: isItemKey, index: u32v, question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) }),
+  "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
 };
 
 export function checkPayload(payload) {

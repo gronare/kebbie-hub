@@ -1,5 +1,5 @@
-const SHELL = "kebbie-shell-v11";
-const FILES = ["/", "/app.css", "/app.js", "/blobs.js", "/board.js", "/connect.js", "/decide.js", "/device.js", "/device-name.js", "/markdown.js", "/pages.js", "/screens.js", "/sections.js", "/pose.js", "/scroll.js", "/hub.js", "/store.js", "/passkey.js", "/signin.js", "/email.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
+const SHELL = "kebbie-shell-v12";
+const FILES = ["/", "/app.css", "/app.js", "/backlog.js", "/blobs.js", "/board.js", "/connect.js", "/decide.js", "/device.js", "/device-name.js", "/markdown.js", "/pages.js", "/screens.js", "/sections.js", "/pose.js", "/scroll.js", "/hub.js", "/store.js", "/passkey.js", "/signin.js", "/email.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
 const FALLBACK = { title: "kebbie", body: "Something on the board changed.", tag: "kebbie", url: "/#/board" };
 
 self.addEventListener("install", (event) => {

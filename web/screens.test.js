@@ -284,9 +284,9 @@ test("a question's options show as cards with only the recommended one marked, a
   assert.equal(text(machineAnswerNote()), "Answer at the machine: N on the board, or ask the lead.");
 });
 
-test("the nav names the tabs, counts waiting questions in a badge, marks the open tab and links the account", () => {
+test("the nav names the tabs with the backlog between board and questions, counts waiting questions in a badge, marks the open tab and links the account", () => {
   const html = nav({ active: "questions", questions: 2 });
-  assert.deepEqual(hrefs(html), [{ label: "Board", href: "/#/board" }, { label: "Questions", href: "/#/questions" }, { label: "Machines", href: "/#/machines" }, { label: "Account", href: "/account" }]);
+  assert.deepEqual(hrefs(html), [{ label: "Board", href: "/#/board" }, { label: "Backlog", href: "/#/backlog" }, { label: "Questions", href: "/#/questions" }, { label: "Machines", href: "/#/machines" }, { label: "Account", href: "/account" }]);
   assert.match(html, /class="on" aria-current="page">Questions <em class="badge">2<\/em>/);
   assert.doesNotMatch(nav({ active: "board" }), /badge|Admin/);
   assert.match(nav({ active: "account", deskOnly: true }), /^<nav class="tabbar desk-nav">/);
@@ -487,3 +487,19 @@ test("a device's page shows its key and what it sent, newest first and grouped b
   assert.equal(historyEntry({ payload: answer, machineName: "MacBook", at: AT_TWO_PM, exp: AT_TWO_PM + 3600, result: { outcome: "refused", reason: "denied", text: "" } }, AT_TWO_PM).said, "denied on MacBook");
 });
 
+
+test("a device's history names what it sent to the backlog: the idea and its machine, the item answered and the item started", () => {
+  const now = 1_762_956_540;
+  const entry = (payload, fields = {}) => ({ machineName: "MacBook", payload, at: now - 60, exp: now + 3_000, result: { outcome: "done", reason: null, text: "ok" }, label: null, ...fields });
+  assert.deepEqual(
+    [
+      historyEntry(entry({ type: "idea", text: "ci push retry flaky", repo: null }), now).what,
+      historyEntry(entry({ type: "item-answer", item: "vault:Projects/session.md", index: 0, question: "Q?", answer: "Renew it" }, { label: "Session drops on reload" }), now).what,
+      historyEntry(entry({ type: "start-item", item: "local:retry-a-flaky-ci-push", anyway: false }), now).what,
+    ],
+    ["Idea for MacBook: ci push retry flaky", "Answered a question on Session drops on reload", "Started retry-a-flaky-ci-push"],
+  );
+  const refused = historyEntry(entry({ type: "start-item", item: "vault:Projects/session.md", anyway: false }, { label: "Session drops on reload", result: { outcome: "refused", reason: "questions-open", blocking: 2, text: "Not started: 2 questions wait on you." } }), now);
+  assert.deepEqual([refused.what, refused.said], ["Start of Session drops on reload refused", "Not started: 2 questions wait on you."]);
+  assert.equal(historyEntry(entry({ type: "idea", text: "x".repeat(80), repo: null }, { result: null }), now).what, `Idea for MacBook: ${"x".repeat(59)}… waiting`);
+});

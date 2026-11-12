@@ -1,6 +1,7 @@
 mod account;
 mod alert;
 mod authorize;
+mod backlog;
 mod blob;
 mod board;
 mod connect;
@@ -22,6 +23,10 @@ pub use account::{
 };
 pub use alert::{Alert, AlertKind, AlertState};
 pub use authorize::{Applied, AppliedCommands, Verified, Dropped, Machine, Refusal, authorize};
+pub use backlog::{
+    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Home, HomeKind, ItemKey, MAX_LABEL_BYTES,
+    OpenQuestion, Priority, is_relative_label,
+};
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
     Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
@@ -41,8 +46,9 @@ pub use device::{
 pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
-    Answer, CommandResult, Event, MAX_OPTIONS, MAX_PROMPT_CHARS, Notice, Outcome, Payload,
-    PromptAnswer, PushApproval, Reason, RunRoutine, StartTask,
+    Answer, CommandResult, Event, Idea, ItemAnswer, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, MAX_OPTIONS,
+    MAX_PROMPT_CHARS, Notice, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
+    StartTask,
 };
 
 pub const PROTOCOL_VERSION: u16 = 1;
