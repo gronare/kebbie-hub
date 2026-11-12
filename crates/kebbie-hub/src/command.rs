@@ -21,7 +21,7 @@ const MAX_SHORT_COMMAND_CT: usize = 4 * 1024;
 
 fn max_ciphertext(kind: Kind) -> usize {
     match kind {
-        Kind::Answer | Kind::Start | Kind::Idea | Kind::ItemAnswer | Kind::ReviewComments => MAX_TEXT_COMMAND_CT,
+        Kind::Answer | Kind::Start | Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::ReviewComments => MAX_TEXT_COMMAND_CT,
         _ => MAX_SHORT_COMMAND_CT,
     }
 }

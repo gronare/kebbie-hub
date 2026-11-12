@@ -25,6 +25,7 @@ pub enum Kind {
     Idea,
     ItemAnswer,
     StartItem,
+    ItemEdit,
     DeviceDecision,
     ReviewOpen,
     ReviewComments,
@@ -46,6 +47,7 @@ impl Kind {
             Kind::Idea => "idea",
             Kind::ItemAnswer => "item-answer",
             Kind::StartItem => "start-item",
+            Kind::ItemEdit => "item-edit",
             Kind::DeviceDecision => "device-decision",
             Kind::ReviewOpen => "review-open",
             Kind::ReviewComments => "review-comments",
@@ -65,6 +67,7 @@ impl Kind {
                 | Kind::Idea
                 | Kind::ItemAnswer
                 | Kind::StartItem
+                | Kind::ItemEdit
                 | Kind::DeviceDecision
                 | Kind::ReviewOpen
                 | Kind::ReviewComments
@@ -86,7 +89,7 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::DeviceDecision => 3_600,
+            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem => 86_400,
@@ -99,7 +102,7 @@ impl Kind {
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem => 86_400,
-            Kind::Idea | Kind::ItemAnswer | Kind::DeviceDecision => 3_600,
+            Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep => 3_600,
             Kind::PromptAnswer => 600,
         }

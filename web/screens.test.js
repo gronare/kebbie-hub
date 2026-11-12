@@ -561,3 +561,12 @@ test("the device's history names review comments by count and an accept by its s
   assert.equal(entry({ type: "review-read", address: "retry-push@kebbie", path: "src/ci.rs", read: true, content: "a".repeat(40) }), "Marked src/ci.rs read on retry-push@kebbie");
   assert.equal(entry({ type: "review-open", address: "retry-push@kebbie" }), "Opened the review of retry-push@kebbie");
 });
+
+test("the device's history names an item edit by its section, or the title", () => {
+  const done = { outcome: "done", reason: null, text: "" };
+  const entry = (payload, heading) => historyEntry({ payload, heading, label: "Session drops on reload", machineName: "MacBook", at: 1_761_070_000, exp: 1_761_073_600, result: done }, 1_761_070_000).what;
+  const edit = { type: "item-edit", item: "vault:Projects/session.md", text: "x", base: "a".repeat(64) };
+  assert.equal(entry({ ...edit, section: "goal" }), "Edited “goal” of Session drops on reload");
+  assert.equal(entry({ ...edit, section: "what-we-know" }, "What we know"), "Edited “What we know” of Session drops on reload");
+  assert.equal(entry({ ...edit, section: null }), "Edited the title of Session drops on reload");
+});

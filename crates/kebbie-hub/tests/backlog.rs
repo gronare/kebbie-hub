@@ -7,12 +7,16 @@ use common::*;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Backlog, MachineState};
 use kebbie_hub_protocol::{
-    BacklogBody, BacklogRow, BacklogState, Board, Home, HomeKind, Idea, ItemAnswer, ItemKey, OpenQuestion, Outcome,
-    Payload, Priority, Reason, StartItem, open_blob,
+    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Home, HomeKind, Idea, ItemAnswer, ItemEdit, ItemKey, OpenQuestion,
+    Outcome, Payload, Priority, Reason, StartItem, open_blob, text_hash,
 };
 
 const SOON: Duration = Duration::from_secs(5);
 const ITEM: &str = "local:retry-a-flaky-ci-push";
+
+fn section(key: &str, heading: &str, text: &str, required: bool) -> BodySection {
+    BodySection { key: key.to_string(), heading: heading.to_string(), text: text.to_string(), required }
+}
 
 fn backlog() -> Backlog {
     let item = ItemKey::parse(ITEM).unwrap();
@@ -32,12 +36,14 @@ fn backlog() -> Backlog {
             body: None,
         }],
         bodies: [(item, BacklogBody {
-            background: "A push stops when the runner drops.".to_string(),
-            goal: "Retry a dropped runner.".to_string(),
-            what_we_know: "- Three of ten failures were drops.".to_string(),
+            sections: vec![
+                section("problem", "Problem", "A push stops when the runner drops.", true),
+                section("solution", "Solution", "Retry a dropped runner.", true),
+                section("questions", "Open questions", "", false),
+                section("out-of-scope", "Out of scope", "Flaky tests.", false),
+            ],
             questions: vec![question("How many tries?", true), question("Wait for the runner?", true), question("Log each retry?", false)],
-            out_of_scope: "Flaky tests.".to_string(),
-            source: "From the board.".to_string(),
+            questions_key: Some("questions".to_string()),
         })]
         .into(),
     }
@@ -96,4 +102,41 @@ async fn an_idea_an_answer_and_a_start_travel_through_the_hub_and_the_board_show
     assert!(shown.backlog.unwrap().iter().all(|row| row.item.as_str() != ITEM), "a started item leaves the backlog");
     assert_eq!(shown.items[0].title.as_deref(), Some("Retry a flaky CI push"));
     assert_eq!(sent(&mut person, &mut machine, start(true)).await, Outcome::Refused { reason: Reason::AlreadyStarted });
+}
+
+async fn body_of(person: &mut Browser, machine: &MachineState) -> BacklogBody {
+    let rows = board_of(person, machine).await.backlog.unwrap();
+    let body_ref = rows.iter().find(|row| row.item.as_str() == ITEM).unwrap().body.clone().unwrap();
+    serde_json::from_slice(&open_blob(&body_ref, &person.blob(&body_ref.id).await.unwrap()).unwrap()).unwrap()
+}
+
+fn edit(section: Option<&str>, text: &str, base: &str) -> Payload {
+    Payload::ItemEdit(ItemEdit { item: ItemKey::parse(ITEM).unwrap(), section: section.map(Into::into), text: text.to_string(), base: text_hash(base) })
+}
+
+#[tokio::test]
+async fn an_edit_replaces_a_section_or_the_title_only_from_the_text_the_machine_still_has() {
+    let test = start_hub(|_| {}).await;
+    let mut person = member(&test).await;
+    let mut machine = connected_with_board(&test, &mut person).await;
+    person.knows(&machine.machine, machine.public());
+    machine.post_board(board(MARKER)).await.unwrap();
+    machine.backlog = backlog();
+    machine.publish_backlog().await.unwrap();
+
+    let solution = "Retry a dropped runner up to twice.";
+    assert_eq!(sent(&mut person, &mut machine, edit(Some("solution"), solution, "Retry a dropped runner.")).await, Outcome::Done);
+    let body = body_of(&mut person, &machine).await;
+    assert_eq!(body.section("solution").map(|one| one.text.as_str()), Some(solution));
+    assert_eq!(body.sections.iter().map(|one| one.key.as_str()).collect::<Vec<_>>(), ["problem", "solution", "questions", "out-of-scope"], "an edit keeps the template's order");
+
+    assert_eq!(sent(&mut person, &mut machine, edit(Some("solution"), "Retry forever.", "Retry a dropped runner.")).await, Outcome::Refused { reason: Reason::SectionChanged }, "an edit made on an older text is refused");
+    assert_eq!(sent(&mut person, &mut machine, edit(Some("risks"), "None.", "")).await, Outcome::Refused { reason: Reason::SectionChanged });
+    assert_eq!(sent(&mut person, &mut machine, edit(Some("problem"), " ", "A push stops when the runner drops.")).await, Outcome::Refused { reason: Reason::BadRequest }, "a required section is never saved empty");
+    assert_eq!(sent(&mut person, &mut machine, edit(Some("out-of-scope"), "", "Flaky tests.")).await, Outcome::Done);
+    assert_eq!(body_of(&mut person, &machine).await.section("out-of-scope").map(|one| one.text.as_str()), Some(""));
+
+    assert_eq!(sent(&mut person, &mut machine, edit(None, "Retry a dropped CI runner", "Retry a flaky CI push")).await, Outcome::Done);
+    let rows = board_of(&mut person, &machine).await.backlog.unwrap();
+    assert_eq!(rows.iter().find(|row| row.item.as_str() == ITEM).unwrap().title, "Retry a dropped CI runner");
 }

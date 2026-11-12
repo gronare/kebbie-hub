@@ -14,7 +14,7 @@ use crate::account::{
 };
 use crate::authorize::{AppliedCommands, Verified, Machine, Refusal, authorize};
 use crate::backlog::{
-    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Home, HomeKind, ItemKey,
+    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, BodySection, Home, HomeKind, ItemKey,
     OpenQuestion, Priority,
 };
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
@@ -40,7 +40,7 @@ use crate::review::{
     ReviewOpen, ReviewRead, ReviewStep, Side,
 };
 use crate::message::{
-    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, Notice, NoticeCategory, Outcome, Payload,
+    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
 };
 
@@ -461,11 +461,22 @@ fn next_board() -> Payload {
 const VAULT_ITEM: &str = "Projects/refund-rounding.md";
 const BLOCKING_QUESTION: &str = "Round half up, or to even like the ledger?";
 
+fn section(key: &str, heading: &str, text: &str, required: bool) -> BodySection {
+    BodySection { key: key.into(), heading: heading.into(), text: text.into(), required }
+}
+
+const GOAL: &str = "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds keep rounding per line.";
+
 fn backlog_body() -> BacklogBody {
     BacklogBody {
-        background: "Refunds are rounded per line, invoices on the total, so a refund can differ from its invoice by a cent.".into(),
-        goal: "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds keep rounding per line.".into(),
-        what_we_know: "- Invoices round the total since 2.12.\n- `Refund#amount` sums rounded lines.".into(),
+        sections: vec![
+            section("background", "Background", "Refunds are rounded per line, invoices on the total, so a refund can differ from its invoice by a cent.", true),
+            section("goal", "Goal", GOAL, true),
+            section("what-we-know", "What we know", "- Invoices round the total since 2.12.\n- `Refund#amount` sums rounded lines.", false),
+            section("questions", "Open questions", "", false),
+            section("out-of-scope", "Out of scope", "Currency conversion.", false),
+            section("source", "Source", "Support thread about a refund one cent short.", false),
+        ],
         questions: vec![
             OpenQuestion {
                 text: BLOCKING_QUESTION.into(),
@@ -483,8 +494,7 @@ fn backlog_body() -> BacklogBody {
                 pending_answer: None,
             },
         ],
-        out_of_scope: "Currency conversion.".into(),
-        source: "Support thread about a refund one cent short.".into(),
+        questions_key: Some("questions".into()),
     }
 }
 
@@ -498,7 +508,7 @@ fn backlog_blob() -> (BlobRef, Vec<u8>) {
 }
 
 fn backlog_kinds() -> Vec<Kind> {
-    vec![Kind::Answer, Kind::Push, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem]
+    vec![Kind::Answer, Kind::Push, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem, Kind::ItemEdit]
 }
 
 fn backlog_board() -> Payload {
@@ -572,6 +582,35 @@ fn item_answer(answer: &str) -> Payload {
         index: 0,
         question: BLOCKING_QUESTION.into(),
         answer: answer.into(),
+    })
+}
+
+const EDITED_GOAL: &str = "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds round per line, as today.";
+
+fn item_edit(section: Option<&str>, text: &str, base: &str) -> Payload {
+    Payload::ItemEdit(ItemEdit {
+        item: ItemKey::vault(VAULT_ITEM).unwrap(),
+        section: section.map(Into::into),
+        text: text.into(),
+        base: crate::text_hash(base),
+    })
+}
+
+fn goal_edit() -> Payload {
+    item_edit(Some("goal"), EDITED_GOAL, GOAL)
+}
+
+fn title_edit() -> Payload {
+    item_edit(None, "Refunds round exactly like their invoice", "Refunds round like their invoice")
+}
+
+fn section_changed() -> Payload {
+    Payload::Result(CommandResult {
+        command: command_id("item-edit"),
+        device: Party::new("phone", Prefix::Device).id,
+        outcome: Outcome::Refused { reason: Reason::SectionChanged },
+        text: "Not saved: the goal changed on the machine since you opened it.".into(),
+        blob: None,
     })
 }
 
@@ -1062,6 +1101,8 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         ("item-answer-opened-by-the-machine", "item-answer", Kind::ItemAnswer, item_answer("Half up, like invoices.")),
         ("start-item-opened-by-the-machine", "start-item", Kind::StartItem, start_item(false)),
         ("start-item-anyway-opened-by-the-machine", "start-item-anyway", Kind::StartItem, start_item(true)),
+        ("item-edit-opened-by-the-machine", "item-edit", Kind::ItemEdit, goal_edit()),
+        ("title-edit-opened-by-the-machine", "title-edit", Kind::ItemEdit, title_edit()),
     ] {
         let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
         cases.push(opens(name, &sealed, machine, phone, payload));
@@ -1080,6 +1121,8 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         questions_open(),
     ));
+    let refused_edit = seal_case("section-changed", machine_header("item-edit", Kind::Result, machine), &section_changed(), machine, &[machine, account]);
+    cases.push(opens("edit-refused-for-a-newer-section-opened-by-the-account", &refused_edit, account, machine, section_changed()));
 
     let reviewing = seal_case(
         "review-board",
@@ -1649,6 +1692,7 @@ fn envelopes_json(parties: &Parties) -> Value {
         Kind::Idea,
         Kind::ItemAnswer,
         Kind::StartItem,
+        Kind::ItemEdit,
         Kind::DeviceDecision,
         Kind::ReviewOpen,
         Kind::ReviewComments,
@@ -1946,6 +1990,16 @@ fn authorize_json(parties: &Parties) -> Value {
             "device-answers-an-items-question",
             from_phone("authorize/item-answer", Kind::ItemAnswer, &item_answer("Half up, like invoices.")),
             applies(item_answer("Half up, like invoices.")),
+        ),
+        backlog_case(
+            "device-edits-an-items-section",
+            from_phone("authorize/item-edit", Kind::ItemEdit, &goal_edit()),
+            applies(goal_edit()),
+        ),
+        backlog_case(
+            "title-edit-over-two-lines-is-refused",
+            from_phone("authorize/title-two-lines", Kind::ItemEdit, &item_edit(None, "Refunds round\nlike invoices", "Refunds round like their invoice")),
+            Err(Refusal::Answer(Reason::BadRequest)),
         ),
         backlog_case(
             "device-starts-an-item-that-lives-a-day",
@@ -2591,11 +2645,76 @@ fn backlog_json() -> Value {
             json!({ "key": key, "valid": valid })
         })
         .collect();
+    let hashes: Vec<Value> = ["", GOAL, "Två ord · €"].into_iter().map(|text| json!({ "text": text, "hash": crate::text_hash(text) })).collect();
+    let edit = serde_json::to_value(goal_edit()).unwrap();
+    let with = |key: &str, value: Value| {
+        let mut changed = edit.clone();
+        changed[key] = value;
+        changed
+    };
+    let edits = [
+        ("a section edit", edit.clone(), true),
+        ("a title edit", serde_json::to_value(title_edit()).unwrap(), true),
+        ("a section emptied", with("text", json!("")), true),
+        ("a section at its length", with("text", json!("x".repeat(crate::MAX_SECTION_CHARS))), true),
+        ("a section past its length", with("text", json!("x".repeat(crate::MAX_SECTION_CHARS + 1))), false),
+        ("a section too large to send", with("text", json!("😀".repeat(crate::MAX_SECTION_CHARS))), false),
+        ("a section with a control character", with("text", json!("a\u{7}b")), false),
+        ("a section key in capitals", with("section", json!("Goal")), false),
+        ("a base that is not a SHA-256", with("base", json!("5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d")), false),
+        ("an empty title", json!({ "type": "item-edit", "item": edit["item"], "section": null, "text": " ", "base": edit["base"] }), false),
+        ("a title past its length", json!({ "type": "item-edit", "item": edit["item"], "section": null, "text": "x".repeat(crate::MAX_ITEM_TITLE_CHARS + 1), "base": edit["base"] }), false),
+        ("an edit without its base", json!({ "type": "item-edit", "item": edit["item"], "section": "goal", "text": "x" }), false),
+        ("an edit of an item by a path on the machine", with("item", json!("vault:/Users/someone/vault/Projects/x.md")), false),
+    ];
+    let edits: Vec<Value> = edits
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
+    let body = serde_json::to_value(backlog_body()).unwrap();
+    let change = |pointer: &str, value: Value| {
+        let mut changed = body.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        changed.pointer_mut(parent).unwrap()[key] = value;
+        changed
+    };
+    let mut twice = body.clone();
+    twice["sections"].as_array_mut().unwrap().push(body["sections"][0].clone());
+    let bodies = [
+        ("the body", body.clone(), true),
+        ("questions after the last section", change("/questions_key", json!(null)), true),
+        ("no sections", json!({ "sections": [], "questions": [], "questions_key": null }), true),
+        ("questions under a section it does not have", change("/questions_key", json!("risks")), false),
+        ("a section listed twice", twice, false),
+        ("a key with a space", change("/sections/0/key", json!("what we know")), false),
+        ("an empty heading", change("/sections/0/heading", json!(" ")), false),
+        ("a heading on two lines", change("/sections/0/heading", json!("Back\nground")), false),
+        ("a section without required", { let mut changed = body.clone(); changed["sections"][0].as_object_mut().unwrap().remove("required"); changed }, false),
+        ("the fixed fields of before", json!({ "background": "", "goal": "", "what_we_know": "", "questions": [], "out_of_scope": "", "source": "" }), false),
+    ];
+    let bodies: Vec<Value> = bodies
+        .into_iter()
+        .map(|(name, body, valid)| {
+            assert_eq!(serde_json::from_value::<BacklogBody>(body.clone()).is_ok(), valid, "{name}");
+            json!({ "name": name, "body": body, "valid": valid })
+        })
+        .collect();
     json!({
         "media_type": BACKLOG_BODY_MEDIA_TYPE,
         "max_label_bytes": crate::MAX_LABEL_BYTES,
         "max_idea_chars": crate::MAX_IDEA_CHARS,
         "max_item_answer_chars": crate::MAX_ITEM_ANSWER_CHARS,
+        "max_item_title_chars": crate::MAX_ITEM_TITLE_CHARS,
+        "max_section_chars": crate::MAX_SECTION_CHARS,
+        "max_item_edit_bytes": crate::MAX_ITEM_EDIT_BYTES,
+        "max_heading_chars": crate::MAX_HEADING_CHARS,
+        "text_hashes": hashes,
+        "edits": edits,
+        "bodies": bodies,
         "body": backlog_body(),
         "blob": blob,
         "ciphertext": b64(&ciphertext),

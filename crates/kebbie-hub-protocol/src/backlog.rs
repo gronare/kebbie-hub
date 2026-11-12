@@ -2,12 +2,16 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::board::BlobRef;
+use crate::message::{check, is_line};
 
 pub const BACKLOG_BODY_MEDIA_TYPE: &str = "application/vnd.kebbie.backlog-item+json";
 pub const MAX_LABEL_BYTES: usize = 256;
 const MAX_LOCAL_ID_CHARS: usize = 64;
+pub const MAX_SECTION_KEY_CHARS: usize = 64;
+pub const MAX_HEADING_CHARS: usize = 120;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
@@ -155,14 +159,77 @@ pub(crate) fn backlog_rows<'de, D: Deserializer<'de>>(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "BodyFields", into = "BodyFields")]
 pub struct BacklogBody {
-    pub background: String,
-    pub goal: String,
-    pub what_we_know: String,
+    pub sections: Vec<BodySection>,
     pub questions: Vec<OpenQuestion>,
-    pub out_of_scope: String,
-    pub source: String,
+    /// The section the open questions are shown under; none puts them after the last section.
+    pub questions_key: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BodySection {
+    pub key: String,
+    pub heading: String,
+    pub text: String,
+    pub required: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BodyFields {
+    sections: Vec<BodySection>,
+    questions: Vec<OpenQuestion>,
+    questions_key: Option<String>,
+}
+
+impl TryFrom<BodyFields> for BacklogBody {
+    type Error = &'static str;
+
+    fn try_from(fields: BodyFields) -> Result<BacklogBody, &'static str> {
+        let body = BacklogBody { sections: fields.sections, questions: fields.questions, questions_key: fields.questions_key };
+        body.check()?;
+        Ok(body)
+    }
+}
+
+impl From<BacklogBody> for BodyFields {
+    fn from(body: BacklogBody) -> BodyFields {
+        BodyFields { sections: body.sections, questions: body.questions, questions_key: body.questions_key }
+    }
+}
+
+impl BacklogBody {
+    pub fn check(&self) -> Result<(), &'static str> {
+        let mut keys = BTreeSet::new();
+        for section in &self.sections {
+            check(is_section_key(&section.key), "a section's key is not a short lowercase word")?;
+            check(keys.insert(section.key.as_str()), "a section is listed once")?;
+            check(is_line(&section.heading, MAX_HEADING_CHARS), "a section's heading is empty, too long or not one line")?;
+        }
+        check(self.questions_key.as_deref().is_none_or(|key| keys.contains(key)), "the questions sit under a section the body does not have")
+    }
+
+    pub fn section(&self, key: &str) -> Option<&BodySection> {
+        self.sections.iter().find(|section| section.key == key)
+    }
+}
+
+pub fn is_section_key(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    (1..=MAX_SECTION_KEY_CHARS).contains(&bytes.len())
+        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
+        && bytes.iter().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
+}
+
+/// What an item edit names as its base: the lowercase hex SHA-256 of the text's UTF-8 bytes.
+pub fn text_hash(text: &str) -> String {
+    Sha256::digest(text.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+pub fn is_text_hash(text: &str) -> bool {
+    text.len() == 64 && text.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -222,5 +289,24 @@ mod tests {
         for wrong in [serde_json::json!([local]), serde_json::json!([blocking]), serde_json::json!([absolute]), serde_json::json!([row.clone(), row])] {
             assert!(rows(wrong.clone()).is_err(), "{wrong}");
         }
+    }
+
+    #[test]
+    fn a_body_is_its_templates_sections_in_order_with_the_questions_under_one_of_them() {
+        let section = |key: &str| serde_json::json!({ "key": key, "heading": "Goal", "text": "", "required": true });
+        let body = |sections: Vec<serde_json::Value>, under: Option<&str>| serde_json::from_value::<BacklogBody>(serde_json::json!({ "sections": sections, "questions": [], "questions_key": under }));
+        assert_eq!(body(vec![section("goal"), section("risks")], Some("risks")).unwrap().section("goal").map(|one| one.required), Some(true));
+        assert!(body(vec![section("goal")], None).is_ok());
+        assert!(body(vec![section("goal")], Some("risks")).is_err());
+        assert!(body(vec![section("goal"), section("goal")], None).is_err());
+        assert!(body(vec![section("Goal")], None).is_err());
+        assert!(body(vec![section(&"a".repeat(MAX_SECTION_KEY_CHARS + 1))], None).is_err());
+    }
+
+    #[test]
+    fn an_edit_names_its_base_as_the_sha256_of_the_text_it_edited() {
+        assert_eq!(text_hash(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert!(is_text_hash(&text_hash("Goal")));
+        assert!(!is_text_hash(&text_hash("Goal").to_uppercase()));
     }
 }

@@ -1,13 +1,14 @@
 import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { backlogList, chip, chooseMachine, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
+import { backlogList, chip, chooseMachine, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
 import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
-import { answerBlock, answerReady, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { textHash } from "../js/protocol.js";
+import { answerBlock, answerReady, APPROVAL_STATES, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
@@ -398,7 +399,7 @@ function backlogEntries() {
 }
 
 function backlogUi(id) {
-  if (!state.backlogUi.has(id)) state.backlogUi.set(id, { picked: null, text: "", busy: false, error: null, choosing: false, machine: null, visit: nowSeconds() });
+  if (!state.backlogUi.has(id)) state.backlogUi.set(id, { picked: null, text: "", busy: false, error: null, choosing: false, machine: null, visit: nowSeconds(), editing: null });
   return state.backlogUi.get(id);
 }
 
@@ -440,7 +441,16 @@ function itemCardHtml(entry) {
   const start = entry.key ? latestFor(entry, "start-item") : null;
   const sentFor = (index) => latestFor(entry, "item-answer", (sent) => sent.index === index);
   const idea = entry.idea ? { ...entry.idea, standing: shownOf(entry.idea.sent).standing } : null;
-  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start) });
+  const edits = entry.key ? { machine: chosenFor(entry, "item-edit"), editing: ui.editing, sentFor: (section) => editFor(entry, section) } : null;
+  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits });
+}
+
+function editFor(entry, section) {
+  const shown = latestFor(entry, "item-edit", (sent) => (sent.section ?? null) === section);
+  if (!shown) return null;
+  const storedAt = state.opened.find((machine) => machine.machine === shown.sent.machine)?.storedAt ?? 0;
+  const saving = shown.live && (shown.state !== "done" || storedAt < (shown.sent.result?.at ?? 0)) && !APPROVAL_STATES.includes(shown.state) && shown.state !== "waiting";
+  return { ...shown, saving, recent: shown.sent.at >= backlogUi(entry.id).visit };
 }
 
 function findEntry(id) {
@@ -478,6 +488,13 @@ function itemRoute(id) {
   const back = backButton("#/backlog");
   if (!entry) return shell("backlog", back + top("Backlog") + missingItem);
   return shell("backlog", back + top(entry.row.title, `<span class="machine">${esc(chip(entry))}</span>`) + itemCardHtml(entry));
+}
+
+// iOS opens the keyboard only for a focus the tap itself makes, so the composer is rendered and focused inside the tap.
+function openComposer() {
+  location.hash = "#/idea";
+  render();
+  document.getElementById("idea")?.focus({ preventScroll: true });
 }
 
 function ideaRoute() {
@@ -662,6 +679,7 @@ function render() {
   rendered = location.hash;
   if (panelTop) root.querySelector(".panel")?.scrollTo(0, panelTop);
   document.documentElement.classList.toggle("has-send", Boolean(root.querySelector(".rv-sendbar")));
+  document.documentElement.classList.toggle("has-fab", Boolean(root.querySelector(".fab, .idea-add")));
   if (reviewing) hangLines(root);
   const refocus = focused ? document.getElementById(focused.id) : null;
   if (refocus) {
@@ -1057,13 +1075,45 @@ async function startItem(entry) {
   render();
 }
 
-const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "start-item"]);
+async function sendItemEdit(entry) {
+  const ui = backlogUi(entry.id);
+  const editing = ui.editing;
+  const chosen = chosenFor(entry, "item-edit");
+  if (!editing || !chosen || !editReady(editing, editing.required)) return;
+  const base = await textHash(editing.original);
+  const text = cleanEdit(editing);
+  const payload = { type: "item-edit", item: entry.key, section: editing.section, text, base };
+  editing.error = editProblem(payload);
+  if (editing.error) return render();
+  const sent = await sendBacklog({ machine: chosen, payload, meta: { address: entry.key, section: editing.section, heading: editing.heading, text, label: entry.row.title }, ui: editing });
+  if (sent) ui.editing = null;
+  render();
+}
+
+function openEditor(entry, section) {
+  const ui = backlogUi(entry.id);
+  const part = section === null ? null : bodyOf(entry).body?.sections.find((one) => one.key === section);
+  if (section !== null && !part) return;
+  const original = part ? part.text : entry.row.title;
+  ui.editing = { section, heading: part?.heading ?? null, text: original, original, required: part ? part.required : true, busy: false, error: null };
+  render();
+  const field = document.getElementById(section === null ? "edit-title" : `edit-${section}`);
+  if (!field) return;
+  field.focus();
+  field.setSelectionRange(field.value.length, field.value.length);
+}
+
+const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "start-item", "item-edit", "item-edit-cancel", "item-edit-save"]);
 
 function backlogAction(action, target) {
   const id = target.closest("[data-item]")?.dataset.item ?? null;
   const entry = id ? findEntry(id).entry : null;
   const ui = entry ? backlogUi(entry.id) : state.idea;
-  if (ui.busy) return;
+  if (ui.busy || ui.editing?.busy) return;
+  const section = target.dataset.section === "" ? null : (target.dataset.section ?? null);
+  if (action === "item-edit" && entry) return openEditor(entry, section);
+  if (action === "item-edit-save" && entry) return sendItemEdit(entry);
+  if (action === "item-edit-cancel") ui.editing = null;
   if (action === "add-idea") return addIdea();
   if (action === "send-item-answer" && entry) return sendItemAnswer(entry);
   if (action === "start-item" && entry) return startItem(entry);
@@ -1415,6 +1465,10 @@ root.addEventListener("click", (event) => {
     event.preventDefault();
     return closeSheet(() => go(picked.getAttribute("href")));
   }
+  if (event.target.closest("a.fab")) {
+    event.preventDefault();
+    return openComposer();
+  }
   const fileRow = event.target.closest("a.rv-file");
   if (fileRow) return openFile(event, fileRow);
   const target = event.target.closest("[data-action]");
@@ -1490,6 +1544,14 @@ root.addEventListener("input", (event) => {
     if (button) button.disabled = ui.busy || ui.text.trim() === "";
     return;
   }
+  if (draft === "item-edit") {
+    const ui = backlogUi(event.target.closest("[data-item]")?.dataset.item);
+    if (!ui.editing) return;
+    ui.editing.text = event.target.value;
+    const button = event.target.closest(".sec-edit")?.querySelector('[data-action="item-edit-save"]');
+    if (button) button.disabled = !editReady(ui.editing, ui.editing.required);
+    return;
+  }
   const field = event.target.closest("textarea[data-draft]");
   const decided = field?.closest(".decide");
   if (!decided) return;
@@ -1522,7 +1584,7 @@ addEventListener("hashchange", () => {
   if (name === "item") backlogUi(route().params[0]).visit = nowSeconds();
   state.sheet = false;
   render();
-  if (!(twoColumns() && (name === "task" || name === "plan" || name === "item"))) window.scrollTo(0, 0);
+  if (!(twoColumns() && (name === "task" || name === "plan" || name === "item" || name === "idea"))) window.scrollTo(0, 0);
   const pending = revealAfter;
   revealAfter = null;
   if (pending) reveal(pending.selector, pending.offset);

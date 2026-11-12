@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::backlog::ItemKey;
+use crate::backlog::{ItemKey, is_section_key, is_text_hash};
 use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
@@ -10,6 +10,9 @@ pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
 pub const MAX_IDEA_CHARS: usize = 2_000;
 pub const MAX_ITEM_ANSWER_CHARS: usize = 2_000;
+pub const MAX_ITEM_TITLE_CHARS: usize = 200;
+pub const MAX_SECTION_CHARS: usize = 8_000;
+pub const MAX_ITEM_EDIT_BYTES: usize = 24 * 1024;
 pub const MAX_NOTICE_TITLE_CHARS: usize = 120;
 pub const MAX_NOTICE_BODY_CHARS: usize = 600;
 pub const MAX_NOTICE_BYTES: usize = 2_048;
@@ -31,6 +34,7 @@ pub enum Payload {
     Idea(Idea),
     ItemAnswer(ItemAnswer),
     StartItem(StartItem),
+    ItemEdit(ItemEdit),
     DeviceDecision(DeviceDecision),
     ReviewOpen(ReviewOpen),
     ReviewComments(ReviewComments),
@@ -220,6 +224,7 @@ pub enum Reason {
     QuestionsOpen { blocking: u32 },
     AlreadyStarted,
     UnknownDevice,
+    SectionChanged,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -239,6 +244,7 @@ enum ReasonKey {
     QuestionsOpen,
     AlreadyStarted,
     UnknownDevice,
+    SectionChanged,
 }
 
 impl Reason {
@@ -258,6 +264,7 @@ impl Reason {
             Reason::QuestionsOpen { .. } => "questions-open",
             Reason::AlreadyStarted => "already-started",
             Reason::UnknownDevice => "unknown-device",
+            Reason::SectionChanged => "section-changed",
         }
     }
 
@@ -277,6 +284,7 @@ impl Reason {
             Reason::QuestionsOpen { .. } => ReasonKey::QuestionsOpen,
             Reason::AlreadyStarted => ReasonKey::AlreadyStarted,
             Reason::UnknownDevice => ReasonKey::UnknownDevice,
+            Reason::SectionChanged => ReasonKey::SectionChanged,
         }
     }
 
@@ -299,6 +307,7 @@ impl Reason {
             },
             ReasonKey::AlreadyStarted => Reason::AlreadyStarted,
             ReasonKey::UnknownDevice => Reason::UnknownDevice,
+            ReasonKey::SectionChanged => Reason::SectionChanged,
         })
     }
 }
@@ -367,6 +376,32 @@ pub struct StartItem {
     pub anyway: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ItemEdit {
+    pub item: ItemKey,
+    /// The body section to replace; none replaces the item's title.
+    pub section: Option<String>,
+    pub text: String,
+    /// The text_hash of the text this edit was made on.
+    pub base: String,
+}
+
+impl ItemEdit {
+    pub fn check(&self) -> Result<(), &'static str> {
+        check(is_text_hash(&self.base), "base is not a hex SHA-256")?;
+        match &self.section {
+            None => check(is_line(&self.text, MAX_ITEM_TITLE_CHARS), "a title is empty, too long or not one line")?,
+            Some(key) => {
+                check(is_section_key(key), "section is not a section key")?;
+                check(self.text.chars().count() <= MAX_SECTION_CHARS, "the section is too long")?;
+                check(!self.text.chars().any(|char| char.is_control() && !matches!(char, '\n' | '\t')), "the section holds control characters")?;
+            }
+        }
+        check(serde_json::to_vec(self).expect("an edit always serializes").len() <= MAX_ITEM_EDIT_BYTES, "the edit is too large to send")
+    }
+}
+
 impl Payload {
     pub fn kind(&self) -> Kind {
         match self {
@@ -381,6 +416,7 @@ impl Payload {
             Payload::Idea(_) => Kind::Idea,
             Payload::ItemAnswer(_) => Kind::ItemAnswer,
             Payload::StartItem(_) => Kind::StartItem,
+            Payload::ItemEdit(_) => Kind::ItemEdit,
             Payload::DeviceDecision(_) => Kind::DeviceDecision,
             Payload::ReviewOpen(_) => Kind::ReviewOpen,
             Payload::ReviewComments(_) => Kind::ReviewComments,
@@ -454,6 +490,7 @@ impl Payload {
                 check(decision.device.prefix() == Prefix::Device, "device is not a device id")?;
                 check(is_fingerprint(&decision.fingerprint), "fingerprint is not a device fingerprint")
             }
+            Payload::ItemEdit(edit) => edit.check(),
             Payload::ReviewOpen(open) => open.check(),
             Payload::ReviewComments(comments) => comments.check(),
             Payload::ReviewRead(read) => read.check(),
@@ -480,7 +517,7 @@ pub(crate) fn is_text(text: &str, max: usize) -> bool {
     !text.trim().is_empty() && text.chars().count() <= max
 }
 
-fn is_line(text: &str, max: usize) -> bool {
+pub(crate) fn is_line(text: &str, max: usize) -> bool {
     is_text(text, max) && !text.chars().any(char::is_control)
 }
 
@@ -639,6 +676,24 @@ mod tests {
             [Kind::Idea, Kind::ItemAnswer, Kind::StartItem].map(|kind| (kind.is_command(), kind.default_ttl(), kind.max_ttl())),
             [(true, 3_600, 3_600), (true, 3_600, 3_600), (true, 86_400, 86_400)]
         );
+    }
+
+    #[test]
+    fn an_item_edit_replaces_a_section_or_the_title_from_a_base_and_lives_an_hour() {
+        let edit = |section: Option<&str>, text: &str| Payload::ItemEdit(ItemEdit { item: ItemKey::parse("kept:idea-1").unwrap(), section: section.map(Into::into), text: text.into(), base: crate::text_hash("before") });
+        assert_eq!(edit(Some("goal"), "New goal").validate(), Ok(()));
+        assert_eq!(edit(Some("goal"), "").validate(), Ok(()), "only the template knows a section is required");
+        assert_eq!(edit(None, "A new title").validate(), Ok(()));
+        assert!(edit(None, "").validate().is_err());
+        assert!(edit(None, "Two\nlines").validate().is_err());
+        assert!(edit(Some("Goal"), "x").validate().is_err());
+        assert!(edit(Some("goal"), &"x".repeat(MAX_SECTION_CHARS + 1)).validate().is_err());
+        assert!(edit(Some("goal"), &"😀".repeat(MAX_SECTION_CHARS)).validate().is_err(), "the edit is too large to send");
+        let Payload::ItemEdit(mut short) = edit(Some("goal"), "x") else { unreachable!() };
+        short.base = "abc".into();
+        assert!(Payload::ItemEdit(short).validate().is_err());
+        assert_eq!((Kind::ItemEdit.name(), Kind::ItemEdit.is_command(), Kind::ItemEdit.default_ttl(), Kind::ItemEdit.max_ttl()), ("item-edit", true, 3_600, 3_600));
+        assert_eq!(Reason::SectionChanged.key(), "section-changed");
     }
 
     #[test]

@@ -4,7 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AccountKey, AppliedCommands, BacklogBody, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, verify_command,
+    AccountKey, AppliedCommands, BacklogBody, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
 };
 use serde_json::Value;
 
@@ -349,5 +349,15 @@ fn a_backlog_items_body_opens_from_its_blob_and_its_keys_hold_as_the_vectors_say
     for case in vectors["item_keys"].as_array().unwrap() {
         let key = case["key"].as_str().unwrap();
         assert_eq!(ItemKey::parse(key).is_ok(), case["valid"].as_bool().unwrap(), "{key}");
+    }
+    for case in vectors["text_hashes"].as_array().unwrap() {
+        assert_eq!(text_hash(case["text"].as_str().unwrap()), case["hash"].as_str().unwrap());
+    }
+    for case in vectors["edits"].as_array().unwrap() {
+        let parsed = serde_json::from_value::<Payload>(case["payload"].clone());
+        assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    for case in vectors["bodies"].as_array().unwrap() {
+        assert_eq!(serde_json::from_value::<BacklogBody>(case["body"].clone()).is_ok(), case["valid"].as_bool().unwrap(), "{}", case["name"]);
     }
 }

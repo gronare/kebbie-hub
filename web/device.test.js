@@ -102,7 +102,7 @@ test("an answer is signed by this device, sealed to the machine and the account,
   assert.deepEqual(swapped, [], "an entry whose kind the hub misreports is left out");
 });
 
-test("a review comment's words stay in this browser's store only until the machine answers or the command expires", async () => {
+test("a review comment's and a section edit's words stay in this browser's store only until the machine answers or the command expires", async () => {
   const store = memoryStore();
   const comments = [{ path: "src/orders.rs", line: 41, side: "old", sha: null, text: "Why the cast?" }];
   const entry = (id, fields) => ({ id, kind: "review-comments", machine: "mch_a", address: "payments@api", at: AT, exp: AT + 3600, comments, count: 1, result: null, ...fields });
@@ -114,4 +114,7 @@ test("a review comment's words stay in this browser's store only until the machi
   assert.deepEqual(kept.sent.map((one) => one.comments[0].text), ["Why the cast?", undefined, undefined]);
   assert.deepEqual(kept.sent[1].comments[0], { path: "src/orders.rs", line: 41, side: "old", sha: null }, "where the comment sat is kept");
   assert.equal(sending.comments[0].text, "Why the cast?", "the page in memory keeps the words");
+  const edit = { id: "cmd_4", kind: "item-edit", machine: "mch_a", address: "vault:Projects/session.md", section: "goal", text: "You stay signed in.", at: AT, exp: AT + 3600, result: { outcome: "done" } };
+  await keepSent(store, "acc_a", { cursor: 5, sent: [{ ...edit, result: null }, { ...edit, id: "cmd_5" }] }, AT);
+  assert.deepEqual((await loadSent(store, "acc_a", AT)).sent.map((one) => one.text), ["You stay signed in.", undefined], "a section's words go once the machine answered");
 });

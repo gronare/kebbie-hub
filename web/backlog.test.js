@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { backlogList, chooseMachine, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startsAnyway } from "./backlog.js";
+import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
+import { backlogList, chooseMachine, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startsAnyway } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -13,17 +14,22 @@ const row = (item, fields = {}) => ({ item, title: item, priority: "medium", rep
 const machine = (id, name, backlog, { lastSeen = NOW - 20, accepts = ALL, repos = ["kebbie"] } = {}) => ({ machine: id, name, lastSeen, storedAt: lastSeen, board: { accepts, backlog, checkouts: repos.map((repo) => ({ repo, free_worktrees: 1, busy_worktrees: 0 })), items: [] } });
 
 const session = row("vault:Projects/session.md", { title: "Session drops on reload", priority: "high", repo: "greenhouse", state: "drafting", questions: 3, blocking: 2, body: { id: "blb_1", key: "k", media_type: "application/vnd.kebbie.backlog-item+json", bytes: 900 } });
+const section = (key, heading, text, required = false) => ({ key, heading, text, required });
 const body = {
-  background: "Users are signed out on reload.",
-  goal: "You stay signed in.",
-  what_we_know: "- The cookie lasts ten minutes.",
+  sections: [
+    section("background", "Background", "Users are signed out on reload.", true),
+    section("goal", "Goal", "You stay signed in.", true),
+    section("what-we-know", "What we know", "- The cookie lasts ten minutes."),
+    section("questions", "Open questions", ""),
+    section("out-of-scope", "Out of scope", "The operator app."),
+    section("source", "Source", "From the board."),
+  ],
   questions: [
     { text: "Should a reload renew the session?", blocks: true, pending_answer: null },
     { text: "Does a password change sign out every device?", blocks: true, pending_answer: null },
     { text: "Is 14 days right?", blocks: false, pending_answer: null },
   ],
-  out_of_scope: "The operator app.",
-  source: "From the board.",
+  questions_key: "questions",
 };
 const opened = [
   machine("mch_mac", "MacBook", [session, row("local:faster", { title: "Faster board", goal: "The board shows the push within a second." }), row("local:logs", { title: "Archive logs", state: "to-write", filed: NOW - 7200 })], { repos: ["kebbie"] }),
@@ -113,7 +119,7 @@ test("behind the plan gate the backlog and its cards read, with Hub Pro lines wh
   assert.doesNotMatch(html, /data-action="pick-question"|data-action="start-item"/);
   assert.match(text(html), /Answering its questions from this device comes with Hub Pro\. Details/);
   assert.match(text(html), /Starting it from this device comes with Hub Pro\. Details$/);
-  assert.equal(listAction({ access: "ready", ideaMachines: [{}] }).includes('href="#/idea"'), true);
+  assert.match(listAction({ access: "ready", ideaMachines: [{}] }), /^<a class="fab" href="#\/idea" aria-label="New idea">/);
   assert.equal(listAction({ access: "ready", ideaMachines: [] }), "");
 });
 
@@ -153,4 +159,63 @@ test("a vault note's row shows the furthest state and the fewest blocking questi
   const said = text(itemBody(ready, { access: "ready", ui: ui(), candidates: ready.machines, chosen: ready.machines[0], now: NOW }));
   assert.match(said, /Goal The board shows the push within a second\. Save to backlog Start/);
   assert.doesNotMatch(said, /writes it out/);
+});
+
+test("the card shows whatever template the item uses, in its order, with the open questions under the section the template names", () => {
+  const shared = mergeBacklog(opened, NOW)[0];
+  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const other = { sections: [section("problem", "Problem", "Reloads sign you out.", true), section("risks", "Risks", "")], questions: body.questions, questions_key: null };
+  const said = text(itemBody(shared, { body: other, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW }));
+  assert.match(said, /Problem Reloads sign you out\. Risks Empty\. Open questions 2 wait on you before it starts/);
+  assert.doesNotMatch(said, /Background|Goal|Out of scope/);
+  const under = text(itemBody(shared, { body: { ...other, questions_key: "problem" }, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW }));
+  assert.match(under, /Problem Reloads sign you out\. 2 wait on you before it starts .* Risks Empty\./);
+});
+
+test("each section and the title get an Edit where a machine takes edits, and Save waits for a change a required section can hold", () => {
+  const shared = mergeBacklog(opened, NOW)[0];
+  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const card = (fields) => itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: () => null, ...fields } });
+  assert.equal((card({}).match(/data-action="item-edit"/g) ?? []).length, body.sections.length + 1);
+  assert.doesNotMatch(card({ machine: null }), /data-action="item-edit"/);
+  assert.doesNotMatch(itemBody(shared, { body, access: "view-only", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: () => null } }), /data-action="item-edit"/);
+  const editing = { section: "goal", text: "You stay signed in.", original: "You stay signed in.", required: true, busy: false, error: null };
+  const open = card({ editing });
+  assert.match(open, /<textarea id="edit-goal" data-draft="item-edit"[^>]*>You stay signed in\.<\/textarea>/);
+  assert.match(text(open), /Goal · markdown You stay signed in\. Goal can't be empty: the template requires it\. Cancel Save/);
+  assert.equal(editReady(editing, true), false, "nothing changed");
+  assert.equal(editReady({ ...editing, text: " " }, true), false, "a required section is never saved empty");
+  assert.equal(editReady({ ...editing, section: "source", text: "" }, false), true, "an optional section can be emptied");
+  assert.equal(editReady({ ...editing, section: null, text: "" }, false), false, "a title is never empty");
+  assert.match(card({ editing: { ...editing, section: null, text: "Session drops", original: "Session drops on reload" } }), /<input id="edit-title" data-draft="item-edit" maxlength="200"[^>]*value="Session drops">/);
+});
+
+test("a saved edit shows Saving with its text until the board carries it, and an edit made on an older text says the machine has a newer one", () => {
+  const shared = mergeBacklog(opened, NOW)[0];
+  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const edit = (shown) => (key) => (key === "goal" ? shown : null);
+  const card = (shown) => text(itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: edit(shown) } }));
+  const sent = sentAt({ kind: "item-edit", section: "goal", text: "You stay signed in across a reload." });
+  assert.match(card({ sent, state: "sending", standing: null, live: true, saving: true, recent: true }), /Goal You stay signed in across a reload\. Saving… What we know/);
+  const refused = { ...sent, result: { outcome: "refused", reason: "section-changed", text: "Not saved: it changed on the machine since you opened it.", at: NOW } };
+  assert.match(card({ sent: refused, state: "refused", standing: null, live: false, saving: false, recent: true }), /Goal Edit You stay signed in\. work-mac has a newer version of this section; reload and edit again from iPhone 16/);
+  assert.match(card({ sent: refused, state: "refused", standing: null, live: false, saving: false, recent: false }), /Goal Edit You stay signed in\. What we know/, "a refusal from an earlier visit is not shown again");
+  const title = (shown) => text(itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: (key) => (key === null ? shown : null) } }));
+  assert.match(title({ sent: { ...sent, section: null, text: "Session survives a reload" }, state: "sending", standing: null, live: true, saving: true, recent: true }), /title: Session survives a reload Saving…/);
+});
+
+test("an edit loses control characters the machine refuses, says what is too long before anything is sealed, and a kept edit without its words still shows Saving", () => {
+  assert.equal(cleanEdit({ section: "goal", text: "Stay\u001b[2J signed in\n\tacross a reload" }), "Stay[2J signed in\n\tacross a reload");
+  assert.equal(cleanEdit({ section: null, text: "Session\tdrops" }), "Sessiondrops");
+  const payload = (section, text) => ({ item: "vault:Projects/session.md", section, text, base: "0".repeat(64) });
+  assert.equal(editProblem(payload("goal", "x".repeat(MAX_SECTION_CHARS))), null);
+  assert.equal(editProblem(payload("goal", "x".repeat(MAX_SECTION_CHARS + 1))), "This section is 8,001 characters; a section holds at most 8,000.");
+  assert.equal(editProblem(payload(null, "x".repeat(MAX_ITEM_TITLE_CHARS + 1))), "This title is 201 characters; a title holds at most 200.");
+  assert.equal(editProblem(payload("goal", "😀".repeat(MAX_SECTION_CHARS))), "This section comes to 32 kB, and an edit holds at most 24 kB. Shorten it before saving.");
+  const shared = mergeBacklog(opened, NOW)[0];
+  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const { text: _, ...kept } = sentAt({ kind: "item-edit", section: "goal", result: { outcome: "done", at: NOW } });
+  const card = (key) => text(itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: (one) => (one === key ? { sent: kept, state: "done", standing: null, live: true, saving: true, recent: true } : null) } }));
+  assert.match(card("goal"), /Goal Saving…/);
+  assert.match(card(null), /Saving…/);
 });

@@ -1662,7 +1662,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -1712,7 +1713,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -1764,7 +1766,107 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "qbDE4z4jN4QX9dke3YGF1tvx8RreERq-JsT9N_xmGSKmgfQTcgvqNrcVyloJtSXrS2axW2jhmQk_PRk--0HhVJadk6C1bGt8ZSoIktjCgS-ZTP8p89R_P_Rl2RZKwv5Gb3UWKdOCjrAJyvRkFbFQ70Rwd7LKopwB8eqxSZANy5fLXA1uEqqwmQBByGhYL43Ei7zRuzxU-VJuRu-PZs-mDEDE8qzCpWP2xRTy2ezAppqJpki4xqF6mfEdEAeuAi3u1DH3TFB_DC0TyZD3tuAmJhp3bUUFDvG10QnBfOnacWLQZVcW345mLWBWhDKVTMncSMTcOcoVRJ8kgCupHJ2ZbQ9G8OoLGEGuQbaBbc5obgsMfRDW1Xc1byvgFVHJ6ZJ5UEeipaquaw0Wm6iuQP9cRw",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7eb0-82d2-3cc777e6b713",
+        "kc": "-id3IZDcMwC6QAUxstIM2o59eylWWPDyNFbTznbqujA",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "nbRSzwfkU9mojv8RKjqloBM_n4y8se9cnT-xDorVYXY80aLJutgNosjQKwgLjmO_dZ74DxVGe4pTX8edNUMFN0lQQc-W2Bl_fb9pyQDXpEw",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "G8bFv2EB5K-01O-_Y8pj6YOt54P1wc_O3DFcraw8MXW_obAN9O4cK2dB4kVYe3ZZcxE-g3T5L-GTHlzXZSf9HWoYNzPee0yJAo6GNKTV1Y8"
+        },
+        "kind": "item-edit",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "RklaPjWK1b5icVLSM0VN1HgGyROeavIzNHt7XIE0YyCG7khlE0JS6BduNI1l9Ro7yCCm2u2zkJGOUJ9uEPrTCQ",
+        "v": 1
+      },
+      "expect": {
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "payload": {
+          "base": "a001b08e5733d73d0b0ace94e7fa7797d8c38dccd6ab483d0ea212a8b0ed8a88",
+          "item": "vault:Projects/refund-rounding.md",
+          "section": "goal",
+          "text": "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds round per line, as today.",
+          "type": "item-edit"
+        }
+      },
+      "name": "device-edits-an-items-section",
+      "trust": "account"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "prompt-answer",
+        "idea",
+        "item-answer",
+        "start-item",
+        "item-edit"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "JXa6XYjloJJFLtMHxwX812xpmaspCMcYSRQEoyc1xC-evfUDTttT9FdM5vcvG45b0a1x8nBcmMpCvfhgBSmS4pVvq4JfADXjmTLGK3uCZNi1qJrCG7a1FgDsClEvF4CFYTOmDOx4LLtbjyx_z7YUJvpqxq8IjxOkPS958A2zCYf3_ke0FQNEZpwLDavwT19Tt4JsEYQcp97ZzVwgxkMtOwojecAbS9OSf_TaS2TawO8T2IlZpF8uquezUEyXCXlxE7gPNL-yZxYQ2c7n0z8h7sttTg6gZgJpgTE",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7958-9f6f-5ce7bfeb7ed7",
+        "kc": "1mPzadrCDQXnVenhBxqzpXpTX3fqc3G9SggIiSK5A5E",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "XVoFBC9nNDu96NYZkHKIMJpTAy2hneyQ0dGumVZ_3WJrgfF-Y2thvmgN8z_5XYlhfKuZnQ8N2QFn7ZkQ4H0i67eAQXVd-B_blRUfseNa1ZI",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "tNs5xIPUBmDuTnBJKbnWnOITcCUxWkEHEF16gd0Gb2H9n15Va4eJ8itiUWOz2vuo0XU5nyX9HkmVMQ3eMfyOLLahP2P0ibhSq9v1uBSXrX4"
+        },
+        "kind": "item-edit",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "tqG_1SH92pF1lJajGvshU6lA3FgqzT7l_OxcmjaC9kiuRIVTYKUiWP6KAcx9n7eBrgKILUEzhmHr0uJTKpsjAA",
+        "v": 1
+      },
+      "expect": {
+        "answer": "bad-request"
+      },
+      "name": "title-edit-over-two-lines-is-refused",
+      "trust": "account"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "prompt-answer",
+        "idea",
+        "item-answer",
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -1814,7 +1916,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -1908,7 +2011,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -1953,7 +2057,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -1998,7 +2103,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}
@@ -2043,7 +2149,8 @@
         "prompt-answer",
         "idea",
         "item-answer",
-        "start-item"
+        "start-item",
+        "item-edit"
       ],
       "applied": {
         "applied": {}

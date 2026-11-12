@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, checkReview, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, checkReview, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -557,7 +557,7 @@ test("a board lists its backlog by item key, each row naming its home and a safe
   const full = envelopes.cases.find((vector) => vector.name === "board-with-backlog-opened-by-the-account").expect.payload;
   checkPayload(full);
   assert.deepEqual(full.backlog.map((row) => [row.item, row.home.kind, row.state]), [["vault:Projects/refund-rounding.md", "vault", "ready"], ["local:01JB7Q2M3N8K", "local", "drafting"], ["kept:idea-4411", "kept", "to-write"]]);
-  assert.deepEqual(full.accepts.slice(-3), ["idea", "item-answer", "start-item"]);
+  assert.deepEqual(full.accepts.slice(-4), ["idea", "item-answer", "start-item", "item-edit"]);
   const plain = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
   assert.equal(Object.hasOwn(plain, "backlog"), false);
   const wrong = [
@@ -588,8 +588,11 @@ test("a backlog item's body opens from its blob as sections and questions, and i
   assert.deepEqual(body, backlog.body);
   checkBacklogBody(body);
   assert.deepEqual(body.questions.map((question) => [question.blocks, question.pending_answer]), [[true, null], [true, "No, only new ones."], [false, null]]);
-  for (const wrong of [{ ...body, what_we_know: undefined }, { ...body, notes: "" }, { ...body, questions: [{ text: "Which?", blocks: "yes", pending_answer: null }] }]) {
-    assert.throws(() => checkBacklogBody(wrong), (error) => error.code === "malformed");
+  assert.deepEqual(body.sections.map((section) => [section.key, section.required]), [["background", true], ["goal", true], ["what-we-know", false], ["questions", false], ["out-of-scope", false], ["source", false]]);
+  assert.equal(body.questions_key, "questions");
+  for (const { name, body: candidate, valid } of backlog.bodies) {
+    if (valid) checkBacklogBody(candidate);
+    else assert.throws(() => checkBacklogBody(candidate), (error) => error.code === "malformed", name);
   }
   for (const { key, valid } of backlog.item_keys) assert.equal(isItemKey(key), valid, key);
 });
@@ -619,6 +622,27 @@ test("ideas and answers on an item live an hour and a start from an item a day, 
     { type: "start-item", item: "vault:Projects/x.md", anyway: "yes" },
   ];
   for (const payload of wrong) assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", JSON.stringify(payload));
+});
+
+test("an item edit replaces a section or the title from the hash of the text it edited, lives an hour, and passes or fails as Rust's validation says", async () => {
+  const backlog = load("backlog.json");
+  assert.deepEqual([backlog.max_item_title_chars, backlog.max_section_chars, backlog.max_item_edit_bytes, backlog.max_heading_chars], [MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS]);
+  for (const { text, hash } of backlog.text_hashes) assert.equal(await textHash(text), hash, text);
+  for (const { name, payload, valid } of backlog.edits) {
+    if (valid) checkPayload(payload);
+    else assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", name);
+  }
+  assert.deepEqual([KINDS["item-edit"].command, KINDS["item-edit"].ttl, KINDS["item-edit"].maxTtl, envelopes.max_ttl["item-edit"]], [true, 3600, 3600, 3600]);
+  const device = await certifiedPhone();
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  for (const name of ["item-edit-opened-by-the-machine", "title-edit-opened-by-the-machine"]) {
+    const vector = envelopes.cases.find((candidate) => candidate.name === name);
+    const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
+    assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
+  }
+  const refused = envelopes.cases.find((vector) => vector.name === "edit-refused-for-a-newer-section-opened-by-the-account").expect.payload;
+  assert.equal(refused.reason, "section-changed");
+  checkPayload(refused);
 });
 
 test("a start refused for open questions says how many wait, and no other result carries a count", () => {

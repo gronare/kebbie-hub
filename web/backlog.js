@@ -1,3 +1,4 @@
+import { MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
 import { failedLine, loadingLine } from "./blobs.js";
 import { isAsleep } from "./board.js";
 import { APPROVAL_STATES, approvalStatus, block, clock, from, hours, refusal, settled, takes, viewOnlyBlock } from "./decide.js";
@@ -88,7 +89,7 @@ export function listAction({ access, refusedUrl, ideaMachines, composing }) {
   if (access === "refused") return `<div class="thumb-end">${proLine("Adding ideas and starting them from this device come with Hub Pro.", refusedUrl)}</div>`;
   if (access === "view-only") return `<div class="thumb-end">${viewOnlyBlock()}</div>`;
   if (ideaMachines.length === 0) return "";
-  return `<div class="thumb"><a class="btn primary" href="#/idea">New idea</a></div>`;
+  return `<a class="fab" href="#/idea" aria-label="New idea"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>`;
 }
 
 export function backlogList({ entries, selected = null, now, top, action = "" }) {
@@ -122,7 +123,7 @@ export function ideaForm({ text = "", candidates, chosen, choosing = false, busy
   if (!chosen) return field + `<div class="pro">No machine takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
   const ready = text.trim() !== "" && !busy;
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
-  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing }) + failed + `<div class="thumb"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
+  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
@@ -143,15 +144,84 @@ function stateText(row, { left, withLead }) {
   return `drafting: ${lead || "the lead writes it out"}`;
 }
 
-export function itemFacts(entry, counts, now) {
+export function itemFacts(entry, counts, now, title = "") {
   const { row } = entry;
   const names = entry.machines.map((one) => one.name);
   const seen = names.length > 1 ? `seen on ${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : `on ${names[0]}`;
   const rows = [["priority", esc(row.priority)], ["repo", esc(row.repo ?? "none")], ["state", stateText(row, counts)], ["filed", esc(dayOf(row.filed, now))], [HOME_TERMS[row.home.kind], `${esc(row.home.label)}<span class="meta"> · ${esc(seen)}</span>`]];
-  return `<section class="task"><dl class="facts">${rows.map(([label, value]) => `<dt>${label}</dt><dd>${value}</dd>`).join("")}</dl></section>`;
+  return `<section class="task"><dl class="facts">${rows.map(([label, value]) => `<dt>${label}</dt><dd>${value}</dd>`).join("")}</dl>${title}</section>`;
 }
 
 const section = (title, text) => `<h3 class="sec">${esc(title)}</h3><div class="md" data-markdown>${esc(text)}</div>`;
+
+export function editStatus(sent, state, { standing = null, now }) {
+  const machine = esc(sent.machineName);
+  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing, now, what: { goes: "Your edit is saved", again: "edit again" } });
+  if (state === "refused" && sent.result?.reason === "section-changed") return block("refused", `${machine} has a newer version of this section; reload and edit again`, "", from(sent));
+  if (state === "refused") return block("refused", ...refusal("Not saved", sent.result?.text), from(sent));
+  if (state === "expired") return block("refused", `Not saved: ${machine} stayed asleep past the hour`, `Edit again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `Your edit is saved when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+  return "";
+}
+
+const saving = `<div class="meta saving" role="status"><span class="spinner"></span>Saving…</div>`;
+
+export const cleanEdit = (editing) => (editing.section === null ? editing.text.replace(/\p{Cc}/gu, "") : editing.text.replace(/[^\P{Cc}\n\t]/gu, ""));
+const thousands = (count) => count.toLocaleString("en-US");
+
+export function editProblem(payload) {
+  const length = [...payload.text].length;
+  const what = payload.section === null ? "title" : "section";
+  const limit = payload.section === null ? MAX_ITEM_TITLE_CHARS : MAX_SECTION_CHARS;
+  if (length > limit) return `This ${what} is ${thousands(length)} characters; a ${what} holds at most ${thousands(limit)}.`;
+  const bytes = new TextEncoder().encode(JSON.stringify({ item: payload.item, section: payload.section ?? null, text: payload.text, base: payload.base })).length;
+  if (bytes > MAX_ITEM_EDIT_BYTES) return `This ${what} comes to ${Math.ceil(bytes / 1024)} kB, and an edit holds at most ${MAX_ITEM_EDIT_BYTES / 1024} kB. Shorten it before saving.`;
+  return null;
+}
+
+export function editReady(editing, required) {
+  if (!editing || editing.busy || editing.text === editing.original) return false;
+  if (editing.section === null || required) return editing.text.trim() !== "";
+  return true;
+}
+
+function editor(editing, { heading, required }) {
+  const key = editing.section ?? "";
+  const ready = editReady(editing, required);
+  const field = editing.section === null
+    ? `<input id="edit-title" data-draft="item-edit" maxlength="200" enterkeyhint="done" value="${esc(editing.text)}">`
+    : `<textarea id="edit-${esc(key)}" data-draft="item-edit" rows="8" maxlength="8000">${esc(editing.text)}</textarea>`;
+  const hint = required ? `${esc(heading)} can't be empty: the template requires it.` : "Markdown.";
+  const failed = editing.error ? `<div class="center warn" role="alert">${esc(editing.error)}</div>` : "";
+  return `<div class="sec-edit"><div class="note-field"><label for="edit-${esc(key) || "title"}">${editing.section === null ? "Title" : `${esc(heading)} · markdown`}</label>${field}</div><div class="meta">${hint}</div>${failed}<div class="row2"><button type="button" class="btn" data-action="item-edit-cancel" data-section="${esc(key)}">Cancel</button><button type="button" class="btn primary" data-action="item-edit-save" data-section="${esc(key)}"${ready ? "" : " disabled"}>Save</button></div></div>`;
+}
+
+const editButton = (key, label) => `<button type="button" class="sub-btn sec-tap" data-action="item-edit" data-section="${esc(key)}">${label}</button>`;
+
+function titleArea(entry, edit) {
+  if (!edit.can && !edit.sentFor(null)) return "";
+  const editing = edit.ui?.section === null ? edit.ui : null;
+  if (editing) return `<div class="title-edit" data-item="${esc(entry.id)}">${editor(editing, { heading: "Title", required: true })}</div>`;
+  const sent = edit.sentFor(null);
+  if (sent?.saving) return `<div class="title-edit" data-item="${esc(entry.id)}">${sent.sent.text ? `<div class="meta">title: ${esc(sent.sent.text)}</div>` : ""}${saving}</div>`;
+  const status = sent?.recent ? editStatus(sent.sent, sent.state, { standing: sent.standing, now: edit.now }) : "";
+  return `<div class="title-edit" data-item="${esc(entry.id)}">${status}${edit.can ? editButton("", "Edit title") : ""}</div>`;
+}
+
+function sectionBlock(entry, part, edit, after = "") {
+  const editing = edit.ui?.section === part.key ? edit.ui : null;
+  const sent = edit.sentFor(part.key);
+  const button = edit.can && !editing && !sent?.saving ? editButton(part.key, "Edit") : "";
+  const head = `<div class="sec-head"><h3 class="sec">${esc(part.heading)}</h3>${button}</div>`;
+  let shown;
+  if (editing) shown = editor(editing, part);
+  else if (sent?.saving) shown = (sent.sent.text?.trim() ? `<div class="md" data-markdown>${esc(sent.sent.text)}</div>` : "") + saving;
+  else {
+    const status = sent?.recent ? editStatus(sent.sent, sent.state, { standing: sent.standing, now: edit.now }) : "";
+    shown = (part.text.trim() ? `<div class="md" data-markdown>${esc(part.text)}</div>` : after ? "" : `<div class="meta">Empty.</div>`) + status;
+  }
+  return `<section class="sec-block" data-item="${esc(entry.id)}" data-section="${esc(part.key)}">${head}${shown}</section>${after}`;
+}
 
 export function answerStatus(sent, state, { standing = null, now }) {
   const machine = esc(sent.machineName);
@@ -191,14 +261,14 @@ function answerRow(index, ui) {
   return `<div class="answer-row"><div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" rows="2" maxlength="2000">${esc(ui.text)}</textarea></div><button type="button" class="btn primary" data-action="send-item-answer"${ready ? "" : " disabled"}>Send to the lead</button></div>${failed}`;
 }
 
-function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts }) {
+function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, heading = `<h3 class="sec">Open questions</h3>` }) {
   const questions = body.questions;
   const head = counts.left > 0 ? `${counts.left === 1 ? "1 waits" : `${counts.left} wait`} on you before it starts` : "none blocks the start";
   const pickable = access === "ready" && takesAnswers;
   const cards = questions.map((question, index) => questionCard(question, index, { pickable, picked: ui.picked === index, ui, sent: sentFor(index), now })).join("");
   const gate = access === "refused" ? proLine("Answering its questions from this device comes with Hub Pro.", refusedUrl) : access === "view-only" && questions.length ? viewOnlyBlock() : "";
-  if (questions.length === 0) return `<h3 class="sec">Open questions</h3><div class="meta pad">None.</div>`;
-  return `<h3 class="sec">Open questions</h3><div class="meta pad">${head}</div><div class="options qlist">${cards}</div>${gate}`;
+  if (questions.length === 0) return `${heading}<div class="meta pad">None open.</div>`;
+  return `${heading}<div class="meta pad">${head}</div><div class="options qlist">${cards}</div>${gate}`;
 }
 
 export function startStatus(sent, state, { title, standing = null, now, taskHref = "#/board" }) {
@@ -234,11 +304,12 @@ function ideaCard(entry, now) {
   return `<section class="task"><dl class="facts"><dt>state</dt><dd>${esc(shown)}</dd><dt>filed</dt><dd>${esc(dayOf(sent.at, now))}, from ${esc(sent.deviceName ?? "this device")}</dd></dl></section><div class="md"><p>${esc(said)}</p></div>${status}`;
 }
 
-export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board" }) {
+export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null }) {
   if (entry.idea) return ideaCard(entry, now);
   if (entry.gone) return `<div class="decide start-area">${start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : ""}</div><div class="meta pad">It left the backlog when it started.</div>`;
   const counts = body ? questionsLeft(body, sentFor) : { left: entry.row.blocking, withLead: 0 };
-  const facts = itemFacts(entry, counts, now);
+  const edit = { can: access === "ready" && Boolean(edits?.machine), ui: edits?.editing ?? null, sentFor: edits?.sentFor ?? (() => null), now };
+  const facts = itemFacts(entry, counts, now, entry.key ? titleArea(entry, edit) : "");
   const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref })}</div>`;
   if (!entry.row.body && entry.row.state === "ready") return facts + (entry.row.goal ? section("Goal", entry.row.goal) : "") + area;
   if (!entry.row.body) {
@@ -247,7 +318,10 @@ export function itemBody(entry, { body = null, bodyState = null, access = "off",
   }
   if (!body) return facts + `<div class="plan"><div>${esc(bodyState === "failed" ? failedLine("item") : loadingLine("item", entry.row.body))}</div></div>` + area;
   const takesAnswers = Boolean(chosen && takes(chosen.accepts, "item-answer")) || entry.machines.some((one) => takes(one.accepts, "item-answer"));
-  return facts + section("Background", body.background) + section("Goal", body.goal) + section("What we know", body.what_we_know) + `<div class="decide" data-item="${esc(entry.id)}">${questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts })}</div>` + section("Out of scope", body.out_of_scope) + section("Source", body.source) + area;
+  const questions = (heading) => `<div class="decide" data-item="${esc(entry.id)}">${questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, heading })}</div>`;
+  const parts = body.sections.map((part) => (part.key === body.questions_key ? sectionBlock(entry, part, edit, questions("")) : sectionBlock(entry, part, edit))).join("");
+  const trailing = body.questions_key || body.questions.length === 0 ? "" : questions(undefined);
+  return facts + parts + trailing + area;
 }
 
 export function startedEntry(id, sent) {

@@ -31,7 +31,10 @@ export async function loadSent(store, account, now) {
   }
 }
 
-const WORDED = { "review-comments": (sent) => ({ ...sent, comments: (sent.comments ?? []).map(({ text, ...where }) => where) }) };
+const WORDED = {
+  "review-comments": (sent) => ({ ...sent, comments: (sent.comments ?? []).map(({ text, ...where }) => where) }),
+  "item-edit": ({ text, ...sent }) => sent,
+};
 export const storedSent = (sent, now) => (WORDED[sent.kind] && (sent.result || sent.exp <= now) ? WORDED[sent.kind](sent) : sent);
 export const keepSent = (store, account, kept, now = Math.floor(Date.now() / 1000)) => store.put(sentKey(account), { ...kept, sent: kept.sent.map((sent) => storedSent(sent, now)) }).catch(() => undefined);
 

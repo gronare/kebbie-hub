@@ -632,3 +632,28 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 :root:is(.pose-split, .pose-land) .rv-band { left: 50%; background: var(--card); }
 .pose-land.rail-right .rv-band { right: var(--rail); }
 .pose-desk .rv-band { left: auto; right: 0; bottom: 0; width: clamp(300px, 22vw, 380px); height: calc(var(--tabbar) + env(safe-area-inset-bottom) + 68px); background: var(--card); }
+
+.fab, .idea-add { position: fixed; z-index: 3; right: calc(env(safe-area-inset-right) + 16px); bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px); }
+:root:is(.pose-stack, .pose-split, .pose-land) :is(.fab, .idea-add) { bottom: var(--content-bottom); }
+.pose-land.rail-right :is(.fab, .idea-add) { right: calc(var(--rail) + 16px); }
+:is(.pose-split, .pose-land) .app.with-panel .fab { right: calc(50% + 16px); }
+.pose-desk :is(.fab, .idea-add) { bottom: 24px; }
+.pose-desk .app.with-panel .fab { right: calc(clamp(300px, 22vw, 380px) + 24px); }
+.fab { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); color: var(--ink); }
+.fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.idea-add .btn { width: auto; min-height: 44px; padding: 0 20px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); }
+:root.has-fab main.screen.in-app { padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 80px); }
+:root.has-fab:is(.pose-stack, .pose-split, .pose-land) main.screen.in-app, :root.has-fab:is(.pose-split, .pose-land, .pose-desk) .panel { padding-bottom: calc(var(--content-bottom) + 68px); }
+
+.sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); margin: 6px 0 0; }
+.sec-head .sec { flex: 1; border-bottom: 0; margin: 0; }
+.sec-block { display: grid; gap: 8px; }
+.sec-block > .decide { margin: 0; }
+.sec-tap { position: relative; padding: 2px 0; font-size: 13.5px; }
+.sec-tap::after { content: ""; position: absolute; inset: -12px -10px; }
+.sec-edit { display: grid; gap: 8px; }
+.sec-edit textarea { min-height: 160px; }
+.sec-edit .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.title-edit { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 6px; }
+.title-edit .sub-btn { padding: 2px 0; }
+.saving { display: flex; align-items: center; gap: 8px; }

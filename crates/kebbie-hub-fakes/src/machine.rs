@@ -11,8 +11,8 @@ use kebbie_hub_api::{
 };
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
-    Idea, ItemAnswer, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
-    DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob,
+    Idea, ItemAnswer, ItemEdit, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
+    DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
     ReviewOffer, ReviewRead, Side, StepState,
 };
@@ -32,6 +32,7 @@ pub fn every_command() -> Vec<Kind> {
         Kind::Idea,
         Kind::ItemAnswer,
         Kind::StartItem,
+        Kind::ItemEdit,
         Kind::ReviewOpen,
         Kind::ReviewComments,
         Kind::ReviewRead,
@@ -759,6 +760,30 @@ impl MachineState {
         Ok("The lead has your answer.".to_string())
     }
 
+    fn edit_item(&mut self, edit: &ItemEdit) -> Result<String, Reason> {
+        let row = self.backlog.rows.iter_mut().find(|row| row.item == edit.item).ok_or(Reason::UnknownItem)?;
+        let Some(key) = &edit.section else {
+            if text_hash(&row.title) != edit.base {
+                return Err(Reason::SectionChanged);
+            }
+            row.title = edit.text.clone();
+            self.backlog_changed = true;
+            return Ok("Saved the title.".to_string());
+        };
+        let body = self.backlog.bodies.get_mut(&edit.item).ok_or(Reason::UnknownItem)?;
+        let section = body.sections.iter_mut().find(|section| &section.key == key).ok_or(Reason::SectionChanged)?;
+        if text_hash(&section.text) != edit.base {
+            return Err(Reason::SectionChanged);
+        }
+        if section.required && edit.text.trim().is_empty() {
+            return Err(Reason::BadRequest);
+        }
+        section.text = edit.text.clone();
+        let heading = section.heading.clone();
+        self.backlog_changed = true;
+        Ok(format!("Saved {heading}."))
+    }
+
     fn start_item(&mut self, start: &StartItem) -> Result<String, Reason> {
         if self.started.contains_key(&start.item) {
             return Err(Reason::AlreadyStarted);
@@ -947,6 +972,10 @@ impl MachineState {
                 format!("start {}{}", start.item, if start.anyway { " anyway" } else { "" }),
                 self.start_item(start).map_or_else(|reason| refusal(command, device, reason), done),
             ),
+            Payload::ItemEdit(edit) => (
+                format!("edit {} {}:\n{}", edit.item, edit.section.as_deref().unwrap_or("title"), edit.text),
+                self.edit_item(edit).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
             Payload::DeviceDecision(decision) => (
                 format!("{} {}", if decision.approve { "approve" } else { "deny" }, decision.device),
                 self.decide(decision).map_or_else(|reason| refusal(command, device, reason), done),
@@ -1076,6 +1105,7 @@ fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
         Reason::AlreadyStarted => "Not started: it was started already.".to_string(),
         Reason::UnknownItem => "It is no longer in the backlog.".to_string(),
         Reason::QuestionChanged => "Not answered: the question changed since you saw it.".to_string(),
+        Reason::SectionChanged => "Not saved: it changed on the machine since you opened it.".to_string(),
         Reason::UnknownDevice => "No such device waits for approval here.".to_string(),
         Reason::AlreadySettled => "Already settled.".to_string(),
         Reason::HeadMoved => "It changed since you saw it.".to_string(),

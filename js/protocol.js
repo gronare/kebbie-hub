@@ -35,6 +35,10 @@ export const START_ITEM_TTL = DAY;
 export const MAX_IDEA_CHARS = 2000;
 export const MAX_ITEM_ANSWER_CHARS = 2000;
 export const MAX_QUESTION_CHARS = 4000;
+export const MAX_ITEM_TITLE_CHARS = 200;
+export const MAX_SECTION_CHARS = 8000;
+export const MAX_ITEM_EDIT_BYTES = 24 * 1024;
+export const MAX_HEADING_CHARS = 120;
 export const MAX_NOTICE_TITLE_CHARS = 120;
 export const MAX_NOTICE_BODY_CHARS = 600;
 export const MAX_NOTICE_BYTES = 2048;
@@ -61,6 +65,7 @@ export const KINDS = {
   idea: { ...command, maxTtl: COMMAND_TTL },
   "item-answer": { ...command, maxTtl: COMMAND_TTL },
   "start-item": { ...command, ttl: START_ITEM_TTL },
+  "item-edit": { ...command, maxTtl: COMMAND_TTL },
   "device-decision": { ...command, maxTtl: COMMAND_TTL },
   "review-open": { ...command, maxTtl: COMMAND_TTL },
   "review-comments": { ...command, maxTtl: COMMAND_TTL },
@@ -264,14 +269,12 @@ const backlogRow = (row) =>
   homeOf(row.item) === row.home.kind &&
   row.blocking <= row.questions;
 const backlog = (rows) => list(backlogRow)(rows) && new Set(rows.map((row) => row.item)).size === rows.length;
-const backlogBody = shape({
-  background: string,
-  goal: string,
-  what_we_know: string,
-  questions: list(shape({ text: string, blocks: bool, pending_answer: optionalField(string) })),
-  out_of_scope: string,
-  source: string,
-});
+export const isSectionKey = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(value);
+const bodySection = shape({ key: isSectionKey, heading: (value) => isLine(MAX_HEADING_CHARS)(value), text: string, required: bool });
+const backlogBody = (body) =>
+  shape({ sections: list(bodySection), questions: list(shape({ text: string, blocks: bool, pending_answer: optionalField(string) })), questions_key: optionalField(isSectionKey) })(body) &&
+  new Set(body.sections.map((section) => section.key)).size === body.sections.length &&
+  (absent(body.questions_key) || body.sections.some((section) => section.key === body.questions_key));
 
 export function checkBacklogBody(body) {
   if (!backlogBody(body)) throw new ProtocolError("malformed");
@@ -322,6 +325,15 @@ const reviewComments = (value) =>
   typed({ address: isAddress, step: optionalField(stepNumber), comments: (comments) => Array.isArray(comments) && comments.length >= 1 && comments.length <= MAX_REVIEW_COMMENTS && comments.every(reviewComment) })(value) &&
   text.encode(JSON.stringify({ ...value, type: undefined })).length <= MAX_REVIEW_COMMENTS_BYTES;
 
+const isTextHash = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+export async function textHash(value) {
+  return new Uint8Array(await subtle.digest("SHA-256", text.encode(value))).toHex();
+}
+const itemEdit = (value) =>
+  typed({ item: isItemKey, section: optionalField(isSectionKey), text: string, base: isTextHash })(value) &&
+  (absent(value.section) ? isLine(MAX_ITEM_TITLE_CHARS)(value.text) : [...value.text].length <= MAX_SECTION_CHARS && !/[^\P{Cc}\n\t]/u.test(value.text)) &&
+  text.encode(JSON.stringify({ item: value.item, section: value.section ?? null, text: value.text, base: value.base })).length <= MAX_ITEM_EDIT_BYTES;
+
 const nextRow = shape({ part: oneOf("stopped", "push", "read"), address: string, rank: u32v, line: string, since: optionalField(u64v), waits_behind: u32v });
 const later = shape({ address: string, title: optionalField(string), state: oneOf("queued", "parked"), line: string, until: optionalField(u64v), question: bool });
 const STANDINGS = {
@@ -331,7 +343,7 @@ const STANDINGS = {
 };
 const standing = (value) => isPlainObject(value) && string(value.state) && Object.hasOwn(STANDINGS, value.state) && STANDINGS[value.state](value);
 const devices = (value) => isPlainObject(value) && Object.entries(value).every(([key, entry]) => prefixOf(key) === "dev" && standing(entry));
-const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started", "unknown-device"];
+const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started", "unknown-device", "section-changed"];
 const isAddress = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}@[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
 const isLine = (max) => (value) => isText(max)(value) && !/\p{Cc}/u.test(value);
 const TARGETS = {
@@ -379,6 +391,7 @@ const PAYLOADS = {
   idea: typed({ text: isText(MAX_IDEA_CHARS), repo: optionalField(string) }),
   "item-answer": typed({ item: isItemKey, index: u32v, question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) }),
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
+  "item-edit": itemEdit,
   "device-decision": typed({ device: (value) => prefixOf(value) === "dev", fingerprint: (value) => typeof value === "string" && FINGERPRINT.test(value), approve: bool }),
   "review-open": typed({ address: isAddress }),
   "review-comments": reviewComments,

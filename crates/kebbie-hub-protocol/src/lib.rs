@@ -25,8 +25,8 @@ pub use account::{
 pub use alert::{Alert, AlertKind, AlertState};
 pub use authorize::{Applied, AppliedCommands, Verified, Dropped, Machine, Refusal, authorize};
 pub use backlog::{
-    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Home, HomeKind, ItemKey, MAX_LABEL_BYTES,
-    OpenQuestion, Priority, is_relative_label,
+    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, BodySection, Home, HomeKind, ItemKey, MAX_HEADING_CHARS,
+    MAX_LABEL_BYTES, MAX_SECTION_KEY_CHARS, OpenQuestion, Priority, is_relative_label, is_section_key, is_text_hash, text_hash,
 };
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
@@ -47,7 +47,8 @@ pub use device::{
 pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
-    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,
     MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
     MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
     StartTask, Target,
