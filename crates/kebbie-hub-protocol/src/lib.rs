@@ -10,6 +10,7 @@ mod device;
 mod envelope;
 mod ids;
 mod message;
+mod review;
 #[cfg(any(test, feature = "test-vectors"))]
 pub mod vectors;
 
@@ -50,6 +51,11 @@ pub use message::{
     MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
     MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
     StartTask, Target,
+};
+pub use review::{
+    AcceptStep, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
+    MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
+    ReviewOpen, ReviewRead, ReviewStep, Side, is_content_hash,
 };
 
 pub const PROTOCOL_VERSION: u16 = 1;

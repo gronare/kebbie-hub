@@ -45,6 +45,16 @@ pub async fn put_blob(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn delete_blob(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let id = blob_id(&id).ok_or(ApiError::bad_request("bad-id"))?;
+    hub.store().delete_blob(&machine, &id)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub async fn blob(
     State(hub): State<Arc<Hub>>,
     KeyAccount(account): KeyAccount,

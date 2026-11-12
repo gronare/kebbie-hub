@@ -551,3 +551,13 @@ test("a device's history names a decision by the device it was about", () => {
   assert.deepEqual(historyEntry(entry({ outcome: "refused", reason: "not-allowed", text: "" }), AT_TWO_PM), { icon: "✗", what: "Decision on iPad refused", said: "MacBook takes approvals only at the machine", at: AT_TWO_PM });
   assert.equal(historyEntry(entry(null), AT_TWO_PM).what, "Decision on iPad waiting");
 });
+
+test("the device's history names review comments by count and an accept by its step", () => {
+  const done = { outcome: "done", reason: null, text: "" };
+  const entry = (payload) => historyEntry({ payload, machineName: "MacBook", at: 1_761_070_000, exp: 1_761_073_600, result: done }, 1_761_070_000).what;
+  const comment = { path: "src/a.rs", line: 1, side: "new", text: "x" };
+  assert.equal(entry({ type: "review-comments", address: "retry-push@kebbie", step: 1, comments: [comment, comment, comment] }), "Sent 3 review comments on retry-push@kebbie");
+  assert.equal(entry({ type: "accept-step", address: "retry-push@kebbie", step: 1, sha: "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e" }), "Accepted step 1 of retry-push@kebbie");
+  assert.equal(entry({ type: "review-read", address: "retry-push@kebbie", path: "src/ci.rs", read: true, content: "a".repeat(40) }), "Marked src/ci.rs read on retry-push@kebbie");
+  assert.equal(entry({ type: "review-open", address: "retry-push@kebbie" }), "Opened the review of retry-push@kebbie");
+});

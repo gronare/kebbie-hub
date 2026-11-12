@@ -1562,6 +1562,391 @@
     {
       "envelope": {
         "at": 1761069600,
+        "ct": "t_9AGXLE-35UIkAKIO9Xj2ovQCTFp9P5_eppoaQoKu5clb58KEGncCI35tLhDF4CDra3Teg-DdFq7QYrRnmOvLKSva0niR2xHmOsPnr2HZolwnCmCXNtonrn5vzbK8_kOviUP086kyWNcGwDhYRl7GxzoBOweTv0ShTWc-713A-2I0JMdgP3PbuKdldVZeN94Gr8JNIyb2hKtt4-PpW9wb9D6AhEMYW8eILoHNURxJgUMjFsr9sPfoV3doreds8TtUhGlE9DlEUZkH12qeTsAL-R9NavdAC9lKiWaZZXmWg2ms6c_lI00nBtgudjPwRut1cnniQ_QNa056Wc03uwoquZG6C6dJ9wOHlHQHUgtdEBneZjv0kEC3pG29da_iwShSZ-Qoy5hfHn_g7YYphJdPL8oxO7nJJm00AV40RhVoJ8tJypcd-Of7XmWQUX47gg7pFT3ov6j6tEJQllMsOCYVMk2UKHGI2qXjEvTTvRSWoZz-MYUxKvhTbavl7VpPV9C0Oty2LPGwXGUBGblH4645e88KXsAFZwR54jjBfInXPstr3jntrvfFi32Y8gR8rnUZYLmXXbHT_WFrkg2vHBX-l0OZvUAuShMjd4s0zKKpbrCPaW6izYM_Cv4m3XRn4czWMKtnntcS1GRIwbY7v8jGlGb3QvQ59w4zUrGm6iCtEdfn-kE-dH7CnhwcmD-qEGB_Fz8wD42CyYfpI5JkP2qFVq8dOif2hYWI-hoCP8GiCndenK1Sw4HVXaPDRSEa9tDb46314Dvk-1aoaT3mOatu5PqnQnElbApExq_5VAwnd5S5sMvtI-oAOgNFEDeynGm1qI84Ad2ixuIQVWygO08hIVtTlCAoTRG-YY2RfT9nbuT2n04rUkCF__Er74Tgrk122FHwqqBN0UvE80wX0rGR5pyaJ6BxZ1VdB55SvaMc6eJts7suy_Gu409vdZy7xd9fMZTe4J82fcM6B9ptwdlrcHfeYgrN2uRbCo52Pl5C3VwyaE6ZmuyqFu8zJFwgQ89677kmMMPJ1xIKRqkQv_dBWHNkr9FyAdLSVf-O8nq0z8EM4krbN0XrJZTjP9jBYcn0Kbt6pkm8ahdiVVAtSEuZ2wLpp8hvNr_GETS9Qz70X86eURv_XBkLdrhTKeI7ZkI1urOEvrKHMfoBWdCLQxeXLIv-U-YeXnuMx_waa9A0EO3rdhe1TxGLXs5Jxlzt0xp1nfD0n_Ow3AEFEtUS6Df9SEQ1667iPtJvNyw0iXPjFT3j4ND08oU9QDyXK6v3w-7IQpVbnLRsqrTzSoyC4Dw5dWg4cllNHOPmTeCmkzCWtYT4aYUIhgVVPMX32gOfGVkAAEe2h9G28MOVTMxbViezM9oA_pXhCHbZIZMSJDOf0uBFOalgFPtwqoyUOeQIHIBewXdHHcFOTixtDt2ksfgANKyUU-S52dg3dWAyF5y0n1I8AhGJVwsIUZBhyztWCVbPHOErWWy7d9GWdJ6B-rVz85OB6HVRL8si-x4alFrp73CBZ_4kAVPUQBsWgOCMCN1oHHhogyRtCur1u4Jk7u6hVjvjwJllb-cnWgkYIEP9g",
+        "exp": 1761156000,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "brd_01K83YV380ZVYEJ6GPWH4F88DQ",
+        "kc": "kJZzG0ZSBIm4jNtfuXGb3PTOrv-FGOV0nNKG3V5DUOs",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "7mP-wqtKBx6RKIiKxRnuUH361eKgJTEGXqyMx7rG3RJM4Ou52NEwykNy-lU-Uvh8Opln5xF-7gGBTq_gNcVirdgMWXOFFIFqHp00ei-zvtI",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "K6aRgQf9sOT_lLlZWGOXOyfAdmMSMf78yT8EkP_l2jBqiTqk0wUQNGqktyGKI7KYvJXh_DEnRReoAxDrUC51D-8d223xvfoCf0dnFyjHsiE"
+        },
+        "kind": "board",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "Ren5_U176fEGIMfRV4_9Jf6IKx1AwMRtGHJsYLwSm9RZOhJDaSBjDs7c-jkN6W83UFB_vjAGcHySDl-U6ahqDg",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "accepts": [
+            "answer",
+            "push",
+            "review-open",
+            "review-comments",
+            "review-read",
+            "accept-step"
+          ],
+          "away_since": null,
+          "checkouts": [
+            {
+              "busy_worktrees": 4,
+              "free_worktrees": 2,
+              "repo": "shop"
+            }
+          ],
+          "items": [
+            {
+              "address": "payments@api",
+              "agent": {
+                "status": "working"
+              },
+              "card": null,
+              "ci": null,
+              "follows_main": false,
+              "git": {
+                "ahead": 2,
+                "approved": true,
+                "behind": 0,
+                "uncommitted": 0,
+                "upstream": "main"
+              },
+              "group": "WORKING",
+              "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "next_for_you": null,
+              "prompt": null,
+              "push_permission": null,
+              "push_waits": null,
+              "question": null,
+              "recover": null,
+              "report": null,
+              "review": {
+                "files": 3,
+                "step": 2
+              },
+              "routine": null,
+              "steps": {
+                "items": [
+                  {
+                    "number": 2,
+                    "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+                    "state": "committed",
+                    "title": "Charge through a PaymentGateway"
+                  },
+                  {
+                    "number": 3,
+                    "sha": null,
+                    "state": "in-progress",
+                    "title": "Add the new gateway"
+                  },
+                  {
+                    "number": 4,
+                    "sha": null,
+                    "state": "planned",
+                    "title": "Remove the old payment client"
+                  }
+                ],
+                "pushed": 1
+              },
+              "summary": "2 commits",
+              "urgency": 0,
+              "verdict": null
+            }
+          ],
+          "kebbie": "0.24.0",
+          "rev": 1842,
+          "routines": [
+            {
+              "id": "nightly-deps",
+              "last_outcome": "ok",
+              "mode": "fix",
+              "next_run": 1761100200,
+              "repo": "shop",
+              "title": "Nightly deps"
+            }
+          ],
+          "sessions_outside_tasks": 1,
+          "type": "board"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAeYnJkXzAxSzgzWVYzODBaVllFSjZHUFdINEY4OERRAAVib2FyZAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK2tKWnpHMFpTQkltNGpOdGZ1WEdiM1BUT3J2LUZHT1Ywbk5LRzNWNURVT3MAAAA",
+      "name": "board-offering-a-review-opened-by-the-account",
+      "recipient": "account",
+      "seal": {
+        "content_key": "EM0CiI3CclNbvP-ROoZPMQHReV8NtTN0GmHDaEOdMgI",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "Y7om2kysmJR-SO2RWGmmJdpK26il0LlGXpm6nfyhYSY",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "qP5pi8Qe2USEHuw1Ya2EPIT1EfuewjgqSlICii2gnhc"
+        },
+        "nonce": "t_9AGXLE-35UIkAK",
+        "plaintext": "eyJ0eXBlIjoiYm9hcmQiLCJyZXYiOjE4NDIsImtlYmJpZSI6IjAuMjQuMCIsImF3YXlfc2luY2UiOm51bGwsImNoZWNrb3V0cyI6W3sicmVwbyI6InNob3AiLCJmcmVlX3dvcmt0cmVlcyI6MiwiYnVzeV93b3JrdHJlZXMiOjR9XSwicm91dGluZXMiOlt7ImlkIjoibmlnaHRseS1kZXBzIiwidGl0bGUiOiJOaWdodGx5IGRlcHMiLCJyZXBvIjoic2hvcCIsIm1vZGUiOiJmaXgiLCJuZXh0X3J1biI6MTc2MTEwMDIwMCwibGFzdF9vdXRjb21lIjoib2sifV0sIml0ZW1zIjpbeyJhZGRyZXNzIjoicGF5bWVudHNAYXBpIiwiZ3JvdXAiOiJXT1JLSU5HIiwidXJnZW5jeSI6MCwic3VtbWFyeSI6IjIgY29tbWl0cyIsIm5leHRfZm9yX3lvdSI6bnVsbCwiYWdlbnQiOnsic3RhdHVzIjoid29ya2luZyJ9LCJyZXBvcnQiOm51bGwsInF1ZXN0aW9uIjpudWxsLCJwcm9tcHQiOm51bGwsImdpdCI6eyJ1cHN0cmVhbSI6Im1haW4iLCJhaGVhZCI6MiwiYmVoaW5kIjowLCJ1bmNvbW1pdHRlZCI6MCwiYXBwcm92ZWQiOnRydWV9LCJoZWFkIjoiOWYzYzJhMWU1YjdkNGM2YThiMGUyZjRkNmM4YTBiMmU0ZjZkOGMwYSIsInZlcmRpY3QiOm51bGwsInB1c2hfcGVybWlzc2lvbiI6bnVsbCwicHVzaF93YWl0cyI6bnVsbCwiZm9sbG93c19tYWluIjpmYWxzZSwiY2kiOm51bGwsInJlY292ZXIiOm51bGwsInJvdXRpbmUiOm51bGwsImNhcmQiOm51bGwsInN0ZXBzIjp7InB1c2hlZCI6MSwiaXRlbXMiOlt7Im51bWJlciI6MiwidGl0bGUiOiJDaGFyZ2UgdGhyb3VnaCBhIFBheW1lbnRHYXRld2F5Iiwic3RhdGUiOiJjb21taXR0ZWQiLCJzaGEiOiI5ZjNjMmExZTViN2Q0YzZhOGIwZTJmNGQ2YzhhMGIyZTRmNmQ4YzBhIn0seyJudW1iZXIiOjMsInRpdGxlIjoiQWRkIHRoZSBuZXcgZ2F0ZXdheSIsInN0YXRlIjoiaW4tcHJvZ3Jlc3MiLCJzaGEiOm51bGx9LHsibnVtYmVyIjo0LCJ0aXRsZSI6IlJlbW92ZSB0aGUgb2xkIHBheW1lbnQgY2xpZW50Iiwic3RhdGUiOiJwbGFubmVkIiwic2hhIjpudWxsfV19LCJyZXZpZXciOnsic3RlcCI6MiwiZmlsZXMiOjN9fV0sInNlc3Npb25zX291dHNpZGVfdGFza3MiOjEsImFjY2VwdHMiOlsiYW5zd2VyIiwicHVzaCIsInJldmlldy1vcGVuIiwicmV2aWV3LWNvbW1lbnRzIiwicmV2aWV3LXJlYWQiLCJhY2NlcHQtc3RlcCJdfQ"
+      },
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "KOCjckhciIqbPiIYNv_ajzZAqTOlBBtIIjueQhMvQszAq-9831WXt2ytih25Aa9bOw-GKorcT9G9pcx0qPOLuK1Ttoui0uINFGTJ",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-79ec-a7c2-f0ac1e83fb8c",
+        "kc": "2YBIQ0iGlO6l7ZDR-TsdcG7v05tfawR423LwDyfV09s",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "zhGEddkC8geWjavfaQdASYAJdijh-CDc_7Xd4GGXU2FCEPjl1TfyVwHjAZSrU55CmJfD8XWS6p54ahlydp1s0Eq8QpvQYrhqXb6bmziGOac",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "rXrU_d7-XKjuCL_gf5gNXH0haMzOyg19b-_nA1F8-HVdJGfnuWKaTTKREL3zNGQn38MS5c39mekLkiRTj-fKKAzt01l1zZyP1AuY6aZThL4"
+        },
+        "kind": "review-open",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "12Z0vjplOZ-1yrVC0n20--SFxbzvp02CEc2qadQJCIszLBpfe2qKUj8-wooHcNFd8NagPcEuauAL_Fp5fzneBQ",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "address": "payments@api",
+          "type": "review-open"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzllYy1hN2MyLWYwYWMxZTgzZmI4YwALcmV2aWV3LW9wZW4AHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPfYMAABACsyWUJJUTBpR2xPNmw3WkRSLVRzZGNHN3YwNXRmYXdSNDIzTHdEeWZWMDlzAAABABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAAlpUGhvbmUgMTYAA3dlYuMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2QAAAAAaPZ4oC5sEblFD9kAE5eNTciRHSf2vW41I7G-4P5gIdsfGTD4tAMNePDaVq69BU_repaZyohYb8B6qwH268YcYiFZxQk",
+      "name": "review-open-opened-by-the-machine",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "Kyx9KOYzAnfwyBYJfyasKFPnTOsWZi9BEwcM9WV4iz8",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "kCh0CNHB0icJiwqLDPOiQzRiEw-oiOpDiFb5bFWecC8",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "eR1TdEMDwneULC2SNnxyTdGQUdfAunD05_RNyRiLdyA"
+        },
+        "nonce": "KOCjckhciIqbPiIY",
+        "plaintext": "eyJ0eXBlIjoicmV2aWV3LW9wZW4iLCJhZGRyZXNzIjoicGF5bWVudHNAYXBpIn0"
+      },
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "AIFtFD6OdJ8lgZl2VkrgLNlW3RbZdqwwzGphpO977O_6xOw9mVP8dPoyTFx2G6da5w_P_hX8uPmhRXz2BPO0CjRXJzec_D1lIPOTbX1t6wVa2b71_v1xMWBpO49vSLYdIcohm3o1mTHcKdKIpQAqNEk1a1FmEYkWr5_ybfhl0yUrYaIt3DHBiLoASiqXOwwFEwPWWPtpdguy5Y6l4RtRVI5hCcLxBT5PeYd9VKGLRk2Etd70k_yGq5zIafK_zHBuERXbFp4l2mC307PF7Gd9xPL838Qh3e-3elh6AzGSv5dcehF8OzDsSE-Rsa-mKSt0GNxe4ITgO3Pr7PgHXQMQqQbjrhqrTUjIPuYlBns6wWn-VSm1w9S3aPRAIDslCwgfHtCXTAn1J2JERS01V54cRRgu5QveurHzy8osKM545rqutimoohTEx0UDwdSn3owzm_Qdp_D6ldmxecNto8FlV-Xp1FJyH20ufUokNFi_gAVoS-uDeDjvNfgzr1tG6MLM9KTQxjuroD_qIhd5S2o",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-755a-93d9-8212aab29bc5",
+        "kc": "nhVp7mfc1VFjItbwuFthdGxpY3vljxMpqYfjcbARNBk",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "q37HgCfSDpEurR9rF1jo1-JwjB0xwAZhfohPhpZiIH2E5bWe4UULIaEAeiiKnrGh-f8mGzywpJz1m1skctesGq2lZxHctXgS-EaK1U0RRBQ",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "YaQjLqxbm7AdQdjaIzaDhGlwXx5jMTOMGn1qau7PcRF0gdU_EFkawZP0KcW4bdAb8vp2AWXCeZAbQpRNhPg_6rdjhGQy0fbQeuo3hymZMfY"
+        },
+        "kind": "review-comments",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "goGfb_7ySy-t-HL-CZc6yzCvs17YOi7-YGzHXbq8SNQgxNUtNe27fGFYYex41Wo6PPXnGEkxW_GMu2cZ9NAZBg",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "address": "payments@api",
+          "comments": [
+            {
+              "line": 41,
+              "path": "src/orders.rs",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "side": "old",
+              "text": "Did anything else call client::charge with a float?"
+            },
+            {
+              "line": 2,
+              "path": "src/gateway.rs",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "side": "new",
+              "text": "Name the currency next to cents."
+            }
+          ],
+          "step": 2,
+          "type": "review-comments"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzU1YS05M2Q5LTgyMTJhYWIyOWJjNQAPcmV2aWV3LWNvbW1lbnRzAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArbmhWcDdtZmMxVkZqSXRid3VGdGhkR3hwWTN2bGp4TXBxWWZqY2JBUk5CawAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
+      "name": "review-comments-opened-by-the-machine",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "6ctjB3t3zECTwS-PaHg9WtTLcl3IaqnmwNThxculDkM",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "Ox8iVmHrKWdi7W2lMqmyQMHTg7exhuZopPR58Kk3J9g",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "PtI-rnyjCISym9sawvcSkX6KCkUT1fqp9X3gLG_yGB4"
+        },
+        "nonce": "AIFtFD6OdJ8lgZl2",
+        "plaintext": "eyJ0eXBlIjoicmV2aWV3LWNvbW1lbnRzIiwiYWRkcmVzcyI6InBheW1lbnRzQGFwaSIsInN0ZXAiOjIsImNvbW1lbnRzIjpbeyJwYXRoIjoic3JjL29yZGVycy5ycyIsImxpbmUiOjQxLCJzaWRlIjoib2xkIiwic2hhIjoiOWYzYzJhMWU1YjdkNGM2YThiMGUyZjRkNmM4YTBiMmU0ZjZkOGMwYSIsInRleHQiOiJEaWQgYW55dGhpbmcgZWxzZSBjYWxsIGNsaWVudDo6Y2hhcmdlIHdpdGggYSBmbG9hdD8ifSx7InBhdGgiOiJzcmMvZ2F0ZXdheS5ycyIsImxpbmUiOjIsInNpZGUiOiJuZXciLCJzaGEiOiI5ZjNjMmExZTViN2Q0YzZhOGIwZTJmNGQ2YzhhMGIyZTRmNmQ4YzBhIiwidGV4dCI6Ik5hbWUgdGhlIGN1cnJlbmN5IG5leHQgdG8gY2VudHMuIn1dfQ"
+      },
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "9k4QbJmYU_tc4zklmUpyjsheG06khc24k_WDQDky3PSTDjqF2A2h4eRFRcy9APCzsFh3KiX3jAd09JH5VgRwqU60vK3BfiobtGbihfeIvQ2zI9AaUNK65jt2_ZzaPq8NNOP5KGvz0b4xJDitMQHe-RZYuaxPHWWRlELJ7IwQSk7Ub0BapS0vMdk5NZU4G4C1uEr1cjRsGYFQi4_GWM9oQnDTAAE",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7dde-a0d2-3ea34a98a13a",
+        "kc": "X3GCs4FLNcc36raX7dc06-c4oClU4I4dakopf0BI6iY",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "WHsI4QYltmM9PYKIhfAtMmjvwij3gUvlv6kH3YGbOln15J0mABYCi7AwdSox51wYUDXSGMxmbDqFNOt-thh8WrbNTrRgiruFN9jl5KtzMMA",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "HNY7Ov8avsscf1G-RKETkrPdF-Kx4HClgHqnWOUsZ3j3yOe64tI09ucgPNH1Z3jYldaacVcD9V9XJJdFXT-NB3o7Tqyuq9VC75toj71qOUY"
+        },
+        "kind": "review-read",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "XT0cxT4ncIkcPXzkll4zz4DadgkjdErBYyqSSUZk6BAbry7rbFgWsQtjfe3vobzFXJhqwM8ys1SOdQ0OH1_1Bw",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "address": "payments@api",
+          "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+          "path": "src/gateway.rs",
+          "read": true,
+          "type": "review-read"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2RkZS1hMGQyLTNlYTM0YTk4YTEzYQALcmV2aWV3LXJlYWQAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPfYMAABACtYM0dDczRGTE5jYzM2cmFYN2RjMDYtYzRvQ2xVNEk0ZGFrb3BmMEJJNmlZAAABABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAAlpUGhvbmUgMTYAA3dlYuMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2QAAAAAaPZ4oC5sEblFD9kAE5eNTciRHSf2vW41I7G-4P5gIdsfGTD4tAMNePDaVq69BU_repaZyohYb8B6qwH268YcYiFZxQk",
+      "name": "review-read-opened-by-the-machine",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "hjEkivKz-sEX4F56Mu5h8EHNFFX4rro9UbaRjLMDAFk",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "AS8O2qZdkxZlGC0XB6akthtJKPC15eWBLCAJZwGv_cI",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "yUzFLxmzEbMqlpYMW6lL7hXQlUBn4GG2Hori9A5TnG4"
+        },
+        "nonce": "9k4QbJmYU_tc4zkl",
+        "plaintext": "eyJ0eXBlIjoicmV2aWV3LXJlYWQiLCJhZGRyZXNzIjoicGF5bWVudHNAYXBpIiwicGF0aCI6InNyYy9nYXRld2F5LnJzIiwicmVhZCI6dHJ1ZSwiY29udGVudCI6IjVkMWMwYTllOGY3YjZjNWQ0ZTNmMmExYjBjOWQ4ZTdmNmE1YjRjM2QifQ"
+      },
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "ph15SABM4vo8t1HdQWnK2pvbZ7CcAPI8hrsnJhh6f-cfDVcbGO7Oah7zoUHPgZL9z9oXwylS7umtNe9MddAviAcTweMbQZyzDGLejUpQUuF72f2BeyMYVqiJThjKEDGo2GBn74Q1iHrBROhMEFA5TqYcMDoiKOphMD4tdZBMOtD2Ru1oBw",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7546-a0d2-801f0350886f",
+        "kc": "BN-bDV6FuL1k2n0DgUzti3Jt2oOrAFyw1lR-MsUGwP8",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "VYZP-j58ZqxYUdVLzF4HllFMLkcke1WgROI8myUtOE9ottNDR_2gMZn_IphIYrPuVqJeOtZ0yaqDDJiSjNcCrTSndla0GCFIgktpaGU-vgk",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "iwhXxn8Jl0hDaphH6DZcx9TD7_Sle7env4dxlzwj6GeSbL1xTVif0Zio8ifZQON6DaIfCKOR02AwuXzEtvpmjKuCNtD9aS5f8-r0b8_ltgY"
+        },
+        "kind": "accept-step",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "GrEXJX1AccTBGl14ZjdNG1o6SzqrAFY5zyl73vxhmjhKfE1uVmFEJ3u1BS4wuvW74uc9m865y5agaj62_lX8Bw",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "address": "payments@api",
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "step": 2,
+          "type": "accept-step"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzU0Ni1hMGQyLTgwMWYwMzUwODg2ZgALYWNjZXB0LXN0ZXAAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPfYMAABACtCTi1iRFY2RnVMMWsybjBEZ1V6dGkzSnQyb09yQUZ5dzFsUi1Nc1VHd1A4AAABABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAAlpUGhvbmUgMTYAA3dlYuMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2QAAAAAaPZ4oC5sEblFD9kAE5eNTciRHSf2vW41I7G-4P5gIdsfGTD4tAMNePDaVq69BU_repaZyohYb8B6qwH268YcYiFZxQk",
+      "name": "accept-step-opened-by-the-machine",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "qCdYzTeRw_-MC_Z0e66qCx0sik3nYhkq0s3RpNSw1nA",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "U5Am9soAFXaRlIYbpE5nm_ob1EbDQ2blpXa-o0aZOys",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "pxi7gKsrkJA9R-sFIMd0oMGOCcghzldMzjOEeZL3_og"
+        },
+        "nonce": "ph15SABM4vo8t1Hd",
+        "plaintext": "eyJ0eXBlIjoiYWNjZXB0LXN0ZXAiLCJhZGRyZXNzIjoicGF5bWVudHNAYXBpIiwic3RlcCI6Miwic2hhIjoiOWYzYzJhMWU1YjdkNGM2YThiMGUyZjRkNmM4YTBiMmU0ZjZkOGMwYSJ9"
+      },
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "ct": "-LrFRiDhJNcalghnKlU4khdgKEhjnuzA_9Mi1huwXlOe-eDCRh6I9MorrSepTir1mb41Epi00CxxJh2LfRtR3Mzdq8z1AVTPmu9VKhShN729A4MqyWaUUBDTpOmTFamm5Tl2pSCeLE5c2ywZlF3xLJtEOkP0V6FlP00oUqAKfqs399ph-OPFbTdDpJYoaZZADO9BB8Zez_lfVUrPWGJriw0GgOqhQGheUX31cj7Uj1j3qAS2fHcRyv2DBUJfvgz_uk4gPfX2xlEJh_c6nCudrOMnZH6MJ5RPlB5UQL0FBKyXmpHRqSfgXantxk75yxyrvZkOX6xOPE7uDsot2hi9OSXS4J9f51DZQLP-7ZArKDyZ1DcnpW93N6Nthp2SN4zHfmfZjiesa55cx2YkwcDyvIiU_JTlQ60wF2KXod6UU5YSgOPs4KMzkdslh1kfTGj0gSZeQgMTrCkh8SaOZYfFsNvmMp2x4NzWSoUnxX6aZRAfpdg_ORhXDEVugVYV_XAw7A8yq1SylYkTcEc_cA",
+        "exp": 1761674400,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "cmd_019a07ed-8d00-79ec-a7c2-f0ac1e83fb8c",
+        "kc": "bJ8dglX6X50ih6Q1-IhSmdx_lj8sHTCVTsK3qE3BWe4",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "Qk-QrUPITw_BZYEaBEdzQg8qSOpDHsvdUvl2NJqgXW6YnflrZPzvDRhwDOaPEtqJKAA5EltlvsRSPcQX-JYbodco0yjpJfAR4wSCTxYtV7c",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "yNT6nvHGRQVP-mZ6OWmmX0-bSQwLP0IZrq_uLB1fQ1d4N9vS4rSwN9GKmdEyo0GsISHHY1X7Har8Jp0paVL5FzbX3AIKI7-Nwl1ZP3iSVyM"
+        },
+        "kind": "result",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "nGGTu2-ZOiyqXeTSc3GXXpRlV8dotM7sMP6GOMSZaR1v__B5NOxg1oQCZI0KYIPHVaINvteHnsjcm49ojTvDAA",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "blob": {
+            "bytes": 1700,
+            "id": "blb_b952aeeabc9e0b44d852a4cde2671ce78b9986e9fe095b25362dcb29dcbfe64d",
+            "key": "o6_c4Hb4UCGFMZ_cTbSARU7sg-WFe9PWrSuI_r7Bz4s",
+            "media_type": "application/vnd.kebbie.review+json"
+          },
+          "command": "cmd_019a07ed-8d00-79ec-a7c2-f0ac1e83fb8c",
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "outcome": "done",
+          "text": "The review of step 2 is ready.",
+          "type": "result"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzllYy1hN2MyLWYwYWMxZTgzZmI4YwAGcmVzdWx0AB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGkBBKAAAQArYko4ZGdsWDZYNTBpaDZRMS1JaFNtZHhfbGo4c0hUQ1ZUc0szcUUzQldlNAAAAA",
+      "name": "review-result-naming-its-blob-opened-by-the-account",
+      "recipient": "account",
+      "seal": {
+        "content_key": "laxmXEn1N1qv3eqVfPPtkcTGqlOIFqOW6Ht5PBE8oKo",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "VG3QaRm9CnY2fe129YUajMkPEcIOOCVKzydHQ6ecjeg",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "VR3FV5HPcZrOjQfJdrZ4ussuyQAissHFxcER9DU40v4"
+        },
+        "nonce": "-LrFRiDhJNcalghn",
+        "plaintext": "eyJ0eXBlIjoicmVzdWx0IiwiY29tbWFuZCI6ImNtZF8wMTlhMDdlZC04ZDAwLTc5ZWMtYTdjMi1mMGFjMWU4M2ZiOGMiLCJkZXZpY2UiOiJkZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIiLCJvdXRjb21lIjoiZG9uZSIsInRleHQiOiJUaGUgcmV2aWV3IG9mIHN0ZXAgMiBpcyByZWFkeS4iLCJibG9iIjp7ImlkIjoiYmxiX2I5NTJhZWVhYmM5ZTBiNDRkODUyYTRjZGUyNjcxY2U3OGI5OTg2ZTlmZTA5NWIyNTM2MmRjYjI5ZGNiZmU2NGQiLCJrZXkiOiJvNl9jNEhiNFVDR0ZNWl9jVGJTQVJVN3NnLVdGZTlQV3JTdUlfcjdCejRzIiwibWVkaWFfdHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5rZWJiaWUucmV2aWV3K2pzb24iLCJieXRlcyI6MTcwMH19"
+      },
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
         "collapse": "AAyLu_YSiuUeo24eow0qFOFW_PrkJMx4EQ1jg_DBaPE",
         "ct": "BmffOKMXanhX3M6vULi4W1POaKPq9_K7ArNzZ7zeuHGaHKQxENetvBWPw3uP2q9jPiTuYCY2XROQz9dkriOHp-Pz7bpTRNayfCRVJU8Iu12kt36TsU5ZZtbUiVV87LetKXRZcYwI58lsSiczWA2t3SeF0jyGrl4vvSJOyooVp4AD8SXM4ar2ywpZuERWv5jDtUsvw-CwKa_ihVAqazJ-tbRpjAWZbgqh4sD1fChPMT-SNwWP4z8mjS6LyzpAK8rcVB__S7_EO2p2b0JLI1pd5RAZGFi2WJfOtfI047HI47EkujiysQh19KcdA7Ud8d-1mhI",
         "exp": 1761156000,
@@ -2830,6 +3215,7 @@
   "clock_skew": 300,
   "hpke_info": "kebbie-hub content key v1",
   "max_ttl": {
+    "accept-step": 3600,
     "answer": 86400,
     "board": 86400,
     "device-decision": 3600,
@@ -2839,6 +3225,9 @@
     "prompt-answer": 600,
     "push": 86400,
     "result": 604800,
+    "review-comments": 3600,
+    "review-open": 3600,
+    "review-read": 3600,
     "routine": 86400,
     "start": 86400,
     "start-item": 86400

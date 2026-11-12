@@ -7,7 +7,15 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kebbie_hub_fakes::machine::{ApproveFrom, Backlog, Handled, Handling, MachineState, Posted, connect, every_command, join};
 use kebbie_hub_fakes::{load, save};
-use kebbie_hub_protocol::{Board, Id, ItemKey, Kind, Notice, NoticeCategory, Outcome, Target, Urgency};
+use kebbie_hub_protocol::{Board, Id, Item, ItemKey, Kind, Notice, NoticeCategory, Outcome, Review, Target, Urgency};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewFile {
+    item: Item,
+    review: Review,
+}
 
 #[derive(Parser)]
 #[command(
@@ -52,6 +60,8 @@ enum Command {
     },
     #[command(about = "Replace the machine's backlog with a JSON file of rows and bodies, seal each body as a blob and post the board")]
     PostBacklog { file: PathBuf },
+    #[command(about = "Put a task up for review from a JSON file of its board item and its review, and post the board")]
+    PostReview { file: PathBuf },
     #[command(about = "Long-poll the machine's queue once")]
     Poll {
         #[arg(long, default_value_t = 25)]
@@ -266,6 +276,14 @@ async fn run(cli: Cli) -> Result<(), String> {
             let posted = state.publish_backlog().await.map_err(|e| text(&e))?;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("posted board rev {posted} with {} backlog items", state.backlog.rows.len());
+        }
+        Command::PostReview { file } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let ReviewFile { item, review } = load(&file).map_err(|e| text(&e))?;
+            let address = review.address.clone();
+            let posted = state.post_review(item, review).await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("posted board rev {posted} with {address} up for review");
         }
         Command::Poll { wait } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

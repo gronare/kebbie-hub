@@ -43,6 +43,11 @@ export const NOTICE_CATEGORIES = ["questions", "new-device", "idea-questions", "
 export const DEFAULT_NOTICE_CATEGORIES = NOTICE_CATEGORIES.filter((category) => category !== "started");
 export const MAX_LABEL_BYTES = 256;
 export const BACKLOG_BODY_MEDIA_TYPE = "application/vnd.kebbie.backlog-item+json";
+export const REVIEW_MEDIA_TYPE = "application/vnd.kebbie.review+json";
+export const MAX_REVIEW_COMMENTS = 50;
+export const MAX_REVIEW_COMMENT_CHARS = 2000;
+export const MAX_REVIEW_COMMENTS_BYTES = 24 * 1024;
+const MAX_SINCE_CHARS = 256;
 const command = { prefix: "cmd", maxTtl: DAY, ttl: COMMAND_TTL, command: true };
 export const KINDS = {
   board: { prefix: "brd", maxTtl: DAY, command: false },
@@ -57,6 +62,10 @@ export const KINDS = {
   "item-answer": { ...command, maxTtl: COMMAND_TTL },
   "start-item": { ...command, ttl: START_ITEM_TTL },
   "device-decision": { ...command, maxTtl: COMMAND_TTL },
+  "review-open": { ...command, maxTtl: COMMAND_TTL },
+  "review-comments": { ...command, maxTtl: COMMAND_TTL },
+  "review-read": { ...command, maxTtl: COMMAND_TTL },
+  "accept-step": { ...command, maxTtl: COMMAND_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -220,6 +229,7 @@ const item = shape({
   recipe: optionalField(string),
   assessment: optionalField(string),
   second_opinion: optionalField(shape({ by: string, points: optionalField(u32v), running: bool })),
+  review: optionalField(shape({ step: optionalField(u32v), files: u32v })),
 });
 export const isHomeLabel = (label) =>
   typeof label === "string" &&
@@ -267,6 +277,51 @@ export function checkBacklogBody(body) {
   if (!backlogBody(body)) throw new ProtocolError("malformed");
 }
 
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const isFullSha = (value) => typeof value === "string" && FULL_SHA.test(value);
+export const isContentHash = (value) => typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value);
+const count = uint(0xffff_ffff);
+const stepNumber = (value) => count(value) && value >= 1;
+const LINE_NUMBERS = { context: (line) => count(line.old) && count(line.new), add: (line) => absent(line.old) && count(line.new), del: (line) => count(line.old) && absent(line.new) };
+const diffLine = (line) => shape({ kind: oneOf("context", "add", "del"), old: optionalField(count), new: optionalField(count), text: string })(line) && LINE_NUMBERS[line.kind](line);
+const reviewFile = (file) =>
+  shape({
+    path: isHomeLabel,
+    old_path: optionalField(isHomeLabel),
+    status: oneOf("added", "modified", "deleted", "renamed"),
+    add: count,
+    del: count,
+    content: isContentHash,
+    read: bool,
+    omitted: bool,
+    hunks: list(shape({ head: string, lines: list(diffLine) })),
+  })(file) &&
+  (file.status === "renamed") === !absent(file.old_path) &&
+  (file.omitted ? file.hunks.length === 0 : countsFit(file));
+const countsFit = (file) => {
+  const lines = file.hunks.flatMap((hunk) => hunk.lines);
+  return lines.filter((line) => line.kind === "add").length === file.add && lines.filter((line) => line.kind === "del").length === file.del;
+};
+const review = (body) =>
+  shape({
+    address: isAddress,
+    since: (value) => isText(MAX_SINCE_CHARS)(value) && !/\p{Cc}/u.test(value),
+    head: isFullSha,
+    step: optionalField(shape({ number: stepNumber, title: string, sha: isFullSha, subject: string, body: string })),
+    guide: list(shape({ path: isHomeLabel, text: string })),
+    left_out: optionalField(string),
+    files: list(reviewFile),
+  })(body) && new Set(body.files.map((file) => file.path)).size === body.files.length;
+
+export function checkReview(body) {
+  if (!review(body)) throw new ProtocolError("malformed");
+}
+
+const reviewComment = shape({ path: isHomeLabel, line: stepNumber, side: oneOf("old", "new"), sha: optionalField(isFullSha), text: (value) => isText(MAX_REVIEW_COMMENT_CHARS)(value) && !/[^\P{Cc}\n\t]/u.test(value) });
+const reviewComments = (value) =>
+  typed({ address: isAddress, step: optionalField(stepNumber), comments: (comments) => Array.isArray(comments) && comments.length >= 1 && comments.length <= MAX_REVIEW_COMMENTS && comments.every(reviewComment) })(value) &&
+  text.encode(JSON.stringify({ ...value, type: undefined })).length <= MAX_REVIEW_COMMENTS_BYTES;
+
 const nextRow = shape({ part: oneOf("stopped", "push", "read"), address: string, rank: u32v, line: string, since: optionalField(u64v), waits_behind: u32v });
 const later = shape({ address: string, title: optionalField(string), state: oneOf("queued", "parked"), line: string, until: optionalField(u64v), question: bool });
 const STANDINGS = {
@@ -312,8 +367,9 @@ const PAYLOADS = {
   }),
   notice,
   result: (value) =>
-    typed({ command: id, device: (value) => prefixOf(value) === "dev", outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), blocking: optionalField(uint(0xffff_ffff)), text: string })(value) &&
+    typed({ command: id, device: (value) => prefixOf(value) === "dev", outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), blocking: optionalField(uint(0xffff_ffff)), text: string, blob: optionalField(blobRef) })(value) &&
     (value.outcome === "refused") === !absent(value.reason) &&
+    (absent(value.blob) || value.outcome === "done") &&
     (value.reason === "questions-open") === (!absent(value.blocking) && value.blocking > 0),
   answer: typed({ address: string, question: string, choice: optionalField(u8), comment: string }),
   push: typed({ address: string, head: string, card_sha: optionalField(string) }),
@@ -324,6 +380,10 @@ const PAYLOADS = {
   "item-answer": typed({ item: isItemKey, index: u32v, question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) }),
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
   "device-decision": typed({ device: (value) => prefixOf(value) === "dev", fingerprint: (value) => typeof value === "string" && FINGERPRINT.test(value), approve: bool }),
+  "review-open": typed({ address: isAddress }),
+  "review-comments": reviewComments,
+  "review-read": typed({ address: isAddress, path: isHomeLabel, read: bool, content: isContentHash }),
+  "accept-step": typed({ address: isAddress, step: stepNumber, sha: isFullSha }),
 };
 
 export function checkPayload(payload) {

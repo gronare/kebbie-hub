@@ -31,7 +31,9 @@ export async function loadSent(store, account, now) {
   }
 }
 
-export const keepSent = (store, account, kept) => store.put(sentKey(account), kept).catch(() => undefined);
+const WORDED = { "review-comments": (sent) => ({ ...sent, comments: (sent.comments ?? []).map(({ text, ...where }) => where) }) };
+export const storedSent = (sent, now) => (WORDED[sent.kind] && (sent.result || sent.exp <= now) ? WORDED[sent.kind](sent) : sent);
+export const keepSent = (store, account, kept, now = Math.floor(Date.now() / 1000)) => store.put(sentKey(account), { ...kept, sent: kept.sent.map((sent) => storedSent(sent, now)) }).catch(() => undefined);
 
 export async function loadDevice(store, account) {
   try {
@@ -66,7 +68,7 @@ export async function openResult(entry, identity, machineKeys, now) {
   if (entry.envelope?.machine !== entry.machine || entry.envelope?.id !== entry.command) throw new CommandProblem("misfiled-result");
   const payload = await openEnvelope(entry.envelope, identity, await importSender(entry.machine, machineKeys), now);
   if (payload.type !== "result" || payload.command !== entry.command) throw new CommandProblem("misfiled-result");
-  return { outcome: payload.outcome, reason: payload.reason ?? null, ...(payload.blocking ? { blocking: payload.blocking } : {}), text: payload.text, device: payload.device, at: entry.stored_at };
+  return { outcome: payload.outcome, reason: payload.reason ?? null, ...(payload.blocking ? { blocking: payload.blocking } : {}), ...(payload.blob ? { blob: payload.blob } : {}), text: payload.text, device: payload.device, at: entry.stored_at };
 }
 
 export async function openHistory(commands, identity, keysOf) {

@@ -26,6 +26,10 @@ pub enum Kind {
     ItemAnswer,
     StartItem,
     DeviceDecision,
+    ReviewOpen,
+    ReviewComments,
+    ReviewRead,
+    AcceptStep,
 }
 
 impl Kind {
@@ -43,6 +47,10 @@ impl Kind {
             Kind::ItemAnswer => "item-answer",
             Kind::StartItem => "start-item",
             Kind::DeviceDecision => "device-decision",
+            Kind::ReviewOpen => "review-open",
+            Kind::ReviewComments => "review-comments",
+            Kind::ReviewRead => "review-read",
+            Kind::AcceptStep => "accept-step",
         }
     }
 
@@ -58,6 +66,10 @@ impl Kind {
                 | Kind::ItemAnswer
                 | Kind::StartItem
                 | Kind::DeviceDecision
+                | Kind::ReviewOpen
+                | Kind::ReviewComments
+                | Kind::ReviewRead
+                | Kind::AcceptStep
         )
     }
 
@@ -75,6 +87,7 @@ impl Kind {
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::DeviceDecision => 3_600,
+            Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem => 86_400,
         }
@@ -87,6 +100,7 @@ impl Kind {
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::DeviceDecision => 3_600,
+            Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep => 3_600,
             Kind::PromptAnswer => 600,
         }
     }

@@ -79,3 +79,12 @@ test("a backlog item's body opens as checked JSON, and a body that is not one fa
   const plan = blobReader(hub({ [opens.blob.id]: opens.ciphertext }).fetchBytes);
   assert.deepEqual(await plan.load({ ...opens.blob, media_type: backlog.media_type }), { failed: true });
 });
+
+test("a review opens as a checked review, and a review that fails the check does not", async () => {
+  const review = JSON.parse(readFileSync(new URL("../vectors/review.json", import.meta.url), "utf8"));
+  const reader = blobReader(hub({ [review.blob.id]: review.ciphertext }).fetchBytes);
+  assert.deepEqual(await reader.load(review.blob), { review: review.review });
+  const backlog = JSON.parse(readFileSync(new URL("../vectors/backlog.json", import.meta.url), "utf8"));
+  const wrong = blobReader(hub({ [backlog.blob.id]: backlog.ciphertext }).fetchBytes);
+  assert.deepEqual(await wrong.load({ ...backlog.blob, media_type: review.media_type }), { failed: true });
+});

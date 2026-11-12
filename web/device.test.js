@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceFingerprint, fromB64, importIdentity, openCommand, sealEnvelope, verifyDeviceCert } from "../js/protocol.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepAllowsChanges, loadDevice, openHistory, sendCommand } from "./device.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand } from "./device.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -100,4 +100,18 @@ test("an answer is signed by this device, sealed to the machine and the account,
   assert.deepEqual(history.map((entry) => [entry.id, entry.device, entry.payload, entry.result.reason, entry.at]), [[envelope.id, device.id, answer, "not-approved", AT + 1]]);
   const swapped = await openHistory([{ command: envelope.id, machine: machine.id, kind: "push", queued_at: AT, envelope, result: null }], identity, () => null);
   assert.deepEqual(swapped, [], "an entry whose kind the hub misreports is left out");
+});
+
+test("a review comment's words stay in this browser's store only until the machine answers or the command expires", async () => {
+  const store = memoryStore();
+  const comments = [{ path: "src/orders.rs", line: 41, side: "old", sha: null, text: "Why the cast?" }];
+  const entry = (id, fields) => ({ id, kind: "review-comments", machine: "mch_a", address: "payments@api", at: AT, exp: AT + 3600, comments, count: 1, result: null, ...fields });
+  const sending = entry("cmd_1", {});
+  const answered = entry("cmd_2", { result: { outcome: "done" } });
+  const expired = entry("cmd_3", { exp: AT - 1 });
+  await keepSent(store, "acc_a", { cursor: 4, sent: [sending, answered, expired] }, AT);
+  const kept = await loadSent(store, "acc_a", AT);
+  assert.deepEqual(kept.sent.map((one) => one.comments[0].text), ["Why the cast?", undefined, undefined]);
+  assert.deepEqual(kept.sent[1].comments[0], { path: "src/orders.rs", line: 41, side: "old", sha: null }, "where the comment sat is kept");
+  assert.equal(sending.comments[0].text, "Why the cast?", "the page in memory keeps the words");
 });

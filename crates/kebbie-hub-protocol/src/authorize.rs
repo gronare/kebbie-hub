@@ -46,7 +46,7 @@ impl Dropped {
 pub enum Refusal {
     Drop(Dropped),
     Answer(Reason),
-    Replay(CommandResult),
+    Replay(Box<CommandResult>),
     Waiting(Box<Verified>),
 }
 
@@ -85,7 +85,7 @@ pub fn authorize(
         })
     })?;
     if let Some(result) = applied.result(device.id(), &header.id) {
-        return Err(Refusal::Replay(result.clone()));
+        return Err(Refusal::Replay(Box::new(result.clone())));
     }
     let trust = machine.trust.trust(&device, now);
     if trust == Trust::Denied {
@@ -189,6 +189,7 @@ mod tests {
                 device: phone.clone(),
                 outcome: Outcome::Done,
                 text: "answered".into(),
+                blob: None,
             },
         );
         assert_eq!(

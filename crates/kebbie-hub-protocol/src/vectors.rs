@@ -34,6 +34,11 @@ use crate::device::{
 };
 use crate::envelope::{Envelope, Header, Kind, Urgency};
 use crate::ids::{Id, Prefix};
+use crate::review::{
+    AcceptStep, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
+    MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
+    ReviewOpen, ReviewRead, ReviewStep, Side,
+};
 use crate::message::{
     Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, Notice, NoticeCategory, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
@@ -265,6 +270,7 @@ fn board() -> Payload {
             recipe: None,
             assessment: None,
             second_opinion: None,
+            review: None,
         }],
         sessions_outside_tasks: 1,
         next: None,
@@ -330,6 +336,7 @@ fn stepped_board() -> Payload {
         recipe: None,
         assessment: None,
         second_opinion: None,
+        review: None,
     }];
     Payload::Board(board)
 }
@@ -583,6 +590,132 @@ fn questions_open() -> Payload {
             reason: Reason::QuestionsOpen { blocking: 2 },
         },
         text: "Not started: 2 questions wait on you.".into(),
+        blob: None,
+    })
+}
+
+const REVIEWED: &str = "payments@api";
+const GATEWAY_CONTENT: &str = "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d";
+
+fn review() -> Review {
+    let line = |kind: LineKind, old: Option<u32>, new: Option<u32>, text: &str| DiffLine { kind, old, new, text: text.into() };
+    Review {
+        address: REVIEWED.into(),
+        since: "main".into(),
+        head: HEAD.into(),
+        step: Some(ReviewStep {
+            number: 2,
+            title: "Charge through a PaymentGateway".into(),
+            sha: HEAD.into(),
+            subject: "Charge through a PaymentGateway".into(),
+            body: "Orders charge through the gateway trait, so the new provider slots in next.".into(),
+        }),
+        guide: vec![
+            GuideNote { path: "src/gateway.rs".into(), text: "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float.".into() },
+            GuideNote { path: "src/orders.rs".into(), text: "Orders call the trait instead of the client.".into() },
+        ],
+        left_out: Some("Left out: the CHANGES.md line, which the release writes.".into()),
+        files: vec![
+            ReviewFile {
+                path: "src/gateway.rs".into(),
+                old_path: None,
+                status: FileStatus::Added,
+                add: 3,
+                del: 0,
+                content: GATEWAY_CONTENT.into(),
+                read: false,
+                omitted: false,
+                hunks: vec![Hunk {
+                    head: "@@ -0,0 +1,3 @@".into(),
+                    lines: vec![
+                        line(LineKind::Add, None, Some(1), "pub trait PaymentGateway {"),
+                        line(LineKind::Add, None, Some(2), "    fn charge(&self, cents: u64) -> Result<Receipt>;"),
+                        line(LineKind::Add, None, Some(3), "}"),
+                    ],
+                }],
+            },
+            ReviewFile {
+                path: "src/orders.rs".into(),
+                old_path: None,
+                status: FileStatus::Modified,
+                add: 1,
+                del: 1,
+                content: "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567".into(),
+                read: true,
+                omitted: false,
+                hunks: vec![Hunk {
+                    head: "@@ -40,3 +40,3 @@ impl Order {".into(),
+                    lines: vec![
+                        line(LineKind::Context, Some(40), Some(40), "    pub fn pay(&self) -> Result<Receipt> {"),
+                        line(LineKind::Del, Some(41), None, "        client::charge(self.total as f64)"),
+                        line(LineKind::Add, None, Some(41), "        self.gateway.charge(self.total)"),
+                        line(LineKind::Context, Some(42), Some(42), "    }"),
+                    ],
+                }],
+            },
+            ReviewFile {
+                path: "assets/logo.png".into(),
+                old_path: None,
+                status: FileStatus::Modified,
+                add: 0,
+                del: 0,
+                content: "f".repeat(64),
+                read: false,
+                omitted: true,
+                hunks: Vec::new(),
+            },
+        ],
+    }
+}
+
+fn review_blob() -> (BlobRef, Vec<u8>) {
+    seal_blob_with(
+        &serde_json::to_vec(&review()).unwrap(),
+        REVIEW_MEDIA_TYPE,
+        seed("review/blob/key"),
+        seed("review/blob/nonce")[..12].try_into().unwrap(),
+    )
+}
+
+fn review_board() -> Payload {
+    let Payload::Board(mut board) = stepped_board() else {
+        unreachable!()
+    };
+    board.accepts = Some(vec![Kind::Answer, Kind::Push, Kind::ReviewOpen, Kind::ReviewComments, Kind::ReviewRead, Kind::AcceptStep]);
+    board.items[0].review = Some(ReviewOffer { step: Some(2), files: 3 });
+    Payload::Board(board)
+}
+
+fn review_open() -> Payload {
+    Payload::ReviewOpen(ReviewOpen { address: REVIEWED.into() })
+}
+
+fn review_comments() -> Payload {
+    Payload::ReviewComments(ReviewComments {
+        address: REVIEWED.into(),
+        step: Some(2),
+        comments: vec![
+            ReviewComment { path: "src/orders.rs".into(), line: 41, side: Side::Old, sha: Some(HEAD.into()), text: "Did anything else call client::charge with a float?".into() },
+            ReviewComment { path: "src/gateway.rs".into(), line: 2, side: Side::New, sha: Some(HEAD.into()), text: "Name the currency next to cents.".into() },
+        ],
+    })
+}
+
+fn review_read() -> Payload {
+    Payload::ReviewRead(ReviewRead { address: REVIEWED.into(), path: "src/gateway.rs".into(), read: true, content: GATEWAY_CONTENT.into() })
+}
+
+fn accept_step() -> Payload {
+    Payload::AcceptStep(AcceptStep { address: REVIEWED.into(), step: 2, sha: HEAD.into() })
+}
+
+fn review_ready() -> Payload {
+    Payload::Result(CommandResult {
+        command: command_id("review-open"),
+        device: Party::new("phone", Prefix::Device).id,
+        outcome: Outcome::Done,
+        text: "The review of step 2 is ready.".into(),
+        blob: Some(review_blob().0),
     })
 }
 
@@ -657,6 +790,7 @@ fn result() -> Payload {
             reason: Reason::AlreadySettled,
         },
         text: "That question no longer waits for an answer".into(),
+        blob: None,
     })
 }
 
@@ -946,6 +1080,32 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         questions_open(),
     ));
+
+    let reviewing = seal_case(
+        "review-board",
+        machine_header("review-board", Kind::Board, machine),
+        &review_board(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens("board-offering-a-review-opened-by-the-account", &reviewing, account, machine, review_board()));
+    for (name, case, kind, payload) in [
+        ("review-open-opened-by-the-machine", "review-open", Kind::ReviewOpen, review_open()),
+        ("review-comments-opened-by-the-machine", "review-comments", Kind::ReviewComments, review_comments()),
+        ("review-read-opened-by-the-machine", "review-read", Kind::ReviewRead, review_read()),
+        ("accept-step-opened-by-the-machine", "accept-step", Kind::AcceptStep, accept_step()),
+    ] {
+        let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
+        cases.push(opens(name, &sealed, machine, phone, payload));
+    }
+    let ready = seal_case(
+        "review-ready",
+        machine_header("review-open", Kind::Result, machine),
+        &review_ready(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens("review-result-naming-its-blob-opened-by-the-account", &ready, account, machine, review_ready()));
 
     let mut notice_header = machine_header("notice", Kind::Notice, machine);
     notice_header.urgency = Some(Urgency::High);
@@ -1490,6 +1650,10 @@ fn envelopes_json(parties: &Parties) -> Value {
         Kind::ItemAnswer,
         Kind::StartItem,
         Kind::DeviceDecision,
+        Kind::ReviewOpen,
+        Kind::ReviewComments,
+        Kind::ReviewRead,
+        Kind::AcceptStep,
     ]
     .into_iter()
     .map(|kind| (kind.name(), kind.max_ttl()))
@@ -1609,6 +1773,7 @@ fn authorize_json(parties: &Parties) -> Value {
             device: phone.id.clone(),
             outcome: Outcome::Done,
             text: "Answered refunds@shop's question.".into(),
+            blob: None,
         },
     );
     let routine = Payload::Routine(RunRoutine {
@@ -1669,6 +1834,7 @@ fn authorize_json(parties: &Parties) -> Value {
             device: phone.id.clone(),
             outcome: Outcome::Done,
             text: "Answered refunds@shop's question.".into(),
+            blob: None,
         },
     );
     let expired_result = expired_applied
@@ -1835,12 +2001,12 @@ fn authorize_json(parties: &Parties) -> Value {
             trust: CaseTrust::Account,
             applied: applied.clone(),
             envelope: answered.clone(),
-            expect: Err(Refusal::Replay(
+            expect: Err(Refusal::Replay(Box::new(
                 applied
                     .result(&phone.id, &answered.header.id)
                     .unwrap()
                     .clone(),
-            )),
+            ))),
         },
         AuthorizeCase {
             name: "same-command-id-from-another-device-is-not-a-replay",
@@ -1864,7 +2030,7 @@ fn authorize_json(parties: &Parties) -> Value {
             trust: CaseTrust::Account,
             applied: expired_applied,
             envelope: expired_answer,
-            expect: Err(Refusal::Replay(expired_result)),
+            expect: Err(Refusal::Replay(Box::new(expired_result))),
         },
         AuthorizeCase {
             name: "device-the-machine-approved-answers",
@@ -2437,6 +2603,91 @@ fn backlog_json() -> Value {
     })
 }
 
+fn review_json() -> Value {
+    let (blob, ciphertext) = review_blob();
+    let comment = json!({ "path": "src/orders.rs", "line": 41, "side": "old", "sha": HEAD, "text": "Why the cast?" });
+    let comments = |list: Value| json!({ "type": "review-comments", "address": REVIEWED, "step": 2, "comments": list });
+    let with = |key: &str, value: Value| {
+        let mut changed = comment.clone();
+        changed[key] = value;
+        comments(json!([changed]))
+    };
+    let payloads = [
+        ("comments on old and new lines", review_comments_json(), true),
+        ("a comment with neither step nor sha", json!({ "type": "review-comments", "address": REVIEWED, "comments": [{ "path": "src/gateway.rs", "line": 1, "side": "new", "text": "Fine." }] }), true),
+        ("no comments", comments(json!([])), false),
+        ("one comment too many", comments(json!(vec![comment.clone(); MAX_REVIEW_COMMENTS + 1])), false),
+        ("an empty comment", with("text", json!("  ")), false),
+        ("a comment past its length", with("text", json!("x".repeat(MAX_REVIEW_COMMENT_CHARS + 1))), false),
+        ("a comment holding a terminal escape", with("text", json!("Clear it\u{1b}[2J")), false),
+        ("a comment over two lines with a tab", with("text", json!("Why the cast?\n\tIt drops cents.")), true),
+        ("comments too large to send together", comments(json!(vec![{ let mut big = comment.clone(); big["text"] = json!("€".repeat(MAX_REVIEW_COMMENT_CHARS)); big }; 5])), false),
+        ("line zero", with("line", json!(0)), false),
+        ("a side that is neither old nor new", with("side", json!("both")), false),
+        ("a short sha", with("sha", json!("9f3c2a1")), false),
+        ("an absolute path", with("path", json!("/Users/someone/api/src/orders.rs")), false),
+        ("a path out of the repo", with("path", json!("../secrets.env")), false),
+        ("a field kebbie does not know", with("range", json!([40, 42])), false),
+        ("a read mark", serde_json::to_value(review_read()).unwrap(), true),
+        ("a read mark on a 64-character object id", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": false, "content": "a".repeat(64) }), true),
+        ("a read mark on a short hash", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": "5d1c0a9" }), false),
+        ("a read mark without its content", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true }), false),
+        ("an accept", serde_json::to_value(accept_step()).unwrap(), true),
+        ("an accept of step zero", json!({ "type": "accept-step", "address": REVIEWED, "step": 0, "sha": HEAD }), false),
+        ("an accept of a short sha", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "sha": "9f3c2a1" }), false),
+        ("a review asked for", serde_json::to_value(review_open()).unwrap(), true),
+        ("a review asked for a task without its repo", json!({ "type": "review-open", "address": "payments" }), false),
+    ];
+    let payloads: Vec<Value> = payloads
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
+    let body = serde_json::to_value(review()).unwrap();
+    let change = |pointer: &str, value: Value| {
+        let mut changed = body.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        changed.pointer_mut(parent).unwrap()[key] = value;
+        changed
+    };
+    let bodies = [
+        ("the review", body.clone(), true),
+        ("an absolute path", change("/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
+        ("counts that differ from the lines", change("/files/1/add", json!(2)), false),
+        ("an added line with an old number", change("/files/0/hunks/0/lines/0/old", json!(1)), false),
+        ("an omitted file with hunks", change("/files/0/omitted", json!(true)), false),
+        ("a short head", change("/head", json!("9f3c2a1")), false),
+        ("a content hash in capitals", change("/files/1/content", json!("0A1B2C3D4E5F60718293A4B5C6D7E8F901234567")), false),
+        ("a renamed file without its old path", change("/files/1/status", json!("renamed")), false),
+    ];
+    let bodies: Vec<Value> = bodies
+        .into_iter()
+        .map(|(name, body, valid)| {
+            let parsed = serde_json::from_value::<Review>(body.clone());
+            assert_eq!(parsed.is_ok_and(|review| review.check().is_ok()), valid, "{name}");
+            json!({ "name": name, "body": body, "valid": valid })
+        })
+        .collect();
+    json!({
+        "media_type": REVIEW_MEDIA_TYPE,
+        "max_comments": MAX_REVIEW_COMMENTS,
+        "max_comment_chars": MAX_REVIEW_COMMENT_CHARS,
+        "max_comments_bytes": MAX_REVIEW_COMMENTS_BYTES,
+        "review": review(),
+        "blob": blob,
+        "ciphertext": b64(&ciphertext),
+        "payloads": payloads,
+        "bodies": bodies,
+    })
+}
+
+fn review_comments_json() -> Value {
+    serde_json::to_value(review_comments()).unwrap()
+}
+
 fn blobs_json() -> Value {
     let sealed = |label: &str| {
         seal_blob_with(
@@ -2477,6 +2728,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("devices.json", devices_json(&parties)),
         ("blobs.json", blobs_json()),
         ("backlog.json", backlog_json()),
+        ("review.json", review_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

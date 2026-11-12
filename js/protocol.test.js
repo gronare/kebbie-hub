@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, checkReview, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -632,4 +632,33 @@ test("a start refused for open questions says how many wait, and no other result
   for (const name of ["result-counting-questions-for-another-reason", "open-questions-refusal-without-a-count"]) {
     assert.equal(envelopes.cases.find((vector) => vector.name === name).expect.error, "malformed", name);
   }
+});
+
+test("review commands hold Rust's limits and lifetimes, and each payload passes or fails as Rust's validation says", async () => {
+  const review = load("review.json");
+  assert.deepEqual([review.media_type, review.max_comments, review.max_comment_chars, review.max_comments_bytes], [REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES]);
+  for (const kind of ["review-open", "review-comments", "review-read", "accept-step"]) assert.deepEqual([KINDS[kind].command, KINDS[kind].ttl, KINDS[kind].maxTtl, envelopes.max_ttl[kind]], [true, 3600, 3600, 3600], kind);
+  for (const { name, payload, valid } of review.payloads) assert.equal((await failure(Promise.resolve().then(() => checkPayload(payload)))) === null, valid, name);
+  const device = await certifiedPhone();
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  for (const name of ["review-open-opened-by-the-machine", "review-comments-opened-by-the-machine", "review-read-opened-by-the-machine", "accept-step-opened-by-the-machine"]) {
+    const vector = envelopes.cases.find((candidate) => candidate.name === name);
+    const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
+    assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
+  }
+});
+
+test("a review opens from the blob its result names, checked as Rust checks it, and only a result that is done names a blob", async () => {
+  const review = load("review.json");
+  const body = JSON.parse(new TextDecoder().decode(await openBlob(review.blob, fromB64(review.ciphertext))));
+  assert.deepEqual(body, review.review);
+  for (const { name, body: candidate, valid } of review.bodies) assert.equal((await failure(Promise.resolve().then(() => checkReview(candidate)))) === null, valid, name);
+  const ready = envelopes.cases.find((vector) => vector.name === "review-result-naming-its-blob-opened-by-the-account");
+  const opened = await openEnvelope(ready.envelope, await identity("account"), await sender("machine"), envelopes.now);
+  assert.deepEqual(opened.blob, review.blob);
+  assert.throws(() => checkPayload({ ...opened, outcome: "refused", reason: "not-allowed" }), (error) => error.code === "malformed");
+  const offering = envelopes.cases.find((vector) => vector.name === "board-offering-a-review-opened-by-the-account").expect.payload;
+  checkPayload(offering);
+  assert.deepEqual(offering.items[0].review, { step: 2, files: 3 });
+  assert.throws(() => checkPayload({ ...offering, items: [{ ...offering.items[0], review: { step: 2, files: 3, diff: "+x" } }] }), (error) => error.code === "malformed");
 });

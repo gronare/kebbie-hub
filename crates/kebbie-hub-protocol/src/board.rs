@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::backlog::BacklogRow;
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
+use crate::review::ReviewOffer;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -150,6 +151,8 @@ pub struct Item {
     pub assessment: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub second_opinion: Option<SecondOpinion>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<ReviewOffer>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

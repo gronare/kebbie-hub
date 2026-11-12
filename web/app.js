@@ -13,6 +13,7 @@ import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememb
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled } from "./notify.js";
+import { cleanComment, commentProblem, commentsProblem, diffHref, freshReviewUi, hangLines, offerKey, openOf, opensOffer, readKey, readOf, reviewDiff, reviewEntry, reviewHref, reviewOverview, sendControl, settleReview } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -24,7 +25,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
 const cameraAtBottom = () => globalThis.screen?.orientation?.angle === (Math.max(innerWidth, innerHeight) > 800 ? 90 : 270);
@@ -68,6 +69,7 @@ function stripExpected() {
 }
 let pose = null;
 let layout = null;
+let rendered = null;
 
 
 const splitLike = () => pose === "split" || pose === "land";
@@ -272,7 +274,7 @@ function cardBlock(found) {
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
   if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
   const card = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
-  return card + pushArea(found);
+  return card + reviewEntry(found) + pushArea(found);
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
@@ -484,6 +486,89 @@ function ideaRoute() {
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
 }
 
+const taskHref = (machine, address) => `#/task/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
+
+function reviewUiOf(machine, address) {
+  const key = uiKey(machine, address);
+  if (!state.reviewUi.has(key)) state.reviewUi.set(key, freshReviewUi());
+  return state.reviewUi.get(key);
+}
+
+const sentOn = (found, kind, match = () => true) => state.kept.sent.filter((sent) => sent.kind === kind && sent.machine === found.machine && sent.address === found.item.address && match(sent)).sort((a, b) => b.at - a.at);
+
+function reviewFetch(found, opener, access) {
+  const opened = state.opened.find((machine) => machine.machine === found.machine);
+  const fetch = { state: "fetching", sent: opener, standing: null, lastSeen: opened?.lastSeen ?? null };
+  if (opener?.result?.outcome === "done") return { ...fetch, state: opener.result.blob ? "fetching" : "failed" };
+  if (access !== "ready") return { ...fetch, state: access };
+  if (!takes(found.accepts, "review-open")) return { ...fetch, state: "not-taken" };
+  if (!opener) return { ...fetch, state: isAsleep({ lastSeen: fetch.lastSeen }, nowSeconds()) ? "asleep" : "fetching" };
+  const shown = shownOf(opener);
+  const named = { refused: "rejected", waiting: "asleep", sending: "fetching" };
+  return { ...fetch, state: named[shown.state] ?? shown.state, standing: shown.standing };
+}
+
+function heldReview(found, opener) {
+  const blob = opener?.result?.outcome === "done" ? opener.result.blob : null;
+  if (!blob) return { review: null, failed: false };
+  const held = blobs.peek(blob.id);
+  if (!held) blobs.load(blob).then((loaded) => loaded && render());
+  if (held?.review && held.review.address !== found.item.address) return { review: null, failed: true };
+  return { review: held?.review ?? null, failed: Boolean(held?.failed) };
+}
+
+function reviewView(found) {
+  const ui = reviewUiOf(found.machine, found.item.address);
+  const offer = offerKey(found.item);
+  const access = commandGate();
+  const opener = sentOn(found, "review-open", opensOffer(found.item))[0] ?? null;
+  const { review, failed } = heldReview(found, opener);
+  settleReview(ui, review);
+  const fetch = failed ? { state: "failed", sent: opener } : reviewFetch(found, opener, access);
+  if (!opener && !ui.busy && ui.requested !== offer && access === "ready" && takes(found.accepts, "review-open")) {
+    ui.requested = offer;
+    queueMicrotask(() => requestReview(found));
+  }
+  const sha = review?.step?.sha ?? null;
+  const sentComments = sentOn(found, "review-comments", (sent) => (sent.sha ?? null) === sha).flatMap((sent) => {
+    const shown = shownOf(sent).state;
+    return (sent.comments ?? []).map((comment) => ({ ...comment, at: sent.at, state: shown }));
+  });
+  const accepted = sha ? sentOn(found, "accept-step", (sent) => sent.sha === sha)[0] : null;
+  const readSent = opener ? sentOn(found, "review-read", (sent) => sent.at >= opener.at && !settled(shownOf(sent).state)) : [];
+  const ready = access === "ready";
+  return {
+    machine: found.machine,
+    name: found.name,
+    address: found.item.address,
+    task: found.task,
+    title: taskName(found.item, found.task),
+    item: found.item,
+    accepts: found.accepts,
+    review,
+    fetch,
+    ui,
+    sentComments,
+    readSent,
+    acceptSent: accepted ? shownOf(accepted) : null,
+    access,
+    canComment: ready && takes(found.accepts, "review-comments"),
+    canRead: ready && takes(found.accepts, "review-read"),
+    refusedUrl: state.refused?.url ?? null,
+    now: nowSeconds(),
+  };
+}
+
+function reviewRoute([machine, address], diff = false) {
+  const found = findTask(state.opened, machine, address);
+  const back = backButton(diff && !twoColumns() ? reviewHref(machine, address) : taskHref(machine, address));
+  if (!found) return shell("board", back + top("Review") + `<div class="center">This task is no longer on the board.</div>`);
+  const v = reviewView(found);
+  if (twoColumns()) return shell("board", back + reviewOverview(v, { split: true, top }), reviewDiff(v, { inPanel: true, top })) + sendControl(v);
+  const main = diff ? reviewDiff(v, { inPanel: false, top }) : reviewOverview(v, { split: false, top });
+  return shell("board", back + main) + sendControl(v);
+}
+
 function boardRoute() {
   if (splitLike()) return splitScreen("next");
   return shell("board", overview() ? boardOverview() : boardScreen());
@@ -565,11 +650,19 @@ function render() {
   else if (name === "backlog") html = backlogRoute();
   else if (name === "item") html = itemRoute(params[0]);
   else if (name === "idea") html = ideaRoute();
+  else if (name === "review") html = reviewRoute(params);
+  else if (name === "diff") html = reviewRoute(params, true);
   else html = boardRoute();
   const focused = document.activeElement?.id && root.contains(document.activeElement) ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
   const auth = isAuthScreen(html);
   liftKeyboard(auth && html.includes("<input"));
+  const reviewing = name === "review" || name === "diff";
+  const panelTop = reviewing && rendered === location.hash ? (root.querySelector(".panel")?.scrollTop ?? 0) : 0;
   root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`;
+  rendered = location.hash;
+  if (panelTop) root.querySelector(".panel")?.scrollTo(0, panelTop);
+  document.documentElement.classList.toggle("has-send", Boolean(root.querySelector(".rv-sendbar")));
+  if (reviewing) hangLines(root);
   const refocus = focused ? document.getElementById(focused.id) : null;
   if (refocus) {
     refocus.focus({ preventScroll: true });
@@ -577,8 +670,9 @@ function render() {
   }
   fillBlobs();
   for (const element of root.querySelectorAll("[data-markdown]")) element.replaceChildren(...markdown(element.textContent));
-  document.title = (name === "task" || name === "plan") && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
+  document.title = ["task", "plan", "review", "diff"].includes(name) && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
 }
+
 
 let retrying = null;
 
@@ -772,7 +866,7 @@ function sendPush(target) {
 
 const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
 
-async function sendBacklog({ machine, payload, meta, ui }) {
+async function sendTo({ machine, payload, meta, ui }) {
   const keys = keysOf(machine.machine);
   ui.busy = true;
   ui.error = null;
@@ -785,8 +879,6 @@ async function sendBacklog({ machine, payload, meta, ui }) {
     const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine.machine, keys }, payload, at: nowSeconds(), meta: { machineName: machine.name, ...meta } });
     state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
     await keepSent(deviceStore, identity.id, state.kept);
-    state.lastMachine = machine.machine;
-    await put(lastMachineKey(), machine.machine).catch(() => undefined);
     ui.busy = false;
     return sent;
   } catch (error) {
@@ -798,6 +890,141 @@ async function sendBacklog({ machine, payload, meta, ui }) {
   } finally {
     collect();
   }
+}
+
+async function sendBacklog({ machine, payload, meta, ui }) {
+  const sent = await sendTo({ machine, payload, meta, ui });
+  if (!sent) return null;
+  state.lastMachine = machine.machine;
+  await put(lastMachineKey(), machine.machine).catch(() => undefined);
+  return sent;
+}
+
+const machineOf = (found) => ({ machine: found.machine, name: found.name });
+
+async function requestReview(found) {
+  const ui = reviewUiOf(found.machine, found.item.address);
+  await sendTo({ machine: machineOf(found), payload: { type: "review-open", address: found.item.address }, meta: { head: found.item.head ?? null, step: found.item.review?.step ?? null }, ui });
+  render();
+}
+
+function reveal(selector, offset = null) {
+  const element = root.querySelector(selector);
+  if (!element) return;
+  const panel = element.closest(".panel");
+  const header = element.querySelector(".rv-fh") ?? element;
+  const gap = offset ?? (parseFloat(getComputedStyle(header).top) || 0);
+  if (panel) panel.scrollTop += element.getBoundingClientRect().top - panel.getBoundingClientRect().top - gap;
+  else scrollTo(0, element.getBoundingClientRect().top + scrollY - gap);
+}
+
+function toDiff(v, selector, offset) {
+  if (twoColumns() || route().name === "diff") {
+    render();
+    return reveal(selector, offset);
+  }
+  revealAfter = { selector, offset };
+  go(diffHref(v.machine, v.address));
+}
+
+let revealAfter = null;
+
+async function sendComments(found, v) {
+  const { ui, review } = v;
+  if (!review || !ui.drafts.length || ui.busy) return;
+  const sha = review.step?.sha ?? null;
+  const comments = ui.drafts.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, sha, text: draft.text }));
+  const payload = { address: v.address, step: review.step?.number ?? null, comments };
+  ui.error = commentsProblem(payload);
+  if (ui.error) return render();
+  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-comments", ...payload }, meta: { sha, comments, count: comments.length }, ui });
+  if (sent) {
+    const receipt = { count: comments.length, at: sent.at, device: sent.deviceName ?? "this device" };
+    Object.assign(ui, { drafts: [], tray: false, composing: null, receipt });
+    setTimeout(() => {
+      if (ui.receipt !== receipt) return;
+      ui.receipt = null;
+      render();
+    }, 4000);
+  }
+  render();
+}
+
+async function markRead(found, v, index) {
+  const { ui, review } = v;
+  const file = review.files[index];
+  const read = !readOf(v, file);
+  ui.read.set(readKey(file), read);
+  ui.open.set(file.path, !read);
+  if (ui.composing?.path === file.path) ui.composing = null;
+  render();
+  reveal(`#rv-f-${index}`);
+  if (!v.canRead) return;
+  const quiet = { busy: false, error: null };
+  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-read", address: v.address, path: file.path, read, content: file.content }, meta: { path: file.path, read, content: file.content }, ui: quiet });
+  if (!sent) ui.error = quiet.error;
+  render();
+}
+
+async function acceptStep(found, v) {
+  const step = v.review?.step;
+  if (!step || v.ui.busy) return;
+  const sent = await sendTo({ machine: machineOf(found), payload: { type: "accept-step", address: v.address, step: step.number, sha: step.sha }, meta: { sha: step.sha, step: step.number }, ui: v.ui });
+  if (sent) v.ui.confirming = false;
+  render();
+}
+
+function reviewAction(action, target) {
+  const [machine, address] = route().params;
+  const found = findTask(state.opened, machine, address);
+  if (!found) return;
+  const v = reviewView(found);
+  const { ui, review } = v;
+  const id = Number(target.dataset.id);
+  const draft = ui.drafts.find((one) => one.id === id);
+  const file = review?.files[Number(target.dataset.file)];
+  if (action === "rv-retry") {
+    Object.assign(ui, { requested: offerKey(found.item), error: null });
+    return requestReview(found);
+  }
+  if (action === "rv-send") return sendComments(found, v);
+  if (action === "rv-read" && file) return markRead(found, v, Number(target.dataset.file));
+  if (action === "rv-accept") return acceptStep(found, v);
+  if (action === "rv-line" && file) {
+    if (ui.composing || !v.canComment) return;
+    ui.composing = { path: file.path, side: target.dataset.side, line: Number(target.dataset.line), text: "" };
+    ui.tray = false;
+    render();
+    return root.querySelector("#rv-c")?.focus({ preventScroll: true });
+  }
+  if (action === "rv-edit" && draft) {
+    Object.assign(ui, { composing: { ...draft }, tray: false });
+    ui.open.set(draft.path, true);
+    return toDiff(v, "#rv-c", 160);
+  }
+  if (action === "rv-show" && draft) {
+    ui.tray = false;
+    ui.open.set(draft.path, true);
+    return toDiff(v, `#rv-c-${id}`, 200);
+  }
+  if (action === "rv-compose-cancel") ui.composing = null;
+  else if (action === "rv-compose-add" && ui.composing) {
+    const text = cleanComment(ui.composing.text);
+    if (!text) return;
+    ui.composing.problem = commentProblem(text);
+    if (ui.composing.problem) return render();
+    if (ui.composing.id) Object.assign(ui.drafts.find((one) => one.id === ui.composing.id) ?? {}, { text });
+    else ui.drafts.push({ id: ui.nextId++, path: ui.composing.path, side: ui.composing.side, line: ui.composing.line, text });
+    Object.assign(ui, { composing: null, receipt: null, error: null });
+  } else if (action === "rv-remove") {
+    ui.drafts = ui.drafts.filter((one) => one.id !== id);
+    if (ui.composing?.id === id) ui.composing = null;
+  } else if (action === "rv-tray") ui.tray = !ui.tray;
+  else if (action === "rv-stale-dismiss") ui.stale = null;
+  else if (action === "rv-fold" && file) ui.open.set(file.path, !openOf(v, file));
+  else if (action === "rv-accept-ask") Object.assign(ui, { confirming: true, error: null });
+  else if (action === "rv-accept-cancel") Object.assign(ui, { confirming: false, error: null });
+  render();
 }
 
 async function addIdea() {
@@ -878,6 +1105,7 @@ function stopCommands() {
   state.backlogUi = new Map();
   state.idea = { text: "", machine: null, choosing: false, busy: false, error: null };
   state.lastMachine = null;
+  state.reviewUi = new Map();
 }
 
 function lockBoards() {
@@ -1187,9 +1415,12 @@ root.addEventListener("click", (event) => {
     event.preventDefault();
     return closeSheet(() => go(picked.getAttribute("href")));
   }
+  const fileRow = event.target.closest("a.rv-file");
+  if (fileRow) return openFile(event, fileRow);
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
+  if (action.startsWith("rv-")) return reviewAction(action, target);
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
   const decided = target.closest(".decide");
   if (decided) return decideAction(action, decided, target);
@@ -1225,7 +1456,29 @@ root.addEventListener("click", (event) => {
   }
 });
 
+function openFile(event, link) {
+  const [machine, address] = route().params;
+  const found = findTask(state.opened, machine, address);
+  const index = Number(link.dataset.file);
+  const file = found ? reviewView(found).review?.files[index] : null;
+  if (!file) return;
+  reviewUiOf(machine, address).open.set(file.path, true);
+  if (!twoColumns()) {
+    revealAfter = { selector: `#rv-f-${index}`, offset: null };
+    return;
+  }
+  event.preventDefault();
+  render();
+  reveal(`#rv-f-${index}`, 8);
+}
+
 root.addEventListener("input", (event) => {
+  if (event.target.dataset?.draft === "review-comment") {
+    const [machine, address] = route().params;
+    const ui = reviewUiOf(machine, address);
+    if (ui.composing) ui.composing.text = event.target.value;
+    return;
+  }
   if (event.target.id === "email") state.draft.email = event.target.value;
   if (event.target.id === "code") state.draft.code = event.target.value;
   const draft = event.target.dataset?.draft;
@@ -1254,7 +1507,7 @@ root.addEventListener("keydown", (event) => {
     event.preventDefault();
     return root.querySelector(SUBMIT)?.click();
   }
-  const pick = event.target.closest?.('[data-action="pick"], [data-action="pick-question"], [data-action="backlog-machine"]');
+  const pick = event.target.closest?.('[data-action="pick"], [data-action="pick-question"], [data-action="backlog-machine"], [data-action="rv-line"]');
   if (!pick || (event.key !== "Enter" && event.key !== " ")) return;
   event.preventDefault();
   pick.click();
@@ -1270,6 +1523,9 @@ addEventListener("hashchange", () => {
   state.sheet = false;
   render();
   if (!(twoColumns() && (name === "task" || name === "plan" || name === "item"))) window.scrollTo(0, 0);
+  const pending = revealAfter;
+  revealAfter = null;
+  if (pending) reveal(pending.selector, pending.offset);
 });
 
 let settleUntil = 0;

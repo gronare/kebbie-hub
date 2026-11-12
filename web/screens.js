@@ -37,7 +37,7 @@ export function sleepingRow(machine, now) {
   return `<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">asleep · last seen ${esc(lastSeenText(machine.lastSeen, now))}${working}</div></div>`;
 }
 
-const STEP_MARKS = { planned: "○", "in-progress": "◐", committed: "●", accepted: "✓" };
+export const STEP_MARKS = { planned: "○", "in-progress": "◐", committed: "●", accepted: "✓" };
 const STEP_LABELS = { planned: "", "in-progress": "in progress", committed: "committed", accepted: "accepted" };
 
 export function waited(seconds) {
@@ -471,7 +471,7 @@ export function devicesSection(devices, now) {
   return `<h2 class="group g-muted">Devices · ${devices.length}</h2>${devices.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>`;
 }
 
-const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "device-decision": "Decision on" };
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on" };
 const clip = (text, length = 60) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept):/, "").replace(/\.md$/, "");
 
@@ -507,6 +507,10 @@ export function historyEntry(entry, now) {
     if (kind === "idea") return { icon: "✓", what: `Idea for ${what}`, said: "filed in its backlog", at: entry.at };
     if (kind === "device-decision") return { icon: "✓", what: `${entry.payload.approve ? "Approved" : "Denied"} ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "item-answer") return { icon: "✓", what: `Answered a question on ${what}`, said: `"${clip(entry.payload.answer)}" · on ${machine}`, at: entry.at };
+    if (kind === "review-open") return { icon: "✓", what: `Opened the review of ${what}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "review-comments") return { icon: "✓", what: `Sent ${plural(entry.payload.comments.length, "review comment", "review comments")} on ${what}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "review-read") return { icon: "✓", what: `Marked ${entry.payload.path} ${entry.payload.read ? "read" : "unread"} on ${what}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "accept-step") return { icon: "✓", what: `Accepted step ${entry.payload.step} of ${what}`, said: [entry.payload.sha.slice(0, 7), `on ${machine}`].join(" · "), at: entry.at };
     return { icon: "✓", what: `Started ${what}`, said: `on ${machine}`, at: entry.at };
   }
   const noun = `${NOUNS[kind] ?? kind} ${what}`;

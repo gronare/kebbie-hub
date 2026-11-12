@@ -13,7 +13,8 @@ use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
     Idea, ItemAnswer, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob,
-    DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency,
+    DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
+    ReviewOffer, ReviewRead, Side, StepState,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,20 @@ use tokio::time::Instant;
 use crate::{Error, HubClient, HubError, KeyFile, PairError, now, save};
 
 pub fn every_command() -> Vec<Kind> {
-    vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem]
+    vec![
+        Kind::Answer,
+        Kind::Push,
+        Kind::Start,
+        Kind::Routine,
+        Kind::PromptAnswer,
+        Kind::Idea,
+        Kind::ItemAnswer,
+        Kind::StartItem,
+        Kind::ReviewOpen,
+        Kind::ReviewComments,
+        Kind::ReviewRead,
+        Kind::AcceptStep,
+    ]
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,6 +129,16 @@ pub struct MachineState {
     pub approve_from: ApproveFrom,
     #[serde(default)]
     pub retracts: Vec<String>,
+    #[serde(default)]
+    pub reviews: BTreeMap<String, Review>,
+    #[serde(skip)]
+    review_blobs: Vec<(Id, Vec<u8>)>,
+    #[serde(skip)]
+    sealed_reviews: BTreeMap<String, (Vec<u8>, BlobRef, Vec<u8>)>,
+    #[serde(skip)]
+    superseded_blobs: Vec<Id>,
+    #[serde(skip)]
+    board_changed: bool,
     #[serde(skip)]
     backlog_changed: bool,
     #[serde(skip)]
@@ -320,6 +344,11 @@ impl MachineState {
             started: BTreeMap::new(),
             approve_from: ApproveFrom::Devices,
             retracts: Vec::new(),
+            reviews: BTreeMap::new(),
+            review_blobs: Vec::new(),
+            sealed_reviews: BTreeMap::new(),
+            superseded_blobs: Vec::new(),
+            board_changed: false,
             backlog_changed: false,
             decided: false,
         }
@@ -557,6 +586,11 @@ impl MachineState {
         Ok(())
     }
 
+    pub async fn delete_blob(&self, id: &Id) -> Result<(), Error> {
+        self.client().delete(&format!("/v1/m/blobs/{id}")).await?;
+        Ok(())
+    }
+
     pub async fn post_board(&mut self, board: Board) -> Result<u64, Error> {
         let rev = self.last_rev + 1;
         self.post_board_at(board, rev).await
@@ -611,6 +645,10 @@ impl MachineState {
         }
         if self.backlog_changed {
             self.publish_backlog().await?;
+        } else if std::mem::take(&mut self.board_changed)
+            && let Some(board) = self.board.clone()
+        {
+            self.post_board(board).await?;
         }
         if let Some(path) = state_file {
             save(path, self)?;
@@ -636,6 +674,58 @@ impl MachineState {
         board.backlog = Some(self.backlog.rows.clone());
         self.backlog_changed = false;
         self.post_board(board).await
+    }
+
+    pub async fn post_review(&mut self, mut item: Item, review: Review) -> Result<u64, Error> {
+        review.check().map_err(|problem| Error::Protocol(problem.to_string()))?;
+        item.address = review.address.clone();
+        item.review = Some(ReviewOffer { step: review.step.as_ref().map(|step| step.number), files: review.files.len() as u32 });
+        let mut board = self.board.clone().unwrap_or_else(empty_board);
+        board.items.retain(|held| held.address != item.address);
+        board.items.insert(0, item);
+        self.reviews.insert(review.address.clone(), review);
+        self.post_board(board).await
+    }
+
+    fn seal_review(&mut self, address: &str) -> Result<BlobRef, Reason> {
+        let review = self.reviews.get(address).ok_or(Reason::AlreadySettled)?;
+        let plaintext = serde_json::to_vec(review).expect("a review always serializes");
+        if let Some((held, blob, ciphertext)) = self.sealed_reviews.get(address)
+            && *held == plaintext
+        {
+            self.review_blobs.push((blob.id.clone(), ciphertext.clone()));
+            return Ok(blob.clone());
+        }
+        let (blob, ciphertext) = seal_blob(&plaintext, REVIEW_MEDIA_TYPE);
+        self.review_blobs.push((blob.id.clone(), ciphertext.clone()));
+        if let Some((_, old, _)) = self.sealed_reviews.insert(address.to_string(), (plaintext, blob.clone(), ciphertext)) {
+            self.superseded_blobs.push(old.id);
+        }
+        Ok(blob)
+    }
+
+    fn mark_read(&mut self, read: &ReviewRead) -> Result<String, Reason> {
+        let review = self.reviews.get_mut(&read.address).ok_or(Reason::AlreadySettled)?;
+        let file = review.files.iter_mut().find(|file| file.path == read.path).ok_or(Reason::HeadMoved)?;
+        if file.content != read.content {
+            return Err(Reason::HeadMoved);
+        }
+        file.read = read.read;
+        Ok(format!("Marked {} {}.", read.path, if read.read { "read" } else { "unread" }))
+    }
+
+    fn accept_step(&mut self, accept: &AcceptStep) -> Result<String, Reason> {
+        let item = self.board.as_mut().and_then(|board| board.items.iter_mut().find(|item| item.address == accept.address)).ok_or(Reason::UnknownRepo)?;
+        let step = item.steps.as_mut().and_then(|steps| steps.items.iter_mut().find(|step| step.number == accept.step)).ok_or(Reason::HeadMoved)?;
+        if step.sha.as_deref() != Some(accept.sha.as_str()) {
+            return Err(Reason::HeadMoved);
+        }
+        if step.state == StepState::Accepted {
+            return Err(Reason::AlreadySettled);
+        }
+        step.state = StepState::Accepted;
+        self.board_changed = true;
+        Ok(format!("Accepted step {} of {}.", accept.step, accept.address))
     }
 
     fn file_idea(&mut self, idea: &Idea) -> String {
@@ -746,7 +836,7 @@ impl MachineState {
                 Handling::Applied { did, result }
             }
             Err(Refusal::Answer(reason)) => Handling::Refused(refusal(&header.id, &header.from, reason)),
-            Err(Refusal::Replay(result)) => Handling::Replayed(result),
+            Err(Refusal::Replay(result)) => Handling::Replayed(*result),
             Err(Refusal::Waiting(waiting)) => {
                 let device = waiting.device.id().clone();
                 let cert = waiting.device.cert();
@@ -771,6 +861,12 @@ impl MachineState {
                 save(path, self)?;
             }
         }
+        for (id, ciphertext) in std::mem::take(&mut self.review_blobs) {
+            self.put_blob(&id, ciphertext).await?;
+        }
+        for id in std::mem::take(&mut self.superseded_blobs) {
+            self.delete_blob(&id).await?;
+        }
         let posted = match handling.result() {
             Some(result) => Some(self.deliver_result(&account, result).await?),
             None => None,
@@ -791,6 +887,7 @@ impl MachineState {
             device: device.clone(),
             outcome: Outcome::Done,
             text,
+            blob: None,
         };
         match payload {
             Payload::Answer(answer) => {
@@ -853,6 +950,25 @@ impl MachineState {
             Payload::DeviceDecision(decision) => (
                 format!("{} {}", if decision.approve { "approve" } else { "deny" }, decision.device),
                 self.decide(decision).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::ReviewOpen(open) => (
+                format!("open the review of {}", open.address),
+                match self.seal_review(&open.address) {
+                    Ok(blob) => CommandResult { blob: Some(blob), ..done(format!("The review of {} is ready.", open.address)) },
+                    Err(reason) => refusal(command, device, reason),
+                },
+            ),
+            Payload::ReviewComments(comments) => (
+                format!("type into {}'s Claude:\n{}", comments.address, comment_lines(comments)),
+                done(format!("Sent {} to {}'s Claude.", plural(comments.comments.len(), "comment"), comments.address)),
+            ),
+            Payload::ReviewRead(read) => (
+                format!("mark {} {} on {}", read.path, if read.read { "read" } else { "unread" }, read.address),
+                self.mark_read(read).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::AcceptStep(accept) => (
+                format!("accept step {} at {} on {}", accept.step, accept.sha, accept.address),
+                self.accept_step(accept).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),
@@ -962,6 +1078,7 @@ fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
         Reason::QuestionChanged => "Not answered: the question changed since you saw it.".to_string(),
         Reason::UnknownDevice => "No such device waits for approval here.".to_string(),
         Reason::AlreadySettled => "Already settled.".to_string(),
+        Reason::HeadMoved => "It changed since you saw it.".to_string(),
         _ => format!("refused: {}", reason.key()),
     };
     CommandResult {
@@ -969,7 +1086,21 @@ fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
         device: device.clone(),
         outcome: Outcome::Refused { reason },
         text,
+        blob: None,
     }
+}
+
+fn plural(count: usize, one: &str) -> String {
+    if count == 1 { format!("1 {one}") } else { format!("{count} {one}s") }
+}
+
+fn comment_lines(comments: &ReviewComments) -> String {
+    let line = |comment: &kebbie_hub_protocol::ReviewComment| {
+        let before = if comment.side == Side::Old { " (before)" } else { "" };
+        let commit = comment.sha.as_deref().map(|sha| format!(" in {}", &sha[..7])).unwrap_or_default();
+        format!("{}:{}{before}{commit} — {}", comment.path, comment.line, comment.text)
+    };
+    comments.comments.iter().map(line).collect::<Vec<_>>().join("\n")
 }
 
 fn waiting_on_you(body: &BacklogBody) -> u32 {
@@ -1021,6 +1152,7 @@ fn started_task(address: &str, title: &str) -> Item {
         recipe: Some("small-fix".to_string()),
         assessment: None,
         second_opinion: None,
+        review: None,
     }
 }
 

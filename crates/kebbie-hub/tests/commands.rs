@@ -106,6 +106,7 @@ fn done(command: &Id) -> CommandResult {
         device: Id::ulid(Prefix::Device, 0, [0; 10]).unwrap(),
         outcome: Outcome::Done,
         text: "done".to_string(),
+        blob: None,
     }
 }
 

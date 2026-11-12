@@ -1,4 +1,4 @@
-import { BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, openBlob } from "../js/protocol.js";
+import { BACKLOG_BODY_MEDIA_TYPE, REVIEW_MEDIA_TYPE, checkBacklogBody, checkReview, openBlob } from "../js/protocol.js";
 
 export const kb = (bytes) => `${Math.max(1, Math.round(bytes / 1024))} kB`;
 
@@ -26,10 +26,15 @@ export function blobReader(fetchBytes, open = openBlob) {
         const done = (async () => {
           try {
             const body = ref.media_type === BACKLOG_BODY_MEDIA_TYPE;
-            if (!body && !/^text\//.test(ref.media_type)) throw new Error("not text");
-            const text = new TextDecoder("utf-8", { fatal: body }).decode(await open(ref, await fetchBytes(ref.id)));
-            if (!body) return { text };
+            const review = ref.media_type === REVIEW_MEDIA_TYPE;
+            if (!body && !review && !/^text\//.test(ref.media_type)) throw new Error("not text");
+            const text = new TextDecoder("utf-8", { fatal: body || review }).decode(await open(ref, await fetchBytes(ref.id)));
+            if (!body && !review) return { text };
             const parsed = JSON.parse(text);
+            if (review) {
+              checkReview(parsed);
+              return { review: parsed };
+            }
             checkBacklogBody(parsed);
             return { body: parsed };
           } catch {

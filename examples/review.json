@@ -1,0 +1,557 @@
+{
+  "item": {
+    "address": "retry-push@kebbie",
+    "group": "NEEDS YOU",
+    "urgency": 1,
+    "summary": "1 commit · step 1 of 2",
+    "next_for_you": null,
+    "agent": {
+      "status": "idle",
+      "kind": "claude",
+      "model": "opus"
+    },
+    "report": null,
+    "question": null,
+    "prompt": null,
+    "git": {
+      "upstream": "main",
+      "ahead": 1,
+      "behind": 0,
+      "uncommitted": 0,
+      "approved": false
+    },
+    "head": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
+    "verdict": null,
+    "push_permission": null,
+    "push_waits": null,
+    "follows_main": false,
+    "ci": null,
+    "recover": null,
+    "routine": null,
+    "card": null,
+    "steps": {
+      "pushed": 0,
+      "required": true,
+      "items": [
+        {
+          "number": 1,
+          "title": "Retry the push when the runner drops",
+          "state": "committed",
+          "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e"
+        },
+        {
+          "number": 2,
+          "title": "Show the retries on the board",
+          "state": "in-progress",
+          "sha": null
+        }
+      ]
+    },
+    "title": "Retry a flaky CI push",
+    "recipe": "small-fix"
+  },
+  "review": {
+    "address": "retry-push@kebbie",
+    "since": "main",
+    "head": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
+    "step": {
+      "number": 1,
+      "title": "Retry the push when the runner drops",
+      "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
+      "subject": "Retry a CI push when the runner drops",
+      "body": "A run that GitHub marks failed because its runner stopped answering never ran the code to the end. The push now waits for a runner and reruns it, twice at most. A third loss, or any failed step, stops the task as before. Each retry gets a line in the task's note."
+    },
+    "guide": [
+      {
+        "path": "src/tasks/push.rs",
+        "text": "`wait_for_ci` now loops: a run that lost its runner is rerun once a runner answers, twice at most, then the task stops with the reason. Worth a look: the two tries are a constant, not a setting."
+      },
+      {
+        "path": "src/ci.rs",
+        "text": "`Run` reads `runner_lost` from GitHub, and `failed()` leaves such a run out. Worth a look: a run only counts as lost when its conclusion is failure, so a cancelled run stays a cancel."
+      },
+      {
+        "path": "tests/push_retry.rs",
+        "text": "Two losses then a pass pushes, a third loss stops the task, a failed step is never retried."
+      }
+    ],
+    "left_out": "Left out: the CHANGES.md line, which the release writes.",
+    "files": [
+      {
+        "path": "src/tasks/push.rs",
+        "old_path": null,
+        "status": "modified",
+        "add": 21,
+        "del": 5,
+        "content": "1fd89a3f8a857003557e20d4258c1921b9729189",
+        "read": false,
+        "omitted": false,
+        "hunks": [
+          {
+            "head": "@@ -9,5 +9,6 @@ use crate::task_note;",
+            "lines": [
+              {
+                "kind": "context",
+                "old": 9,
+                "new": 9,
+                "text": "use crate::tasks::Task;"
+              },
+              {
+                "kind": "context",
+                "old": 10,
+                "new": 10,
+                "text": ""
+              },
+              {
+                "kind": "context",
+                "old": 11,
+                "new": 11,
+                "text": "const CI_WAIT: Duration = Duration::from_secs(20 * 60);"
+              },
+              {
+                "kind": "add",
+                "new": 12,
+                "text": "const RUNNER_RETRIES: u32 = 2;"
+              },
+              {
+                "kind": "context",
+                "old": 12,
+                "new": 13,
+                "text": ""
+              },
+              {
+                "kind": "context",
+                "old": 13,
+                "new": 14,
+                "text": "pub enum CiOutcome {"
+              }
+            ]
+          },
+          {
+            "head": "@@ -111,7 +112,22 @@ pub fn wait_for_ci(task: &Task, sha: &str) -> Result<CiOutcome> {",
+            "lines": [
+              {
+                "kind": "context",
+                "old": 111,
+                "new": 112,
+                "text": "    let deadline = Instant::now() + CI_WAIT;"
+              },
+              {
+                "kind": "del",
+                "old": 112,
+                "text": "    let runs = ci::settled_runs(&task.repo, sha, deadline)?;"
+              },
+              {
+                "kind": "del",
+                "old": 113,
+                "text": "    if let Some(run) = runs.iter().find(|run| run.failed()) {"
+              },
+              {
+                "kind": "del",
+                "old": 114,
+                "text": "        return Ok(CiOutcome::Failed(ci::failure_line(run)));"
+              },
+              {
+                "kind": "del",
+                "old": 115,
+                "text": "    }"
+              },
+              {
+                "kind": "del",
+                "old": 116,
+                "text": "    Ok(CiOutcome::Passed)"
+              },
+              {
+                "kind": "add",
+                "new": 113,
+                "text": "    let mut tries = 0;"
+              },
+              {
+                "kind": "add",
+                "new": 114,
+                "text": "    loop {"
+              },
+              {
+                "kind": "add",
+                "new": 115,
+                "text": "        let runs = ci::settled_runs(&task.repo, sha, deadline)?;"
+              },
+              {
+                "kind": "add",
+                "new": 116,
+                "text": "        if let Some(run) = runs.iter().find(|run| run.failed()) {"
+              },
+              {
+                "kind": "add",
+                "new": 117,
+                "text": "            return Ok(CiOutcome::Failed(ci::failure_line(run)));"
+              },
+              {
+                "kind": "add",
+                "new": 118,
+                "text": "        }"
+              },
+              {
+                "kind": "add",
+                "new": 119,
+                "text": "        let lost: Vec<&ci::Run> = runs.iter().filter(|run| run.lost_runner()).collect();"
+              },
+              {
+                "kind": "add",
+                "new": 120,
+                "text": "        if lost.is_empty() {"
+              },
+              {
+                "kind": "add",
+                "new": 121,
+                "text": "            return Ok(CiOutcome::Passed);"
+              },
+              {
+                "kind": "add",
+                "new": 122,
+                "text": "        }"
+              },
+              {
+                "kind": "add",
+                "new": 123,
+                "text": "        if tries == RUNNER_RETRIES {"
+              },
+              {
+                "kind": "add",
+                "new": 124,
+                "text": "            return Ok(CiOutcome::Failed(format!(\"{} lost its runner {} times; rerun it by hand when the runners are back\", lost[0].title(), tries + 1)));"
+              },
+              {
+                "kind": "add",
+                "new": 125,
+                "text": "        }"
+              },
+              {
+                "kind": "add",
+                "new": 126,
+                "text": "        tries += 1;"
+              },
+              {
+                "kind": "add",
+                "new": 127,
+                "text": "        task_note::append(task, &format!(\"CI: {} lost its runner, retry {tries} of {RUNNER_RETRIES}\", lost[0].title()))?;"
+              },
+              {
+                "kind": "add",
+                "new": 128,
+                "text": "        ci::wait_for_runner(&task.repo, deadline)?;"
+              },
+              {
+                "kind": "add",
+                "new": 129,
+                "text": "        for run in lost {"
+              },
+              {
+                "kind": "add",
+                "new": 130,
+                "text": "            ci::rerun(&task.repo, run.id)?;"
+              },
+              {
+                "kind": "add",
+                "new": 131,
+                "text": "        }"
+              },
+              {
+                "kind": "add",
+                "new": 132,
+                "text": "    }"
+              },
+              {
+                "kind": "context",
+                "old": 117,
+                "new": 133,
+                "text": "}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ci.rs",
+        "old_path": null,
+        "status": "modified",
+        "add": 7,
+        "del": 2,
+        "content": "70f91266ae1c31bd300a22602c7646dc10e28b05",
+        "read": false,
+        "omitted": false,
+        "hunks": [
+          {
+            "head": "@@ -31,4 +31,5 @@ pub struct Run {",
+            "lines": [
+              {
+                "kind": "context",
+                "old": 31,
+                "new": 31,
+                "text": "    pub status: String,"
+              },
+              {
+                "kind": "context",
+                "old": 32,
+                "new": 32,
+                "text": "    pub conclusion: String,"
+              },
+              {
+                "kind": "context",
+                "old": 33,
+                "new": 33,
+                "text": "    pub url: String,"
+              },
+              {
+                "kind": "add",
+                "new": 34,
+                "text": "    pub runner_lost: bool,"
+              },
+              {
+                "kind": "context",
+                "old": 34,
+                "new": 35,
+                "text": "}"
+              }
+            ]
+          },
+          {
+            "head": "@@ -49,6 +50,10 @@ impl Run {",
+            "lines": [
+              {
+                "kind": "context",
+                "old": 49,
+                "new": 50,
+                "text": "        self.done() && self.conclusion == \"cancelled\""
+              },
+              {
+                "kind": "context",
+                "old": 50,
+                "new": 51,
+                "text": "    }"
+              },
+              {
+                "kind": "context",
+                "old": 51,
+                "new": 52,
+                "text": ""
+              },
+              {
+                "kind": "add",
+                "new": 53,
+                "text": "    pub fn lost_runner(&self) -> bool {"
+              },
+              {
+                "kind": "add",
+                "new": 54,
+                "text": "        self.done() && self.conclusion == \"failure\" && self.runner_lost"
+              },
+              {
+                "kind": "add",
+                "new": 55,
+                "text": "    }"
+              },
+              {
+                "kind": "add",
+                "new": 56,
+                "text": ""
+              },
+              {
+                "kind": "context",
+                "old": 52,
+                "new": 57,
+                "text": "    fn failed(&self) -> bool {"
+              },
+              {
+                "kind": "del",
+                "old": 53,
+                "text": "        self.done() && !self.cancelled() && !PASSED.contains(&self.conclusion.as_str())"
+              },
+              {
+                "kind": "add",
+                "new": 58,
+                "text": "        self.done() && !self.cancelled() && !self.lost_runner() && !PASSED.contains(&self.conclusion.as_str())"
+              },
+              {
+                "kind": "context",
+                "old": 54,
+                "new": 59,
+                "text": "    }"
+              }
+            ]
+          },
+          {
+            "head": "@@ -61,4 +67,4 @@ impl Run {",
+            "lines": [
+              {
+                "kind": "context",
+                "old": 61,
+                "new": 67,
+                "text": "    fn from_json(value: &Value) -> Option<Run> {"
+              },
+              {
+                "kind": "context",
+                "old": 62,
+                "new": 68,
+                "text": "        let text = |key: &str| value[key].as_str().unwrap_or_default().to_string();"
+              },
+              {
+                "kind": "del",
+                "old": 63,
+                "text": "        Some(Run { id: value[\"id\"].as_u64()?, name: text(\"name\"), workflow: text(\"workflow\"), status: text(\"status\"), conclusion: text(\"conclusion\"), url: text(\"url\") })"
+              },
+              {
+                "kind": "add",
+                "new": 69,
+                "text": "        Some(Run { id: value[\"id\"].as_u64()?, name: text(\"name\"), workflow: text(\"workflow\"), status: text(\"status\"), conclusion: text(\"conclusion\"), url: text(\"url\"), runner_lost: value[\"runner_lost\"].as_bool().unwrap_or(false) })"
+              },
+              {
+                "kind": "context",
+                "old": 64,
+                "new": 70,
+                "text": "    }"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "path": "tests/push_retry.rs",
+        "old_path": null,
+        "status": "added",
+        "add": 24,
+        "del": 0,
+        "content": "10fe6b602a652748b761ebac3e0c6c8b5993c07b",
+        "read": false,
+        "omitted": false,
+        "hunks": [
+          {
+            "head": "@@ -0,0 +1,24 @@",
+            "lines": [
+              {
+                "kind": "add",
+                "new": 1,
+                "text": "use kebbie::tasks::push::{CiOutcome, wait_for_ci};"
+              },
+              {
+                "kind": "add",
+                "new": 2,
+                "text": "use kebbie::test_support::{FakeGh, task_in};"
+              },
+              {
+                "kind": "add",
+                "new": 3,
+                "text": ""
+              },
+              {
+                "kind": "add",
+                "new": 4,
+                "text": "#[test]"
+              },
+              {
+                "kind": "add",
+                "new": 5,
+                "text": "fn two_lost_runners_then_a_pass_pushes() {"
+              },
+              {
+                "kind": "add",
+                "new": 6,
+                "text": "    let gh = FakeGh::runs(&[&[\"lost\"], &[\"lost\"], &[\"success\"]]);"
+              },
+              {
+                "kind": "add",
+                "new": 7,
+                "text": "    let task = task_in(&gh);"
+              },
+              {
+                "kind": "add",
+                "new": 8,
+                "text": "    assert!(matches!(wait_for_ci(&task, gh.head()).unwrap(), CiOutcome::Passed));"
+              },
+              {
+                "kind": "add",
+                "new": 9,
+                "text": "    assert_eq!(gh.reruns(), 2);"
+              },
+              {
+                "kind": "add",
+                "new": 10,
+                "text": "    assert_eq!(task.note_lines(\"CI:\"), [\"CI: test lost its runner, retry 1 of 2\", \"CI: test lost its runner, retry 2 of 2\"]);"
+              },
+              {
+                "kind": "add",
+                "new": 11,
+                "text": "}"
+              },
+              {
+                "kind": "add",
+                "new": 12,
+                "text": ""
+              },
+              {
+                "kind": "add",
+                "new": 13,
+                "text": "#[test]"
+              },
+              {
+                "kind": "add",
+                "new": 14,
+                "text": "fn a_third_lost_runner_stops_the_task() {"
+              },
+              {
+                "kind": "add",
+                "new": 15,
+                "text": "    let gh = FakeGh::runs(&[&[\"lost\"], &[\"lost\"], &[\"lost\"]]);"
+              },
+              {
+                "kind": "add",
+                "new": 16,
+                "text": "    let CiOutcome::Failed(line) = wait_for_ci(&task_in(&gh), gh.head()).unwrap() else { panic!(\"pushed\") };"
+              },
+              {
+                "kind": "add",
+                "new": 17,
+                "text": "    assert_eq!(line, \"test lost its runner 3 times; rerun it by hand when the runners are back\");"
+              },
+              {
+                "kind": "add",
+                "new": 18,
+                "text": "}"
+              },
+              {
+                "kind": "add",
+                "new": 19,
+                "text": ""
+              },
+              {
+                "kind": "add",
+                "new": 20,
+                "text": "#[test]"
+              },
+              {
+                "kind": "add",
+                "new": 21,
+                "text": "fn a_failed_step_is_not_retried() {"
+              },
+              {
+                "kind": "add",
+                "new": 22,
+                "text": "    let gh = FakeGh::runs(&[&[\"failure\"]]);"
+              },
+              {
+                "kind": "add",
+                "new": 23,
+                "text": "    assert!(matches!(wait_for_ci(&task_in(&gh), gh.head()).unwrap(), CiOutcome::Failed(_)));"
+              },
+              {
+                "kind": "add",
+                "new": 24,
+                "text": "    assert_eq!(gh.reruns(), 0);"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1751 @@
+{
+  "blob": {
+    "bytes": 1700,
+    "id": "blb_b952aeeabc9e0b44d852a4cde2671ce78b9986e9fe095b25362dcb29dcbfe64d",
+    "key": "o6_c4Hb4UCGFMZ_cTbSARU7sg-WFe9PWrSuI_r7Bz4s",
+    "media_type": "application/vnd.kebbie.review+json"
+  },
+  "bodies": [
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "the review",
+      "valid": true
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "/Users/someone/api/src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "an absolute path",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 2,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "counts that differ from the lines",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "old": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "an added line with an old number",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": true,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "an omitted file with hunks",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a short head",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0A1B2C3D4E5F60718293A4B5C6D7E8F901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a content hash in capitals",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "renamed"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "number": 2,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a renamed file without its old path",
+      "valid": false
+    }
+  ],
+  "ciphertext": "BE7362wCZmQHAGO7QF7c4VVleLQDzctVm8lBHv5bHo_YkkbGlOGa0hUwvv2nE8aCQgAjx2ARsS3y_oHVvGliF6TUZjwYHG5ZyIJXHNakkukW9qtZcDIGQD4Cf9-Da85u-7LCr3Cr_IwdG5qcOXpuHUChcFa2g9Np1ZjKuhpISDub5yucjJ3X1DXd1na40zH5UrZLqXw-fBumy_C07ujQF7IwpgRHWrT6c1F-YjEmpPI1wL-841_7-D1OGMbMbiybPum5VUNtCRO55S7BoJYD3UcLTLjgutPzCULKT6o_hk3V_ziwyMwlgQfjUL4rUl5R-TxCF58fp7Mr01MnIAKBoU3EHV4jKEfRBUNg4W1sCGka0wOGgrKWUZGYFn6NHHqSHl7BPTQcWGgCKJIe8DG-QLiYCHEY0Oyl6oaerp9nEpCIj9aW20G02_EAJ-E0kc_ir4sXWLmI-1BPvhHRsDC517EdV8llUbEHVNK267PBBn9Gr47jWoi4ojulVDuNuorTbiFie9sbrTc2tQ6TYQQwyW7MrP9qNPAvQNUHq1TK6r5eJfqIEex_q4Bj5CpRgW23I8XWGgPpYeXM9c2IqR3CE1wEV9DqAjcldlsOa4uhoM8dGh_hgnUkdv15_GpDE5NxIZ9TKFYQpxsvPC8RBuWCsP253a6hH27uXuEMY6bbIAp4_QtV-qXvaPYRik-TXhVGRok_MjTTyxadtFWmcNvFnJer8qZY9GLifZW6yKyYaOJTX6cMKi2Jnvpj6Z4FN8fX3tGYUyV9qHh9-c_CfdolVrWGwI3bGjzIPM9ug4ZNV6_eTMjw5qK0M37UyKF3y7CjqwAOS4wXwccTA13vl5gyz8B94f4eifqgBVVIHppHnV4jYfQZJAJ8vANHGIzuZGgtJxqVU5ws2Ke_ctA9eMvXKIAqyEP15ZhcpNTw8sZW8gXVk8zJtLglPGD3k7np1HQeITVCtu3NGRHGulI1QK6K0vbeTmAZjlGAF7sm7RFZ4kvp-GUP_hXOF7AfU88FS--PPpb5MI6Q2Yb_m6SJCxw1RBsH65bdjfIBcrfW-dcCrSQrS06OdKcWVhX0NXsl04OgT7bwx3ZQKzIpXo4RAyTV2YVhAq4kUjwofo3HoFxt-deRrt-K3T-iBYBwl7KEybq9RVhpSWmXnWTJrPzB3hb4HsrwrnCtlQJGRUNwFYPB-EAoDMemlCOH_pGzhSv4gA62oHA1EEGbdG439MsdiBBehHrUXjlqyS_FspAYU856VtdUSPHFsJe0dYxDj069bddxf6reXBMxaLxRHnDGQHLgD4Jsd9wkdDb_Lm3kg597wVwAcon2keViP17LAsyuMEjxD_NSdf6oge_bnQfV5QJ00K_RFEg0x1Zvi0QyqaKSRVor4Y1PLkkMNC5SuP8A4ROlbtfHRaQyiAtVBBiBGv7_X_CFjbR7xSQSKHf3YOIo-a4EXyqB2u4qv7UuA5VgSvPYWyl-wZXmOIJDyiCxjQU4cVyqCcz1Sbbo25s5_hC9RW0a18A6Co-7CRRJO9d9KlPIMuEt434Kr2nY68d3jlxMbKzBZrvypG83jo6YNbJ227T4aomno6LIBnvK-tj9oJTZ2eXhCYOTMZwef8NV0LEP9SaFrcfDs3kMnjqLEbFEm3Sgr6Y4aB3mBq6l3mfMHA0NBC1R28PcMKi0_QgB7HtNnQ-FKQMjeuSLtUnrvWgfUIlcsbbT52b8IxhE80Z5OhzFea8i2JrArQTMCONLLVzXA740GoUgBdsA6oD-QSjyOyE0sGXdtBobet_zYytXBkbyBULSVhXdHglGOlNcMUnGnWjoJbjg0YXnNPZDxEa8W8xrVGW2uEyRaWxUlhFGuequWn_ZWs4sp8CY8cdRh8Udp1kIulO8v3xCFnsz053wrWJog8OczpNbgTCrFK5g_YP7D7ObBfqNv47niI9ko1X8EZIERn1FKfDrZkcAeRZvnoutdFc8GlhGBCQrindRzLC8-cYS2m5J_namxKY5Hp79T24B9_fi1xoy_ZD7A8lcyatJGHHwZLAENI5p8AZJ6Dph3f5rRHrwRUcVqGhLMz0aEFaLIhms3Ei4sePiG5sHI47D1yKMhI7juQL2gxEau_Blj1XgZlSyP2qEYgtCeJccBwayigzAB5pKD2HaHO8_WrnNeqkS-B4MLxhJshnGFQt6mCHK5T-vjaWsSIgDUnFgZO0sVQSoDBhL08A5nN47XbPhZp8DNa7XjMfXg4TK50nO5STvUtZJHVMstODLbd0-QL8lU8Eb3XLmhxiELT3qC4xKRQAJDc245VusHi9UIIOk",
+  "max_comment_chars": 2000,
+  "max_comments": 50,
+  "max_comments_bytes": 24576,
+  "media_type": "application/vnd.kebbie.review+json",
+  "payloads": [
+    {
+      "name": "comments on old and new lines",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Did anything else call client::charge with a float?"
+          },
+          {
+            "line": 2,
+            "path": "src/gateway.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "new",
+            "text": "Name the currency next to cents."
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": true
+    },
+    {
+      "name": "a comment with neither step nor sha",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 1,
+            "path": "src/gateway.rs",
+            "side": "new",
+            "text": "Fine."
+          }
+        ],
+        "type": "review-comments"
+      },
+      "valid": true
+    },
+    {
+      "name": "no comments",
+      "payload": {
+        "address": "payments@api",
+        "comments": [],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "one comment too many",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "an empty comment",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "  "
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a comment past its length",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a comment holding a terminal escape",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Clear it\u001b[2J"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a comment over two lines with a tab",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?\n\tIt drops cents."
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": true
+    },
+    {
+      "name": "comments too large to send together",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€"
+          },
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "line zero",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 0,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a side that is neither old nor new",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "both",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a short sha",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "sha": "9f3c2a1",
+            "side": "old",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "an absolute path",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "/Users/someone/api/src/orders.rs",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a path out of the repo",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "../secrets.env",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a field kebbie does not know",
+      "payload": {
+        "address": "payments@api",
+        "comments": [
+          {
+            "line": 41,
+            "path": "src/orders.rs",
+            "range": [
+              40,
+              42
+            ],
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "side": "old",
+            "text": "Why the cast?"
+          }
+        ],
+        "step": 2,
+        "type": "review-comments"
+      },
+      "valid": false
+    },
+    {
+      "name": "a read mark",
+      "payload": {
+        "address": "payments@api",
+        "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+        "path": "src/gateway.rs",
+        "read": true,
+        "type": "review-read"
+      },
+      "valid": true
+    },
+    {
+      "name": "a read mark on a 64-character object id",
+      "payload": {
+        "address": "payments@api",
+        "content": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "src/gateway.rs",
+        "read": false,
+        "type": "review-read"
+      },
+      "valid": true
+    },
+    {
+      "name": "a read mark on a short hash",
+      "payload": {
+        "address": "payments@api",
+        "content": "5d1c0a9",
+        "path": "src/gateway.rs",
+        "read": true,
+        "type": "review-read"
+      },
+      "valid": false
+    },
+    {
+      "name": "a read mark without its content",
+      "payload": {
+        "address": "payments@api",
+        "path": "src/gateway.rs",
+        "read": true,
+        "type": "review-read"
+      },
+      "valid": false
+    },
+    {
+      "name": "an accept",
+      "payload": {
+        "address": "payments@api",
+        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "step": 2,
+        "type": "accept-step"
+      },
+      "valid": true
+    },
+    {
+      "name": "an accept of step zero",
+      "payload": {
+        "address": "payments@api",
+        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "step": 0,
+        "type": "accept-step"
+      },
+      "valid": false
+    },
+    {
+      "name": "an accept of a short sha",
+      "payload": {
+        "address": "payments@api",
+        "sha": "9f3c2a1",
+        "step": 2,
+        "type": "accept-step"
+      },
+      "valid": false
+    },
+    {
+      "name": "a review asked for",
+      "payload": {
+        "address": "payments@api",
+        "type": "review-open"
+      },
+      "valid": true
+    },
+    {
+      "name": "a review asked for a task without its repo",
+      "payload": {
+        "address": "payments",
+        "type": "review-open"
+      },
+      "valid": false
+    }
+  ],
+  "review": {
+    "address": "payments@api",
+    "files": [
+      {
+        "add": 3,
+        "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+        "del": 0,
+        "hunks": [
+          {
+            "head": "@@ -0,0 +1,3 @@",
+            "lines": [
+              {
+                "kind": "add",
+                "new": 1,
+                "text": "pub trait PaymentGateway {"
+              },
+              {
+                "kind": "add",
+                "new": 2,
+                "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+              },
+              {
+                "kind": "add",
+                "new": 3,
+                "text": "}"
+              }
+            ]
+          }
+        ],
+        "old_path": null,
+        "omitted": false,
+        "path": "src/gateway.rs",
+        "read": false,
+        "status": "added"
+      },
+      {
+        "add": 1,
+        "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+        "del": 1,
+        "hunks": [
+          {
+            "head": "@@ -40,3 +40,3 @@ impl Order {",
+            "lines": [
+              {
+                "kind": "context",
+                "new": 40,
+                "old": 40,
+                "text": "    pub fn pay(&self) -> Result<Receipt> {"
+              },
+              {
+                "kind": "del",
+                "old": 41,
+                "text": "        client::charge(self.total as f64)"
+              },
+              {
+                "kind": "add",
+                "new": 41,
+                "text": "        self.gateway.charge(self.total)"
+              },
+              {
+                "kind": "context",
+                "new": 42,
+                "old": 42,
+                "text": "    }"
+              }
+            ]
+          }
+        ],
+        "old_path": null,
+        "omitted": false,
+        "path": "src/orders.rs",
+        "read": true,
+        "status": "modified"
+      },
+      {
+        "add": 0,
+        "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "del": 0,
+        "hunks": [],
+        "old_path": null,
+        "omitted": true,
+        "path": "assets/logo.png",
+        "read": false,
+        "status": "modified"
+      }
+    ],
+    "guide": [
+      {
+        "path": "src/gateway.rs",
+        "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+      },
+      {
+        "path": "src/orders.rs",
+        "text": "Orders call the trait instead of the client."
+      }
+    ],
+    "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+    "left_out": "Left out: the CHANGES.md line, which the release writes.",
+    "since": "main",
+    "step": {
+      "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+      "number": 2,
+      "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+      "subject": "Charge through a PaymentGateway",
+      "title": "Charge through a PaymentGateway"
+    }
+  }
+}

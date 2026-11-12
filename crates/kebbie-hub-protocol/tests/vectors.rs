@@ -148,7 +148,7 @@ fn commands_are_authorised_as_the_vectors_say() {
                 assert_eq!(Some(dropped.key()), expect["drop"].as_str(), "{name}")
             }
             Err(Refusal::Replay(result)) => assert_eq!(
-                result,
+                *result,
                 serde_json::from_value::<CommandResult>(expect["replay"].clone()).unwrap(),
                 "{name}"
             ),

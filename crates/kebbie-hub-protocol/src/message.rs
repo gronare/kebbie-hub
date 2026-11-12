@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::backlog::ItemKey;
-use crate::board::Board;
+use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
+use crate::review::{AcceptStep, ReviewComments, ReviewOpen, ReviewRead};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
@@ -31,6 +32,10 @@ pub enum Payload {
     ItemAnswer(ItemAnswer),
     StartItem(StartItem),
     DeviceDecision(DeviceDecision),
+    ReviewOpen(ReviewOpen),
+    ReviewComments(ReviewComments),
+    ReviewRead(ReviewRead),
+    AcceptStep(AcceptStep),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,6 +116,7 @@ pub struct CommandResult {
     pub device: Id,
     pub outcome: Outcome,
     pub text: String,
+    pub blob: Option<BlobRef>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -124,6 +130,8 @@ struct ResultFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     blocking: Option<u32>,
     text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    blob: Option<BlobRef>,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -153,11 +161,15 @@ impl TryFrom<ResultFields> for CommandResult {
         if fields.device.prefix() != Prefix::Device {
             return Err("device is not a device id");
         }
+        if fields.blob.is_some() && outcome != Outcome::Done {
+            return Err("only a result that is done names a blob");
+        }
         Ok(CommandResult {
             command: fields.command,
             device: fields.device,
             outcome,
             text: fields.text,
+            blob: fields.blob,
         })
     }
 }
@@ -180,6 +192,7 @@ impl From<CommandResult> for ResultFields {
             reason: reason.map(Reason::to_key),
             blocking,
             text: result.text,
+            blob: result.blob,
         }
     }
 }
@@ -369,6 +382,10 @@ impl Payload {
             Payload::ItemAnswer(_) => Kind::ItemAnswer,
             Payload::StartItem(_) => Kind::StartItem,
             Payload::DeviceDecision(_) => Kind::DeviceDecision,
+            Payload::ReviewOpen(_) => Kind::ReviewOpen,
+            Payload::ReviewComments(_) => Kind::ReviewComments,
+            Payload::ReviewRead(_) => Kind::ReviewRead,
+            Payload::AcceptStep(_) => Kind::AcceptStep,
         }
     }
 
@@ -437,12 +454,16 @@ impl Payload {
                 check(decision.device.prefix() == Prefix::Device, "device is not a device id")?;
                 check(is_fingerprint(&decision.fingerprint), "fingerprint is not a device fingerprint")
             }
+            Payload::ReviewOpen(open) => open.check(),
+            Payload::ReviewComments(comments) => comments.check(),
+            Payload::ReviewRead(read) => read.check(),
+            Payload::AcceptStep(accept) => accept.check(),
             Payload::StartItem(_) | Payload::Board(_) | Payload::Result(_) => Ok(()),
         }
     }
 }
 
-fn check(holds: bool, problem: &'static str) -> Result<(), &'static str> {
+pub(crate) fn check(holds: bool, problem: &'static str) -> Result<(), &'static str> {
     if holds { Ok(()) } else { Err(problem) }
 }
 
@@ -455,7 +476,7 @@ fn is_token(text: &str) -> bool {
         })
 }
 
-fn is_text(text: &str, max: usize) -> bool {
+pub(crate) fn is_text(text: &str, max: usize) -> bool {
     !text.trim().is_empty() && text.chars().count() <= max
 }
 
@@ -480,12 +501,12 @@ fn is_word(text: &str, max: usize) -> bool {
         && text.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
-fn is_address(text: &str) -> bool {
+pub(crate) fn is_address(text: &str) -> bool {
     text.split_once('@')
         .is_some_and(|(task, repo)| is_token(task) && is_token(repo))
 }
 
-fn is_full_sha(text: &str) -> bool {
+pub(crate) fn is_full_sha(text: &str) -> bool {
     text.len() == 40
         && text
             .bytes()
@@ -505,6 +526,7 @@ mod tests {
                 reason: Reason::HeadMoved,
             },
             text: "HEAD moved".to_string(),
+            blob: None,
         });
         let json = serde_json::to_value(&result).unwrap();
         assert_eq!(
@@ -578,6 +600,7 @@ mod tests {
                 device: Id::ulid(Prefix::Device, 1, [2; 10]).unwrap(),
                 outcome: Outcome::Refused { reason },
                 text: "Not started".into(),
+                blob: None,
             })
         };
         let open = refused(Reason::QuestionsOpen { blocking: 2 });
@@ -666,6 +689,29 @@ mod tests {
         assert!(decision(Id::account([1; 16]), "0C11-5E9A").validate().is_err());
         assert_eq!((Kind::DeviceDecision.is_command(), Kind::DeviceDecision.default_ttl(), Kind::DeviceDecision.max_ttl()), (true, 3_600, 3_600));
         assert_eq!(serde_json::to_value(decision(Id::ulid(Prefix::Device, 1, [2; 10]).unwrap(), "0C11-5E9A")).unwrap()["type"], "device-decision");
+    }
+
+    #[test]
+    fn review_commands_live_an_hour_and_only_a_result_that_is_done_names_a_blob() {
+        let kinds = [Kind::ReviewOpen, Kind::ReviewComments, Kind::ReviewRead, Kind::AcceptStep];
+        assert_eq!(kinds.map(|kind| (kind.name(), kind.is_command(), kind.default_ttl(), kind.max_ttl())), [
+            ("review-open", true, 3_600, 3_600),
+            ("review-comments", true, 3_600, 3_600),
+            ("review-read", true, 3_600, 3_600),
+            ("accept-step", true, 3_600, 3_600),
+        ]);
+        let open = serde_json::json!({ "type": "review-open", "address": "retry-push@kebbie" });
+        assert_eq!(serde_json::from_value::<Payload>(open).unwrap().kind(), Kind::ReviewOpen);
+        let blob = serde_json::json!({ "id": format!("blb_{}", "ab".repeat(32)), "key": "k".repeat(43), "media_type": crate::REVIEW_MEDIA_TYPE, "bytes": 2048 });
+        let device = Id::ulid(Prefix::Device, 1, [2; 10]).unwrap();
+        let done = serde_json::json!({ "type": "result", "command": Id::command(1, [1; 10]), "device": device, "outcome": "done", "text": "The review is ready.", "blob": blob });
+        let Payload::Result(result) = serde_json::from_value::<Payload>(done.clone()).unwrap() else { panic!("a result") };
+        assert_eq!(result.blob.as_ref().map(|blob| blob.bytes), Some(2048));
+        assert_eq!(serde_json::to_value(Payload::Result(result)).unwrap(), done);
+        let mut refused = done;
+        refused["outcome"] = serde_json::json!("refused");
+        refused["reason"] = serde_json::json!("not-allowed");
+        assert!(serde_json::from_value::<Payload>(refused).is_err());
     }
 
     #[test]

@@ -568,6 +568,14 @@ impl Store {
         Ok(BlobWrite::Stored)
     }
 
+    pub fn delete_blob(&mut self, machine: &Id, id: &Id) -> Result<bool> {
+        let deleted = self.connection.execute(
+            "DELETE FROM blobs WHERE id = ?1 AND machine_id = ?2",
+            params![id.as_str(), machine.as_str()],
+        )?;
+        Ok(deleted > 0)
+    }
+
     pub fn blob_for_account(&self, id: &Id, account: &str) -> Result<Option<Vec<u8>>> {
         self.connection
             .query_row(

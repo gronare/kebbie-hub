@@ -546,7 +546,7 @@ impl Hub {
 
     fn limit_command(&self, account: &str, kind: Kind) -> Result<(), ApiError> {
         let limiter = match kind {
-            Kind::Start | Kind::StartItem | Kind::Push => &self.start_push_limiter,
+            Kind::Start | Kind::StartItem | Kind::Push | Kind::AcceptStep => &self.start_push_limiter,
             _ => &self.command_limiter,
         };
         if limiter.allow(&format!("{account}:{}", kind.name())) {
@@ -651,7 +651,7 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         )
         .route(
             "/v1/m/blobs/{id}",
-            put(blobs::put_blob).layer(DefaultBodyLimit::max(MAX_BLOB_BYTES)),
+            put(blobs::put_blob).layer(DefaultBodyLimit::max(MAX_BLOB_BYTES)).delete(blobs::delete_blob),
         )
         .route("/v1/a/blobs/{id}", get(blobs::blob))
         .route("/v1/m/name", put(machine::rename))
