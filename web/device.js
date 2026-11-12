@@ -36,7 +36,7 @@ export const keepSent = (store, account, kept) => store.put(sentKey(account), ke
 export async function loadDevice(store, account) {
   try {
     const kept = await store.get(deviceKey(account));
-    return kept?.cert?.account === account && kept.signing ? kept : null;
+    return kept?.cert?.account === account && kept.signing && kept.encryption ? kept : null;
   } catch {
     return null;
   }
@@ -47,9 +47,9 @@ export async function ensureDevice({ store, calls, identity, name, now, kept = u
   if (held && (await verifyDeviceCert(identity.key, held.cert))) return held;
   const key = await newDeviceKey();
   const id = deviceId(now * 1000);
-  const cert = await signDeviceCert(identity, { device: id, name, signing: key.public, created_at: now });
+  const cert = await signDeviceCert(identity, { device: id, name, signing: key.public, encryption: key.encryptionPublic, created_at: now });
   await calls.addDevice(cert);
-  const device = { id, cert, signing: key.signing, fingerprint: await deviceFingerprint(key.public) };
+  const device = { id, cert, signing: key.signing, encryption: key.encryption, fingerprint: await deviceFingerprint(key.public) };
   await store.put(deviceKey(identity.id), device).catch(() => undefined);
   return device;
 }

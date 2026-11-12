@@ -3,7 +3,7 @@ use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use kebbie_hub_protocol::{AccountKey, DeviceCert, DeviceKind, Envelope, Id, MachineList, PublicKeys};
+use kebbie_hub_protocol::{AccountKey, DeviceCert, DeviceKind, Envelope, Id, MachineList, NoticeCategory, PublicKeys};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 pub use webauthn_rs_proto::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
@@ -404,6 +404,8 @@ pub struct HubInfo {
     // Set when the embedding service signs people in by email code; a new account from `kebbie hub connect` then starts with an email or GitHub.
     #[serde(default)]
     pub email_signin: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vapid: Option<String>,
 }
 
 pub const MAX_EMAIL_CHARS: usize = 254;
@@ -501,6 +503,58 @@ pub struct DeviceView {
     pub cert: DeviceCert,
     pub created_at: u64,
     pub last_seen_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub push: Option<DevicePush>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DevicePush {
+    pub categories: Vec<NoticeCategory>,
+    pub subscribed_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PushKeys {
+    pub p256dh: String,
+    pub auth: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PushSubscribe {
+    pub endpoint: String,
+    pub keys: PushKeys,
+    pub categories: Vec<NoticeCategory>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoticeCategories {
+    pub categories: Vec<NoticeCategory>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotifiedDevice {
+    pub cert: DeviceCert,
+    #[serde(default)]
+    pub notifications: Option<Vec<NoticeCategory>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotifiedDevices {
+    pub devices: Vec<NotifiedDevice>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoticeUpload {
+    pub envelope: Envelope,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoticePosted {
+    pub notice: Id,
+    pub pushes: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -682,7 +736,7 @@ mod tests {
 
     #[test]
     fn released_kebbie_still_reads_a_hub_info_that_advertises_email() {
-        let info = HubInfo { signup: SignupMode::Open, plans: true, needs_setup: false, github: true, commands: true, email: true, email_signin: true };
+        let info = HubInfo { signup: SignupMode::Open, plans: true, needs_setup: false, github: true, commands: true, email: true, email_signin: true, vapid: Some("BAAA".into()) };
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("\"email\":true") && json.contains("\"email_signin\":true"), "{json}");
         let released: ReleasedHubInfo = serde_json::from_str(&json).unwrap();

@@ -1,6 +1,8 @@
-const SHELL = "kebbie-shell-v12";
-const FILES = ["/", "/app.css", "/app.js", "/backlog.js", "/blobs.js", "/board.js", "/connect.js", "/decide.js", "/device.js", "/device-name.js", "/markdown.js", "/pages.js", "/screens.js", "/sections.js", "/pose.js", "/scroll.js", "/hub.js", "/store.js", "/passkey.js", "/signin.js", "/email.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
-const FALLBACK = { title: "kebbie", body: "Something on the board changed.", tag: "kebbie", url: "/#/board" };
+import { showPushed } from "./notify.js";
+import { get } from "./store.js";
+
+const SHELL = "kebbie-shell-v13";
+const FILES = ["/", "/app.css", "/app.js", "/backlog.js", "/blobs.js", "/board.js", "/connect.js", "/decide.js", "/device.js", "/device-name.js", "/markdown.js", "/pages.js", "/screens.js", "/sections.js", "/pose.js", "/scroll.js", "/hub.js", "/notify.js", "/store.js", "/passkey.js", "/signin.js", "/email.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));
@@ -28,17 +30,26 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+const pushed = (event) => {
+  try {
+    return event.data?.json() ?? null;
+  } catch {
+    return null;
+  }
+};
+
 self.addEventListener("push", (event) => {
-  event.waitUntil(self.registration.showNotification(FALLBACK.title, { body: FALLBACK.body, tag: FALLBACK.tag, data: { url: FALLBACK.url }, icon: "/icon-192.png" }));
+  event.waitUntil(showPushed(self.registration, pushed(event), { get, now: Math.floor(Date.now() / 1000) }));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url ?? "/";
+  const url = new URL(event.notification.data?.url ?? "/", self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       const open = windows[0];
-      return open ? open.navigate(url).then((client) => (client ?? open).focus()) : self.clients.openWindow(url);
+      if (!open) return self.clients.openWindow(url);
+      return open.navigate(url).then((client) => (client ?? open).focus()).catch(() => self.clients.openWindow(url));
     }),
   );
 });

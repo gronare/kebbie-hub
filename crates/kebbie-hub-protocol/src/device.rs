@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::account::AccountKey;
-use crate::crypto::SecretKeys;
+use crate::crypto::{PublicKeys, SecretKeys};
 use crate::ids::{Id, Prefix};
 
-pub const DEVICE_CERT_DOMAIN: &[u8] = b"kebbie-hub device certificate v1";
+pub const DEVICE_CERT_DOMAIN: &[u8] = b"kebbie-hub device certificate v2";
 pub const DEVICE_FINGERPRINT_DOMAIN: &[u8] = b"kebbie-hub device key v1";
 pub const MAX_DEVICE_NAME_CHARS: usize = 64;
 
@@ -28,32 +28,36 @@ impl DeviceKind {
 
 #[derive(Clone)]
 pub struct DeviceKey {
-    signing: SigningKey,
+    keys: SecretKeys,
 }
 
 impl DeviceKey {
     pub fn generate() -> DeviceKey {
-        let mut secret = [0u8; 32];
-        getrandom::fill(&mut secret).expect("the system random source failed");
-        DeviceKey::from_bytes(secret)
-    }
-
-    pub fn from_bytes(secret: [u8; 32]) -> DeviceKey {
         DeviceKey {
-            signing: SigningKey::from_bytes(&secret),
+            keys: SecretKeys::generate(),
         }
     }
 
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.signing.to_bytes()
+    pub fn from_bytes(signing: [u8; 32], encryption: [u8; 32]) -> DeviceKey {
+        DeviceKey {
+            keys: SecretKeys::from_bytes(signing, encryption),
+        }
     }
 
-    pub fn public(&self) -> [u8; 32] {
-        self.signing.verifying_key().to_bytes()
+    pub fn to_bytes(&self) -> ([u8; 32], [u8; 32]) {
+        self.keys.to_bytes()
+    }
+
+    pub fn public(&self) -> PublicKeys {
+        self.keys.public()
+    }
+
+    pub fn keys(&self) -> &SecretKeys {
+        &self.keys
     }
 
     pub(crate) fn signing(&self) -> &SigningKey {
-        &self.signing
+        self.keys.signing_key()
     }
 }
 
@@ -61,7 +65,7 @@ impl fmt::Debug for DeviceKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("DeviceKey")
-            .field("fingerprint", &device_fingerprint(&self.public()))
+            .field("fingerprint", &device_fingerprint(&self.public().signing))
             .finish_non_exhaustive()
     }
 }
@@ -75,6 +79,8 @@ pub struct DeviceCert {
     pub kind: DeviceKind,
     #[serde(with = "crate::crypto::b64_32")]
     pub signing: [u8; 32],
+    #[serde(with = "crate::crypto::b64_32")]
+    pub encryption: [u8; 32],
     pub created_at: u64,
     #[serde(with = "crate::crypto::b64_64")]
     pub sig: [u8; 64],
@@ -98,7 +104,7 @@ impl DeviceCert {
         device: Id,
         name: &str,
         kind: DeviceKind,
-        signing: [u8; 32],
+        keys: PublicKeys,
         created_at: u64,
     ) -> Result<DeviceCert, BadCert> {
         let mut cert = DeviceCert {
@@ -106,7 +112,8 @@ impl DeviceCert {
             device,
             name: name.to_string(),
             kind,
-            signing,
+            signing: keys.signing,
+            encryption: keys.encryption,
             created_at,
             sig: [0; 64],
         };
@@ -150,11 +157,22 @@ impl DeviceCert {
             out.extend(text.as_bytes());
         }
         out.extend(self.signing);
+        out.extend(self.encryption);
         out.extend(self.created_at.to_be_bytes());
     }
 
     pub fn fingerprint(&self) -> String {
         device_fingerprint(&self.signing)
+    }
+
+    pub fn recipient(&self) -> (Id, PublicKeys) {
+        (
+            self.device.clone(),
+            PublicKeys {
+                signing: self.signing,
+                encryption: self.encryption,
+            },
+        )
     }
 }
 
@@ -275,7 +293,11 @@ mod tests {
                 ..cert.clone()
             },
             DeviceCert {
-                signing: DeviceKey::generate().public(),
+                signing: DeviceKey::generate().public().signing,
+                ..cert.clone()
+            },
+            DeviceCert {
+                encryption: DeviceKey::generate().public().encryption,
                 ..cert.clone()
             },
             DeviceCert {

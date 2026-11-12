@@ -51,6 +51,9 @@ export const account = {
   results: (after, wait = 0) => call("GET", `/v1/a/results?after=${after}&wait=${wait}`),
   addDevice: (cert) => call("POST", "/v1/a/devices", { body: { cert } }),
   devices: () => call("GET", "/v1/a/devices"),
+  subscribePush: (device, subscription) => call("PUT", `/v1/a/devices/${query(device)}/push`, { body: subscription }),
+  setCategories: (device, categories) => call("PUT", `/v1/a/devices/${query(device)}/categories`, { body: { categories } }),
+  unsubscribePush: (device) => call("DELETE", `/v1/a/devices/${query(device)}/push`),
   deviceCommands: (device, before = null) => call("GET", `/v1/a/devices/${query(device)}/commands${before === null ? "" : `?before=${before}`}`),
 };
 

@@ -105,6 +105,14 @@ pub fn authorize(
     payload
         .validate()
         .map_err(|_| Refusal::Answer(Reason::BadRequest))?;
+    if let Payload::DeviceDecision(decision) = &payload {
+        if &decision.device == device.id() {
+            return Err(Refusal::Answer(Reason::BadRequest));
+        }
+        if trust == Trust::Waiting {
+            return Err(Refusal::Answer(Reason::NotApproved));
+        }
+    }
     match trust {
         Trust::Waiting => Err(Refusal::Waiting(Box::new(Verified { device, payload }))),
         _ => Ok(Verified { device, payload }),

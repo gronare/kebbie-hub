@@ -214,3 +214,43 @@ export const COMMAND_TEXT = {
   "no-device": "This device has no key yet. Turn on Allow changes in Account.",
   "unknown-device": "The hub doesn't know this device. Turn Allow changes off and on in Account.",
 };
+
+export const decides = (standing) => standing.state === "waiting" && standing.mine === "approved" && takes(standing.accepts, "device-decision");
+
+export function decisionState(sent, now) {
+  if (!sent) return null;
+  if (sent.result) return sent.result.outcome === "done" ? "done" : "refused";
+  return now >= sent.exp ? "expired" : "sending";
+}
+
+function decisionStatus(sent, state, { machine, name, now }) {
+  const verb = sent.approve ? "Approval" : "Denial";
+  const meta = `Sent ${from(sent)}`;
+  if (state === "sending") return block("wait", `${verb} sent to ${machine}`, `${machine} ${sent.approve ? "approves" : "denies"} ${name} when it takes it.`, `${meta} · expires ${esc(until(sent.exp, now))}`);
+  if (state === "done") return block("done", `✓ ${sent.approve ? "Approved" : "Denied"} on ${machine}`, "", meta);
+  if (state === "expired") return block("refused", `Not delivered: ${machine} didn't take it within the hour`, `Try again when ${machine} is awake.`, `${meta} · expired ${esc(clock(sent.exp))}`);
+  const reason = sent.result.reason;
+  if (reason === "not-allowed") return block("refused", `${machine} takes approvals only at the machine`, `Approve or deny ${name} in kebbie on ${machine}.`, meta);
+  if (reason === "not-approved") return block("refused", `${machine} hasn't approved this device yet`, `Approve this device in kebbie on ${machine} first, then decide here.`, meta);
+  if (reason === "denied") return block("refused", `${machine} doesn't take changes from this device`, `Approve or deny ${name} in kebbie on ${machine}.`, meta);
+  if (reason === "unknown-device") return block("refused", `${name} no longer waits on ${machine}`, `It was approved or denied already, or it asked again with a new key.`, meta);
+  return block("refused", ...refusal("Not decided", sent.result.text), meta);
+}
+
+export function decisionBlock({ standing, device, sent = null, self = false, allowed = true, busy = false, now }) {
+  if (standing.state !== "waiting") return "";
+  const machine = esc(standing.machine);
+  const name = esc(device.name);
+  if (self) return `<div class="meta">Approve this device in kebbie on ${machine}.</div>`;
+  if (!decides(standing)) {
+    const why = standing.mine === "approved" ? `${machine} takes approvals only at the machine.` : `Approve or deny it in kebbie on ${machine}.`;
+    return `<div class="meta">${why}</div>`;
+  }
+  const state = decisionState(sent, now);
+  const status = state ? decisionStatus(sent, state, { machine, name, now }) : "";
+  if (!allowed && !status) return `<div class="meta">Allow changes from this device to approve or deny ${name} here, or decide in kebbie on ${machine}.</div>`;
+  const open = allowed && state !== "sending" && state !== "done";
+  const off = busy ? " disabled" : "";
+  const buttons = open ? `<div class="pair-answer"><button type="button" class="btn" data-action="decide-device" data-machine="${esc(standing.machineId)}" data-approve="false"${off}>Deny</button><button type="button" class="btn primary" data-action="decide-device" data-machine="${esc(standing.machineId)}" data-approve="true"${off}>Approve</button></div>` : "";
+  return `<div class="decide">${status}${buttons}</div>`;
+}

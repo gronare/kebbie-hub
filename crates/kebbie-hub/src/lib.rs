@@ -13,11 +13,13 @@ mod github;
 mod limit;
 mod machine;
 mod pairing;
+mod push;
 mod server;
 mod signin;
 pub mod store;
 mod wake;
 pub mod web;
+pub mod webpush;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -43,7 +45,9 @@ use github::GitHub;
 use limit::Limiter;
 pub use limit::{MAX_BUCKETS, RateLimit};
 pub use server::{serve, serve_with};
+use push::Pusher;
 use store::{Pairing, Store};
+use webpush::{Vapid, check_subject};
 use wake::{Wakeups, account_key, machine_key, pairing_key};
 
 pub const DATABASE_FILE: &str = "hub.sqlite3";
@@ -55,6 +59,8 @@ const MAX_NAME_CHARS: usize = 64;
 pub const MAX_STORED_INTEGER: u64 = i64::MAX as u64;
 pub const DEV_ORIGIN: &str = "http://localhost:8470";
 pub const DEV_RP_ID: &str = "localhost";
+pub const DEV_VAPID_SUBJECT: &str = "https://github.com/gronare/kebbie-hub";
+pub const VAPID_KEY_FILE: &str = "vapid.key";
 const SETUP_TTL: u64 = 30 * 86_400;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -115,12 +121,23 @@ pub struct Config {
     pub connect_interval: u64,
     pub connect_rate: RateLimit,
     pub code_rate: RateLimit,
+    pub vapid_subject: String,
+    pub vapid_key: PathBuf,
+    pub push_allow_hosts: Vec<String>,
+    pub notice_rate: RateLimit,
+    pub device_push_rate: RateLimit,
+    pub push_in_flight: usize,
+    pub push_pending: usize,
+    pub push_retries: u32,
+    pub push_backoff: Duration,
+    pub push_timeout: Duration,
 }
 
 impl Config {
     pub fn new(data_dir: impl Into<PathBuf>) -> Config {
         let data_dir = data_dir.into();
         Config {
+            vapid_key: data_dir.join(VAPID_KEY_FILE),
             data_dir,
             rate: RateLimit::default(),
             join_code_ttl: 600,
@@ -165,6 +182,21 @@ impl Config {
                 burst: 10,
                 per_minute: 10,
             },
+            vapid_subject: DEV_VAPID_SUBJECT.to_string(),
+            push_allow_hosts: Vec::new(),
+            notice_rate: RateLimit {
+                burst: 30,
+                per_minute: 30,
+            },
+            device_push_rate: RateLimit {
+                burst: 30,
+                per_minute: 30,
+            },
+            push_in_flight: 256,
+            push_pending: 4096,
+            push_retries: 3,
+            push_backoff: Duration::from_secs(1),
+            push_timeout: Duration::from_secs(30),
         }
     }
 
@@ -210,6 +242,7 @@ pub enum OpenError {
     RelyingParty(String),
     DataDir(String),
     GitHub(String),
+    Push(String),
 }
 
 impl std::fmt::Display for OpenError {
@@ -218,7 +251,8 @@ impl std::fmt::Display for OpenError {
             OpenError::Store(error) => error.fmt(formatter),
             OpenError::RelyingParty(message)
             | OpenError::DataDir(message)
-            | OpenError::GitHub(message) => formatter.write_str(message),
+            | OpenError::GitHub(message)
+            | OpenError::Push(message) => formatter.write_str(message),
         }
     }
 }
@@ -271,6 +305,9 @@ pub struct Hub {
     start_push_limiter: Limiter,
     connect_limiter: Limiter,
     code_limiter: Limiter,
+    notice_limiter: Limiter,
+    device_push_limiter: Limiter,
+    pusher: Pusher,
     setup_url: Mutex<Option<String>>,
     wakeups: Wakeups,
     closing: watch::Sender<bool>,
@@ -330,6 +367,10 @@ impl Hub {
             }
             (None, _) => None,
         };
+        check_subject(&config.vapid_subject).map_err(OpenError::Push)?;
+        let vapid = Vapid::load_or_create(&config.vapid_key).map_err(OpenError::Push)?;
+        let pusher = Pusher::new(vapid, config.push_timeout, config.push_in_flight, config.push_pending)
+            .map_err(OpenError::Push)?;
         let store = Store::open(&config.database())?;
         let setup_url = if store.account_count()? == 0 {
             let token = auth::new_token(auth::SETUP_TOKEN_PREFIX);
@@ -341,6 +382,9 @@ impl Hub {
         Ok(Arc::new(Hub {
             connect_limiter: Limiter::new(config.connect_rate, config.max_buckets),
             code_limiter: Limiter::new(config.code_rate, config.max_buckets),
+            notice_limiter: Limiter::new(config.notice_rate, config.max_buckets),
+            device_push_limiter: Limiter::new(config.device_push_rate, config.max_buckets),
+            pusher,
             setup_url: Mutex::new(setup_url),
             store: Mutex::new(store),
             limiter: Limiter::new(config.rate, config.max_buckets),
@@ -429,6 +473,14 @@ impl Hub {
             .setup_url
             .lock()
             .expect("the setup lock is never poisoned") = None;
+    }
+
+    pub fn vapid_public_key(&self) -> &str {
+        self.pusher.vapid.public_key()
+    }
+
+    pub fn pushes_in_flight(&self) -> usize {
+        self.pusher.pending()
     }
 
     pub fn email_sign_in(&self) -> bool {
@@ -557,6 +609,8 @@ impl Hub {
         self.start_push_limiter.forget_idle();
         self.connect_limiter.forget_idle();
         self.code_limiter.forget_idle();
+        self.notice_limiter.forget_idle();
+        self.device_push_limiter.forget_idle();
         self.wakeups.forget_idle();
         swept
     }
@@ -611,6 +665,10 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         .route("/v1/a/results", get(command::results))
         .route("/v1/a/devices", get(devices::devices).post(devices::post_device))
         .route("/v1/a/devices/{id}/commands", get(devices::device_commands))
+        .route("/v1/a/devices/{id}/push", put(push::subscribe).delete(push::unsubscribe))
+        .route("/v1/a/devices/{id}/categories", put(push::set_categories))
+        .route("/v1/m/devices", get(push::notified_devices))
+        .route("/v1/m/notices", post(push::post_notice))
         .route("/v1/m/pairings/{id}", get(machine::pairing))
         .route("/v1/m/pairings/{id}/reply", post(machine::reply))
         .route("/v1/m/pairings/{id}/admit", post(machine::admit))

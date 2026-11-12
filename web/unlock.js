@@ -1,11 +1,12 @@
 import { accountFingerprints, accountIdentity, fromB64, newAccountSecrets, signStatement, toB64, unwrapAccountSecrets, wrapAccountSecrets, wrapperStatement } from "../js/protocol.js";
 import { HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
+import { LISTING } from "./notify.js";
 import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
 const REMEMBERED = "kebbie-credential";
 const KEPT = "unlock";
-export const LISTING = "listing";
+export { LISTING };
 export const KEEP_MS = 60 * 60 * 1000;
 
 export const STATE_TEXT = {

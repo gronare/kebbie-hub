@@ -11,10 +11,11 @@ use kebbie_hub_api::{
     CreationCeremony, LoginBegin, LoginFinish, PairingState, PairingView, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony, ResultEntry, Results, SignedIn,
     SignedMachineList, WrapperUpload, DeviceCommands, DeviceUpload, DeviceView, Devices,
+    NoticeCategories, PushSubscribe,
 };
 use kebbie_hub_protocol::{
     AccountHandoff, AccountKey, Board, CommandResult, ConnectSecret, DeviceCert, DeviceKey,
-    DeviceKind, Envelope, Header, Id, MachineList, OpenError, Payload, Prefix, PublicKeys,
+    DeviceKind, Envelope, Header, Id, MachineList, Notice, NoticeCategory, OpenError, Payload, Prefix, PublicKeys,
     SecretKeys, Unlock, VerifiedDevice, open, open_command, seal_command, sign_wrapper,
 };
 use reqwest::{Method, RequestBuilder, Response};
@@ -216,6 +217,39 @@ impl Browser {
     ) -> Result<DeviceCommands, HubError> {
         let query = before.map(|before| format!("?before={before}")).unwrap_or_default();
         self.get(&format!("/v1/a/devices/{device}/commands{query}")).await
+    }
+
+    pub async fn subscribe_push(&mut self, subscription: &PushSubscribe) -> Result<(), HubError> {
+        let path = format!("/v1/a/devices/{}/push", self.device_id);
+        let _: Option<()> = self.put(&path, subscription).await?;
+        Ok(())
+    }
+
+    pub async fn set_categories(&mut self, categories: &[NoticeCategory]) -> Result<(), HubError> {
+        let path = format!("/v1/a/devices/{}/categories", self.device_id);
+        let _: Option<()> = self.put(&path, &NoticeCategories { categories: categories.to_vec() }).await?;
+        Ok(())
+    }
+
+    pub async fn unsubscribe_push(&mut self) -> Result<(), HubError> {
+        self.delete(&format!("/v1/a/devices/{}/push", self.device_id)).await
+    }
+
+    pub fn device_id(&self) -> &Id {
+        &self.device_id
+    }
+
+    pub fn open_notice(&self, envelope: &Envelope, at: u64) -> Result<Notice, String> {
+        let machine = &envelope.header.machine;
+        let keys = self.machine_keys(machine).map_err(|error| error.to_string())?;
+        match open(envelope, &self.device_id, self.device.keys(), machine, &keys, at) {
+            Ok(Payload::Notice(notice)) => {
+                Payload::Notice(notice.clone()).validate().map_err(str::to_string)?;
+                Ok(notice)
+            }
+            Ok(_) => Err("is not a notice".into()),
+            Err(error) => Err(format!("does not open: {error}")),
+        }
     }
 
     pub fn open_command(&self, envelope: &Envelope) -> Result<(VerifiedDevice, Payload), String> {

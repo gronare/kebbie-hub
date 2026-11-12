@@ -56,6 +56,10 @@ impl SecretKeys {
         (self.signing.to_bytes(), self.encryption.to_bytes().into())
     }
 
+    pub(crate) fn signing_key(&self) -> &SigningKey {
+        &self.signing
+    }
+
     pub fn public(&self) -> PublicKeys {
         PublicKeys {
             signing: self.signing.verifying_key().to_bytes(),
@@ -241,7 +245,7 @@ pub(crate) fn seal_command_with(
     randomness: &Randomness,
 ) -> Result<Envelope, SealError> {
     let cert = header.cert.as_ref().ok_or(SealError::NotACommand)?;
-    if !account.verifies_device(cert) || cert.signing != device.public() {
+    if !account.verifies_device(cert) || cert.recipient().1 != device.public() {
         return Err(SealError::CertMismatch);
     }
     seal_with(header, payload, device.signing(), recipients, randomness)
@@ -597,7 +601,7 @@ mod tests {
         let machine = Id::ulid(Prefix::Machine, 1, [1; 10]).unwrap();
         let account = Id::account([2; 16]);
         let keys = SecretKeys::generate();
-        let cert = DeviceCert::issue(&keys, &account, Id::ulid(Prefix::Device, 1, [3; 10]).unwrap(), "iPhone", DeviceKind::Web, keys.public().signing, 1_000).unwrap();
+        let cert = DeviceCert::issue(&keys, &account, Id::ulid(Prefix::Device, 1, [3; 10]).unwrap(), "iPhone", DeviceKind::Web, keys.public(), 1_000).unwrap();
         let payload = Payload::Routine(RunRoutine {
             id: "nightly-deps".into(),
         });

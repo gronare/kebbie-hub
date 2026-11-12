@@ -46,9 +46,10 @@ pub use device::{
 pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
-    Answer, CommandResult, Event, Idea, ItemAnswer, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, MAX_OPTIONS,
-    MAX_PROMPT_CHARS, Notice, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
-    StartTask,
+    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
+    MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
+    StartTask, Target,
 };
 
 pub const PROTOCOL_VERSION: u16 = 1;

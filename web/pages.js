@@ -4,8 +4,10 @@ import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
 import { put, get } from "./store.js";
-import { allowsChanges, ensureDevice, keepAllowsChanges, loadDevice, loadSent, openHistory } from "./device.js";
-import { verifyDeviceCert } from "../js/protocol.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand } from "./device.js";
+import { fromB64, toB64, verifyDeviceCert } from "../js/protocol.js";
+import { decisionBlock, standingOn } from "./decide.js";
+import { categoriesKey, deviceWord, keptCategories, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
@@ -25,10 +27,31 @@ const EMAIL_ERRORS = {
 
 const ERRORS = {
   unauthorized: "That link is used or expired. Ask for a new one.",
+  "endpoint-not-allowed": "The hub doesn't send to this browser's push service.",
+  "endpoint-not-https": "The hub doesn't send to this browser's push service.",
+  "bad-endpoint": "This browser gave a subscription the hub can't use.",
+  "bad-push-keys": "This browser gave a subscription the hub can't use.",
+  "endpoint-taken": "Another device holds this browser's subscription. Turn notifications off and on there.",
+  "unknown-device": "The hub doesn't know this device. Reload the page and try again.",
   ...CONNECT_TEXT,
 };
 
+const PROBLEMS = {
+  "view-only": "Allow changes from this device first.",
+  "no-device": "This device isn't registered yet. Allow changes from it first.",
+};
+
+export function notifyEnvironment(scope = globalThis) {
+  const agent = scope.navigator?.userAgent ?? "";
+  const ios = /iPhone|iPad|iPod/.test(agent) || (scope.navigator?.platform === "MacIntel" && scope.navigator?.maxTouchPoints > 1);
+  const standalone = scope.navigator?.standalone === true || Boolean(scope.matchMedia?.("(display-mode: standalone)")?.matches);
+  const supported = Boolean(scope.navigator?.serviceWorker) && "PushManager" in scope && "Notification" in scope;
+  const word = deviceWord(agent);
+  return { ios, standalone, supported, permission: supported ? scope.Notification.permission : "default", word: ios && word === "browser" ? "iPad" : word };
+}
+
 function message(error) {
+  if (error instanceof CommandProblem) return PROBLEMS[error.reason] ?? error.reason;
   if (error instanceof PairingFailed) return connectText(error.reason);
   if (error instanceof HubError) return ERRORS[error.code] ?? `The hub answered ${error.status} (${error.code}).`;
   if (error?.name === "NotAllowedError") return "The passkey was cancelled.";
@@ -53,7 +76,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, notify: null, kept: null, deciding: false };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -147,8 +170,9 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (!state.me) return accountSignIn();
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
     const viewing = state.viewing && state.devices?.find((device) => device.id === state.viewing);
-    if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, notice: state.notice, now: nowSeconds() });
-    return accountScreen({ me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
+    if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, notice: state.notice, decisions: decisionsFor(viewing), now: nowSeconds() });
+    const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word, machines: state.opened.map((machine) => machine.name) }) } : null;
+    return accountScreen({ notify, me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
   }
 
   const unlockedIdentity = () => (state.session?.state === "unlocked" ? state.session.identity : null);
@@ -164,9 +188,9 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     for (const row of listed.devices) {
       if (!(await verifyDeviceCert(identity.key, row.cert))) continue;
       const standing = state.opened
-        .map((machine) => ({ machine: machine.name, ...(machine.board?.devices?.[row.device] ?? {}) }))
+        .map((machine) => ({ machine: machine.name, machineId: machine.machine, accepts: machine.board?.accepts ?? null, mine: standingOn(machine.board, state.device)?.state ?? null, ...(machine.board?.devices?.[row.device] ?? {}) }))
         .filter((one) => one.state && one.fingerprint === row.fingerprint);
-      devices.push({ id: row.device, name: row.name, kind: row.kind, self: row.device === state.device?.id, added: row.created_at, seen: row.last_seen_at, key: row.fingerprint, standing });
+      devices.push({ id: row.device, name: row.name, kind: row.kind, self: row.device === state.device?.id, added: row.created_at, seen: row.last_seen_at, key: row.fingerprint, standing, push: row.push ?? null });
     }
     state.devices = devices.sort((a, b) => Number(b.self) - Number(a.self));
   }
@@ -186,12 +210,184 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       const local = new Map(kept.sent.map((one) => [one.id, one]));
       const names = new Map(state.opened.map((machine) => [machine.machine, machine.name]));
       if (state.viewing !== id) return;
-      state.history = opened.map((entry) => ({ ...entry, machineName: names.get(entry.machine) ?? entry.machine.slice(-6), label: local.get(entry.id)?.label ?? null, short: entry.payload.head?.slice(0, 7) ?? null }));
+      const deviceNames = new Map((state.devices ?? []).map((device) => [device.id, device.name]));
+      state.history = opened.map((entry) => ({ ...entry, machineName: names.get(entry.machine) ?? entry.machine.slice(-6), label: local.get(entry.id)?.label ?? null, short: entry.payload.head?.slice(0, 7) ?? null, targetName: entry.payload.type === "device-decision" ? (deviceNames.get(entry.payload.device) ?? null) : null }));
     } catch (error) {
       state.history = [];
       state.notice = message(error);
     }
     draw();
+  }
+
+  function latestDecision(machine, device) {
+    const mine = (state.kept?.sent ?? []).filter((one) => one.kind === "device-decision" && one.machine === machine && one.target === device);
+    return mine.sort((a, b) => b.at - a.at)[0] ?? null;
+  }
+
+  function decisionsFor(device) {
+    return new Map(device.standing.map((one) => [one.machineId, decisionBlock({ standing: one, device, sent: latestDecision(one.machineId, device.id), self: device.self, allowed: state.allowed === true, busy: state.deciding, now: nowSeconds() })]));
+  }
+
+  async function decideDevice(machine, approve) {
+    const identity = unlockedIdentity();
+    const viewing = state.devices?.find((device) => device.id === state.viewing);
+    const standing = viewing?.standing.find((one) => one.machineId === machine);
+    const keys = state.keys.get(machine);
+    if (!identity || !standing || !keys || state.deciding) return;
+    state.deciding = true;
+    state.notice = null;
+    draw();
+    try {
+      const kept = state.kept ?? (await loadSent({ get }, identity.id, nowSeconds()));
+      const payload = { type: "device-decision", device: viewing.id, fingerprint: standing.fingerprint, approve };
+      const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta: { machineName: standing.machine, target: viewing.id, targetName: viewing.name, approve } });
+      state.kept = { ...kept, sent: [...kept.sent, sent] };
+      await keepSent({ put }, identity.id, state.kept);
+    } catch (error) {
+      state.notice = message(error);
+    }
+    state.deciding = false;
+    draw();
+    follow();
+  }
+
+  let following = false;
+
+  async function follow() {
+    const identity = unlockedIdentity();
+    if (following || !identity) return;
+    following = true;
+    const waiting = () => state.kept?.sent.some((one) => one.kind === "device-decision" && !one.result && nowSeconds() < one.exp);
+    try {
+      while (!state.left && waiting()) {
+        const answered = state.kept.sent.filter((one) => one.result).length;
+        const kept = await collectResults({ calls: account, identity, kept: state.kept, keysOf: (machine) => state.keys.get(machine) ?? null, now: nowSeconds(), wait: 25 });
+        if (state.left) return;
+        state.kept = kept;
+        await keepSent({ put }, identity.id, kept);
+        if (kept.sent.filter((one) => one.result).length > answered) await loadDevices().catch(() => undefined);
+        draw();
+      }
+    } catch {
+    } finally {
+      following = false;
+    }
+  }
+
+  async function workerRegistration() {
+    const workers = navigator.serviceWorker;
+    if (!(await workers.getRegistration("/"))) await workers.register("/sw.js", { type: "module", scope: "/", updateViaCache: "none" });
+    return workers.ready;
+  }
+
+  async function currentSubscription() {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    return (await registration?.pushManager.getSubscription()) ?? null;
+  }
+
+  async function keepNotifyRecord(identity) {
+    if (!identity || !state.device) return;
+    await put(NOTIFY_RECORD, { account: identity.key, device: state.device.id }).catch(() => undefined);
+  }
+
+  async function loadNotify() {
+    if (!state.info?.commands || !state.info?.vapid) {
+      state.notify = null;
+      return;
+    }
+    const env = notifyEnvironment();
+    const reachable = env.supported && !(env.ios && !env.standalone);
+    const subscription = reachable ? await currentSubscription().catch(() => null) : null;
+    const listed = state.devices ? (state.devices.find((device) => device.self)?.push ?? null) : undefined;
+    const kept = state.device ? await get(categoriesKey(state.device.id)).catch(() => null) : null;
+    const subscribed = Boolean(subscription) && listed !== null;
+    state.notify = { env, phase: notifyPhase({ ...env, subscribed }), categories: keptCategories(listed?.categories ?? kept), busy: false };
+    if (state.notify.phase === "on") await keepNotifyRecord(unlockedIdentity());
+  }
+
+  function toggleNotify(input) {
+    const notify = state.notify;
+    if (!notify || notify.busy) return;
+    if (!input.checked) return turnOff();
+    const identity = unlockedIdentity();
+    if (!identity) {
+      state.notice = "Unlock your boards to turn on notifications.";
+      return draw();
+    }
+    const asked = Notification.permission === "granted" ? Promise.resolve("granted") : Notification.requestPermission();
+    notify.busy = true;
+    notify.phase = "asking";
+    draw();
+    return turnOn(asked, identity);
+  }
+
+  async function turnOn(asked, identity) {
+    const notify = state.notify;
+    try {
+      const permission = await asked;
+      notify.env.permission = permission;
+      if (permission !== "granted") {
+        notify.phase = permission === "denied" ? "denied" : "off";
+        return;
+      }
+      state.device = await ensureDevice({ store: { get, put }, calls: account, identity, name: deviceName(), now: nowSeconds(), kept: state.device });
+      const registration = await workerRegistration();
+      let subscription = await registration.pushManager.getSubscription();
+      const held = subscription?.options?.applicationServerKey;
+      if (subscription && held && toB64(new Uint8Array(held)) !== state.info.vapid) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
+      subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64(state.info.vapid) });
+      const { endpoint, keys } = subscription.toJSON();
+      await account.subscribePush(state.device.id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, categories: notify.categories });
+      await keepNotifyRecord(identity);
+      await put(categoriesKey(state.device.id), notify.categories).catch(() => undefined);
+      notify.phase = "on";
+      await loadDevices().catch(() => undefined);
+    } catch (error) {
+      notify.phase = "off";
+      state.notice = message(error);
+    } finally {
+      notify.busy = false;
+      draw();
+    }
+  }
+
+  async function turnOff() {
+    const notify = state.notify;
+    notify.busy = true;
+    draw();
+    try {
+      await (await currentSubscription())?.unsubscribe();
+      if (state.device) await account.unsubscribePush(state.device.id);
+      await loadDevices().catch(() => undefined);
+    } catch (error) {
+      state.notice = message(error);
+    } finally {
+      notify.phase = "off";
+      notify.busy = false;
+      draw();
+    }
+  }
+
+  async function toggleCategory(input) {
+    const notify = state.notify;
+    if (!notify || !state.device) return;
+    const before = notify.categories;
+    notify.categories = withCategory(before, input.value, input.checked);
+    await put(categoriesKey(state.device.id), notify.categories).catch(() => undefined);
+    try {
+      await account.setCategories(state.device.id, notify.categories);
+    } catch (error) {
+      if (error instanceof HubError && error.code === "not-subscribed") notify.phase = "off";
+      else {
+        notify.categories = before;
+        state.notice = message(error);
+      }
+    }
+    draw();
+    root.querySelector(`input[value="${input.value}"]`)?.focus({ preventScroll: true });
   }
 
   function draw() {
@@ -208,8 +404,13 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       if (state.me && keepsEmail()) state.address = await account.email().catch(() => null);
       if (state.me && path === "/account") {
         state.allowed = await allowsChanges({ get }, state.me.account);
-        state.device = await loadDevice({ get }, state.me.account);
+        state.device = (await loadDevice({ get }, state.me.account)) ?? state.device;
         await loadDevices().catch((error) => (state.notice = message(error)));
+        await loadNotify().catch(() => undefined);
+        if (unlockedIdentity()) {
+          state.kept = await loadSent({ get }, state.me.account, nowSeconds());
+          follow();
+        }
       }
     } catch (error) {
       state.view = null;
@@ -466,6 +667,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       return draw();
     }
     try {
+      if (action === "decide-device") return await decideDevice(target.dataset.machine, target.dataset.approve === "true");
       if (action === "sign-in" || action === "other-passkey") return await signInClicked();
       if (action === "add-passkey") return await addPasskey();
       if (action === "sign-out") return await signOutClicked();
@@ -510,7 +712,10 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
   }, { signal: listening.signal });
 
   root.addEventListener("change", async (event) => {
-    if (state.left || event.target.name !== "allow-changes" || !state.me) return;
+    if (state.left || !state.me) return;
+    if (event.target.name === "notify") return toggleNotify(event.target);
+    if (event.target.name === "notice-category") return toggleCategory(event.target);
+    if (event.target.name !== "allow-changes") return;
     state.allowed = event.target.checked;
     await keepAllowsChanges({ put }, state.me.account, state.allowed).catch(() => (state.notice = "This browser can't keep the setting; it lasts until you close the page."));
     const identity = unlockedIdentity();
@@ -534,7 +739,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
 
   const started = (async () => {
     if (given) {
-      Object.assign(state, { info: given.info, me: given.me, session: given.session, address: given.address ?? null });
+      Object.assign(state, { info: given.info, me: given.me, session: given.session, address: given.address ?? null, device: given.device ?? null });
     } else {
       render(top("kebbie hub"));
       state.info = await account.hub().catch(() => null);
@@ -546,6 +751,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     }
     await loadView();
     draw();
+    const linked = path === "/account" && location.hash.startsWith("#device/") ? decodeURIComponent(location.hash.slice("#device/".length)) : null;
+    if (linked && state.devices?.some((device) => device.id === linked)) await openDevice(linked);
   })();
 
   return {
@@ -554,7 +761,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       state.left = true;
       unlockEnds.watch(null);
       listening.abort();
-      return { session: state.session, me: state.me, address: state.address, allowed: state.allowed, device: state.device };
+      return { session: state.session, me: state.me, address: state.address, allowed: state.allowed, device: state.device, kept: state.kept };
     },
   };
 }

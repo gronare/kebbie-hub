@@ -24,7 +24,8 @@ async fn a_fresh_hub_is_claimed_only_with_its_setup_link() {
             github: false,
             commands: true,
             email: false,
-            email_signin: false
+            email_signin: false,
+            vapid: Some(test.hub.vapid_public_key().to_string()),
         }
     );
     let token = setup.split_once("token=").unwrap().1.to_string();

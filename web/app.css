@@ -544,3 +544,5 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .opt.plain small { padding-left: calc(0.8em + 8px); }
 .opt.answered { opacity: 0.55; }
 .thumb-end { margin-top: auto; }
+.task > .switch-row + .switch-row { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 5px; }
+.decide { display: grid; gap: 8px; margin: 8px 0 4px; }

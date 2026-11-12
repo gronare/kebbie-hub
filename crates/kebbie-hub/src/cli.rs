@@ -10,7 +10,7 @@ use kebbie_hub_protocol::Id;
 
 use crate::store::{MadeOwner, Store};
 use crate::{
-    AccountSwitch, Config, DEV_ORIGIN, DEV_RP_ID, GITHUB_API_URL,
+    AccountSwitch, Config, DEV_ORIGIN, DEV_RP_ID, DEV_VAPID_SUBJECT, GITHUB_API_URL,
     GITHUB_WEB_URL, Hub, Secret, TrustedProxy, database_path, mint_invite, mint_join_code, now,
     serve_with, set_account_active,
 };
@@ -46,6 +46,22 @@ pub struct HubArgs {
         help = "The origin people open the hub at, like https://hub.example.com"
     )]
     pub origin: Option<String>,
+    #[arg(
+        long,
+        help = "Contact the push services see in every VAPID token: mailto:you@example.com or an https: URL [default: the origin]"
+    )]
+    pub vapid_subject: Option<String>,
+    #[arg(
+        long,
+        help = "File holding the hub's VAPID private key, created on first start [default: <data>/vapid.key]"
+    )]
+    pub vapid_key: Option<PathBuf>,
+    #[arg(
+        long = "push-allow-host",
+        value_name = "HOST",
+        help = "Accept push endpoints on this host besides the known push services; *.example.com matches subdomains, and a loopback host may use http"
+    )]
+    pub push_allow_hosts: Vec<String>,
     #[arg(
         long,
         value_enum,
@@ -188,6 +204,15 @@ impl HubArgs {
     pub fn config(&self, data: &Path) -> Result<Config, String> {
         let (rp_id, origin) = self.relying_party()?;
         let mut config = Config::new(data);
+        config.vapid_subject = match &self.vapid_subject {
+            Some(subject) => subject.clone(),
+            None if origin.starts_with("https://") => origin.clone(),
+            None => DEV_VAPID_SUBJECT.to_string(),
+        };
+        if let Some(key) = &self.vapid_key {
+            config.vapid_key = key.clone();
+        }
+        config.push_allow_hosts = self.push_allow_hosts.iter().map(|host| host.trim().to_ascii_lowercase()).collect();
         config.rp_id = rp_id;
         config.origin = origin;
         config.trusted_proxy = self

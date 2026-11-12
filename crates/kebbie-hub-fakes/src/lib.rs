@@ -2,6 +2,7 @@ pub mod browser;
 pub mod client;
 pub mod machine;
 pub mod passkey;
+pub mod push;
 
 use std::fmt;
 use std::fs;

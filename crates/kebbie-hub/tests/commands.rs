@@ -883,10 +883,8 @@ async fn the_device_routes_answer_404() {
     }
     let on_the_machine = machine.client();
     assert_eq!(status_of(on_the_machine.get::<Value>("/v1/m/device-list", &[]).await), 404);
-    assert_eq!(status_of(on_the_machine.get::<Value>("/v1/m/devices", &[]).await), 404);
     assert_eq!(status_of(on_the_machine.delete("/v1/m/devices/dev_x").await), 404);
     assert_eq!(status_of(on_the_machine.post::<_, Value>("/v1/m/pairings", &()).await), 404);
-    assert_eq!(status_of(on_the_machine.post::<_, Value>("/v1/m/notices", &serde_json::json!({})).await), 404);
 }
 
 fn certify(person: &Browser, device: &DeviceKey, name: &str) -> DeviceCert {
@@ -934,9 +932,9 @@ async fn the_hub_registers_a_device_only_under_a_certificate_its_account_signed(
     let other = member(&test).await;
     let (signing, encryption) = other.account_secret().unwrap();
     let theirs = SecretKeys::from_bytes(signing, encryption);
-    let forged = DeviceCert::issue(&theirs, &cert.account, cert.device.clone(), "Mine now", DeviceKind::Web, cert.signing, 1).unwrap();
-    let foreign = DeviceCert::issue(&theirs, &account_of(&other).account, Id::new(Prefix::Device).unwrap(), "Theirs", DeviceKind::Web, cert.signing, 1).unwrap();
-    let rekeyed = DeviceCert { signing: DeviceKey::generate().public(), ..certify(&person, &DeviceKey::generate(), "Rekeyed") };
+    let forged = DeviceCert::issue(&theirs, &cert.account, cert.device.clone(), "Mine now", DeviceKind::Web, cert.recipient().1, 1).unwrap();
+    let foreign = DeviceCert::issue(&theirs, &account_of(&other).account, Id::new(Prefix::Device).unwrap(), "Theirs", DeviceKind::Web, cert.recipient().1, 1).unwrap();
+    let rekeyed = DeviceCert { signing: DeviceKey::generate().public().signing, ..certify(&person, &DeviceKey::generate(), "Rekeyed") };
     let mut long = certify(&person, &DeviceKey::generate(), "x");
     long.name = "x".repeat(65);
     let (other_signing, other_encryption) = person.account_secret().unwrap();

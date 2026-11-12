@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use kebbie_hub_api::{ConnectState, PairingFailure, PairingState};
-use kebbie_hub_protocol::{AccountKey, DeviceCert, Header, Id, MachineList, PublicKeys};
+use kebbie_hub_protocol::{AccountKey, DeviceCert, Header, Id, MachineList, NoticeCategory, PublicKeys};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 pub type Result<T> = rusqlite::Result<T>;
@@ -93,6 +93,20 @@ CREATE TABLE IF NOT EXISTS devices (
     last_seen_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS devices_by_account ON devices (account_id);
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    device_id TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh BLOB NOT NULL,
+    auth BLOB NOT NULL,
+    categories TEXT NOT NULL,
+    subscribed_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notices (
+    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    notice_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    PRIMARY KEY (machine_id, notice_id)
+);
 CREATE TABLE IF NOT EXISTS commands (
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     command_id TEXT NOT NULL,
@@ -193,14 +207,17 @@ CREATE TABLE IF NOT EXISTS blobs (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 16;
-// Schemas 13 and 14 open as 16: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
+const SCHEMA_VERSION: i64 = 17;
+// Schemas 13 and 14 open as 17: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
 const COMPATIBLE_VERSIONS: [i64; 2] = [13, 14];
-// Schema 15 opens as 16 with its account-signed commands and their results dropped.
-const DEVICE_COMMANDS_FROM: i64 = 15;
-const DROPPED_FOR_DEVICE_COMMANDS: &str = "
+// Schemas 15 and 16 open as 17 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
+const DEVICE_KEYS_FROM: [i64; 2] = [15, 16];
+const DROPPED_FOR_DEVICE_KEYS: &str = "
 DROP TABLE IF EXISTS results;
 DROP TABLE IF EXISTS commands;
+DROP TABLE IF EXISTS push_subscriptions;
+DROP TABLE IF EXISTS notices;
+DROP TABLE IF EXISTS devices;
 DELETE FROM queue;
 ";
 const DROPPED_FOR_ACCOUNT_COMMANDS: &str = "
@@ -320,6 +337,36 @@ pub struct DeviceRow {
     pub cert: DeviceCert,
     pub created_at: u64,
     pub last_seen_at: Option<u64>,
+    pub push: Option<DevicePushRow>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DevicePushRow {
+    pub categories: Vec<NoticeCategory>,
+    pub subscribed_at: u64,
+}
+
+pub struct NewSubscription<'a> {
+    pub account: &'a str,
+    pub device: &'a Id,
+    pub endpoint: &'a str,
+    pub p256dh: &'a [u8],
+    pub auth: &'a [u8],
+    pub categories: &'a [NoticeCategory],
+    pub now: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Subscribed {
+    New,
+    Moved(Id),
+    Taken,
+}
+
+pub struct StoredSubscription {
+    pub endpoint: String,
+    pub p256dh: Vec<u8>,
+    pub auth: Vec<u8>,
 }
 
 pub struct DeviceCommandRow {
@@ -369,7 +416,7 @@ impl Store {
             connection.query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get(0))?;
         let fresh = version == 0 && tables == 0;
         let opens = version == SCHEMA_VERSION
-            || version == DEVICE_COMMANDS_FROM
+            || DEVICE_KEYS_FROM.contains(&version)
             || COMPATIBLE_VERSIONS.contains(&version);
         if !fresh && !opens {
             return Err(rusqlite::Error::SqliteFailure(
@@ -385,8 +432,8 @@ impl Store {
         if COMPATIBLE_VERSIONS.contains(&version) {
             tx.execute_batch(DROPPED_FOR_ACCOUNT_COMMANDS)?;
         }
-        if version == DEVICE_COMMANDS_FROM {
-            tx.execute_batch(DROPPED_FOR_DEVICE_COMMANDS)?;
+        if DEVICE_KEYS_FROM.contains(&version) {
+            tx.execute_batch(DROPPED_FOR_DEVICE_KEYS)?;
         }
         if fresh || version != SCHEMA_VERSION {
             tx.execute_batch(SCHEMA)?;
@@ -739,28 +786,121 @@ impl Store {
     }
 
     pub fn devices(&self, account: &str) -> Result<Vec<DeviceRow>> {
-        self.devices_where("account_id = ?1 ORDER BY created_at, device_id", account)
+        self.devices_where("devices.account_id = ?1 ORDER BY devices.created_at, devices.device_id", account)
     }
 
     pub fn device(&self, device: &Id) -> Result<Option<DeviceRow>> {
-        Ok(self.devices_where("device_id = ?1", device.as_str())?.pop())
+        Ok(self.devices_where("devices.device_id = ?1", device.as_str())?.pop())
     }
 
     fn devices_where(&self, condition: &str, value: &str) -> Result<Vec<DeviceRow>> {
         let mut statement = self.connection.prepare(&format!(
-            "SELECT account_id, cert, created_at, last_seen_at FROM devices WHERE {condition}"
+            "SELECT devices.account_id, devices.cert, devices.created_at, devices.last_seen_at,
+                    push_subscriptions.categories, push_subscriptions.subscribed_at
+             FROM devices LEFT JOIN push_subscriptions ON push_subscriptions.device_id = devices.device_id
+             WHERE {condition}"
         ))?;
         statement
             .query_map([value], |row| {
                 let cert: String = row.get(1)?;
+                let categories: Option<String> = row.get(4)?;
+                let push = match categories {
+                    Some(text) => Some(DevicePushRow {
+                        categories: serde_json::from_str(&text).map_err(|_| corrupt(4))?,
+                        subscribed_at: row.get(5)?,
+                    }),
+                    None => None,
+                };
                 Ok(DeviceRow {
                     account: row.get(0)?,
                     cert: serde_json::from_str(&cert).map_err(|_| corrupt(1))?,
                     created_at: row.get(2)?,
                     last_seen_at: row.get(3)?,
+                    push,
                 })
             })?
             .collect()
+    }
+
+    pub fn subscribe_push(&mut self, new: &NewSubscription<'_>) -> Result<Subscribed> {
+        let tx = self.connection.transaction()?;
+        let holder: Option<(Id, String)> = tx
+            .query_row(
+                "SELECT holder.device_id, holder.account_id
+                 FROM push_subscriptions JOIN devices AS holder ON holder.device_id = push_subscriptions.device_id
+                 WHERE push_subscriptions.endpoint = ?1 AND push_subscriptions.device_id != ?2",
+                params![new.endpoint, new.device.as_str()],
+                |row| Ok((id_at(row, 0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let outcome = match holder {
+            Some((_, account)) if account != new.account => return Ok(Subscribed::Taken),
+            Some((from, _)) => {
+                tx.execute("DELETE FROM push_subscriptions WHERE device_id = ?1", [from.as_str()])?;
+                Subscribed::Moved(from)
+            }
+            None => Subscribed::New,
+        };
+        tx.execute(
+            "INSERT INTO push_subscriptions (device_id, endpoint, p256dh, auth, categories, subscribed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT (device_id) DO UPDATE SET
+                 endpoint = ?2, p256dh = ?3, auth = ?4, categories = ?5, subscribed_at = ?6",
+            params![
+                new.device.as_str(),
+                new.endpoint,
+                new.p256dh,
+                new.auth,
+                categories_text(new.categories),
+                new.now
+            ],
+        )?;
+        tx.commit()?;
+        Ok(outcome)
+    }
+
+    pub fn set_categories(&self, device: &Id, categories: &[NoticeCategory]) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE push_subscriptions SET categories = ?2 WHERE device_id = ?1",
+            params![device.as_str(), categories_text(categories)],
+        )? > 0)
+    }
+
+    pub fn unsubscribe_push(&self, device: &Id) -> Result<bool> {
+        Ok(self
+            .connection
+            .execute("DELETE FROM push_subscriptions WHERE device_id = ?1", [device.as_str()])?
+            > 0)
+    }
+
+    pub fn drop_push_endpoint(&self, device: &Id, endpoint: &str) -> Result<bool> {
+        Ok(self.connection.execute(
+            "DELETE FROM push_subscriptions WHERE device_id = ?1 AND endpoint = ?2",
+            params![device.as_str(), endpoint],
+        )? > 0)
+    }
+
+    pub fn push_subscription(&self, device: &Id) -> Result<Option<StoredSubscription>> {
+        self.connection
+            .query_row(
+                "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE device_id = ?1",
+                [device.as_str()],
+                |row| {
+                    Ok(StoredSubscription {
+                        endpoint: row.get(0)?,
+                        p256dh: row.get(1)?,
+                        auth: row.get(2)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn record_notice(&self, machine: &Id, notice: &Id, expires_at: u64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "INSERT INTO notices (machine_id, notice_id, expires_at) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING",
+            params![machine.as_str(), notice.as_str(), expires_at],
+        )? > 0)
     }
 
     pub fn device_commands(
@@ -1941,6 +2081,8 @@ impl Store {
             "DELETE FROM blobs WHERE stored_at + ?2 <= ?1",
             params![now, BLOB_KEEP_SECONDS],
         )?;
+        self.connection
+            .execute("DELETE FROM notices WHERE expires_at <= ?1", [now])?;
         Ok(Sweep { sessions })
     }
 }
@@ -2337,6 +2479,13 @@ fn connect_where(connection: &Connection, filter: &str, hash: &[u8]) -> Result<O
             },
         )
         .optional()
+}
+
+fn categories_text(categories: &[NoticeCategory]) -> String {
+    let mut sorted = categories.to_vec();
+    sorted.sort();
+    sorted.dedup();
+    serde_json::to_string(&sorted).expect("categories always serialize")
 }
 
 fn corrupt(column: usize) -> rusqlite::Error {

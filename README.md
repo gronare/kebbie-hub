@@ -18,6 +18,8 @@ It offers the public hub at hub.kebbie.dev or your own, shows a code, and opens 
 - A task's question with its options, and the plan behind it in full.
 - A ready task's card, and whether it still matches the task's latest commit.
 - On a hub run with `--commands on`: answers, choices on an agent's prompt and pushes from a device where you turn on "Allow changes from this device" under Account. That device gets its own key, which your account certifies, and signs what it sends. Each machine's `hub.commands` setting in kebbie decides what it takes, and you approve or deny each device in kebbie on that machine. Account lists your devices, where each one stands on each machine, and what it sent in the last 90 days.
+- Notifications on a device where you turn them on under Account › This device, for the kinds you pick: questions and prompts, a new device to approve, the lead's questions on an idea, ready to push, CI failed, a start that went through. Each machine seals a notice to that device's own key, so the hub delivers it by Web Push without reading it. On an iPhone, add the hub to your Home Screen first.
+- On a device the machine approved, approve or deny another device waiting on it, from that device's page under Account, unless the machine's `hub.approve_from` setting in kebbie is `machine`.
 - Layouts for phones, the iPhone Duo folded and unfolded, tablets and desktops.
 - Boards sealed on the machine to your account's key; only your passkeys unlock that key, and the hub stores what it cannot open.
 
@@ -36,7 +38,7 @@ target/release/kebbie-hub --data /var/lib/kebbie-hub --listen 0.0.0.0:8470 \
   --rp-id hub.example.com --origin https://hub.example.com
 ```
 
-On its first start the hub prints a one-time setup link to its log; open it to create the owner's passkey. Then run `kebbie hub connect` on a machine and give it `https://hub.example.com`. `kebbie-hub --help` lists the rest of the options.
+It creates its Web Push key in `<data>/vapid.key` on first start and names its origin as the contact in every push; pass `--vapid-subject mailto:you@example.com` to name an address instead. On its first start the hub prints a one-time setup link to its log; open it to create the owner's passkey. Then run `kebbie hub connect` on a machine and give it `https://hub.example.com`. `kebbie-hub --help` lists the rest of the options.
 
 To try it on your own computer, `bin/dev` runs a hub at `http://localhost:8470`, and `KEBBIE_HUB_DEV=1 kebbie hub connect` connects a machine to it.
 

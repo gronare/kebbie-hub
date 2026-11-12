@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -412,12 +412,75 @@ test("a fresh device key never leaves the browser, and the account certifies it 
   assert.equal(key.signing.extractable, false);
   const id = deviceId();
   assert.match(id, /^dev_[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
-  const cert = await signDeviceCert(account, { device: id, name: "iPhone 16", signing: key.public, created_at: envelopes.now });
+  const cert = await signDeviceCert(account, { device: id, name: "iPhone 16", signing: key.public, encryption: key.encryptionPublic, created_at: envelopes.now });
   assert.equal(await verifyDeviceCert(devices.key, cert), true);
+  assert.equal(await verifyDeviceCert(devices.key, { ...cert, encryption: parties.tablet.public.encryption }), false);
   const payload = { type: "routine", id: "nightly-deps" };
   const envelope = await sealCommand({ device: { id, signing: key.signing, cert }, account: devices.key, machine: { id: parties.machine.id, keys: parties.machine.public }, payload, at: envelopes.now });
   assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, payload);
   assert.match(await deviceFingerprint(key.public), /^[0-9A-F]{4}-[0-9A-F]{4}$/);
+});
+
+const noticeFor = () => ({ type: "notice", category: "questions", title: "refunds · shop", body: "Keep the old endpoint for a release?", open: { to: "task", address: "refunds@shop" } });
+
+test("a notice a machine seals to a fresh device opens with the device's own key, which never leaves the browser", async () => {
+  const key = await newDeviceKey();
+  assert.equal(key.encryption.privateKey.extractable, false);
+  const device = { id: deviceId(), encryption: key.encryption };
+  const machine = await identity("machine");
+  const at = envelopes.now;
+  const header = { v: 1, id: "ntc_01K85Y2D8G0000000000000000", kind: "notice", from: machine.id, machine: machine.id, at, exp: at + 3600, schema: 1, urgency: "high", collapse: "q-refunds" };
+  const envelope = await sealEnvelope(header, new TextEncoder().encode(JSON.stringify(noticeFor())), machine, [{ id: device.id, encryption: key.encryptionPublic }]);
+  const listed = { id: machine.id, keys: parties.machine.public };
+  assert.deepEqual(await openNotice(envelope, device, listed, at), noticeFor());
+  assert.equal(await failure(openNotice(envelope, device, { id: machine.id, keys: parties["other-machine"].public }, at)), "bad-signature");
+  assert.equal(await failure(openNotice(envelope, device, { id: parties["other-machine"].id, keys: parties["other-machine"].public }, at)), "malformed");
+  assert.equal(await failure(openNotice(envelope, { id: device.id, encryption: (await newDeviceKey()).encryption }, listed, at)), "undecryptable");
+  const { collapse, ...uncollapsed } = envelope;
+  assert.throws(() => checkShape(uncollapsed), (error) => error.code === "malformed");
+});
+
+test("a notice is one line, a plain body and a target inside the app, small enough to push", () => {
+  const valid = (payload) => {
+    try {
+      checkPayload(payload);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const notice = noticeFor();
+  assert.equal(valid(notice), true);
+  assert.equal(valid({ ...notice, body: "Keep it?\nThe lead says keep it.", retract: ["q-refunds"] }), true);
+  for (const open of [{ to: "item", item: "kept:idea-1" }, { to: "device", device: parties.tablet.id }]) assert.equal(valid({ ...notice, open }), true, open.to);
+  for (const [name, wrong] of [
+    ["title on two lines", { title: "a\nb" }],
+    ["blank title", { title: " " }],
+    ["long title", { title: "x".repeat(MAX_NOTICE_TITLE_CHARS + 1) }],
+    ["empty body", { body: "" }],
+    ["bell in the body", { body: "a\u0007b" }],
+    ["long body", { body: "x".repeat(MAX_NOTICE_BODY_CHARS + 1) }],
+    ["unknown category", { category: "summary" }],
+    ["a url to open", { open: { to: "url", url: "https://example.com/" } }],
+    ["a task without task@repo", { open: { to: "task", address: "refunds" } }],
+    ["a device that is the account", { open: { to: "device", device: parties.account.id } }],
+    ["a retract that is not a tag", { retract: ["a b"] }],
+    ["too many retracts", { retract: Array(9).fill("a") }],
+    ["too large to push", { title: "€".repeat(MAX_NOTICE_TITLE_CHARS), body: "€".repeat(MAX_NOTICE_BODY_CHARS), retract: Array(8).fill("a".repeat(64)) }],
+  ]) assert.equal(valid({ ...notice, ...wrong }), false, name);
+  assert.deepEqual(NOTICE_CATEGORIES, ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"]);
+  assert.deepEqual(DEFAULT_NOTICE_CATEGORIES, ["questions", "new-device", "idea-questions", "ready", "ci-failed"]);
+});
+
+test("a device decision names the waiting device by id and fingerprint and lives an hour", async () => {
+  const decision = { type: "device-decision", device: parties.tablet.id, fingerprint: "0C11-5E9A", approve: true };
+  checkPayload(decision);
+  for (const wrong of [{ fingerprint: "0c11-5e9a" }, { fingerprint: "0C115E9A" }, { device: parties.account.id }, { approve: "yes" }, { reason: "x" }]) {
+    assert.throws(() => checkPayload({ ...decision, ...wrong }), (error) => error.code === "malformed", JSON.stringify(wrong));
+  }
+  assert.deepEqual([KINDS["device-decision"].command, KINDS["device-decision"].ttl, KINDS["device-decision"].maxTtl], [true, 3600, 3600]);
+  const envelope = await sealCommand({ device: await certifiedPhone(), account: devices.key, machine: { id: parties.machine.id, keys: parties.machine.public }, payload: decision, at: envelopes.now });
+  assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, decision);
 });
 
 test("a command without its device's certificate, or from the account, has no valid shape", () => {

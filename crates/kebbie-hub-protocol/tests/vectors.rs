@@ -168,7 +168,7 @@ fn devices_are_certified_and_their_commands_verified_as_the_vectors_say() {
         assert_eq!((&cert.device, cert.signing), (&device.id, device.public.signing));
         assert_eq!(cert.statement().unwrap(), bytes(&listed["statement"]));
         assert!(key.verifies_device(&cert));
-        let reissued = DeviceCert::issue(&account.secret, &key.account, cert.device.clone(), &cert.name, cert.kind, cert.signing, cert.created_at).unwrap();
+        let reissued = DeviceCert::issue(&account.secret, &key.account, cert.device.clone(), &cert.name, cert.kind, cert.recipient().1, cert.created_at).unwrap();
         assert_eq!(reissued, cert, "an Ed25519 signature is deterministic");
         assert_eq!(device_fingerprint(&cert.signing), listed["fingerprint"].as_str().unwrap());
     }

@@ -560,6 +560,7 @@ pub async fn hub_info(
         commands: hub.config().commands,
         email: hub.keeps_email(),
         email_signin: hub.email_sign_in(),
+        vapid: Some(hub.vapid_public_key().to_string()),
     }))
 }
 

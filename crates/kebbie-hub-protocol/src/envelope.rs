@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::device::DeviceCert;
 use crate::ids::{Id, Prefix};
+use crate::message::is_collapse;
 use crate::{PROTOCOL_VERSION, SCHEMA};
 
 const HEADER_DOMAIN: &[u8] = b"kebbie-hub envelope\0";
-const MAX_COLLAPSE_CHARS: usize = 64;
+pub(crate) const MAX_COLLAPSE_CHARS: usize = 64;
 const KEY_COMMIT_CHARS: usize = 43;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -24,6 +25,7 @@ pub enum Kind {
     Idea,
     ItemAnswer,
     StartItem,
+    DeviceDecision,
 }
 
 impl Kind {
@@ -40,6 +42,7 @@ impl Kind {
             Kind::Idea => "idea",
             Kind::ItemAnswer => "item-answer",
             Kind::StartItem => "start-item",
+            Kind::DeviceDecision => "device-decision",
         }
     }
 
@@ -54,6 +57,7 @@ impl Kind {
                 | Kind::Idea
                 | Kind::ItemAnswer
                 | Kind::StartItem
+                | Kind::DeviceDecision
         )
     }
 
@@ -70,7 +74,7 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer => 3_600,
+            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::DeviceDecision => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem => 86_400,
         }
@@ -82,7 +86,7 @@ impl Kind {
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem => 86_400,
-            Kind::Idea | Kind::ItemAnswer => 3_600,
+            Kind::Idea | Kind::ItemAnswer | Kind::DeviceDecision => 3_600,
             Kind::PromptAnswer => 600,
         }
     }
@@ -244,10 +248,10 @@ impl Header {
                 "only a notice carries urgency or collapse",
             ));
         }
-        let collapse_fits = self.collapse.as_deref().is_none_or(|collapse| {
-            (1..=MAX_COLLAPSE_CHARS).contains(&collapse.len()) && is_base64url(collapse)
-        });
-        if !collapse_fits {
+        if self.kind == Kind::Notice && self.collapse.is_none() {
+            return Err(ShapeError::Malformed("a notice carries its collapse tag"));
+        }
+        if !self.collapse.as_deref().is_none_or(is_collapse) {
             return Err(ShapeError::Malformed(
                 "collapse is not a short base64url tag",
             ));

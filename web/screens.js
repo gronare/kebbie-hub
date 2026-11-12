@@ -1,5 +1,6 @@
 import { acceptRequired, toAccept } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
+import { CATEGORY_GROUPS, switchable } from "./notify.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
@@ -379,13 +380,26 @@ export function thisDevice(allowed) {
   return `<h2 class="group g-muted">This device</h2><section class="task"><label class="row switch-row"><div><div class="name" id="allow-name">Allow changes from this device</div><div class="meta" id="allow-state">${state}</div></div><input type="checkbox" role="switch" class="switch" name="allow-changes" aria-labelledby="allow-name" aria-describedby="allow-state" aria-checked="${allowed ? "true" : "false"}"${allowed ? " checked" : ""}></label></section>`;
 }
 
-export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null, devices = null, now = Date.now() / 1000 }) {
+function switchRow({ id, name, meta, on = false, disabled: off = false, field = id, value = null }) {
+  const valued = value === null ? "" : ` value="${esc(value)}"`;
+  return `<label class="row switch-row"><div><div class="name" id="${id}-name">${esc(name)}</div><div class="meta" id="${id}-state">${esc(meta)}</div></div><input type="checkbox" role="switch" class="switch" name="${field}"${valued} aria-labelledby="${id}-name" aria-describedby="${id}-state" aria-checked="${on ? "true" : "false"}"${on ? " checked" : ""}${off ? " disabled" : ""}></label>`;
+}
+
+export function notifySection({ phase, text, categories = [] }) {
+  const on = phase === "on" || phase === "asking";
+  const main = `<section class="task" id="notify-card">${switchRow({ id: "notify", name: "Notifications", meta: text, on, disabled: !switchable(phase) })}</section>`;
+  if (phase !== "on") return main;
+  const cards = CATEGORY_GROUPS.map((group) => `<h2 class="group g-muted">${esc(group.title)}</h2><section class="task">${group.rows.map((row) => switchRow({ id: row.id, name: row.name, meta: row.meta, on: categories.includes(row.category), field: "notice-category", value: row.category })).join("")}</section>`).join("");
+  return main + cards;
+}
+
+export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null, devices = null, notify = null, now = Date.now() / 1000 }) {
   const linked = me.github
     ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed)) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifySection(notify) : "")) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {
@@ -454,10 +468,10 @@ export function deviceRow(device, now) {
 }
 
 export function devicesSection(devices, now) {
-  return `<h2 class="group g-muted">Devices · ${devices.length}</h2>${devices.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine.</div>`;
+  return `<h2 class="group g-muted">Devices · ${devices.length}</h2>${devices.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>`;
 }
 
-const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of" };
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "device-decision": "Decision on" };
 const clip = (text, length = 60) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept):/, "").replace(/\.md$/, "");
 
@@ -474,6 +488,7 @@ function subject(entry) {
   if (payload.type === "start") return `${payload.name}@${payload.repo}`;
   if (payload.type === "idea") return `${entry.machineName}: ${clip(payload.text)}`;
   if (payload.type === "item-answer" || payload.type === "start-item") return itemName(entry);
+  if (payload.type === "device-decision") return entry.targetName ?? payload.device.slice(-6);
   return payload.address;
 }
 
@@ -490,12 +505,14 @@ export function historyEntry(entry, now) {
     if (kind === "prompt-answer") return { icon: "?", what: `Chose ${words} on ${what}'s prompt`, said: `on ${machine}`, at: entry.at };
     if (kind === "routine") return { icon: "✓", what: `Ran routine ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "idea") return { icon: "✓", what: `Idea for ${what}`, said: "filed in its backlog", at: entry.at };
+    if (kind === "device-decision") return { icon: "✓", what: `${entry.payload.approve ? "Approved" : "Denied"} ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "item-answer") return { icon: "✓", what: `Answered a question on ${what}`, said: `"${clip(entry.payload.answer)}" · on ${machine}`, at: entry.at };
     return { icon: "✓", what: `Started ${what}`, said: `on ${machine}`, at: entry.at };
   }
   const noun = `${NOUNS[kind] ?? kind} ${what}`;
   if (reason === "not-approved") return { icon: "✗", what: `${noun} not delivered`, said: `${machine} didn't approve this device within the hour`, at: entry.at };
   if (reason === "denied") return { icon: "✗", what: `${noun} refused`, said: `denied on ${machine}`, at: entry.at };
+  if (kind === "device-decision" && reason === "not-allowed") return { icon: "✗", what: `${noun} refused`, said: `${machine} takes approvals only at the machine`, at: entry.at };
   if (entry.result) return { icon: "✗", what: `${noun} refused`, said: entry.result.text || `on ${machine}`, at: entry.at };
   if (now >= entry.exp) return { icon: "✗", what: `${noun} not delivered`, said: `expired before ${machine} took it`, at: entry.at };
   return { icon: "⧗", what: `${noun} waiting`, said: on, at: entry.at };
@@ -503,9 +520,9 @@ export function historyEntry(entry, now) {
 
 const TONES = { "✓": "ok", "↑": "ok", "?": "warn", "⧗": "warn", "✗": "g-yellow" };
 
-export function deviceScreen({ device, history, loading = false, notice = null, now = Date.now() / 1000 }) {
+export function deviceScreen({ device, history, loading = false, notice = null, decisions = new Map(), now = Date.now() / 1000 }) {
   const facts = [...deviceFacts(device, now), `key ${device.key}`].map(esc).join(" · ");
-  const standing = `<section class="task"><div class="meta">${facts}</div>${device.standing.map((one) => `<div>${standingText(one, now)}</div>`).join("")}</section>`;
+  const standing = `<section class="task"><div class="meta">${facts}</div>${device.standing.map((one) => `<div>${standingText(one, now)}</div>${decisions.get(one.machineId) ?? ""}`).join("")}</section>`;
   const entries = history.map((entry) => historyEntry(entry, now));
   const days = new Map();
   for (const entry of [...entries].sort((a, b) => b.at - a.at)) {

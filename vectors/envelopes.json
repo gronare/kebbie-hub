@@ -872,24 +872,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
@@ -901,7 +902,7 @@
           "type": "answer"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "answer-opened-by-the-machine",
       "recipient": "machine",
       "seal": {
@@ -922,24 +923,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
@@ -951,7 +953,7 @@
           "type": "answer"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "answer-opened-by-its-own-account",
       "recipient": "account",
       "seal": {
@@ -972,24 +974,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "87yczuTbkjUmkHtvMzblGOLTawBSSTzndTDOXIxEMEor3eEhWY2zNII5TXOyvxCQBpNVpG4GHwnFB-ah4bJkupTjKULXMIVNx_kl705MkjHtQgTFoxOd6P9W6DkE6wzlOFqdOmxpmuIM",
+        "ct": "87yczuTbkjUmkHtvMzblGOLTawBSSTzndTDOXIxEMEor3eEhWY2zNII5TXOyvxCQBpNVpG4GHwnFB-ah4bJkupTjKULXMIVNx_kl705MkjHtQgTFoxOd6P9JlWjQpou9bkvRUNAD3bXq",
         "exp": 1761070200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7db9-a078-ed4dff535425",
         "kc": "SNEuw2nWk6nd0KuV0lXOP4uh9nn8PyQ64YlykeMPQ_w",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ufO-Y0gbD63cd-KoKVpmAaT1JFXyc1Es-i_aKX7zjhKu7KAf4L5ZL_cE-OvSe9F0FJDRaHf5iU8yNhxW0BVvehIq581tS4TLRqUXxHa33Dg",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "S24UmR6dZ0WWUvlySIdy3KzDWgUh2VhziDXatc4OODUDPVwsSaUukwOA9x_fnL93kTae3HoWswlKBX4DVx-eemem1SF0jRgB9MEg69OgTp0"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ufO-Y0gbD63cd-KoKVpmAaT1JFXyc1Es-i_aKX7zjhKu7KAf4L5ZL_cE-OvSe9F0FJDRaHf5iU8yNhxW0BVvetmGcWvuCI3mN5hCFvX6nmA",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "S24UmR6dZ0WWUvlySIdy3KzDWgUh2VhziDXatc4OODUDPVwsSaUukwOA9x_fnL93kTae3HoWswlKBX4DVx-eeqF1q34HtOU9W3oB4JUGnP4"
         },
         "kind": "prompt-answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "MAjqMMsZBt0WXJRNsSVWsbFFzyZh7ROmijzQD-pVFFB1Ns9Tv7YzfyhZA4L1fXG1S5w9aUS_ZXXQkJbqIUOIDw",
+        "sig": "PvO5WHrbVrlljBgmyW-cp28r0sRmMr77zjO17sC72S-nedehsXxDDVVL-E8wGLV9DlGCwmzK0BIBt2qaFmlmBg",
         "v": 1
       },
       "expect": {
@@ -1000,7 +1003,7 @@
           "type": "prompt-answer"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2RiOS1hMDc4LWVkNGRmZjUzNTQyNQANcHJvbXB0LWFuc3dlcgAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo98x4AAEAK1NORXV3Mm5XazZuZDBLdVYwbFhPUDR1aDlubjhQeVE2NFlseWtlTVBRX3cAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oLUt9bGLO149wpvkSM-xUPH0ePw_HRIPXVObl4fAn-o7mlipjanskHC1lBd3kdNyWXqWEmaOquh8jO1zzZaT4wc",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2RiOS1hMDc4LWVkNGRmZjUzNTQyNQANcHJvbXB0LWFuc3dlcgAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo98x4AAEAK1NORXV3Mm5XazZuZDBLdVYwbFhPUDR1aDlubjhQeVE2NFlseWtlTVBRX3cAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
       "name": "prompt-answer-opened-by-the-machine",
       "recipient": "machine",
       "seal": {
@@ -1322,24 +1325,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "VJ3FPa3rQ3JNHVrsvHVzdye9XfUf1OqaILUFGvWzHAL5otTtYwphKAT-tfjwy70hk_b61O5qGf3-R4SzW5c-QAbDUzXtmoMqGh2yCSDE1ecD3wzXGBRHH99ind_ZaJvXKw-7v---Qdym",
+        "ct": "VJ3FPa3rQ3JNHVrsvHVzdye9XfUf1OqaILUFGvWzHAL5otTtYwphKAT-tfjwy70hk_b61O5qGf3-R4SzW5c-QAbDUzXtmoMqGh2yCSDE1ecD3wzXGBRHH9-oMWyZitfvKYQ9r_aPONr7",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7e75-8963-88fb0c7ab081",
         "kc": "VZCNLxx2inwkwyjjU65htSDTaoOljJUXb8K5QzU8Jas",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "cfKUMDejS19Z1xM4igk4bcGDTFLC-EmzrOycUoEvHGvik_fzE7x1-diDqHj5oX9ELveq-dVJ_E1Tprrj84dR-7fyfawZTPt9u-VW8A9Silo",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "E7QGVdyLTJNYSYhmbsoDICb1bQENayvIqPwHmXLX0FnqsmZKK6kFrJuOKtI299crX7QlQThtZ8KHUhDvVrrtWCdFPojcetJd1FaZeTjCQro"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "cfKUMDejS19Z1xM4igk4bcGDTFLC-EmzrOycUoEvHGvik_fzE7x1-diDqHj5oX9ELveq-dVJ_E1Tprrj84dR-1cMyl5vVDjD3ZOEU1-wzo8",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "E7QGVdyLTJNYSYhmbsoDICb1bQENayvIqPwHmXLX0FnqsmZKK6kFrJuOKtI299crX7QlQThtZ8KHUhDvVrrtWDwNFIO1hCCykJvM2hjgS-w"
         },
         "kind": "idea",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "T9Udh9f8UwU1_inzHTfSGGr0SGQlZ6Kngt6js67N1mZf2lxdcuXEpVNw9vZUgD0Y1lgnMuIyldSiwRIeZ7RpAA",
+        "sig": "Y8OQXcT9ixIPqaECUu73wSFfRjKuJkBZrmjETuFDI1rHwF-LUVwl9njEf2RNqV6yh6ToTo93-ZuyVRBhSAFACQ",
         "v": 1
       },
       "expect": {
@@ -1349,7 +1353,7 @@
           "type": "idea"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2U3NS04OTYzLTg4ZmIwYzdhYjA4MQAEaWRlYQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo99gwAAEAK1ZaQ05MeHgyaW53a3d5ampVNjVodFNEVGFvT2xqSlVYYjhLNVF6VThKYXMAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oLUt9bGLO149wpvkSM-xUPH0ePw_HRIPXVObl4fAn-o7mlipjanskHC1lBd3kdNyWXqWEmaOquh8jO1zzZaT4wc",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2U3NS04OTYzLTg4ZmIwYzdhYjA4MQAEaWRlYQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo99gwAAEAK1ZaQ05MeHgyaW53a3d5ampVNjVodFNEVGFvT2xqSlVYYjhLNVF6VThKYXMAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
       "name": "idea-opened-by-the-machine",
       "recipient": "machine",
       "seal": {
@@ -1370,24 +1374,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "Sq8R6HjR0Le5xqpN_GiN-55fJO_tRt6_rfDM8QVVnIexXV8KKhtxGzqrJU2UDdMtnAEiZOAdEWShxX7CI6ZLSxxD1hIdRpGhHdDzCxOOxyxDAyZ7tr-5fHiNksUR5SbZaqTi4Y3k2GBT0ONpa0l2Y7w9jJGt1trAia3JP_D4dMPy2QEyEy_E7sDm1OHSUM4sRzSjTTHI49ShklV3-u0kBmWzzQuzx0c0XQXRAh770IDu1YYlMNVguEUe9UhRp7dPALo",
+        "ct": "Sq8R6HjR0Le5xqpN_GiN-55fJO_tRt6_rfDM8QVVnIexXV8KKhtxGzqrJU2UDdMtnAEiZOAdEWShxX7CI6ZLSxxD1hIdRpGhHdDzCxOOxyxDAyZ7tr-5fHiNksUR5SbZaqTi4Y3k2GBT0ONpa0l2Y7w9jJGt1trAia3JP_D4dMPy2QEyEy_E7sDm1OHSUM4sRzSjTTHI49ShklV3-u0kBmWzzQuzx0c0XQXRAh770IDu1SHboUfkkwxs4dVMwZ_AbWw",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7a2a-9543-855804400dcf",
         "kc": "TYyBdZD7Btc-9oRwlHcueEiHjdrLfUFTqlr41lXosEA",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "SvEmgkZx_tSt8XsgGdf68f7JJjgnnT3CQNPIljeReiIrNHKYV5kBvOM_MjRD-1YO2DkuQ5TToryOfXWWI9t-ekKICVVz_6nyO0Ey-X7qIFQ",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "xVv1F-W7-QWrAdTiSogmbZzQ__4aVEEMoGkjEy2110HocHZF6RnscCWWIMyNhEQUAg2AnbCp60ysczVgupjutGPeC13RrGgKZKJZ7UY_Jm8"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "SvEmgkZx_tSt8XsgGdf68f7JJjgnnT3CQNPIljeReiIrNHKYV5kBvOM_MjRD-1YO2DkuQ5TToryOfXWWI9t-egHsPRjWmTiW6ohig6ubMo8",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "xVv1F-W7-QWrAdTiSogmbZzQ__4aVEEMoGkjEy2110HocHZF6RnscCWWIMyNhEQUAg2AnbCp60ysczVgupjutA5o-PLr8brteDAQuBApkOQ"
         },
         "kind": "item-answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "gDqC-CyN7Dvr8q9PQMuZ4yYHp8Or3U4md5Qz8gt3EO-WGeRHffqH8MgjQYoosQ4bewIhZcn4zRO52ILSTRFJDg",
+        "sig": "9Y7gCzVPvzuVgo4sqkhOBSeWqbZK4v8nHhDrcdhZEU7RQk6QVc2eodgBv1Sm6FKFlzMQcQPlRfecPh3iQyC3Dw",
         "v": 1
       },
       "expect": {
@@ -1399,7 +1404,7 @@
           "type": "item-answer"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2EyYS05NTQzLTg1NTgwNDQwMGRjZgALaXRlbS1hbnN3ZXIAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPfYMAABACtUWXlCZFpEN0J0Yy05b1J3bEhjdWVFaUhqZHJMZlVGVHFscjQxbFhvc0VBAAABABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAAlpUGhvbmUgMTYAA3dlYuMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GAAAAAGj2eKC1LfWxiztePcKb5EjPsVDx9Hj8Px0SD11Tm5eHwJ_qO5pYqY2p7JBwtZQXd5HTcll6lhJmjqrofIztc82Wk-MH",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2EyYS05NTQzLTg1NTgwNDQwMGRjZgALaXRlbS1hbnN3ZXIAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPfYMAABACtUWXlCZFpEN0J0Yy05b1J3bEhjdWVFaUhqZHJMZlVGVHFscjQxbFhvc0VBAAABABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAAlpUGhvbmUgMTYAA3dlYuMD-n36BQyW549VKy9t-zvE3hIyq7BXAWwXTWsndT9GycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2QAAAAAaPZ4oC5sEblFD9kAE5eNTciRHSf2vW41I7G-4P5gIdsfGTD4tAMNePDaVq69BU_repaZyohYb8B6qwH268YcYiFZxQk",
       "name": "item-answer-opened-by-the-machine",
       "recipient": "machine",
       "seal": {
@@ -1420,24 +1425,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "ilp66OD-nDZTZ02sPltT1ZkAU4ALVLaM2qRpCwd5u6mprkIgTyQU1yEFoqt9OLTOYN1H3NCo6gXVHZhEY0tesbP10MprC-AOFc8BQW6nnX3GeIaiUmOlnUiPOWPABM58TPy2w8HN47guuMY",
+        "ct": "ilp66OD-nDZTZ02sPltT1ZkAU4ALVLaM2qRpCwd5u6mprkIgTyQU1yEFoqt9OLTOYN1H3NCo6gXVHZhEY0tesbP10MprC-AOFc8BQW6nnX3GeIaiUmOlnUiPOYVNEf6B49hahTVGEBG3evM",
         "exp": 1761156000,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7c93-bdc2-f67b6710cf1c",
         "kc": "bHYw7L7V2oZwUn3SYZL61P_2JFT7H3thTSSgGKldkyk",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "xyaduo8xZs9b2PJ9T4VnzlpyqDX1UcF9AFdXMT_l8HANfkL64kzES_QyPb-BvIS9zRswXURprsO-tkI8BOycpatnMxEL38jrXRYShTzVU_Y",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "tPAKnEJAPgXSZqdO2hzp8WFgS6z9AaLdTrA-lpvfwxwZCjM08LMxMJgwbroxawqAlssv1hLPOA_nrWIL6PEM1D-6Viet1Hc5T20NgwFDi6M"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "xyaduo8xZs9b2PJ9T4VnzlpyqDX1UcF9AFdXMT_l8HANfkL64kzES_QyPb-BvIS9zRswXURprsO-tkI8BOycpaceij-Jj9wIqtvwt0m0HmE",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "tPAKnEJAPgXSZqdO2hzp8WFgS6z9AaLdTrA-lpvfwxwZCjM08LMxMJgwbroxawqAlssv1hLPOA_nrWIL6PEM1I0VKQFGFBxJgbpwKMzrnzE"
         },
         "kind": "start-item",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "-qJ8elGExaruFEeyrgbZVkQnaWW0SzhYpzHpvgZlOzmPgGvFs3H1J-K8g7HZfJ2aajijnD3N8eYpAqoIlJCvBQ",
+        "sig": "WMDXuUW4Pa2iEHHt4T6DTN5oXvf7irgrbgEj8Uetil6O9jlHqxchuoh29ODRjcc9z3MX8D084ez7mQN0h8a-Aw",
         "v": 1
       },
       "expect": {
@@ -1447,7 +1453,7 @@
           "type": "start-item"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2M5My1iZGMyLWY2N2I2NzEwY2YxYwAKc3RhcnQtaXRlbQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK2JIWXc3TDdWMm9ad1VuM1NZWkw2MVBfMkpGVDdIM3RoVFNTZ0dLbGRreWsAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oLUt9bGLO149wpvkSM-xUPH0ePw_HRIPXVObl4fAn-o7mlipjanskHC1lBd3kdNyWXqWEmaOquh8jO1zzZaT4wc",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2M5My1iZGMyLWY2N2I2NzEwY2YxYwAKc3RhcnQtaXRlbQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK2JIWXc3TDdWMm9ad1VuM1NZWkw2MVBfMkpGVDdIM3RoVFNTZ0dLbGRreWsAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
       "name": "start-item-opened-by-the-machine",
       "recipient": "machine",
       "seal": {
@@ -1468,24 +1474,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "w0MK6pw7mv7e6t2ZxgUnXy1ziRvFWHPcyUbUFrXn7QyGKeT7pcYU5QBbXcWH2aDT-W_OXhHjhbr-5xxjuJWSYIURQbf2s6U41lkzqYjwMBVsMsyVeLk6MF77JZm1JtcD0JF0_KLaHIRy0g",
+        "ct": "w0MK6pw7mv7e6t2ZxgUnXy1ziRvFWHPcyUbUFrXn7QyGKeT7pcYU5QBbXcWH2aDT-W_OXhHjhbr-5xxjuJWSYIURQbf2s6U41lkzqYjwMBVsMsyVeLk6MF77GPy9MoXOurCM7DCKJeAzmQ",
         "exp": 1761156000,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7b19-8b8b-3e175a6d3f5c",
         "kc": "dWRwZ-ZchvZBMmc1ENkZsB5O12ibSrcAKSToPef0fD4",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "kOdaD4mi_745MOBF6mipAgzhDlEoYjEsp1koRr6x6guIBotND39oJMp8MtpP5HfvUhmoJ_E9ElVxauJOh9ylTvmSYvPTjvIc02xElqPdYbk",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "nG1MbSF9Vxr_AUO9Pq5Hx2df7VJs9DfdOtQMlxmSSXfc1mpBlzH0Gq0rexu58rL-WGxFSu-gfZU7upujQmaoNjTySl17p9qmukNZxFhNr_g"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "kOdaD4mi_745MOBF6mipAgzhDlEoYjEsp1koRr6x6guIBotND39oJMp8MtpP5HfvUhmoJ_E9ElVxauJOh9ylTp0Zau-nC_A6vjqs21G-OI0",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "nG1MbSF9Vxr_AUO9Pq5Hx2df7VJs9DfdOtQMlxmSSXfc1mpBlzH0Gq0rexu58rL-WGxFSu-gfZU7upujQmaoNgVcuhHT1oxBSsPytCErf78"
         },
         "kind": "start-item",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "4SesnQ1q7qdw-EBcSg1ngmmISbKDL0mLXz2Q0e6OZUXp2-YtDBBmvBBIo3OmLhkeRlit2o6GnJho5Tx2d1n4CA",
+        "sig": "shaaeDKumNSa7xoiwrmfFERf8ItMRiXS8YXXao1i59vbxQcsPLWy5lPOq_5BqE398g_z4zEghsVIkNWq_v1jCg",
         "v": 1
       },
       "expect": {
@@ -1495,7 +1502,7 @@
           "type": "start-item"
         }
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2IxOS04YjhiLTNlMTc1YTZkM2Y1YwAKc3RhcnQtaXRlbQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK2RXUndaLVpjaHZaQk1tYzFFTmtac0I1TzEyaWJTcmNBS1NUb1BlZjBmRDQAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oLUt9bGLO149wpvkSM-xUPH0ePw_HRIPXVObl4fAn-o7mlipjanskHC1lBd3kdNyWXqWEmaOquh8jO1zzZaT4wc",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2IxOS04YjhiLTNlMTc1YTZkM2Y1YwAKc3RhcnQtaXRlbQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK2RXUndaLVpjaHZaQk1tYzFFTmtac0I1TzEyaWJTcmNBS1NUb1BlZjBmRDQAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
       "name": "start-item-anyway-opened-by-the-machine",
       "recipient": "machine",
       "seal": {
@@ -1556,7 +1563,7 @@
       "envelope": {
         "at": 1761069600,
         "collapse": "AAyLu_YSiuUeo24eow0qFOFW_PrkJMx4EQ1jg_DBaPE",
-        "ct": "BmffOKMXanhX3M6vULi4W1POaKPq9_K7ArNzZ7zevmaLF7d8WIz-81KNwneTwOQgcjaoKHYnRxTekNcs6TeXr_Luybob6RGwI25OPBlI_B3x8XXU7Rl8Z8CEyFJ_-rXuZ3IWcJtOrYROQTZjHha3mGbKzD3KrlE4qHIH8JZQ4YMUsCDM4ar5wQZHuBUQ4JrZpUss3ue4Z-SsnUFyM2Zu8egw3VTHPx7_tc2qJzxIOC2WcEjN43x0hzDdmC4MLIfENR_AT6nfOS8gLAoNA1pD-URGGkOnHL-M8_MR87bK_vY3o_vp3eLw_XkszYO4YRGq0HMXQkC8nHWpFuxzEmTzH3T4NEj95LlOPHE6GKLn5xnOz52jL18",
+        "ct": "BmffOKMXanhX3M6vULi4W1POaKPq9_K7ArNzZ7zeuHGaHKQxENetvBWPw3uP2q9jPiTuYCY2XROQz9dkriOHp-Pz7bpTRNayfCRVJU8Iu12kt36TsU5ZZtbUiVV87LetKXRZcYwI58lsSiczWA2t3SeF0jyGrl4vvSJOyooVp4AD8SXM4ar2ywpZuERWv5jDtUsvw-CwKa_ihVAqazJ-tbRpjAWZbgqh4sD1fChPMT-SNwWP4z8mjS6LyzpAK8rcVB__S7_EO2p2b0JLI1pd5RAZGFi2WJfOtfI047HI47EkujiysQh19KcdA7Ud8d-1mhI",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "ntc_01K83YV380X1K2BKYA4B2BTKJ1",
@@ -1567,24 +1574,19 @@
         "kind": "notice",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "tvtMgkd3YwjeVBrbLMv7Ly0vD9nd-5kkHPLtYG9HRDz9ocpYe3B9LkH2JjoMg0IjCFE5RS6t1Mg0U29Qz5GCCQ",
+        "sig": "ETd7XwI-4nUKaYq5fgDYsK59kXqEzi5YLuRRBBUl9cZdL8jnp4Rc1oAgngAjUlOgZ33Scnypjsj48t8JeQy1Aw",
         "urgency": "high",
         "v": 1
       },
       "expect": {
         "payload": {
-          "address": "refunds@shop",
-          "board_rev": 1842,
-          "body": "Keep the old endpoint for a release?",
-          "event": "question",
-          "options": [
-            "Keep it",
-            "Remove it"
-          ],
-          "question": "1761069540-4411-0-question",
-          "recommend": 0,
-          "retract": null,
-          "title": "refunds asks",
+          "body": "Keep the old endpoint for a release? The lead recommends keeping it: one release of overlap.",
+          "category": "questions",
+          "open": {
+            "address": "refunds@shop",
+            "to": "task"
+          },
+          "title": "refunds · shop",
           "type": "notice"
         }
       },
@@ -1597,44 +1599,112 @@
           "dev_01K83YV380329ARS69J86ZB9PB": "Kc-EF0_zDGb6y9HAoRpnDCDCAl54EKDH7tUJJeYwcpw"
         },
         "nonce": "BmffOKMXanhX3M6v",
-        "plaintext": "eyJ0eXBlIjoibm90aWNlIiwiZXZlbnQiOiJxdWVzdGlvbiIsImFkZHJlc3MiOiJyZWZ1bmRzQHNob3AiLCJ0aXRsZSI6InJlZnVuZHMgYXNrcyIsImJvZHkiOiJLZWVwIHRoZSBvbGQgZW5kcG9pbnQgZm9yIGEgcmVsZWFzZT8iLCJxdWVzdGlvbiI6IjE3NjEwNjk1NDAtNDQxMS0wLXF1ZXN0aW9uIiwib3B0aW9ucyI6WyJLZWVwIGl0IiwiUmVtb3ZlIGl0Il0sInJlY29tbWVuZCI6MCwiYm9hcmRfcmV2IjoxODQyLCJyZXRyYWN0IjpudWxsfQ"
+        "plaintext": "eyJ0eXBlIjoibm90aWNlIiwiY2F0ZWdvcnkiOiJxdWVzdGlvbnMiLCJ0aXRsZSI6InJlZnVuZHMgwrcgc2hvcCIsImJvZHkiOiJLZWVwIHRoZSBvbGQgZW5kcG9pbnQgZm9yIGEgcmVsZWFzZT8gVGhlIGxlYWQgcmVjb21tZW5kcyBrZWVwaW5nIGl0OiBvbmUgcmVsZWFzZSBvZiBvdmVybGFwLiIsIm9wZW4iOnsidG8iOiJ0YXNrIiwiYWRkcmVzcyI6InJlZnVuZHNAc2hvcCJ9fQ"
       },
       "sender": "machine"
     },
     {
       "envelope": {
         "at": 1761069600,
+        "collapse": "wNTCZcQ95qomB3tJ_bp7YUggXe2cMOizpmWO7VsTv9k",
+        "ct": "XJTskyG5Fh4TIT1E9K2m6AQln8hYvNLEWOlE7ch_iLs33W6R6JfO7cJlVqB1H3p9OjxgQwIqJl-AHrqliILmSnvcxeiL2lKNmSvBaTke51Fdcowy6zhmSMf0loGpC9bk_XZoizxMompiy7JMj5FpFmsKv8ROjjufrR6Bz_l7df-yrx_AVpXLs3t90q9KYaRoQXTz3pPfZ6rVpfGQtbtpdfxVWRcvFPGaLKvPZ2uxgUfG_nL4BqUlY-Jg95TssIBy0FsFYC30bhj2pbCu4zfJi6aoZR9wBeJQQmiLt0r6o01cdy2l5Q",
+        "exp": 1761156000,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "ntc_01K83YV3809TH7EPT5Y4Q62E7A",
+        "kc": "4mi5Tg7GTi0eNwB7_hpFuZRr2qsB2VWjYprTf_eoidY",
+        "keys": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "qvTttge2C-V1MPux11GUFMYX4fk0FBwPefcQ41ivzDX4ivlsmGZcqoPeEf6IWUpzqS3f0LKJNimaYi_k4VxdXFDb8hXpHG-iyFyJ11KmZ3g"
+        },
+        "kind": "notice",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "vyxLvNI8UtWz1j-Tdik48lU-k5Gl1vl5j1qqOHUmISEXckzNakWhQZ3zm4ZOX1B9h0XP7Kc1lojzttciVXlJAQ",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "body": "iPad waits for approval on this machine.",
+          "category": "new-device",
+          "open": {
+            "device": "dev_01K83YV3800E98GTJMKEDT10QK",
+            "to": "device"
+          },
+          "title": "A new device asks to send commands",
+          "type": "notice"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAebnRjXzAxSzgzWVYzODA5VEg3RVBUNVk0UTYyRTdBAAZub3RpY2UAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPkboAABACs0bWk1VGc3R1RpMGVOd0I3X2hwRnVaUnIycXNCMlZXallwclRmX2VvaWRZAAEAK3dOVENaY1E5NXFvbUIzdEpfYnA3WVVnZ1hlMmNNT2l6cG1XTzdWc1R2OWsA",
+      "name": "notice-of-a-device-to-approve",
+      "recipient": "phone",
+      "seal": {
+        "content_key": "XHiKbyeoznpebuIfbpGJT8pDt2qIetAeWIBd24hE3P0",
+        "ephemeral": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "JlIYz12iOzp7qk5sW2xeXNxOyAJow1py_jLpsXW0Dbo"
+        },
+        "nonce": "XJTskyG5Fh4TIT1E",
+        "plaintext": "eyJ0eXBlIjoibm90aWNlIiwiY2F0ZWdvcnkiOiJuZXctZGV2aWNlIiwidGl0bGUiOiJBIG5ldyBkZXZpY2UgYXNrcyB0byBzZW5kIGNvbW1hbmRzIiwiYm9keSI6ImlQYWQgd2FpdHMgZm9yIGFwcHJvdmFsIG9uIHRoaXMgbWFjaGluZS4iLCJvcGVuIjp7InRvIjoiZGV2aWNlIiwiZGV2aWNlIjoiZGV2XzAxSzgzWVYzODAwRTk4R1RKTUtFRFQxMFFLIn19"
+      },
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "ct": "0SR187-77j_DXIdw71OSltfODkxEtqksRaKJ1eFHQCQOsRP4QKLfyJLVtImZj-kMeyRT8_dD9TnoxNZR7t62eckBHTIhF3bJVUemv4j85Dmqn1eWWT5DH2Y4DXCrotGTC4B1Tnh8tXOdJoUi9UKy4rZdgbf9T1i3M7v6XaNDGTWfyBc3dph2hNH2xY40-ALjxA2GS1n5axmhvdXrIPhtitrwp2xVzXmvr110XxKpiPs0oJNuyr-_mFeWEjv61MqigycFEcA_sHpf79odrk7mxD4YItM3faX9mM55aXgi8fWx6Mxs73dQqitc33cMowyYWE8",
+        "exp": 1761156000,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "ntc_01K83YV38072V4EPER1PX2KHD4",
+        "kc": "_xBnPdAk1G3dixBL7-ZaiLpTJEvJkUzFpGKpwZd146c",
+        "keys": {
+          "dev_01K83YV380329ARS69J86ZB9PB": "_yAFFtgwTXsj3-oaBcrkz5-QVSfciwoVWtDbjjKoFy1jKaHVjTj4v6S9Wv4f9idv_Qy9OHslCXHWIrc_EYVhcq3DxUnRO0MFjlsGBjofxhg"
+        },
+        "kind": "notice",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "AUSF8MYu58j76Dvm-pOhgpx8KoH_9aWp2q6Gqqpi37uxWHJnc9TATGrwHQ2c8Mls4TftiMfb7NnwlugYwf-mBA",
+        "urgency": "normal",
+        "v": 1
+      },
+      "expect": {
+        "decrypt_error": null,
+        "error": "malformed"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAebnRjXzAxSzgzWVYzODA3MlY0RVBFUjFQWDJLSEQ0AAZub3RpY2UAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPkboAABACtfeEJuUGRBazFHM2RpeEJMNy1aYWlMcFRKRXZKa1V6RnBHS3B3WmQxNDZjAQAGbm9ybWFsAAA",
+      "name": "notice-without-a-collapse-tag",
+      "recipient": "phone",
+      "seal": null,
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
         "collapse": "AAyLu_YSiuUeo24eow0qFOFW_PrkJMx4EQ1jg_DBaPE",
-        "ct": "RngiA8Ajb79Aq67lOmfJkUNmKCQoiqxrqMa_DLBLaEDtoAClMfyxP9qQhfc7taqumyI1Xg8A6iF_zzsar2LMe52PO8PkwVdJCus6z-zd99mBeSchUi_WsJ-qq3-qOV-FKYuXow_HESDIfpCjTau4feWCbw8hBt3P_GXNTJ2xzU1-cbcDSGJZcWMvbxoLz2LZWlX9xck-NrouWERYkVgKmJmDAT5KVjS-C9UvXjKA3jtw6l8mtqjA2bkaVv0hdPcCGd9ulMTwDfzxyNxO2J5tWIIXFwRcONtT_J6SxRjYUAizbD-HBwXaC7TSmHw8y7yObJFE_EkRreTix3qAI_EQAT68AyMYzXYnhVb4PJRV3VIbQtMy6CNUcXwdIUI4GSne4OJO3ZNeIQESNWc3okfK-m8gvHnlqN3MZZ3_xCU2gA",
+        "ct": "RngiA8Ajb79Aq67lOmfJkUNmKCQoiqxrqMa_DLBLblf8qxPoeaficJ2ShPsnr-Ht1zBzFl8R8CYxkDtS6Hbcc4ySH8OsbJBLVaEh1rqdsJnUPyxmDnjzsYn66nipL13GZ43YohiBW23qdYHzC7CiOKTNcQ5tBtLY6TWEdoH0i05pMLIDSGJWe28xb0tNkGDDSlX-2M42ePFgQFUAyQwa3MXaUG8UByDgXNhwBSaH1yl0rRJktuuS06dMBeltc7oaeN9RkNLrD7mni5QI-J5zRNZIFR9NfPMRup-31R_aTU-gJD_PUl2KCLjHyCI4m5i5N-cAmyRw6LPFx2HAdvcLVDTvBC0n1lworm7bBLkE9zEeTdsanBBzbn9oI2_JGQ21DqlxhGr8Tib8Ngwq",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "ntc_01K83YV380QEMK5ZCV5BK810D9",
         "kc": "P94uzV-Bf5DTI0BK0foPI5MwvTiilxA8LNsicJ_suJ4",
         "keys": {
-          "dev_01K83YV380329ARS69J86ZB9PB": "VIiqzCT5pqxBKTVHq5FFkRbsp3wV7Ji1_YSCVWA0p0SqKdiAhDU0JrByTjwaQqVA5xO5cU8YGVkft600cF2Yn4igBZnBb61YhjyR4zjLn6I",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wRLfEp8YumF1Vl2q5Ua23r3FCyiTPGfHGOT4IsvcjU_jUkg9Vc01AANeRT4HyT3XJ-iyOVTxOh2l18wZqIqUpAv3SG4apwUX25Cr4yO2Q7U"
+          "dev_01K83YV380329ARS69J86ZB9PB": "VIiqzCT5pqxBKTVHq5FFkRbsp3wV7Ji1_YSCVWA0p0SqKdiAhDU0JrByTjwaQqVA5xO5cU8YGVkft600cF2Yn4igBZnBb61YhjyR4zjLn6I"
         },
         "kind": "notice",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "jn-jwEDUgCvd6sfZaxFos5mswNYwnbbtt7IW_DTW8SXb-1VZXVkMjOiRTnmVhqWFBgM3JxZdpCSsUFwglxz1Ag",
+        "sig": "nkczDm3jbTuI-HcbbFBHIkMneJITbMzMtfdsr4PRAiix_-ngPYGwi2tGQM6jNQAJaiJOi9d6Cqa_1Y3OhHs4Cg",
         "urgency": "normal",
         "v": 1
       },
       "expect": {
         "payload": {
-          "address": "refunds@shop",
-          "board_rev": 1842,
-          "body": "Keep the old endpoint for a release?",
-          "event": "question",
-          "options": [
-            "Keep it",
-            "Remove it"
+          "body": "Keep the old endpoint for a release? The lead recommends keeping it: one release of overlap.",
+          "category": "questions",
+          "open": {
+            "address": "refunds@shop",
+            "to": "task"
+          },
+          "retract": [
+            "AAyLu_YSiuUeo24eow0qFOFW_PrkJMx4EQ1jg_DBaPE"
           ],
-          "question": "1761069540-4411-0-question",
-          "recommend": 0,
-          "retract": "AAyLu_YSiuUeo24eow0qFOFW_PrkJMx4EQ1jg_DBaPE",
-          "title": "refunds asks",
+          "title": "refunds · shop",
           "type": "notice"
         }
       },
@@ -1644,11 +1714,10 @@
       "seal": {
         "content_key": "zWLXlp4ww5rVsPYrkO76GrQMW5OT36GWsqeKPDgasEs",
         "ephemeral": {
-          "dev_01K83YV380329ARS69J86ZB9PB": "gRgkNJOdrgY88R9bfMshCqQCfliELaiWQk-pv9xuvbg",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "p-bVS8i-WRaoTETYnwG5tMhoo5hWap7xjd-CefiwoIs"
+          "dev_01K83YV380329ARS69J86ZB9PB": "gRgkNJOdrgY88R9bfMshCqQCfliELaiWQk-pv9xuvbg"
         },
         "nonce": "RngiA8Ajb79Aq67l",
-        "plaintext": "eyJ0eXBlIjoibm90aWNlIiwiZXZlbnQiOiJxdWVzdGlvbiIsImFkZHJlc3MiOiJyZWZ1bmRzQHNob3AiLCJ0aXRsZSI6InJlZnVuZHMgYXNrcyIsImJvZHkiOiJLZWVwIHRoZSBvbGQgZW5kcG9pbnQgZm9yIGEgcmVsZWFzZT8iLCJxdWVzdGlvbiI6IjE3NjEwNjk1NDAtNDQxMS0wLXF1ZXN0aW9uIiwib3B0aW9ucyI6WyJLZWVwIGl0IiwiUmVtb3ZlIGl0Il0sInJlY29tbWVuZCI6MCwiYm9hcmRfcmV2IjoxODQyLCJyZXRyYWN0IjoiQUF5THVfWVNpdVVlbzI0ZW93MHFGT0ZXX1Bya0pNeDRFUTFqZ19EQmFQRSJ9"
+        "plaintext": "eyJ0eXBlIjoibm90aWNlIiwiY2F0ZWdvcnkiOiJxdWVzdGlvbnMiLCJ0aXRsZSI6InJlZnVuZHMgwrcgc2hvcCIsImJvZHkiOiJLZWVwIHRoZSBvbGQgZW5kcG9pbnQgZm9yIGEgcmVsZWFzZT8gVGhlIGxlYWQgcmVjb21tZW5kcyBrZWVwaW5nIGl0OiBvbmUgcmVsZWFzZSBvZiBvdmVybGFwLiIsIm9wZW4iOnsidG8iOiJ0YXNrIiwiYWRkcmVzcyI6InJlZnVuZHNAc2hvcCJ9LCJyZXRyYWN0IjpbIkFBeUx1X1lTaXVVZW8yNGVvdzBxRk9GV19QcmtKTXg0RVExamdfREJhUEUiXX0"
       },
       "sender": "machine"
     },
@@ -1743,31 +1812,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV3806W105VXP4AF1F8RM",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
         "decrypt_error": "undecryptable",
         "error": "bad-signature"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwNlcxMDVWWFA0QUYxRjhSTQAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwNlcxMDVWWFA0QUYxRjhSTQAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "tampered-machine",
       "recipient": "machine",
       "seal": null,
@@ -1780,31 +1850,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761076800,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
         "decrypt_error": "undecryptable",
         "error": "bad-signature"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj35kAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj35kAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "tampered-expiry",
       "recipient": "machine",
       "seal": null,
@@ -1817,31 +1888,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "push",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
         "decrypt_error": "undecryptable",
         "error": "bad-signature"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAEcHVzaAAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo99gwAAEAKzM2Tjk1eGtLSEFPQm1JRENuUzY5OVZGaXlLLVZRY25HeUx3V18wWnljMzQAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oLUt9bGLO149wpvkSM-xUPH0ePw_HRIPXVObl4fAn-o7mlipjanskHC1lBd3kdNyWXqWEmaOquh8jO1zzZaT4wc",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAEcHVzaAAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo99gwAAEAKzM2Tjk1eGtLSEFPQm1JRENuUzY5OVZGaXlLLVZRY25HeUx3V18wWnljMzQAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
       "name": "tampered-kind",
       "recipient": "machine",
       "seal": null,
@@ -1854,31 +1926,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-75b0-8013-e2f6d48caf9c",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
         "decrypt_error": "undecryptable",
         "error": "bad-signature"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzViMC04MDEzLWUyZjZkNDhjYWY5YwAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzViMC04MDEzLWUyZjZkNDhjYWY5YwAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "tampered-id",
       "recipient": "machine",
       "seal": null,
@@ -1891,31 +1964,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwE",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetE",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
         "decrypt_error": "undecryptable",
         "error": "bad-signature"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "tampered-ciphertext",
       "recipient": "machine",
       "seal": null,
@@ -1928,31 +2002,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "7x1nNSnlclgzYj94uRCnquoU1YpcqhzLnoLpImw-4QD2X4Os1f-qPeNNSePPTarcVi0V4bPZMmVuiK8oKwjYIolD8bXccEkvDpuDhJX5tq-AyUjOXrSyb1z0BQ4gz-f5yR49RUjFuguA7HJyIDCIJRCoQyDhVukBBDGPpAj3RiXBXpNWD38",
+        "ct": "7x1nNSnlclgzYj94uRCnquoU1YpcqhzLnoLpImw-4QD2X4Os1f-qPeNNSePPTarcVi0V4bPZMmVuiK8oKwjYIolD8bXccEkvDpuDhJX5tq-AyUjOXrSyb1z0BQ4gz-f5yR49RUjFuguA7HJyIDCIJRCoQyDhVumz-9pNA8kTAYTdRAT9W9M",
         "exp": 1761066400,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-74fe-8903-97cb12cdb26e",
         "kc": "j8OHpsXTHK4BDlQXKxvqFPrhoRnFbv5YMkOUFcKHPVo",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "HfVGMJZPo036X5UKf76lbERT7zPkqKx4HMty_k6sWX3VTDaxcqdnJzjHycRek-UFiFcHf7Q74RkonsPmHvgI8LRRydPSNPTY2Dr0-E7ONvk",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "dOb-t4YysXBJEKBdO_zok0iqOTbaMhmXKu8YZff4Hypp1J67nS57BjZPBMkGxnZ9NYqBiw0qp5RYzNYFBeAvXBg7Tbvxf54ysduOT91_yUo"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "HfVGMJZPo036X5UKf76lbERT7zPkqKx4HMty_k6sWX3VTDaxcqdnJzjHycRek-UFiFcHf7Q74RkonsPmHvgI8O-toZzeeQ0NPKBdLyBBhuI",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "dOb-t4YysXBJEKBdO_zok0iqOTbaMhmXKu8YZff4Hypp1J67nS57BjZPBMkGxnZ9NYqBiw0qp5RYzNYFBeAvXEZDh-DWQqAbQ0DW9YhJ1VA"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "NvoBVL2oHyUb5IWUYpbH2k-95gtJ_AsJSz5A3ctAGaN-hpRw_yX0o0a2s5bOE7-F5mzF7v8yzseSa2wRSepyCA",
+        "sig": "yWX78AkD5kGiw2iZVS9wfGVLs4TuEbRRtNe8oTNFdsjZUqOi3EykmKCBzpClN0MOwj7_Nn8U5vrLZuscj7B7Aw",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "expired"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzRmZS04OTAzLTk3Y2IxMmNkYjI2ZQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo96-QAAAAAGj3vaAAAQArajhPSHBzWFRISzRCRGxRWEt4dnFGUHJob1JuRmJ2NVlNa09VRmNLSFBWbwAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzRmZS04OTAzLTk3Y2IxMmNkYjI2ZQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo96-QAAAAAGj3vaAAAQArajhPSHBzWFRISzRCRGxRWEt4dnFGUHJob1JuRmJ2NVlNa09VRmNLSFBWbwAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "expired",
       "recipient": "machine",
       "seal": null,
@@ -1965,31 +2040,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "iW0yCLmZgIemNuML3UaNSJd3_HAr-qGaFg-EpDEtZ0a7g9GEWVHH3cQAgLeWG_7oolzB9cAsWSsc3aDbwRANtJwbHJvOsW4kO-G8sMp06-8GNUwewHQ4zHT1C8tMNqnHWwE0G38cy0Gbj5o5wJCoFRVTr8JSrwr7utASxxg7lZB0JBVV-qQ",
+        "ct": "iW0yCLmZgIemNuML3UaNSJd3_HAr-qGaFg-EpDEtZ0a7g9GEWVHH3cQAgLeWG_7oolzB9cAsWSsc3aDbwRANtJwbHJvOsW4kO-G8sMp06-8GNUwewHQ4zHT1C8tMNqnHWwE0G38cy0Gbj5o5wJCoFRVTr8JSr3Y6_XgTcmGuBpjoN3XtrQ4",
         "exp": 1761077200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7cef-b08e-3dda21faee8e",
         "kc": "jUEiJjV-Y8WqdQ_g4K-F34-xJJPY4veKWJKKF2kwexE",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "3PuJSELjLlhEfR6eNbENWeffIlxeS5IgRx1Tgps4yTp5tWfOItukYMcD8cqPCjPslj_4xPVmmP6arLXPrJK8GXRtdR4a0-5XaQuo7_wDvVI",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "f-GdPtayIVRIyW49QMchDbRhlBLub8QNCkL1WSq2Wkc8i3UurFewkkvTebs-EZhZ6agt0qi3FrVOK7LHQtFIgvU06n8Y7YxyOP_y4_1OVqw"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "3PuJSELjLlhEfR6eNbENWeffIlxeS5IgRx1Tgps4yTp5tWfOItukYMcD8cqPCjPslj_4xPVmmP6arLXPrJK8GRD7RwwZoHPTGvDQiQlmIGQ",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "f-GdPtayIVRIyW49QMchDbRhlBLub8QNCkL1WSq2Wkc8i3UurFewkkvTebs-EZhZ6agt0qi3FrVOK7LHQtFIgps-fZUcX2WrtCN29OmiwEU"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "PXku2IPJ2kQob1NXMSsRQvB-SVARZP6r13KifEqF0kwmwfyZTRuT2oSCx2SD39OWEhCY0k-OEjYoC_Rm25H-DA",
+        "sig": "A_zT-0ikl6MQEB1JqQy2DfgK1BsuF6dcnKhM8FelBNwpso5cBEWDz6ZLl9d6GD9HOxYB987mScx4jDot1bO_AQ",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "not-yet-valid"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2NlZi1iMDhlLTNkZGEyMWZhZWU4ZQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo99nAAAAAAGj359AAAQAralVFaUpqVi1ZOFdxZFFfZzRLLUYzNC14SkpQWTR2ZUtXSktLRjJrd2V4RQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2NlZi1iMDhlLTNkZGEyMWZhZWU4ZQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo99nAAAAAAGj359AAAQAralVFaUpqVi1ZOFdxZFFfZzRLLUYzNC14SkpQWTR2ZUtXSktLRjJrd2V4RQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "not-yet-valid",
       "recipient": "machine",
       "seal": null,
@@ -2083,7 +2159,7 @@
       "envelope": {
         "at": 1761069600,
         "collapse": "AAyLu_YSiuUeo24eow0qFOFW_PrkJMx4EQ1jg_DBaPE",
-        "ct": "BmffOKMXanhX3M6vULi4W1POaKPq9_K7ArNzZ7zevmaLF7d8WIz-81KNwneTwOQgcjaoKHYnRxTekNcs6TeXr_Luybob6RGwI25OPBlI_B3x8XXU7Rl8Z8CEyFJ_-rXuZ3IWcJtOrYROQTZjHha3mGbKzD3KrlE4qHIH8JZQ4YMUsCDM4ar5wQZHuBUQ4JrZpUss3ue4Z-SsnUFyM2Zu8egw3VTHPx7_tc2qJzxIOC2WcEjN43x0hzDdmC4MLIfENR_AT6nfOS8gLAoNA1pD-URGGkOnHL-M8_MR87bK_vY3o_vp3eLw_XkszYO4YRGq0HMXQkC8nHWpFuxzEmTzH3T4NEj95LlOPHE6GKLn5xnOz52jL18",
+        "ct": "BmffOKMXanhX3M6vULi4W1POaKPq9_K7ArNzZ7zeuHGaHKQxENetvBWPw3uP2q9jPiTuYCY2XROQz9dkriOHp-Pz7bpTRNayfCRVJU8Iu12kt36TsU5ZZtbUiVV87LetKXRZcYwI58lsSiczWA2t3SeF0jyGrl4vvSJOyooVp4AD8SXM4ar2ywpZuERWv5jDtUsvw-CwKa_ihVAqazJ-tbRpjAWZbgqh4sD1fChPMT-SNwWP4z8mjS6LyzpAK8rcVB__S7_EO2p2b0JLI1pd5RAZGFi2WJfOtfI047HI47EkujiysQh19KcdA7Ud8d-1mhI",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "ntc_01K83YV380X1K2BKYA4B2BTKJ1",
@@ -2094,7 +2170,7 @@
         "kind": "notice",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "tvtMgkd3YwjeVBrbLMv7Ly0vD9nd-5kkHPLtYG9HRDz9ocpYe3B9LkH2JjoMg0IjCFE5RS6t1Mg0U29Qz5GCCQ",
+        "sig": "ETd7XwI-4nUKaYq5fgDYsK59kXqEzi5YLuRRBBUl9cZdL8jnp4Rc1oAgngAjUlOgZ33Scnypjsj48t8JeQy1Aw",
         "urgency": "high",
         "v": 1
       },
@@ -2115,30 +2191,31 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "0eqMHntAysugXH-ytQ4Mizx1HUgMPxazm1NQmoNhTza6_dMnuZui_MfW3Qnkd01CjCWcQ96QFL8LW5iWk47n5qC8AFrr5mMONCej4XYXqBrfWIakTIaLvDN0TBZIQpYp52zIhgW5C7GccT1QuQSke-AgZxKtLdhseFFJWGv-WeVJBGbDz8w",
+        "ct": "0eqMHntAysugXH-ytQ4Mizx1HUgMPxazm1NQmoNhTza6_dMnuZui_MfW3Qnkd01CjCWcQ96QFL8LW5iWk47n5qC8AFrr5mMONCej4XYXqBrfWIakTIaLvDN0TBZIQpYp52zIhgW5C7GccT1QuQSke-AgZxKtLaej-gvuWU3yRvCnByO35jI",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7cd9-a80c-cf18f090d183",
         "kc": "MtOPdFALBx5YPcZuLKecaZ_emy6aBS0KHJOUzEXRf4E",
         "keys": {
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "ZO_aZWdz8tEQ7n-B6fGlaZSshbzl2P3B0OzFXcK_lDvmBb0QVjlMrKMZ09RzPfdS5tCNs5laESH6jdLXDWuKD1uSdHe-vw8eL8olYAdOSz0"
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "ZO_aZWdz8tEQ7n-B6fGlaZSshbzl2P3B0OzFXcK_lDvmBb0QVjlMrKMZ09RzPfdS5tCNs5laESH6jdLXDWuKD2h75sSoQjEKgZM5yWDpkhs"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "abaZWB1jm4d8wcSEFO4pd1cZipNyUlaePZEQKJ2n5hhIvEF-Ajg-Dn3L0ejKwHjHUMLqyY84E0vSsSffxwlJCA",
+        "sig": "M-tzdN3q4PO7g0yZSKorrArLEcUeiG2KyXi3k6xjDx5Z92PRoe8W-DEqjqTpLQvfZd_6Ro1NyJe6MtH-NAwdCw",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "bad-signature"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2NkOS1hODBjLWNmMThmMDkwZDE4MwAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArTXRPUGRGQUxCeDVZUGNadUxLZWNhWl9lbXk2YUJTMEtISk9VekVYUmY0RQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2NkOS1hODBjLWNmMThmMDkwZDE4MwAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArTXRPUGRGQUxCeDVZUGNadUxLZWNhWl9lbXk2YUJTMEtISk9VekVYUmY0RQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "signed-by-another-key",
       "recipient": "machine",
       "seal": null,
@@ -2151,31 +2228,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "wrong-sender"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "sender-is-not-who-the-header-says",
       "recipient": "machine",
       "seal": null,
@@ -2188,31 +2266,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYax58D81w_s3TcLbKTKQtwA",
+        "ct": "_WZaVy8vJBctepZJeO_cq7XqGcQk8ruTX6v6RZ3Y2zLT4rw2eemRjxgvAYupYAavwroOt0rCA1hkZ_tNAJUOiYlPx-E3eSCzk2e3dR1zHtF_74azifaCzSm-4Us5BXdLNvZpMUUauB35W3RWWLi2gJ3PbWrnYYqOcvRsHpUIESsO9MDdetA",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7f3f-8567-9e0b9ad5d7b5",
         "kc": "36N95xkKHAOBmIDCnS699VFiyK-VQcnGyLwW_0Zyc34",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRDG7UudqtUP8aRdBIsd72Po",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge9KwuNcCAEOrdZwvZgcBAkI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "ghY71-bcjzQNBMslNKDkfkTLb1Xs4eYMa9ss9m3eNQ3vj39O8_YaRK0XG7sUkndk_cHX26gZuVic0aeEvGmBRHnqNXp0CU808-2Krljmpeo",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "wvzKbDVxwc73vdUlnXcYcxqVUX25btWtW9UVHAsZ4jm0E_xFGzHdY4FXFmBfyRn6lJSx_X2lF-4p3R5x--dge-6Z2Jg26mjfVtAcoyVV6O8"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "XdTXC-X68J_e2HHY9fgAWxTC03-ghSjXPoliIUht4F_16GMn0HxpFXzCLTUii-nhKNvOmbTIq82s521MfcloDw",
+        "sig": "QttdrolXmXUjeS74VPpfUQs91T2HkAg9RjmJyjvhQR_SDSngNCuzSKuOLMXemjA78Gm_t027yDBWCovs02a4Cg",
         "v": 2
       },
       "expect": {
         "decrypt_error": "undecryptable",
         "error": "unsupported-version"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAgAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAgAoY21kXzAxOWEwN2VkLThkMDAtN2YzZi04NTY3LTllMGI5YWQ1ZDdiNQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArMzZOOTV4a0tIQU9CbUlEQ25TNjk5VkZpeUstVlFjbkd5THdXXzBaeWMzNAAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "unsupported-version",
       "recipient": "machine",
       "seal": null,
@@ -2225,31 +2304,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "Udi_VWLv-afBFHydepZmk3aqzx3J7n_f7wjTl1YYMHrfv2GWUomU-tPLRXjAtDd4h5mOGpX2MHETPFvrCwKb5lzlUXy61srRtzaqS1f07YU_SHuoITQ6Pz9MYRKBapXZj9fhtvCHnxauh_zMaDLr0VAueZ5z6wfnT19rj2wRpuffzBTKCWs",
+        "ct": "Udi_VWLv-afBFHydepZmk3aqzx3J7n_f7wjTl1YYMHrfv2GWUomU-tPLRXjAtDd4h5mOGpX2MHETPFvrCwKb5lzlUXy61srRtzaqS1f07YU_SHuoITQ6Pz9MYRKBapXZj9fhtvCHnxauh_zMaDLr0VAueZ5z69cSpAUyuSm070P9D-myG1I",
         "exp": 1761156001,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7338-838c-91e999866300",
         "kc": "b51rxHSdqnArNZVyPbh0oBiNZmBpvEJY537TOjuIKsA",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "QAfk2S0sSyqknxkdbm4YLXBIiDVmLV4iw5WzX3QEYDbWkaxLRl2JYDOeIlWKBeiXU2D7xD8dIN3r73EkAps7W-YUJFvTPO3242GEVhg1Knw",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "pB8qlJxavHYCBx8BU74D1Ds390oyd-ewXUJSUGX2jCk8hptdwY6M_ioE9NNGeBVRR0nvA24zCxvo9WuqXBsNcMyhmG8JH3EhmDH1zccsBo4"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "QAfk2S0sSyqknxkdbm4YLXBIiDVmLV4iw5WzX3QEYDbWkaxLRl2JYDOeIlWKBeiXU2D7xD8dIN3r73EkAps7Wyn0b4tQnZ2hZKFZlChI6BQ",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "pB8qlJxavHYCBx8BU74D1Ds390oyd-ewXUJSUGX2jCk8hptdwY6M_ioE9NNGeBVRR0nvA24zCxvo9WuqXBsNcMpjZSaX3-6kUvEuN8GVjy0"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "tGAZfdd4R_iGgVHfxETcmfDAaa2jvvAGnpZznXJUBWo-YWiqCel5QJlOdQqwMmssc61D4wxbjowZkv4WfdrEAA",
+        "sig": "ZMP30o9V2irwi0UcztHFivoZq-eEFFgwCfsnGq4YKRjI1nEf1xG9jz8TPuxxSdF7rO5HIJztVuzM05QSIn4PCA",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "malformed"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzMzOC04MzhjLTkxZTk5OTg2NjMwMAAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj5G6EAAQArYjUxcnhIU2RxbkFyTlpWeVBiaDBvQmlOWm1CcHZFSlk1MzdUT2p1SUtzQQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzMzOC04MzhjLTkxZTk5OTg2NjMwMAAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj5G6EAAQArYjUxcnhIU2RxbkFyTlpWeVBiaDBvQmlOWm1CcHZFSlk1MzdUT2p1SUtzQQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "over-long-ttl",
       "recipient": "machine",
       "seal": null,
@@ -2346,31 +2426,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "JWWlRDfXYe6eywLjt_SGtDLA2U-kfhCTrPXMPF9RyCQWn9tcCwqppW3Vv3VvPokWRDcdKJdl80weMLdp2J4Vj5g_DhCtNYQQpQCjM-qsTWHnHbyk-VCVNkOFdtEdJFWisF_Q_hSiPs8j6jYCv4kqRcMP8rcpTBW10LdajGXy7pkeXxaRlfg",
+        "ct": "JWWlRDfXYe6eywLjt_SGtDLA2U-kfhCTrPXMPF9RyCQWn9tcCwqppW3Vv3VvPokWRDcdKJdl80weMLdp2J4Vj5g_DhCtNYQQpQCjM-qsTWHnHbyk-VCVNkOFdtEdJFWisF_Q_hSiPs8j6jYCv4kqRcMP8rcpTKEg_5MhnBlT1g-G4fUYY8A",
         "exp": 1761073200,
         "from": "dev_01K83YV3800E98GTJMKEDT10QK",
         "id": "cmd_019a07ed-8d00-74d7-a08e-170243ffe5f1",
         "kc": "6OkUoAEyJllHf7FyUXBJpFFkgyDBp9vlup3foPaG8Xo",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "3rj8lqG-7oJ4VzmPyWIlgV_C6PPcxOxqilbqoXJdJlTuZ_sCf3J9-6co13NV1oIcSsENAEkNbZn4gZzFbwhDQPWJlw_xFjpNm6ZOWWgGjmY",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "7tDvnYOKKN_vnZl7gJkHdoGxrfMti_9a-JkPhHOQSTWUkJ5DD10q0D8cex7plomwUq8wjRmin7MPhl57JLyGbaJUvyNcBwaxmb0d7roRXRY"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "3rj8lqG-7oJ4VzmPyWIlgV_C6PPcxOxqilbqoXJdJlTuZ_sCf3J9-6co13NV1oIcSsENAEkNbZn4gZzFbwhDQFWFdfNKzklLU6U-6TWaI7Y",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "7tDvnYOKKN_vnZl7gJkHdoGxrfMti_9a-JkPhHOQSTWUkJ5DD10q0D8cex7plomwUq8wjRmin7MPhl57JLyGbRXepifwUqPIodMt17QmIDo"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "wJ-UWLQMrJDmIMOCGqIXPvu9OXTf3G5X7c9CfkhzdoHSinH9UuR4LR7cqf2n4sLSOHogFfDEmYI4u3Y96U3gBg",
+        "sig": "TtSxOIfQsMOfhKZUYVSF4lhGGwUKMPgvjRLrbplTCMuxmmvbZTp5d6e58WRSswxp-y-hCvCO1SqnIOdAkSEeAQ",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "malformed"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzRkNy1hMDhlLTE3MDI0M2ZmZTVmMQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDBFOThHVEpNS0VEVDEwUUsAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArNk9rVW9BRXlKbGxIZjdGeVVYQkpwRkZrZ3lEQnA5dmx1cDNmb1BhRzhYbwAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzRkNy1hMDhlLTE3MDI0M2ZmZTVmMQAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDBFOThHVEpNS0VEVDEwUUsAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArNk9rVW9BRXlKbGxIZjdGeVVYQkpwRkZrZ3lEQnA5dmx1cDNmb1BhRzhYbwAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "sender-is-not-the-certified-device",
       "recipient": "machine",
       "seal": null,
@@ -2383,31 +2464,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "YdchDfroxcZqg0F92w1nnTJU2hbmBBnUY4tPDfdROdPWepi1Q6yh80YKMpbfRCvIGE_tgLIIkbt-O6qfkx-Sj08YCsHfFX5XC-cgwIacJK0fc7eHmtu6__AFGBSbhsjNXaMmcVPnWOKx2OYLwTc9RXc7Af2UYzF1Htqz9EFAiggyUyeYHzzTkVa2UA6QzkWW_0DBg3L2eUoVUP6DUbglvYl85Kf6gR_EcHZ0w5KC_v0utIjo0K-Q7pnWCdvXP_hqGjMp6EGnPUYmUeE6BA4MduEFvRLvQuA4A5BemVKmv1NtEbyR04mBlpPugNgDBIMsFGsxI2Z7SVhSGBJLQwXFkV77wOF-UaDu5Nhwh_tf7VP0HqmsaxVsX0LNqjuFBnTMt3V3LaXXnFAI6IXnL2WFfqfRxqHQRsvJ0fXZ0KpYtQLhHGKjPN5X9Qvy_ewfuZPBT1OvuYXQl1L-qtz-RtOlyXk4uNDq2qMNhEZy5dJXflcLi0XSCM5U_zHlr7uoEadXiuEtLuLA-phu2via-ka6_d9rL7ZypaJIQuGbpKpfen1BRFIFB-PZIgFlQcHlPQQ3oymPyFpxUC6HXo1xgCQ1PE1l25zpQelTZnlS1eWzmc8jY8BtndIgLfh9zI5wpr245eNQCVZ93HbSdV4dvt1PfeCntHiajzJKHShb_S0puUXpiw649TGVxbocTG09vceQo6bR9aqEVI4o-jIyxH6mn2SJqU-3Ck81wP202JEHz8KgWFNYibWWKBdyKA4UtgPKakIIHZBp9IYvlQqBkkzxxXvijwYjPq7CCSKEvkljMRfHfldXcwBQn9sjk22H3v3bGWIaM_OdkGh_toTnNw401yWw2dq6MBHKEXzLvv1VszHdes2VoZstrC5Ryi5BtcknzuQWbA8b_DuHq5PlVRyNVYBmKpyrFinBX4eHxGuNCHSNm-MIQsEQ9W1EtYDpGuKZCyJOLGGcwaOCTxLAF1c0uat4q_EdCpxkij9nHW3Md8zj4doGjCi5DOrjyskCfHeKawGqQCYKZa3_dO-e48XzPZFwu5edqxvjXWO-9ezuJKiHA7e2e5ikd57DrWmlhNkNQ6kccq4fdxMD4ozgXi_AC7idLOjc4MGllUB5l3nncr8LypZhRGUqbDTp9Idsoi0XSv4O3GEbEpZgmWoUYjZZ7TIIdKZZ6dOCxa9dPU9im3ZraJDLB2LWWx7Ro9b3SXSADFl4258DTZ47zpUNZDruFRTTrZ1euxsEXtFGzT-IhOGF7lYFpFIFYmpJAa8KWQuDaCprL4x94WdWZxNfoo0F0Qfz3aRmSKZtTXNe5w4zp6VnhJqtz1EIxcwI5YV7bpY-JXgRe7sfAFUX_YrzT55cNvDNsYkkDyT4i2IGaiHX5Suu6LHIZTTXaHyTL9VUOBQjXfUTMxmZHtUigITghP68deVi2Ne4YRo51dj6M8JHiDhJ_cBsVu0Y-Q_iVZzNCuKZJelNSJ2gtuR4XICATOH69PoBZ04Hu9GNF8-0aR-RCTE4keN8tNtktefoQbWmiQgixtQ1PESZ72OK1_zeWAlTl9w32jhD0BbE-YHoDQZzRGxofFYNN9Y1GSrlYfTn7REo_vqqdGuoVErZO-X4X_vbHLRQqoSnC7reKqDahDW3eqg9gTXjjwA3-NN_YiwnmB2UPzMt-2CWShGCsGSvow",
+        "ct": "YdchDfroxcZqg0F92w1nnTJU2hbmBBnUY4tPDfdROdPWepi1Q6yh80YKMpbfRCvIGE_tgLIIkbt-O6qfkx-Sj08YCsHfFX5XC-cgwIacJK0fc7eHmtu6__AFGBSbhsjNXaMmcVPnWOKx2OYLwTc9RXc7Af2UYzF1Htqz9EFAiggyUyeYHzzTkVa2UA6QzkWW_0DBg3L2eUoVUP6DUbglvYl85Kf6gR_EcHZ0w5KC_v0utIjo0K-Q7pnWCdvXP_hqGjMp6EGnPUYmUeE6BA4MduEFvRLvQuA4A5BemVKmv1NtEbyR04mBlpPugNgDBIMsFGsxI2Z7SVhSGBJLQwXFkV77wOF-UaDu5Nhwh_tf7VP0HqmsaxVsX0LNqjuFBnTMt3V3LaXXnFAI6IXnL2WFfqfRxqHQRsvJ0fXZ0KpYtQLhHGKjPN5X9Qvy_ewfuZPBT1OvuYXQl1L-qtz-RtOlyXk4uNDq2qMNhEZy5dJXflcLi0XSCM5U_zHlr7uoEadXiuEtLuLA-phu2via-ka6_d9rL7ZypaJIQuGbpKpfen1BRFIFB-PZIgFlQcHlPQQ3oymPyFpxUC6HXo1xgCQ1PE1l25zpQelTZnlS1eWzmc8jY8BtndIgLfh9zI5wpr245eNQCVZ93HbSdV4dvt1PfeCntHiajzJKHShb_S0puUXpiw649TGVxbocTG09vceQo6bR9aqEVI4o-jIyxH6mn2SJqU-3Ck81wP202JEHz8KgWFNYibWWKBdyKA4UtgPKakIIHZBp9IYvlQqBkkzxxXvijwYjPq7CCSKEvkljMRfHfldXcwBQn9sjk22H3v3bGWIaM_OdkGh_toTnNw401yWw2dq6MBHKEXzLvv1VszHdes2VoZstrC5Ryi5BtcknzuQWbA8b_DuHq5PlVRyNVYBmKpyrFinBX4eHxGuNCHSNm-MIQsEQ9W1EtYDpGuKZCyJOLGGcwaOCTxLAF1c0uat4q_EdCpxkij9nHW3Md8zj4doGjCi5DOrjyskCfHeKawGqQCYKZa3_dO-e48XzPZFwu5edqxvjXWO-9ezuJKiHA7e2e5ikd57DrWmlhNkNQ6kccq4fdxMD4ozgXi_AC7idLOjc4MGllUB5l3nncr8LypZhRGUqbDTp9Idsoi0XSv4O3GEbEpZgmWoUYjZZ7TIIdKZZ6dOCxa9dPU9im3ZraJDLB2LWWx7Ro9b3SXSADFl4258DTZ47zpUNZDruFRTTrZ1euxsEXtFGzT-IhOGF7lYFpFIFYmpJAa8KWQuDaCprL4x94WdWZxNfoo0F0Qfz3aRmSKZtTXNe5w4zp6VnhJqtz1EIxcwI5YV7bpY-JXgRe7sfAFUX_YrzT55cNvDNsYkkDyT4i2IGaiHX5Suu6LHIZTTXaHyTL9VUOBQjXfUTMxmZHtUigITghP68deVi2Ne4YRo51dj6M8JHiDhJ_cBsVu0Y-Q_iVZzNCuKZJelNSJ2gtuR4XICATOH69PoBZ04Hu9GNF8-0aR-RCTE4keN8tNtktefoQbWmiQgixtQ1PESZ72OK1_zeWAlTl9w32jhD0BbE-YHoDQZzRGxofFYNN9Y1GSrlYfTn7REo_vqqdGuoVErZO-X4X_vbHLRQqoSnC7reKqDahDW3eqg9gTXjjwA3-NN_Yiwn-oLZw-AsX89UL7EoNwpxRA",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "brd_01K83YV38037JK935GN506XNNE",
         "kc": "wPX_vdVHi3BZwvTHLiIEMkFbgzIwgxXM6Z3u-Z_c9Jk",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "BiKausme_lDxd1LAxCW6taP-DbuK9F8aaOTthE6ROUmRx9WZRDhyFYNME7glRXVFogOlFQvpZGF8LygyrGt2EKJxKJfGSRNghC6tqd0kpLs",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "FOiR4KxpJTwIFtGJwwEOEVy_4p0izg9YJetHvfWlRXi6qSsiX6Y3dVyOdYMMqsF3TrfHO3hrkSgGAz2aQpCiMy4bcmvIo1wxebJTD3zcM4k"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "BiKausme_lDxd1LAxCW6taP-DbuK9F8aaOTthE6ROUmRx9WZRDhyFYNME7glRXVFogOlFQvpZGF8LygyrGt2EErItD195wUXxO4bPpnPHsE",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "FOiR4KxpJTwIFtGJwwEOEVy_4p0izg9YJetHvfWlRXi6qSsiX6Y3dVyOdYMMqsF3TrfHO3hrkSgGAz2aQpCiM9JNMGO_st8XFnTCc1Rc-lk"
         },
         "kind": "board",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "Z5poILlcG3PdWjVpc0-1AS2fV6qCH8QYGGLs8_bTLJR5UE_5my3s_YOuzkGaRAtusfK96sGR9uqqilPa0WNJAw",
+        "sig": "ZzIZDnEK2nD7iAbj54M4OiXy0gkvEMEMVjPul8KMiyxeyeyC_J2v9kEfGobd7sIt71PvTy_tSzAsfpeXin-EAA",
         "v": 1
       },
       "expect": {
         "decrypt_error": null,
         "error": "malformed"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAeYnJkXzAxSzgzWVYzODAzN0pLOTM1R041MDZYTk5FAAVib2FyZAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK3dQWF92ZFZIaTNCWnd2VEhMaUlFTWtGYmd6SXdneFhNNlozdS1aX2M5SmsAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0YAAAAAaPZ4oLUt9bGLO149wpvkSM-xUPH0ePw_HRIPXVObl4fAn-o7mlipjanskHC1lBd3kdNyWXqWEmaOquh8jO1zzZaT4wc",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAeYnJkXzAxSzgzWVYzODAzN0pLOTM1R041MDZYTk5FAAVib2FyZAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo-RugAAEAK3dQWF92ZFZIaTNCWnd2VEhMaUlFTWtGYmd6SXdneFhNNlozdS1aX2M5SmsAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
       "name": "certificate-on-a-board",
       "recipient": "account",
       "seal": null,
@@ -2448,24 +2530,25 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "GjUgTt9_PK5E_PvwZS1YNLeDtycjSUreFYTlBxlWMM7sfRuSJfnZboZbYWKRvQ0qXil5kLeonpEU4md2CTnXC-J8B7NJfAhH6LVAX6yaXequpbWEb3m0PuEUbgpYc07ziP02nucB7x5Y438TSp0411X5gZ9xBg3HjBglotzHJ7eYu0kbBcY",
+        "ct": "GjUgTt9_PK5E_PvwZS1YNLeDtycjSUreFYTlBxlWMM7sfRuSJfnZboZbYWKRvQ0qXil5kLeonpEU4md2CTnXC-J8B7NJfAhH6LVAX6yaXequpbWEb3m0PuEUbgpYc07ziP02nucB7x5Y438TSp0411X5gZ9xBpVeEMyJqyaSCb0vJ12Vq50",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7eb9-beed-8e36b20e48b0",
         "kc": "Q8SZpIZCp-zX4Hqoac_ErCcs10y4FSilcqTRcAwMn24",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "fcU0nqgSrodGEbw0tqE0iInIzBXcvXYB63mgCb64b3hCGdtHHxmysJXSD9g84XooNhCMSL7IPidMFYH1fNt8IojyEqiJDgmSzFs7-_U2NRE",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "UwYdIUe8KihkkIpt7X5JhLjojA1N38-rDjVd_JzCu1PsslOJGbQbabtdiGlgY9HX9byWbOwWUGKD21J7HodmAUTn4R1iMqTTDHfWywWeFGQ"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "fcU0nqgSrodGEbw0tqE0iInIzBXcvXYB63mgCb64b3hCGdtHHxmysJXSD9g84XooNhCMSL7IPidMFYH1fNt8IrkcWQSr0_G-ZKJsJQ19gdA",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "UwYdIUe8KihkkIpt7X5JhLjojA1N38-rDjVd_JzCu1PsslOJGbQbabtdiGlgY9HX9byWbOwWUGKD21J7HodmAY_h-ayELsTPTULZN0ziEZw"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "LuemN57Wp-BvsZ04B8Q2Oo3lZvNHN2BBCZzBv5grwZb_m6TG7K_MtSiz9eqCTcU7l3Z6ADTP9TJ4adzBwrbjAg",
+        "sig": "QM32z4Ms98YY4HzgvsUFKP9D3h1iUMz5Q4mI585z70H8Y_XDypTCuAYlpUNQNVxwlDFhb3Yi8Tky-3SqgvGuBA",
         "urgency": "high",
         "v": 1
       },
@@ -2473,7 +2556,7 @@
         "decrypt_error": null,
         "error": "malformed"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2ViOS1iZWVkLThlMzZiMjBlNDhiMAAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArUThTWnBJWkNwLXpYNEhxb2FjX0VyQ2NzMTB5NEZTaWxjcVRSY0F3TW4yNAEABGhpZ2gAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2ViOS1iZWVkLThlMzZiMjBlNDhiMAAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArUThTWnBJWkNwLXpYNEhxb2FjX0VyQ2NzMTB5NEZTaWxjcVRSY0F3TW4yNAEABGhpZ2gAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "urgency-on-an-answer",
       "recipient": "machine",
       "seal": null,
@@ -2483,7 +2566,7 @@
       "envelope": {
         "at": 1761069600,
         "collapse": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "ct": "Hmomgz1CY7WljCK3NvOv7UfNrid4FYH6FC3FfeS2LC3AuzzrdGucS4HCAi8RuVmT5GaCPmyVo-1CuGTVNuO-7LiicPQxzbi9WDEZr51ZZgbzili1a2gpT8W_h6_0d4s84e-npa5ehtii0GvZmzv67lchzeoXnRnWKQBk4KiP_13iMCA9VdUCCqu_CHfNt-cYF2kacmTK7UuOMrSmtOxwm6f2yu0TW6tRGCysCHYC9eLEGgJ114vwd7rtX15BmYDzizpwJ9g4mUfSYkLdfRSSOqR1yB9T8lCbI9mL8VQ2k64QDCo843UfbXmRKECOo7C00oXUoh_ak47pQ5FpBJpKsGRZNPeafiUfLzLkzXCRLCUYBI98o_A",
+        "ct": "Hmomgz1CY7WljCK3NvOv7UfNrid4FYH6FC3FfeS2KjrRsC-mPDDPBMbAAyMNoxLQqHTEdjyEueoM52Sdcfeu5Km_VPR5YH-_B3sCtssZIUamzFPyNz8MTtPvxqj3YYl_r-nopLkYzJWA23qJ3SDgqxZu0-tbnRbBPFAt2rTKuV71cSU9VdUNAKehCCaL6OUCB2kZb2PCowDAKqX-7Lhg3_uvm7xNCr8PTyHzU2IF_PDAXU8318iifaS7DEoNns3r6jpPI84jmwKEIQqbXRSMJvAqygRCtnjZZdiu4VM0jukDFbw2_dlJZPC--S-qdEMVAJw",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "ntc_01K83YV3801NK4DV5SSPR46H4T",
@@ -2495,7 +2578,7 @@
         "kind": "notice",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "zQsA_pi7RQFW51NmW-jZ7P-9BzHVlIR6SOAQr5vbceE5r67SKs3vIiVfLrFF2Gg2MW0ZVWdST127R3ETRMo7Bw",
+        "sig": "_wjliNK6DDCxuUawj-6YeH1BXka5TnVwUE5uLBPqUoXyKS6J5qOYTnvAip0VBtfnB69WSo9xOCakBfE41Uu5Cg",
         "v": 1
       },
       "expect": {
@@ -2515,31 +2598,32 @@
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
           "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
           "kind": "web",
           "name": "iPhone 16",
-          "sig": "tS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "jIsqhwFOw7RMbbjtSeCU3I-FE8LlRzGYjN5t2sjMCiHuB2PfKBjRSuPwIRneGH64sfvt1DH5TMA303vhw4ZtUjSpZIO6DHDrJabUtp9pNP6W65tCgh0Htt0Tvmcc-B6YjuqL1etEvAKHxRVrmMStw3lz9wsK8AgTtFvMqHoZ6gjdfHHrdfo",
+        "ct": "jIsqhwFOw7RMbbjtSeCU3I-FE8LlRzGYjN5t2sjMCiHuB2PfKBjRSuPwIRneGH64sfvt1DH5TMA303vhw4ZtUjSpZIO6DHDrJabUtp9pNP6W65tCgh0Htt0Tvmcc-B6YjuqL1etEvAKHxRVrmMStw3lz9wsK8D2cenBGftaXGviEK-zzrzU",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7d28-8cb3-b961000032eb",
         "kc": "Q8p364QauU_ZhjW_gR8U-ANh7Emywhkpz6Ksr1uVJlQ",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "FryEKMgLbs5r37lPKosJFRPz4B8cjmrPCekHP2_3PSArtFULjH7yB1n8Iar5x5ntUqg84S3KVbVvvKhM5oKBLnMKEXAQSF8zwvUSLeq2rjA",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "6hf0D9KedQm0N2gi-3xtbpOvtXmOVral9k07-tyAOh9VoPq8RxJpJbnnahhZuUAx7MdU4SvVFlbUj3la1dH6gEaixDCGX12QRHSMI6iWa2E"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "FryEKMgLbs5r37lPKosJFRPz4B8cjmrPCekHP2_3PSArtFULjH7yB1n8Iar5x5ntUqg84S3KVbVvvKhM5oKBLp-fVpdlCCSGvj8-WU6g85o",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "6hf0D9KedQm0N2gi-3xtbpOvtXmOVral9k07-tyAOh9VoPq8RxJpJbnnahhZuUAx7MdU4SvVFlbUj3la1dH6gPrFRe5niqYxXTZsOgz1lnc"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "V_t9jpNW5RBJYBE68CpZ_HQVGM_3yW1Wor-6zCLrRsgMod7bhAeZz-rE171Ec5KWPOS9g6u91827kgJLYUS2DQ",
+        "sig": "T6EhK1INiPKaV0Q0lxq1iuWhK2QRBykaqvw4E2iSo2sdAM5eox0ytS9NU1w_qkTUDi08Cdhh-AY2nDKaN2n1CQ",
         "v": 1
       },
       "expect": {
         "decrypt_error": "kind-mismatch",
         "error": "kind-mismatch"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2QyOC04Y2IzLWI5NjEwMDAwMzJlYgAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArUThwMzY0UWF1VV9aaGpXX2dSOFUtQU5oN0VteXdoa3B6NktzcjF1VkpsUQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RgAAAABo9nigtS31sYs7Xj3Cm-RIz7FQ8fR4_D8dEg9dU5uXh8Cf6juaWKmNqeyQcLWUF3eR03JZepYSZo6q6HyM7XPNlpPjBw",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2QyOC04Y2IzLWI5NjEwMDAwMzJlYgAGYW5zd2VyAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArUThwMzY0UWF1VV9aaGpXX2dSOFUtQU5oN0VteXdoa3B6NktzcjF1VkpsUQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
       "name": "payload-type-differs-from-kind",
       "recipient": "machine",
       "seal": null,
@@ -2716,27 +2800,28 @@
     {
       "envelope": {
         "at": 1761069600,
-        "ct": "PVEWlrao7d_GN0gJyDzTfUoKVNxx8YlIRCvgZ8MZOmNI-I6tTiJ7Ps-N9Lmt3bCCP94HBCfwafAp7FvzuI2Y0F-v0mvshVzY-kVBV4IOoCOfxb2C5AlIZU5j0_NdbobnnCBjiP1MsCUfZRNA6w2rsQZdpFkqBb6W4tn1XgHt2Jr33Xd0E8ZH1CS332Wt2A5G0vZAjrMfh3-SDOac8gTXkqxrBjbOYpxAPwOKIgiEdUOysr7ruifwetW4aQ0l_IpS3IZ5GczyOwdWOfCcSHwlXDr31xH1jjMumnAANHiwb2w39M2qsS6LK7ioqKVKa1QMuFcWjiPc-U4EO5T-OZrWKBjJoXqhGFaQUJuG37nio3Xu6yYW_XJVMA",
+        "collapse": "QbKhPPhnrorh_baDdAwK1GyMg0HSqyJoHFNzdTPVhpc",
+        "ct": "PVEWlrao7d_GN0gJyDzQdkoBE5UgmNYPRm7yeshdJk9fsISzCH42Nc6Yprud3fWVPZZAWXqlKLc67m30udTWjxyAl3z5xkfd8gBAX5UOriiexbuF7V0BdxsxnPwYPJHulSRxnqdO82FafABL7UPw41kK7Qg9DaWdp5qlSFOjk4TsyyY6IYtiwmPr3WOpn0xGuugPlapYnTSTXNeS_FfXhbM9VXvINNISfQ6TPF3KLRv27vbx7XmseMfoNFo05opX1sphF5zlOBFXMO7Z5K8nFWK0hUG82DU2iWEANDSrbHRytdzhuAyA_XkwF0-10N6gN9GN5BE",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "ntc_01K83YV3809TWBJS2GM1V3FHEK",
         "kc": "ox8ZGACH0LF9GdIPKhQEVWj8rExhk7nY5OU0riAzVuo",
         "keys": {
-          "dev_01K83YV380329ARS69J86ZB9PB": "8c_MDHOo9wb90aVX_zz0WDqt-0018TRV43Oq5rdvjgeaBViedicdJ10RT7oQGmYpvfAkNKWY--SIW9zfJ7E1kSPUHy6oIim4IOEIGKpZ_I8",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "PsmelT4AqtwdOWUa0ixZLu6noWc4LM49XOspMftbNRvn_gqlkh8l7S1V7pQy-eRFIe9Vc8BRPP8espahU_QrAMbzq6LoVHX_aKhcVaOcodk"
+          "dev_01K83YV380329ARS69J86ZB9PB": "8c_MDHOo9wb90aVX_zz0WDqt-0018TRV43Oq5rdvjgeaBViedicdJ10RT7oQGmYpvfAkNKWY--SIW9zfJ7E1kdhE-RIGZbcQBa8cHFgxUQk",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "PsmelT4AqtwdOWUa0ixZLu6noWc4LM49XOspMftbNRvn_gqlkh8l7S1V7pQy-eRFIe9Vc8BRPP8espahU_QrAA8s1SIpIWMcmQaqQg3JhRY"
         },
         "kind": "notice",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "7y6jzA-KsjnHPeBZ3ahvUf-_a4lUplFMfbGiFWfKJc6bBhIHBLEfo1hm50B4GP-PevRow8UfakWwD45OhGT4Dg",
+        "sig": "CAKfIwmkho4I2fSMiYG6mMKa3PgtKfOxEqlgWo98Gyrhp9ZSokF2igWR3JTJcLfKZHgl0kMTrdTjbnifAuayCw",
         "v": 1
       },
       "expect": {
         "decrypt_error": "malformed",
         "error": "malformed"
       },
-      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAebnRjXzAxSzgzWVYzODA5VFdCSlMyR00xVjNGSEVLAAZub3RpY2UAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPkboAABACtveDhaR0FDSDBMRjlHZElQS2hRRVZXajhyRXhoazduWTVPVTByaUF6VnVvAAAA",
-      "name": "notice-with-a-string-board-rev",
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAebnRjXzAxSzgzWVYzODA5VFdCSlMyR00xVjNGSEVLAAZub3RpY2UAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAebWNoXzAxSzgzWVYzODBEWUpIUUFEOUtUWTQ4TVo0AAAAAGj3yiAAAAAAaPkboAABACtveDhaR0FDSDBMRjlHZElQS2hRRVZXajhyRXhoazduWTVPVTByaUF6VnVvAAEAK1FiS2hQUGhucm9yaF9iYURkQXdLMUd5TWcwSFNxeUpvSEZOemRUUFZocGMA",
+      "name": "notice-opening-a-url",
       "recipient": "phone",
       "seal": null,
       "sender": "machine"
@@ -2747,6 +2832,7 @@
   "max_ttl": {
     "answer": 86400,
     "board": 86400,
+    "device-decision": 3600,
     "idea": 3600,
     "item-answer": 3600,
     "notice": 86400,

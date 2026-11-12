@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { notifySection, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -456,7 +456,7 @@ test("Account lists the account's devices under This device with where each one 
   assert.ok(shown.indexOf("This device") < shown.indexOf("Devices · 2"), shown);
   assert.match(shown, /iPhone 16 this device web app · added today · last seen now ✓ Approved on MacBook · ⧗ Waiting on work-mac · 21 h/);
   assert.match(shown, /Chrome on Mac web app · added \d+ \w+ · last seen not yet ✗ Denied on MacBook/);
-  assert.match(shown, /Each machine decides which devices make changes on it\. Approve or deny a device in kebbie on that machine\./);
+  assert.match(shown, /Each machine decides which devices make changes on it\. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved\./);
   assert.match(html, /data-action="device" data-id="dev_01JB8Q6Z3V9K2M4N5P6R7S8T9W"/);
   assert.match(html, /name="allow-changes"/, "the switch stays");
   assert.doesNotMatch(accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices: null }), /Devices/);
@@ -502,4 +502,52 @@ test("a device's history names what it sent to the backlog: the idea and its mac
   const refused = historyEntry(entry({ type: "start-item", item: "vault:Projects/session.md", anyway: false }, { label: "Session drops on reload", result: { outcome: "refused", reason: "questions-open", blocking: 2, text: "Not started: 2 questions wait on you." } }), now);
   assert.deepEqual([refused.what, refused.said], ["Start of Session drops on reload refused", "Not started: 2 questions wait on you."]);
   assert.equal(historyEntry(entry({ type: "idea", text: "x".repeat(80), repo: null }, { result: null }), now).what, `Idea for MacBook: ${"x".repeat(59)}… waiting`);
+});
+
+test("Account shows the notifications row under This device, and the two cards of categories only while it is on", () => {
+  const off = accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices, notify: { phase: "off", text: "Off", categories: [] }, now: AT_TWO_PM });
+  assert.ok(text(off).indexOf("Allow changes") < text(off).indexOf("Notifications Off"), text(off));
+  assert.ok(text(off).indexOf("Notifications Off") < text(off).indexOf("Devices · 2"));
+  assert.match(off, /<section class="task" id="notify-card"><label class="row switch-row"><div><div class="name" id="notify-name">Notifications<\/div><div class="meta" id="notify-state">Off<\/div><\/div><input type="checkbox" role="switch" class="switch" name="notify" aria-labelledby="notify-name" aria-describedby="notify-state" aria-checked="false"><\/label><\/section>/);
+  assert.doesNotMatch(off, /Notify me when/);
+  const on = notifySection({ phase: "on", text: "On for this iPhone. MacBook and work-mac send here.", categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed"] });
+  assert.equal(text(on), "Notifications On for this iPhone. MacBook and work-mac send here. Notify me when it needs you Questions and prompts A task asks you something, or an agent's prompt waits for a choice A new device to approve A device wants to make changes on one of your machines The lead's questions on an idea The lead wrote out an idea and needs answers before it starts Notify me when work moves Ready to push A task is reviewed and waits for your push CI failed A push came back red A start went through A task you started from here began on its machine");
+  assert.equal((on.match(/name="notice-category"/g) ?? []).length, 6);
+  assert.equal((on.match(/ checked/g) ?? []).length, 6, "the main switch and five categories");
+  assert.match(on, /name="notice-category" value="started" aria-labelledby="n-start-name" aria-describedby="n-start-state" aria-checked="false">/);
+  assert.match(notifySection({ phase: "asking", text: "Asking iOS for permission…" }), /aria-checked="true" checked>/);
+  for (const phase of ["denied", "install", "unsupported"]) assert.match(notifySection({ phase, text: "x" }), /aria-checked="false" disabled>/, phase);
+  assert.doesNotMatch(accountScreen({ me: { account: "acc_x" }, github: false, allowed: null, notify: { phase: "off", text: "Off" } }), /notify-card/, "no row where the hub takes no commands");
+});
+
+test("a device waiting on a machine gets Approve and Deny there, only from a device that machine approved and that takes decisions", async () => {
+  const { decisionBlock } = await import("./decide.js");
+  const waiting = devices[1];
+  const standing = { machine: "MacBook", machineId: "mch_1", state: "waiting", fingerprint: "91AB-44F0", until: AT_TWO_PM + 3600, mine: "approved", accepts: ["answer", "device-decision"] };
+  const block = (changes = {}, sent = null, self = false) => text(decisionBlock({ standing: { ...standing, ...changes }, device: waiting, sent, self, now: AT_TWO_PM }));
+  const html = decisionBlock({ standing, device: waiting, now: AT_TWO_PM });
+  assert.match(html, /data-action="decide-device" data-machine="mch_1" data-approve="false">Deny<\/button><button type="button" class="btn primary" data-action="decide-device" data-machine="mch_1" data-approve="true">Approve<\/button>/);
+  assert.equal(block({ mine: "waiting" }), "Approve or deny it in kebbie on MacBook.");
+  assert.equal(block({ accepts: ["answer"] }), "MacBook takes approvals only at the machine.");
+  assert.equal(block({}, null, true), "Approve this device in kebbie on MacBook.");
+  assert.equal(block({ state: "approved" }), "");
+  const sent = (result, approve = true) => ({ approve, machineName: "MacBook", at: AT_TWO_PM - 60, exp: AT_TWO_PM + 3540, deviceName: "iPhone 15 Pro", result });
+  assert.match(block({}, sent(null)), /^Approval sent to MacBook MacBook approves Chrome on Mac when it takes it\. Sent from iPhone 15 Pro at \d\d:\d\d · expires/);
+  assert.doesNotMatch(decisionBlock({ standing, device: waiting, sent: sent(null), now: AT_TWO_PM }), /decide-device/, "no second decision while one is on its way");
+  assert.match(block({}, sent({ outcome: "done" }, false)), /^✓ Denied on MacBook/);
+  const refused = (reason) => block({}, sent({ outcome: "refused", reason, text: "" }));
+  assert.match(refused("not-allowed"), /^MacBook takes approvals only at the machine Approve or deny Chrome on Mac in kebbie on MacBook\./);
+  assert.match(refused("not-approved"), /^MacBook hasn't approved this device yet/);
+  assert.match(refused("unknown-device"), /^Chrome on Mac no longer waits on MacBook/);
+  assert.match(decisionBlock({ standing, device: waiting, sent: sent({ outcome: "refused", reason: "not-allowed", text: "" }), now: AT_TWO_PM }), /data-approve="true"/, "a refusal leaves the buttons to try again");
+  assert.match(block({}, { ...sent(null), exp: AT_TWO_PM - 1 }), /^Not delivered: MacBook didn't take it within the hour/);
+  const page = deviceScreen({ device: { ...waiting, standing: [standing] }, history: [], decisions: new Map([["mch_1", decisionBlock({ standing, device: waiting, now: AT_TWO_PM })]]), now: AT_TWO_PM });
+  assert.match(text(page), /⧗ Waiting on MacBook · 1 h Deny Approve Sent from Chrome on Mac/);
+});
+
+test("a device's history names a decision by the device it was about", () => {
+  const entry = (result) => ({ payload: { type: "device-decision", device: "dev_x", fingerprint: "91AB-44F0", approve: true }, targetName: "iPad", machineName: "MacBook", at: AT_TWO_PM, exp: AT_TWO_PM + 3600, result });
+  assert.deepEqual(historyEntry(entry({ outcome: "done" }), AT_TWO_PM), { icon: "✓", what: "Approved iPad", said: "on MacBook", at: AT_TWO_PM });
+  assert.deepEqual(historyEntry(entry({ outcome: "refused", reason: "not-allowed", text: "" }), AT_TWO_PM), { icon: "✗", what: "Decision on iPad refused", said: "MacBook takes approvals only at the machine", at: AT_TWO_PM });
+  assert.equal(historyEntry(entry(null), AT_TWO_PM).what, "Decision on iPad waiting");
 });

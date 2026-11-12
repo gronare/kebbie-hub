@@ -7,11 +7,13 @@ use kebbie_hub_api::{
     CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, Inbox,
     JoinRequest, Joined, MachineName, PairingFailure,
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
+    NoticePosted, NoticeUpload, NotifiedDevices,
 };
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
     Idea, ItemAnswer, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob,
+    DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -21,6 +23,21 @@ use crate::{Error, HubClient, HubError, KeyFile, PairError, now, save};
 
 pub fn every_command() -> Vec<Kind> {
     vec![Kind::Answer, Kind::Push, Kind::Start, Kind::Routine, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem]
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ApproveFrom {
+    #[default]
+    Devices,
+    Machine,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NoticeSent {
+    pub envelope: Option<Envelope>,
+    pub recipients: Vec<Id>,
+    pub pushes: usize,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -94,8 +111,14 @@ pub struct MachineState {
     pub backlog: Backlog,
     #[serde(default)]
     pub started: BTreeMap<ItemKey, String>,
+    #[serde(default)]
+    pub approve_from: ApproveFrom,
+    #[serde(default)]
+    pub retracts: Vec<String>,
     #[serde(skip)]
     backlog_changed: bool,
+    #[serde(skip)]
+    decided: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -295,8 +318,93 @@ impl MachineState {
             held: Vec::new(),
             backlog: Backlog::default(),
             started: BTreeMap::new(),
+            approve_from: ApproveFrom::Devices,
+            retracts: Vec::new(),
             backlog_changed: false,
+            decided: false,
         }
+    }
+
+    pub fn takes(&self) -> Vec<Kind> {
+        let mut kinds: Vec<Kind> = self.accepts.iter().copied().filter(|kind| *kind != Kind::DeviceDecision).collect();
+        if self.trust_devices && self.approve_from == ApproveFrom::Devices {
+            kinds.push(Kind::DeviceDecision);
+        }
+        kinds
+    }
+
+    fn decide(&mut self, decision: &DeviceDecision) -> Result<String, Reason> {
+        let known = self.devices.get_mut(&decision.device).ok_or(Reason::UnknownDevice)?;
+        let fingerprint = device_fingerprint(&known.signing);
+        if fingerprint != decision.fingerprint {
+            return Err(Reason::UnknownDevice);
+        }
+        if !matches!(known.standing, DeviceStanding::Waiting { .. }) {
+            return Err(Reason::AlreadySettled);
+        }
+        let at = now();
+        known.standing = if decision.approve {
+            DeviceStanding::Approved { fingerprint, at }
+        } else {
+            DeviceStanding::Denied { fingerprint, at }
+        };
+        self.decided = true;
+        Ok(format!("{} {}.", if decision.approve { "Approved" } else { "Denied" }, known.name))
+    }
+
+    pub fn settle(&mut self, collapse: &str) {
+        self.retracts.retain(|tag| tag != collapse);
+        self.retracts.push(collapse.to_string());
+        let over = self.retracts.len().saturating_sub(MAX_RETRACTS);
+        self.retracts.drain(..over);
+    }
+
+    pub async fn notified_devices(&self) -> Result<NotifiedDevices, Error> {
+        Ok(self.client().get("/v1/m/devices", &[] as &[(&str, String)]).await?)
+    }
+
+    pub fn notice_recipients(&self, listed: &NotifiedDevices, notice: &Notice) -> Vec<DeviceCert> {
+        let Some(account) = &self.account else {
+            return Vec::new();
+        };
+        listed
+            .devices
+            .iter()
+            .filter(|device| account.verifies_device(&device.cert) && device.notifications.as_ref().is_some_and(|wanted| wanted.contains(&notice.category)))
+            .filter(|device| {
+                !self.trust_devices
+                    || self.devices.get(&device.cert.device).is_some_and(|known| {
+                        known.signing == device.cert.signing && matches!(known.standing, DeviceStanding::Approved { .. })
+                    })
+            })
+            .map(|device| device.cert.clone())
+            .collect()
+    }
+
+    pub fn seal_notice(&self, notice: &Notice, collapse: &str, urgency: Urgency, recipients: &[DeviceCert], at: u64) -> Result<Envelope, Error> {
+        let mut header = Header::new(Id::new(Prefix::Notice).map_err(|error| Error::Protocol(error.to_string()))?, Kind::Notice, self.machine.clone(), self.machine.clone(), at);
+        header.urgency = Some(urgency);
+        header.collapse = Some(collapse.to_string());
+        let recipients: Vec<_> = recipients.iter().map(DeviceCert::recipient).collect();
+        seal(header, &Payload::Notice(notice.clone()), &self.secret(), &recipients).map_err(|error| Error::Protocol(error.to_string()))
+    }
+
+    pub async fn notify(&mut self, mut notice: Notice, collapse: &str, urgency: Urgency) -> Result<NoticeSent, Error> {
+        notice.retract = self.retracts.iter().filter(|tag| *tag != collapse).cloned().collect();
+        Payload::Notice(notice.clone()).validate().map_err(|problem| Error::Protocol(problem.to_string()))?;
+        let listed = self.notified_devices().await?;
+        let recipients = self.notice_recipients(&listed, &notice);
+        if recipients.is_empty() {
+            return Ok(NoticeSent { envelope: None, recipients: Vec::new(), pushes: 0 });
+        }
+        let envelope = self.seal_notice(&notice, collapse, urgency, &recipients, now())?;
+        let posted: NoticePosted = self.client().post("/v1/m/notices", &NoticeUpload { envelope: envelope.clone() }).await?;
+        self.retracts.retain(|tag| !notice.retract.contains(tag));
+        Ok(NoticeSent {
+            envelope: Some(envelope),
+            recipients: recipients.into_iter().map(|cert| cert.device).collect(),
+            pushes: posted.pushes,
+        })
     }
 
     pub fn device_named(&self, name_or_id: &str) -> Option<Id> {
@@ -455,7 +563,7 @@ impl MachineState {
     }
 
     pub async fn post_board_at(&mut self, mut board: Board, rev: u64) -> Result<u64, Error> {
-        board.accepts = Some(self.accepts.clone());
+        board.accepts = Some(self.takes());
         board.devices = self.standings();
         if board.backlog.is_none() && !self.backlog.rows.is_empty() {
             board.backlog = Some(self.backlog.rows.clone());
@@ -492,6 +600,15 @@ impl MachineState {
             }
         }
         self.inbox_seq = inbox.seq;
+        if std::mem::take(&mut self.decided) {
+            let held = std::mem::take(&mut self.held);
+            for envelope in &held {
+                handled.push(self.handle(0, envelope, state_file).await?);
+            }
+            if let Some(board) = self.board.clone() {
+                self.post_board(board).await?;
+            }
+        }
         if self.backlog_changed {
             self.publish_backlog().await?;
         }
@@ -618,7 +735,7 @@ impl MachineState {
             id: &self.machine,
             keys: &secret,
             account: &account,
-            accepts: &self.accepts,
+            accepts: &self.takes(),
             trust: &|device: &VerifiedDevice, _: u64| {
                 if self.trust_devices { trust_of(&self.devices, device) } else { Trust::Approved }
             },
@@ -733,6 +850,10 @@ impl MachineState {
                 format!("start {}{}", start.item, if start.anyway { " anyway" } else { "" }),
                 self.start_item(start).map_or_else(|reason| refusal(command, device, reason), done),
             ),
+            Payload::DeviceDecision(decision) => (
+                format!("{} {}", if decision.approve { "approve" } else { "deny" }, decision.device),
+                self.decide(decision).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),
                 refusal(command, device, Reason::BadRequest),
@@ -839,6 +960,8 @@ fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
         Reason::AlreadyStarted => "Not started: it was started already.".to_string(),
         Reason::UnknownItem => "It is no longer in the backlog.".to_string(),
         Reason::QuestionChanged => "Not answered: the question changed since you saw it.".to_string(),
+        Reason::UnknownDevice => "No such device waits for approval here.".to_string(),
+        Reason::AlreadySettled => "Already settled.".to_string(),
         _ => format!("refused: {}", reason.key()),
     };
     CommandResult {

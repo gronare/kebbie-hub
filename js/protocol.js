@@ -13,7 +13,7 @@ const MACHINE_LIST_DOMAIN = text.encode("kebbie-hub account machines v1");
 const SIGNING_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account signing key v1");
 const ENCRYPTION_FINGERPRINT_DOMAIN = text.encode("kebbie-hub account encryption key v1");
 const ACCOUNT_COMMIT_DOMAIN = text.encode("kebbie-connect-account-commit-v1");
-const DEVICE_CERT_DOMAIN = text.encode("kebbie-hub device certificate v1");
+const DEVICE_CERT_DOMAIN = text.encode("kebbie-hub device certificate v2");
 const DEVICE_FINGERPRINT_DOMAIN = text.encode("kebbie-hub device key v1");
 export const MAX_DEVICE_NAME_CHARS = 64;
 export const DEVICE_KINDS = ["web"];
@@ -35,6 +35,12 @@ export const START_ITEM_TTL = DAY;
 export const MAX_IDEA_CHARS = 2000;
 export const MAX_ITEM_ANSWER_CHARS = 2000;
 export const MAX_QUESTION_CHARS = 4000;
+export const MAX_NOTICE_TITLE_CHARS = 120;
+export const MAX_NOTICE_BODY_CHARS = 600;
+export const MAX_NOTICE_BYTES = 2048;
+export const MAX_RETRACTS = 8;
+export const NOTICE_CATEGORIES = ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"];
+export const DEFAULT_NOTICE_CATEGORIES = NOTICE_CATEGORIES.filter((category) => category !== "started");
 export const MAX_LABEL_BYTES = 256;
 export const BACKLOG_BODY_MEDIA_TYPE = "application/vnd.kebbie.backlog-item+json";
 const command = { prefix: "cmd", maxTtl: DAY, ttl: COMMAND_TTL, command: true };
@@ -50,10 +56,13 @@ export const KINDS = {
   idea: { ...command, maxTtl: COMMAND_TTL },
   "item-answer": { ...command, maxTtl: COMMAND_TTL },
   "start-item": { ...command, ttl: START_ITEM_TTL },
+  "device-decision": { ...command, maxTtl: COMMAND_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
 const BASE64URL = /^[A-Za-z0-9_-]*$/;
+const COLLAPSE = /^[A-Za-z0-9_-]{1,64}$/;
+const FINGERPRINT = /^[0-9A-F]{4}-[0-9A-F]{4}$/;
 
 export class ProtocolError extends Error {
   constructor(code) {
@@ -117,7 +126,7 @@ const hasLength = (value, length) => {
     return false;
   }
 };
-const CERT_FIELDS = ["account", "device", "name", "kind", "signing", "created_at", "sig"];
+const CERT_FIELDS = ["account", "device", "name", "kind", "signing", "encryption", "created_at", "sig"];
 export const isDeviceName = (name) => typeof name === "string" && [...name].length >= 1 && [...name].length <= MAX_DEVICE_NAME_CHARS && !/\p{Cc}/u.test(name);
 const isCert = (cert) =>
   isPlainObject(cert) &&
@@ -127,6 +136,7 @@ const isCert = (cert) =>
   isDeviceName(cert.name) &&
   DEVICE_KINDS.includes(cert.kind) &&
   hasLength(cert.signing, 32) &&
+  hasLength(cert.encryption, 32) &&
   isTime(cert.created_at) &&
   hasLength(cert.sig, 64);
 
@@ -146,9 +156,9 @@ export function checkShape(envelope) {
     envelope.exp - envelope.at <= kind.maxTtl &&
     typeof envelope.kc === "string" &&
     /^[A-Za-z0-9_-]{43}$/.test(envelope.kc) &&
-    (envelope.kind === "notice" || (absent(envelope.urgency) && absent(envelope.collapse))) &&
+    (envelope.kind === "notice" ? !absent(envelope.collapse) : absent(envelope.urgency) && absent(envelope.collapse)) &&
     (absent(envelope.urgency) || envelope.urgency === "high" || envelope.urgency === "normal") &&
-    (absent(envelope.collapse) || (typeof envelope.collapse === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(envelope.collapse))) &&
+    (absent(envelope.collapse) || (typeof envelope.collapse === "string" && COLLAPSE.test(envelope.collapse))) &&
     isPlainObject(envelope.keys) &&
     Object.entries(envelope.keys).every(([id, row]) => prefixOf(id) !== null && typeof row === "string") &&
     typeof envelope.ct === "string" &&
@@ -266,8 +276,23 @@ const STANDINGS = {
 };
 const standing = (value) => isPlainObject(value) && string(value.state) && Object.hasOwn(STANDINGS, value.state) && STANDINGS[value.state](value);
 const devices = (value) => isPlainObject(value) && Object.entries(value).every(([key, entry]) => prefixOf(key) === "dev" && standing(entry));
-const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started"];
-const EVENTS = ["needs-you", "ready", "question", "summary", "ci-failed", "ci-green", "api-error", "routine-findings", "routine-failed"];
+const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started", "unknown-device"];
+const isAddress = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}@[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
+const isLine = (max) => (value) => isText(max)(value) && !/\p{Cc}/u.test(value);
+const TARGETS = {
+  task: shape({ to: string, address: isAddress }),
+  item: shape({ to: string, item: isItemKey }),
+  device: shape({ to: string, device: (value) => prefixOf(value) === "dev" }),
+};
+const target = (value) => isPlainObject(value) && string(value.to) && Object.hasOwn(TARGETS, value.to) && TARGETS[value.to](value);
+const notice = (value) =>
+  typed({
+    category: oneOf(...NOTICE_CATEGORIES),
+    title: isLine(MAX_NOTICE_TITLE_CHARS),
+    body: (body) => isText(MAX_NOTICE_BODY_CHARS)(body) && !/[^\P{Cc}\n]/u.test(body),
+    open: target,
+    retract: optionalField((tags) => Array.isArray(tags) && tags.length <= MAX_RETRACTS && tags.every((tag) => typeof tag === "string" && COLLAPSE.test(tag))),
+  })(value) && text.encode(JSON.stringify(value)).length <= MAX_NOTICE_BYTES;
 const typed = (fields) => shape({ type: string, ...fields });
 const PAYLOADS = {
   board: typed({
@@ -285,17 +310,7 @@ const PAYLOADS = {
     devices: optionalField(devices),
     backlog: optionalField(backlog),
   }),
-  notice: typed({
-    event: oneOf(...EVENTS),
-    address: optionalField(string),
-    title: string,
-    body: string,
-    question: optionalField(string),
-    options: list(string),
-    recommend: optionalField(u8),
-    board_rev: u64v,
-    retract: optionalField(string),
-  }),
+  notice,
   result: (value) =>
     typed({ command: id, device: (value) => prefixOf(value) === "dev", outcome: oneOf("done", "refused", "failed"), reason: optionalField(oneOf(...REASONS)), blocking: optionalField(uint(0xffff_ffff)), text: string })(value) &&
     (value.outcome === "refused") === !absent(value.reason) &&
@@ -308,6 +323,7 @@ const PAYLOADS = {
   idea: typed({ text: isText(MAX_IDEA_CHARS), repo: optionalField(string) }),
   "item-answer": typed({ item: isItemKey, index: u32v, question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) }),
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
+  "device-decision": typed({ device: (value) => prefixOf(value) === "dev", fingerprint: (value) => typeof value === "string" && FINGERPRINT.test(value), approve: bool }),
 };
 
 export function checkPayload(payload) {
@@ -333,15 +349,15 @@ export function headerBytes(header) {
   );
 }
 
-const deviceCertBody = (cert) => concat(field(cert.account), field(cert.device), field(cert.name), field(cert.kind), fromB64(cert.signing), u64(cert.created_at));
+const deviceCertBody = (cert) => concat(field(cert.account), field(cert.device), field(cert.name), field(cert.kind), fromB64(cert.signing), fromB64(cert.encryption), u64(cert.created_at));
 
 export function deviceCertStatement(cert) {
   if (!isCert({ sig: toB64(new Uint8Array(64)), ...cert })) throw new ProtocolError("malformed");
   return concat(DEVICE_CERT_DOMAIN, deviceCertBody(cert));
 }
 
-export async function signDeviceCert(account, { device, name, kind = "web", signing, created_at }) {
-  const cert = { account: account.id, device, name, kind, signing, created_at };
+export async function signDeviceCert(account, { device, name, kind = "web", signing, encryption, created_at }) {
+  const cert = { account: account.id, device, name, kind, signing, encryption, created_at };
   return { ...cert, sig: toB64(await signStatement(account, deviceCertStatement(cert))) };
 }
 
@@ -372,7 +388,14 @@ export function deviceId(millis = Date.now(), randomBytes = random(10)) {
 
 export async function newDeviceKey() {
   const pair = await subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
-  return { signing: pair.privateKey, verifying: pair.publicKey, public: toB64(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))) };
+  const encryption = await subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
+  return {
+    signing: pair.privateKey,
+    verifying: pair.publicKey,
+    public: toB64(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))),
+    encryption: { privateKey: encryption.privateKey, publicKey: encryption.publicKey },
+    encryptionPublic: toB64(new Uint8Array(await subtle.exportKey("raw", encryption.publicKey))),
+  };
 }
 
 export const keyCommitment = async (contentKey) => toB64(await sha256(KEY_COMMIT_DOMAIN, contentKey));
@@ -462,6 +485,12 @@ export async function decryptEnvelope(envelope, recipient) {
 export async function openEnvelope(envelope, recipient, sender, now) {
   await verifyEnvelope(envelope, sender, now);
   return decryptEnvelope(envelope, recipient);
+}
+
+export async function openNotice(envelope, device, machine, now) {
+  checkShape(envelope);
+  if (envelope.kind !== "notice" || envelope.machine !== machine.id) throw new ProtocolError("malformed");
+  return openEnvelope(envelope, device, await importSender(machine.id, machine.keys), now);
 }
 
 const random = (length) => globalThis.crypto.getRandomValues(new Uint8Array(length));

@@ -5,9 +5,9 @@ use std::time::Duration;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kebbie_hub_fakes::machine::{Backlog, Handled, Handling, MachineState, Posted, connect, every_command, join};
+use kebbie_hub_fakes::machine::{ApproveFrom, Backlog, Handled, Handling, MachineState, Posted, connect, every_command, join};
 use kebbie_hub_fakes::{load, save};
-use kebbie_hub_protocol::{Board, Kind, Outcome};
+use kebbie_hub_protocol::{Board, Id, ItemKey, Kind, Notice, NoticeCategory, Outcome, Target, Urgency};
 
 #[derive(Parser)]
 #[command(
@@ -78,6 +78,58 @@ enum Command {
     Deny { device: String },
     #[command(about = "Answer each held command as the machine would once its hour ran out unapproved")]
     Expire,
+    #[command(about = "Take approvals of waiting devices from approved devices, or only here at the machine")]
+    ApproveFrom { from: ApproveFromMode },
+    #[command(about = "Seal a notice to each device approved here that wants its category, and post it for Web Push")]
+    Notify {
+        #[arg(long, value_enum)]
+        category: Category,
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        body: String,
+        #[arg(long, help = "Collapse tag: a newer notice with the same tag replaces the older")]
+        collapse: String,
+        #[arg(long, value_name = "TASK@REPO", group = "target", help = "Open the task")]
+        task: Option<String>,
+        #[arg(long, value_name = "ITEM", group = "target", help = "Open the backlog item, like kept:idea-1")]
+        item: Option<String>,
+        #[arg(long, value_name = "DEVICE", group = "target", help = "Open the device page")]
+        device: Option<String>,
+        #[arg(long, help = "Send with high urgency")]
+        urgent: bool,
+    },
+    #[command(about = "Mark a notice's subject settled, so the next notice closes it")]
+    Settle { collapse: String },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ApproveFromMode {
+    Devices,
+    Machine,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Category {
+    Questions,
+    NewDevice,
+    IdeaQuestions,
+    Ready,
+    CiFailed,
+    Started,
+}
+
+impl Category {
+    fn category(self) -> NoticeCategory {
+        match self {
+            Category::Questions => NoticeCategory::Questions,
+            Category::NewDevice => NoticeCategory::NewDevice,
+            Category::IdeaQuestions => NoticeCategory::IdeaQuestions,
+            Category::Ready => NoticeCategory::Ready,
+            Category::CiFailed => NoticeCategory::CiFailed,
+            Category::Started => NoticeCategory::Started,
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -263,11 +315,43 @@ async fn run(cli: Cli) -> Result<(), String> {
                 println!("{}", describe(&entry));
             }
         }
+        Command::ApproveFrom { from } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.approve_from = match from {
+                ApproveFromMode::Devices => ApproveFrom::Devices,
+                ApproveFromMode::Machine => ApproveFrom::Machine,
+            };
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("approvals: {}", if state.approve_from == ApproveFrom::Devices { "from approved devices or here" } else { "only here at the machine" });
+        }
+        Command::Notify { category, title, body, collapse, task, item, device, urgent } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let open = match (task, item, device) {
+                (Some(address), None, None) => Target::Task { address },
+                (None, Some(item), None) => Target::Item { item: ItemKey::parse(&item).map_err(|e| text(&e))? },
+                (None, None, Some(device)) => Target::Device { device: Id::parse(&device).map_err(|e| text(&e))? },
+                _ => return Err("pass one of --task, --item or --device".to_string()),
+            };
+            let notice = Notice { category: category.category(), title, body, open, retract: Vec::new() };
+            let urgency = if urgent { Urgency::High } else { Urgency::Normal };
+            let sent = state.notify(notice, &collapse, urgency).await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            match sent.envelope {
+                Some(envelope) => println!("posted {} to {} device(s), {} push(es) queued", envelope.header.id, sent.recipients.len(), sent.pushes),
+                None => println!("no approved device wants this category; nothing posted"),
+            }
+        }
+        Command::Settle { collapse } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.settle(&collapse);
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("the next notice closes {collapse}");
+        }
         Command::Takes { takes } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
             state.accepts = takes.kinds();
             save(&cli.state, &state).map_err(|e| text(&e))?;
-            let kinds: Vec<&str> = state.accepts.iter().map(|kind| kind.name()).collect();
+            let kinds: Vec<&str> = state.takes().iter().map(|kind| kind.name()).collect();
             println!("takes: {}", if kinds.is_empty() { "nothing".to_string() } else { kinds.join(", ") });
         }
     }

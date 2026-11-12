@@ -2,13 +2,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::backlog::ItemKey;
 use crate::board::Board;
-use crate::envelope::Kind;
+use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
 pub const MAX_IDEA_CHARS: usize = 2_000;
 pub const MAX_ITEM_ANSWER_CHARS: usize = 2_000;
+pub const MAX_NOTICE_TITLE_CHARS: usize = 120;
+pub const MAX_NOTICE_BODY_CHARS: usize = 600;
+pub const MAX_NOTICE_BYTES: usize = 2_048;
+pub const MAX_RETRACTS: usize = 8;
 const MAX_PROMPT_ID_CHARS: usize = 64;
 const MAX_OPTION_KEY_CHARS: usize = 16;
 
@@ -26,34 +30,78 @@ pub enum Payload {
     Idea(Idea),
     ItemAnswer(ItemAnswer),
     StartItem(StartItem),
+    DeviceDecision(DeviceDecision),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Notice {
-    pub event: Event,
-    pub address: Option<String>,
+    pub category: NoticeCategory,
     pub title: String,
     pub body: String,
-    pub question: Option<String>,
-    pub options: Vec<String>,
-    pub recommend: Option<u8>,
-    pub board_rev: u64,
-    pub retract: Option<String>,
+    pub open: Target,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub retract: Vec<String>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Event {
-    NeedsYou,
+pub enum NoticeCategory {
+    Questions,
+    NewDevice,
+    IdeaQuestions,
     Ready,
-    Question,
-    Summary,
     CiFailed,
-    CiGreen,
-    ApiError,
-    RoutineFindings,
-    RoutineFailed,
+    Started,
+}
+
+impl NoticeCategory {
+    pub const ALL: [NoticeCategory; 6] = [
+        NoticeCategory::Questions,
+        NoticeCategory::NewDevice,
+        NoticeCategory::IdeaQuestions,
+        NoticeCategory::Ready,
+        NoticeCategory::CiFailed,
+        NoticeCategory::Started,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            NoticeCategory::Questions => "questions",
+            NoticeCategory::NewDevice => "new-device",
+            NoticeCategory::IdeaQuestions => "idea-questions",
+            NoticeCategory::Ready => "ready",
+            NoticeCategory::CiFailed => "ci-failed",
+            NoticeCategory::Started => "started",
+        }
+    }
+
+    pub fn on_by_default(self) -> bool {
+        self != NoticeCategory::Started
+    }
+
+    pub fn defaults() -> Vec<NoticeCategory> {
+        NoticeCategory::ALL
+            .into_iter()
+            .filter(|category| category.on_by_default())
+            .collect()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "to", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum Target {
+    Task { address: String },
+    Item { item: ItemKey },
+    Device { device: Id },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceDecision {
+    pub device: Id,
+    pub fingerprint: String,
+    pub approve: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,6 +206,7 @@ pub enum Reason {
     QuestionChanged,
     QuestionsOpen { blocking: u32 },
     AlreadyStarted,
+    UnknownDevice,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -176,6 +225,7 @@ enum ReasonKey {
     QuestionChanged,
     QuestionsOpen,
     AlreadyStarted,
+    UnknownDevice,
 }
 
 impl Reason {
@@ -194,6 +244,7 @@ impl Reason {
             Reason::QuestionChanged => "question-changed",
             Reason::QuestionsOpen { .. } => "questions-open",
             Reason::AlreadyStarted => "already-started",
+            Reason::UnknownDevice => "unknown-device",
         }
     }
 
@@ -212,6 +263,7 @@ impl Reason {
             Reason::QuestionChanged => ReasonKey::QuestionChanged,
             Reason::QuestionsOpen { .. } => ReasonKey::QuestionsOpen,
             Reason::AlreadyStarted => ReasonKey::AlreadyStarted,
+            Reason::UnknownDevice => ReasonKey::UnknownDevice,
         }
     }
 
@@ -233,6 +285,7 @@ impl Reason {
                 _ => return Err("a refusal for open questions counts at least one"),
             },
             ReasonKey::AlreadyStarted => Reason::AlreadyStarted,
+            ReasonKey::UnknownDevice => Reason::UnknownDevice,
         })
     }
 }
@@ -315,6 +368,7 @@ impl Payload {
             Payload::Idea(_) => Kind::Idea,
             Payload::ItemAnswer(_) => Kind::ItemAnswer,
             Payload::StartItem(_) => Kind::StartItem,
+            Payload::DeviceDecision(_) => Kind::DeviceDecision,
         }
     }
 
@@ -364,7 +418,26 @@ impl Payload {
                 check(is_text(&answer.question, MAX_PROMPT_CHARS), "the question is empty or too long")?;
                 check(is_text(&answer.answer, MAX_ITEM_ANSWER_CHARS), "the answer is empty or too long")
             }
-            Payload::StartItem(_) | Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => Ok(()),
+            Payload::Notice(notice) => {
+                check(is_line(&notice.title, MAX_NOTICE_TITLE_CHARS), "the title is empty, too long or not one line")?;
+                check(is_text(&notice.body, MAX_NOTICE_BODY_CHARS) && !notice.body.chars().any(|char| char.is_control() && char != '\n'), "the body is empty, too long or holds control characters")?;
+                check(notice.retract.len() <= MAX_RETRACTS, "too many notices to retract")?;
+                check(notice.retract.iter().all(|tag| is_collapse(tag)), "a retract is not a collapse tag")?;
+                match &notice.open {
+                    Target::Task { address } => check(is_address(address), "address is not task@repo")?,
+                    Target::Device { device } => check(device.prefix() == Prefix::Device, "device is not a device id")?,
+                    Target::Item { .. } => {}
+                }
+                check(
+                    serde_json::to_vec(self).expect("a payload always serializes").len() <= MAX_NOTICE_BYTES,
+                    "the notice is too large to push",
+                )
+            }
+            Payload::DeviceDecision(decision) => {
+                check(decision.device.prefix() == Prefix::Device, "device is not a device id")?;
+                check(is_fingerprint(&decision.fingerprint), "fingerprint is not a device fingerprint")
+            }
+            Payload::StartItem(_) | Payload::Board(_) | Payload::Result(_) => Ok(()),
         }
     }
 }
@@ -384,6 +457,22 @@ fn is_token(text: &str) -> bool {
 
 fn is_text(text: &str, max: usize) -> bool {
     !text.trim().is_empty() && text.chars().count() <= max
+}
+
+fn is_line(text: &str, max: usize) -> bool {
+    is_text(text, max) && !text.chars().any(char::is_control)
+}
+
+pub(crate) fn is_collapse(text: &str) -> bool {
+    (1..=MAX_COLLAPSE_CHARS).contains(&text.len())
+        && text.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+}
+
+fn is_fingerprint(text: &str) -> bool {
+    text.len() == 9
+        && text.bytes().enumerate().all(|(index, byte)| {
+            if index == 4 { byte == b'-' } else { matches!(byte, b'0'..=b'9' | b'A'..=b'F') }
+        })
 }
 
 fn is_word(text: &str, max: usize) -> bool {
@@ -527,6 +616,56 @@ mod tests {
             [Kind::Idea, Kind::ItemAnswer, Kind::StartItem].map(|kind| (kind.is_command(), kind.default_ttl(), kind.max_ttl())),
             [(true, 3_600, 3_600), (true, 3_600, 3_600), (true, 86_400, 86_400)]
         );
+    }
+
+    #[test]
+    fn a_notice_is_one_line_a_body_and_an_in_app_target_that_fits_a_push() {
+        let notice = |title: &str, body: &str, open: Target, retract: Vec<String>| {
+            Payload::Notice(Notice { category: NoticeCategory::Questions, title: title.into(), body: body.into(), open, retract })
+        };
+        let task = || Target::Task { address: "refunds@shop".into() };
+        let plain = notice("refunds · shop", "Keep the old endpoint?\nThe lead says keep it.", task(), vec!["q-refunds".into()]);
+        assert_eq!(plain.validate(), Ok(()));
+        let json = serde_json::to_value(&plain).unwrap();
+        assert_eq!((json["category"].as_str(), json["open"]["to"].as_str()), (Some("questions"), Some("task")));
+        assert_eq!(serde_json::from_value::<Payload>(json).unwrap(), plain);
+        assert!(notice("refunds\nshop", "x", task(), vec![]).validate().is_err());
+        assert!(notice(" ", "x", task(), vec![]).validate().is_err());
+        assert!(notice("x", "", task(), vec![]).validate().is_err());
+        assert!(notice("x", "a\u{7}b", task(), vec![]).validate().is_err());
+        assert!(notice(&"x".repeat(MAX_NOTICE_TITLE_CHARS + 1), "x", task(), vec![]).validate().is_err());
+        assert!(notice("x", &"x".repeat(MAX_NOTICE_BODY_CHARS + 1), task(), vec![]).validate().is_err());
+        assert!(notice("x", &"€".repeat(MAX_NOTICE_BODY_CHARS), task(), vec![]).validate().is_ok());
+        assert!(notice("x", "x", task(), vec!["a".repeat(65)]).validate().is_err());
+        assert!(notice("x", "x", task(), vec!["a b".into()]).validate().is_err());
+        assert!(notice("x", "x", task(), vec!["a".into(); MAX_RETRACTS + 1]).validate().is_err());
+        assert!(notice("x", "x", Target::Task { address: "refunds".into() }, vec![]).validate().is_err());
+        assert!(notice("x", "x", Target::Device { device: Id::account([1; 16]) }, vec![]).validate().is_err());
+        let big = notice(&"€".repeat(MAX_NOTICE_TITLE_CHARS), &"€".repeat(MAX_NOTICE_BODY_CHARS), task(), vec!["a".repeat(64); MAX_RETRACTS]);
+        assert!(big.validate().is_err(), "the notice is too large to push");
+        for open in [serde_json::json!({ "to": "url", "url": "https://example.com/" }), serde_json::json!({ "to": "task", "address": "refunds@shop", "url": "x" })] {
+            let json = serde_json::json!({ "type": "notice", "category": "ready", "title": "x", "body": "x", "open": open });
+            assert!(serde_json::from_value::<Payload>(json).is_err());
+        }
+    }
+
+    #[test]
+    fn categories_are_on_by_default_except_a_start_going_through() {
+        assert_eq!(NoticeCategory::defaults().len(), NoticeCategory::ALL.len() - 1);
+        assert!(!NoticeCategory::defaults().contains(&NoticeCategory::Started));
+        assert_eq!(NoticeCategory::ALL.map(NoticeCategory::name), ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"]);
+    }
+
+    #[test]
+    fn a_device_decision_names_a_device_by_id_and_fingerprint() {
+        let decision = |device: Id, fingerprint: &str| Payload::DeviceDecision(DeviceDecision { device, fingerprint: fingerprint.into(), approve: true });
+        let tablet = Id::ulid(Prefix::Device, 1, [2; 10]).unwrap();
+        assert_eq!(decision(tablet.clone(), "0C11-5E9A").validate(), Ok(()));
+        assert!(decision(tablet.clone(), "0c11-5e9a").validate().is_err());
+        assert!(decision(tablet, "0C115E9A").validate().is_err());
+        assert!(decision(Id::account([1; 16]), "0C11-5E9A").validate().is_err());
+        assert_eq!((Kind::DeviceDecision.is_command(), Kind::DeviceDecision.default_ttl(), Kind::DeviceDecision.max_ttl()), (true, 3_600, 3_600));
+        assert_eq!(serde_json::to_value(decision(Id::ulid(Prefix::Device, 1, [2; 10]).unwrap(), "0C11-5E9A")).unwrap()["type"], "device-decision");
     }
 
     #[test]

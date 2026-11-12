@@ -35,8 +35,8 @@ use crate::device::{
 use crate::envelope::{Envelope, Header, Kind, Urgency};
 use crate::ids::{Id, Prefix};
 use crate::message::{
-    Answer, CommandResult, Event, Idea, ItemAnswer, Notice, Outcome, Payload, PromptAnswer,
-    PushApproval, Reason, RunRoutine, StartItem, StartTask,
+    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, Notice, NoticeCategory, Outcome, Payload,
+    PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
 };
 
 pub const NOW: u64 = 1_761_070_000;
@@ -84,7 +84,8 @@ impl Party {
     }
 
     fn device_key(&self) -> DeviceKey {
-        DeviceKey::from_bytes(self.keys.to_bytes().0)
+        let (signing, encryption) = self.keys.to_bytes();
+        DeviceKey::from_bytes(signing, encryption)
     }
 
     fn to_json(&self) -> Value {
@@ -144,7 +145,7 @@ fn certify(signer: &Party, account: &Party, device: &Party, name: &str) -> Devic
         device.id.clone(),
         name,
         DeviceKind::Web,
-        device.public().signing,
+        device.public(),
         CERTIFIED_AT,
     )
     .unwrap()
@@ -614,18 +615,38 @@ fn push(head: &str) -> Payload {
     })
 }
 
-fn notice(retract: Option<String>) -> Payload {
+fn notice(retract: Vec<String>) -> Payload {
     Payload::Notice(Notice {
-        event: Event::Question,
-        address: Some("refunds@shop".into()),
-        title: "refunds asks".into(),
-        body: "Keep the old endpoint for a release?".into(),
-        question: Some(QUESTION.into()),
-        options: vec!["Keep it".into(), "Remove it".into()],
-        recommend: Some(0),
-        board_rev: 1842,
+        category: NoticeCategory::Questions,
+        title: "refunds · shop".into(),
+        body: "Keep the old endpoint for a release? The lead recommends keeping it: one release of overlap.".into(),
+        open: Target::Task { address: "refunds@shop".into() },
         retract,
     })
+}
+
+fn device_notice(device: &Id) -> Payload {
+    Payload::Notice(Notice {
+        category: NoticeCategory::NewDevice,
+        title: "A new device asks to send commands".into(),
+        body: "iPad waits for approval on this machine.".into(),
+        open: Target::Device { device: device.clone() },
+        retract: Vec::new(),
+    })
+}
+
+fn device_decision(device: &DeviceCert, approve: bool) -> Payload {
+    Payload::DeviceDecision(DeviceDecision {
+        device: device.device.clone(),
+        fingerprint: device.fingerprint(),
+        approve,
+    })
+}
+
+fn collapsed_header(case: &str, machine: &Party) -> Header {
+    let mut header = machine_header(case, Kind::Notice, machine);
+    header.collapse = Some(b64(&seed(&format!("{case}/collapse"))));
+    header
 }
 
 fn result() -> Payload {
@@ -932,9 +953,9 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     let notice_sealed = seal_case(
         "notice",
         notice_header,
-        &notice(None),
+        &notice(Vec::new()),
         machine,
-        &[machine, phone, tablet],
+        &[phone, tablet],
     );
     let mut split = Sealed {
         envelope: notice_sealed.envelope.for_recipient(&phone.id).unwrap(),
@@ -946,10 +967,41 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         &split,
         phone,
         machine,
-        notice(None),
+        notice(Vec::new()),
     ));
 
-    let retract = notice(Some(b64(&seed("notice/collapse"))));
+    let new_device_sealed = seal_case(
+        "new-device-notice",
+        collapsed_header("new-device-notice", machine),
+        &device_notice(&tablet.id),
+        machine,
+        &[phone],
+    );
+    cases.push(opens(
+        "notice-of-a-device-to-approve",
+        &new_device_sealed,
+        phone,
+        machine,
+        device_notice(&tablet.id),
+    ));
+    let mut uncollapsed = machine_header("uncollapsed", Kind::Notice, machine);
+    uncollapsed.urgency = Some(Urgency::Normal);
+    cases.push(fails(
+        "notice-without-a-collapse-tag",
+        seal_bypassing_checks(
+            "uncollapsed",
+            uncollapsed,
+            &serde_json::to_vec(&notice(Vec::new())).unwrap(),
+            machine,
+            &[phone],
+        ),
+        phone,
+        machine,
+        OpenError::Malformed,
+        None,
+    ));
+
+    let retract = notice(vec![b64(&seed("notice/collapse"))]);
     let mut retract_header = machine_header("retract", Kind::Notice, machine);
     retract_header.urgency = Some(Urgency::Normal);
     retract_header.collapse = Some(b64(&seed("notice/collapse")));
@@ -958,7 +1010,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         retract_header,
         &retract,
         machine,
-        &[machine, phone],
+        &[phone],
     );
     cases.push(opens(
         "notice-with-retract",
@@ -1261,7 +1313,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     ));
     let mut long_collapse = machine_header("long-collapse", Kind::Notice, machine);
     long_collapse.collapse = Some("a".repeat(65));
-    let notice_bytes = serde_json::to_vec(&notice(None)).unwrap();
+    let notice_bytes = serde_json::to_vec(&notice(Vec::new())).unwrap();
     cases.push(fails(
         "collapse-of-65-chars",
         seal_bypassing_checks(
@@ -1299,8 +1351,8 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     extra_result["detail"] = json!("seen by the hub");
     let mut reasonless = serde_json::to_value(result()).unwrap();
     reasonless.as_object_mut().unwrap().remove("reason");
-    let mut string_rev = serde_json::to_value(notice(None)).unwrap();
-    string_rev["board_rev"] = json!("1842");
+    let mut url_target = serde_json::to_value(notice(Vec::new())).unwrap();
+    url_target["open"] = json!({ "to": "url", "url": "https://example.com/" });
     let mut absolute_home = serde_json::to_value(backlog_board()).unwrap();
     absolute_home["backlog"][0]["home"]["label"] = json!("/Users/someone/vault/Projects/refund-rounding.md");
     let mut counted_elsewhere = serde_json::to_value(result()).unwrap();
@@ -1345,16 +1397,17 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
             reasonless,
         ),
         (
-            "notice-with-a-string-board-rev",
+            "notice-opening-a-url",
             "stray/notice",
             Kind::Notice,
-            string_rev,
+            url_target,
         ),
     ];
     for (name, label, kind, payload) in strays {
+        let header = if kind == Kind::Notice { collapsed_header(label, machine) } else { machine_header(label, kind, machine) };
         let envelope = seal_bypassing_checks(
             label,
-            machine_header(label, kind, machine),
+            header,
             &serde_json::to_vec(&payload).unwrap(),
             machine,
             &[machine, phone],
@@ -1436,6 +1489,7 @@ fn envelopes_json(parties: &Parties) -> Value {
         Kind::Idea,
         Kind::ItemAnswer,
         Kind::StartItem,
+        Kind::DeviceDecision,
     ]
     .into_iter()
     .map(|kind| (kind.name(), kind.max_ttl()))
@@ -1654,6 +1708,68 @@ fn authorize_json(parties: &Parties) -> Value {
         expect,
     };
     let start_item_from_phone = from_phone("authorize/start-item", Kind::StartItem, &start_item(false));
+    let deciding: Vec<Kind> = all.iter().copied().chain([Kind::DeviceDecision]).collect();
+    let decision_case = |name, trust, envelope, expect| AuthorizeCase {
+        name,
+        accepts: deciding.clone(),
+        trust,
+        applied: AppliedCommands::default(),
+        envelope,
+        expect,
+    };
+    let approve_tablet = device_decision(&tablet_cert, true);
+    let mut misprinted = tablet_cert.clone();
+    misprinted.signing = phone.public().signing;
+    let misprinted = Payload::DeviceDecision(DeviceDecision {
+        fingerprint: misprinted.fingerprint().to_lowercase(),
+        ..DeviceDecision { device: tablet.id.clone(), fingerprint: String::new(), approve: true }
+    });
+    let decision_cases = vec![
+        decision_case(
+            "approved-device-approves-a-waiting-device",
+            only(&[(&phone_cert, phone)], &[]),
+            from_phone("authorize/approve-tablet", Kind::DeviceDecision, &approve_tablet),
+            applies(approve_tablet.clone()),
+        ),
+        decision_case(
+            "approved-device-denies-a-waiting-device",
+            only(&[(&phone_cert, phone)], &[]),
+            from_phone("authorize/deny-tablet", Kind::DeviceDecision, &device_decision(&tablet_cert, false)),
+            applies(device_decision(&tablet_cert, false)),
+        ),
+        decision_case(
+            "device-decision-from-a-device-still-waiting-is-not-approved",
+            only(&[(&tablet_cert, tablet)], &[]),
+            from_phone("authorize/waiting-decides", Kind::DeviceDecision, &approve_tablet),
+            Err(Refusal::Answer(Reason::NotApproved)),
+        ),
+        decision_case(
+            "device-decision-on-the-sending-device-is-refused",
+            only(&[(&phone_cert, phone)], &[]),
+            from_phone("authorize/decides-itself", Kind::DeviceDecision, &device_decision(&phone_cert, true)),
+            Err(Refusal::Answer(Reason::BadRequest)),
+        ),
+        decision_case(
+            "device-decision-with-a-malformed-fingerprint-is-refused",
+            only(&[(&phone_cert, phone)], &[]),
+            from_phone("authorize/misprinted", Kind::DeviceDecision, &misprinted),
+            Err(Refusal::Answer(Reason::BadRequest)),
+        ),
+        decision_case(
+            "device-decision-from-a-denied-device-is-refused",
+            only(&[], &[phone]),
+            from_phone("authorize/denied-decides", Kind::DeviceDecision, &approve_tablet),
+            Err(Refusal::Answer(Reason::Denied)),
+        ),
+        AuthorizeCase {
+            name: "device-decision-to-a-machine-that-takes-approvals-only-at-the-machine-is-refused",
+            accepts: all.clone(),
+            trust: only(&[(&phone_cert, phone)], &[]),
+            applied: AppliedCommands::default(),
+            envelope: from_phone("authorize/approve-at-machine", Kind::DeviceDecision, &approve_tablet),
+            expect: Err(Refusal::Answer(Reason::NotAllowed)),
+        },
+    ];
     let backlog_cases = vec![
         backlog_case(
             "device-files-an-idea",
@@ -1987,6 +2103,7 @@ fn authorize_json(parties: &Parties) -> Value {
     let rendered: Vec<Value> = cases
         .into_iter()
         .chain(backlog_cases)
+        .chain(decision_cases)
         .map(|case| {
             let gate = Machine { id: &machine.id, keys: &machine.keys, account: &account_key, accepts: &case.accepts, trust: &case.trust };
             let decided = authorize(&gate, &case.applied, &case.envelope, NOW);
@@ -2013,7 +2130,7 @@ fn devices_json(parties: &Parties) -> Value {
         .into_iter()
         .map(|(party, cert)| {
             assert!(key.verifies_device(cert));
-            assert_eq!(cert.signing, party.device_key().public());
+            assert_eq!(cert.recipient().1, party.device_key().public());
             json!({ "device": party.name, "cert": cert, "statement": b64(&cert.statement().unwrap()), "fingerprint": cert.fingerprint() })
         })
         .collect();
@@ -2021,11 +2138,14 @@ fn devices_json(parties: &Parties) -> Value {
     renamed.name = "Work iPhone".into();
     let mut rekeyed = phone_cert.clone();
     rekeyed.signing = intruder.public().signing;
+    let mut reencrypted = phone_cert.clone();
+    reencrypted.encryption = intruder.public().encryption;
     let mut later = phone_cert.clone();
     later.created_at += 1;
     let refusals: Vec<Value> = [
         ("renamed-after-signing", renamed),
         ("another-device-key", rekeyed),
+        ("another-encryption-key", reencrypted),
         ("another-creation-time", later),
         ("signed-by-another-account-key", certify(other_account, account, phone, "iPhone 16")),
         ("issued-by-another-account", certify(other_account, other_account, phone, "iPhone 16")),

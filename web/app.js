@@ -12,6 +12,7 @@ import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
+import { closeSettled } from "./notify.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -632,6 +633,7 @@ async function refresh() {
   state.marks = result.marks;
   state.keys = new Map((result.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
   await loadCommands(session);
+  closeSettledNotices();
   blobs.retryFailed();
   await keepMarks();
   if (result.gone.length && !state.offline) {
@@ -645,6 +647,13 @@ async function refresh() {
     }
   }
   render();
+}
+
+function closeSettledNotices() {
+  navigator.serviceWorker
+    ?.getRegistration("/")
+    .then((registration) => registration && closeSettled(registration, state.opened))
+    .catch(() => {});
 }
 
 async function removeMachine(machine, name) {
@@ -1144,7 +1153,7 @@ function openAccount() {
   pageMode = true;
   state.sheet = false;
   scrollTo(0, 0);
-  accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address }, back: () => history.back() });
+  accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address, device: state.device }, back: () => history.back() });
 }
 
 function leaveAccount() {
@@ -1156,6 +1165,7 @@ function leaveAccount() {
   state.address = left.address;
   if (left.allowed !== null) state.allowed = left.allowed;
   if (left.device) state.device = left.device;
+  if (left.kept) state.kept = left.kept;
   render();
 }
 

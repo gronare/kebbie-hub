@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use kebbie_hub_api::{Bytes32, DeviceCommand, DeviceCommands, DeviceUpload, DeviceView, Devices};
+use kebbie_hub_api::{Bytes32, DeviceCommand, DevicePush, DeviceCommands, DeviceUpload, DeviceView, Devices};
 use kebbie_hub_protocol::{Envelope, Id, MAX_DEVICE_NAME_CHARS, Prefix};
 use serde::Deserialize;
 
@@ -24,6 +24,10 @@ fn view(row: DeviceRow) -> DeviceView {
         cert: row.cert,
         created_at: row.created_at,
         last_seen_at: row.last_seen_at,
+        push: row.push.map(|push| DevicePush {
+            categories: push.categories,
+            subscribed_at: push.subscribed_at,
+        }),
     }
 }
 
