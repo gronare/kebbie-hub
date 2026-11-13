@@ -1,6 +1,7 @@
-import { accountFingerprints, accountIdentity, fromB64, newAccountSecrets, signStatement, toB64, unwrapAccountSecrets, wrapAccountSecrets, wrapperStatement } from "../js/protocol.js";
+import { accountFingerprints, accountIdentity, encryptionPkcs8, fromB64, newAccountSecrets, signStatement, toB64, unwrapAccountSecrets, wrapAccountSecrets, wrapperStatement } from "../js/protocol.js";
 import { HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
+import { openEncryption, sealKey } from "./store.js";
 import { browserPush, LISTING, NOTIFY_RECORD } from "./notify.js";
 import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
@@ -58,6 +59,17 @@ const unlockOf = (me, credential, prf, salt) => ({ account: me.account, credenti
 
 const saltChange = (salt, unlock) => (salt === unlock.prf_salt ? {} : { prf_salt: salt });
 
+async function sealedEncryption(secrets) {
+  const pkcs8 = encryptionPkcs8(secrets.encryption);
+  try {
+    return await sealKey(pkcs8);
+  } catch {
+    return null;
+  } finally {
+    pkcs8.fill(0);
+  }
+}
+
 async function createKey(hub, me, unlock, prf, salt) {
   const fresh = await newAccountSecrets(me.account);
   try {
@@ -66,7 +78,7 @@ async function createKey(hub, me, unlock, prf, salt) {
     const identity = await accountIdentity(fresh.key, fresh.secrets, me.account);
     const signature = await signStatement(identity, await wrapperStatement(fresh.key, params.credential, wrapped));
     await hub.account.setKey({ key: fresh.key, credential: unlock.credential, wrapped: toB64(wrapped), signature: toB64(signature), ...saltChange(salt, unlock) });
-    return { state: "unlocked", me: { ...me, key: fresh.key }, identity, credential: unlock.credential };
+    return { state: "unlocked", me: { ...me, key: fresh.key }, identity, credential: unlock.credential, sealed: await sealedEncryption(fresh.secrets) };
   } finally {
     fresh.wipe();
   }
@@ -84,7 +96,7 @@ async function unlockOntoSalt(hub, me, unlock, prf, salt) {
       const wrapped = await wrapAccountSecrets(params, opened);
       const signature = await signStatement(identity, await wrapperStatement(me.key, params.credential, wrapped));
       await hub.account.putWrapper(unlock.credential, { key_version: me.key.version, wrapped: toB64(wrapped), signature: toB64(signature), prf_salt: salt });
-      return { state: "unlocked", me, identity, credential: unlock.credential };
+      return { state: "unlocked", me, identity, credential: unlock.credential, sealed: await sealedEncryption(opened) };
     } finally {
       opened.wipe();
     }
@@ -93,10 +105,17 @@ async function unlockOntoSalt(hub, me, unlock, prf, salt) {
   }
 }
 
-export async function keepUnlock(session, store = deviceStore) {
+export async function keepUnlock(session, sealed, store = deviceStore) {
+  if (!sealed) return forgetUnlock(store);
+  const { encryption, ...identity } = session.identity;
   try {
-    await store.put(KEPT, { identity: session.identity, until: session.until });
+    await store.put(KEPT, { identity, encryption: sealed, until: session.until });
   } catch {}
+}
+
+async function keptIdentity(kept) {
+  if (kept.identity?.encryption) return kept.identity;
+  return { ...kept.identity, encryption: await openEncryption(kept.encryption, kept.identity.key.keys.encryption) };
 }
 
 export const forgetUnlock = (store = deviceStore) => store.del(KEPT).catch(() => undefined);
@@ -142,7 +161,8 @@ export async function keptUnlock(me, store = deviceStore, now = Date.now(), stor
   if (fresh && !me) return null;
   const held = remembered(storage);
   const credential = held?.account === me?.account ? held.credential : null;
-  if (fresh && credential && nonExtractable(kept.identity) && (await sameKey(kept.identity, me))) return { state: "unlocked", me, identity: kept.identity, credential, until: kept.until };
+  const identity = fresh && credential ? await keptIdentity(kept).catch(() => null) : null;
+  if (identity && nonExtractable(identity) && (await sameKey(identity, me))) return { state: "unlocked", me, identity, credential, until: kept.until };
   await forgetUnlock(store);
   return null;
 }
@@ -184,13 +204,13 @@ export async function signedInAccount(account, store = deviceStore) {
 }
 
 export async function unlockAfter(hub, ceremony, storage = localStore(), store = deviceStore, clock = Date.now) {
-  const settled = await settleUnlock(hub, ceremony, storage);
+  const { sealed, ...settled } = await settleUnlock(hub, ceremony, storage);
   if (settled.state !== "unlocked") {
     await forgetUnlock(store);
     return settled;
   }
   const session = { ...settled, until: clock() + KEEP_MS };
-  await keepUnlock(session, store);
+  await keepUnlock(session, sealed, store);
   return session;
 }
 
@@ -221,7 +241,7 @@ async function settleUnlock(hub, ceremony, storage) {
     if (salt !== unlock.prf_salt) return await unlockOntoSalt(hub, me, unlock, prf, salt);
     const opened = await unwrapAccountSecrets(unlockOf(me, unlock.credential, prf, salt), fromB64(unlock.wrapped));
     try {
-      return { state: "unlocked", me, identity: await accountIdentity(me.key, opened, me.account), credential: unlock.credential };
+      return { state: "unlocked", me, identity: await accountIdentity(me.key, opened, me.account), credential: unlock.credential, sealed: await sealedEncryption(opened) };
     } finally {
       opened.wipe();
     }

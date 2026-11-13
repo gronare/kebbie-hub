@@ -399,10 +399,28 @@ test("a page that locked or unlocked anew does not lock on the old hour", async 
 
 test("a kept unlock is never readable as key bytes", async () => {
   const { store } = await unlockedOnce();
-  const { identity } = await store.get("unlock");
+  const { identity, encryption } = await store.get("unlock");
   await assert.rejects(crypto.subtle.exportKey("pkcs8", identity.signing));
-  await assert.rejects(crypto.subtle.exportKey("pkcs8", identity.encryption.privateKey));
   await assert.rejects(crypto.subtle.exportKey("jwk", identity.signing));
+  await assert.rejects(crypto.subtle.exportKey("raw", encryption.key));
+});
+
+const x25519Keys = (value) => (value instanceof CryptoKey ? (value.algorithm.name === "X25519" ? 1 : 0) : value && typeof value === "object" ? Object.values(value).reduce((sum, inner) => sum + x25519Keys(inner), 0) : 0);
+
+test("a kept unlock holds no X25519 CryptoKey, which WebKit reads back as null, and still opens the boards after a reload", async () => {
+  const { store, local, me, before } = await unlockedOnce();
+  assert.equal(x25519Keys(store.values.get("unlock")), 0);
+  const resumed = await keptUnlock(me, store, before + 60_000, local);
+  assert.equal(resumed.identity.encryption.privateKey.extractable, false);
+  await boardOpens(resumed.identity);
+});
+
+test("an unlock kept by an earlier build with its keys as CryptoKeys still opens the boards", async () => {
+  const { store, local, me, before, session } = await unlockedOnce();
+  await store.put("unlock", { identity: session.identity, until: session.until });
+  const resumed = await keptUnlock(me, store, before + 60_000, local);
+  assert.equal(resumed?.state, "unlocked");
+  await boardOpens(resumed.identity);
 });
 
 test("a kept unlock for another account, key version or signing key is ignored and deleted", async () => {

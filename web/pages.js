@@ -4,7 +4,7 @@ import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
 import { put, get, del } from "./store.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, heldDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 import { fromB64, toB64 } from "../js/protocol.js";
 import { decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
@@ -357,6 +357,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const identity = unlockedIdentity();
     const record = await get(NOTIFY_RECORD).catch(() => null);
     if (!identity || record?.account?.account !== identity.id || record.device === state.device?.id) return;
+    if (!state.device && !(await heldDevice({ get }, identity.id)).missing) return;
     const store = { get, put };
     try {
       if (state.device) await pushFollows({ store, calls: account, identity, device: state.device, subscription: async () => subscription });

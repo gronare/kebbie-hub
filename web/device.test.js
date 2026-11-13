@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { accountIdentity, deviceFingerprint, fromB64, importIdentity, openCommand, sealEnvelope, verifyDeviceCert } from "../js/protocol.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
+import { accountIdentity, deviceFingerprint, fromB64, importIdentity, newDeviceKey, openCommand, sealEnvelope, verifyDeviceCert } from "../js/protocol.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, heldDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -66,6 +66,41 @@ test("turning changes on makes a key that never leaves this browser, certifies i
   const forged = { ...device, cert: { ...device.cert, name: "Renamed by someone" } };
   assert.notEqual((await ensureDevice({ store, calls, identity, name: "iPhone", now: AT, kept: forged })).id, device.id, "a cert the account didn't sign is replaced");
   await assert.rejects(ensureDevice({ store: memoryStore(), calls: { addDevice: async () => { throw new Error("hub down"); } }, identity, name: "iPhone", now: AT }), /hub down/);
+});
+
+const x25519Keys = (value) => (value instanceof CryptoKey ? (value.algorithm.name === "X25519" ? 1 : 0) : value && typeof value === "object" ? Object.values(value).reduce((sum, inner) => sum + x25519Keys(inner), 0) : 0);
+
+test("the kept device holds no X25519 CryptoKey, which WebKit reads back as null, and still loads with a non-extractable key that opens what was sealed to it", async () => {
+  const identity = await account();
+  const store = memoryStore();
+  const device = await certified(identity, { addDevice: async () => undefined }, store);
+  assert.equal(x25519Keys(store.kept.get(`device-key:${identity.id}`)), 0);
+  const loaded = await loadDevice(store, identity.id);
+  assert.equal(loaded.id, device.id);
+  assert.equal(loaded.encryption.privateKey.extractable, false);
+  assert.equal(loaded.encryption.privateKey.algorithm.name, "X25519");
+  const peer = await crypto.subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
+  const shared = async (privateKey, publicKey) => new Uint8Array(await crypto.subtle.deriveBits({ name: "X25519", public: publicKey }, privateKey, 256)).toHex();
+  assert.equal(await shared(loaded.encryption.privateKey, peer.publicKey), await shared(peer.privateKey, loaded.encryption.publicKey));
+  assert.equal(await shared(device.encryption.privateKey, peer.publicKey), await shared(peer.privateKey, loaded.encryption.publicKey));
+});
+
+test("a device kept by an earlier build with its keys as CryptoKeys still loads, so a browser that can read it keeps its device", async () => {
+  const identity = await account();
+  const store = memoryStore();
+  const device = await certified(identity, { addDevice: async () => undefined }, store);
+  const key = await newDeviceKey();
+  await store.put(`device-key:${identity.id}`, { ...device, encryption: key.encryption });
+  assert.equal((await loadDevice(store, identity.id)).encryption.privateKey, key.encryption.privateKey);
+});
+
+test("a kept device that reads back unreadable is told apart from no device at all", async () => {
+  const identity = await account();
+  const store = memoryStore();
+  assert.deepEqual(await heldDevice(store, identity.id), { device: null, missing: true });
+  await store.put(`device-key:${identity.id}`, null);
+  assert.deepEqual(await heldDevice(store, identity.id), { device: null, missing: false });
+  assert.deepEqual(await heldDevice({ get: async () => Promise.reject(new Error("blocked")) }, identity.id), { device: null, missing: false });
 });
 
 test("a device that registers anew while notifications are on takes the browser's subscription along, so the worker's record and key name the same device", async () => {

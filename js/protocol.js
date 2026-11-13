@@ -474,15 +474,20 @@ export function deviceId(millis = Date.now(), randomBytes = random(10)) {
 
 export async function newDeviceKey() {
   const pair = await subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
-  const encryption = await subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
+  const generated = await subtle.generateKey({ name: "X25519" }, true, ["deriveBits"]);
+  const encryptionPkcs8 = new Uint8Array(await subtle.exportKey("pkcs8", generated.privateKey));
+  const privateKey = await subtle.importKey("pkcs8", encryptionPkcs8, { name: "X25519" }, false, ["deriveBits"]);
   return {
     signing: pair.privateKey,
     verifying: pair.publicKey,
     public: toB64(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))),
-    encryption: { privateKey: encryption.privateKey, publicKey: encryption.publicKey },
-    encryptionPublic: toB64(new Uint8Array(await subtle.exportKey("raw", encryption.publicKey))),
+    encryption: { privateKey, publicKey: generated.publicKey },
+    encryptionPublic: toB64(new Uint8Array(await subtle.exportKey("raw", generated.publicKey))),
+    encryptionPkcs8,
   };
 }
+
+export const encryptionPkcs8 = (secret) => concat(PKCS8_X25519, secret);
 
 export const keyCommitment = async (contentKey) => toB64(await sha256(KEY_COMMIT_DOMAIN, contentKey));
 

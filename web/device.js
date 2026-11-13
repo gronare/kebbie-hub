@@ -1,5 +1,6 @@
 import { deviceFingerprint, deviceId, importSender, newDeviceKey, openCommand, openEnvelope, sealCommand, signDeviceCert, verifyDeviceCert } from "../js/protocol.js";
 import { browserPush, categoriesKey, keptCategories, NOTIFY_RECORD } from "./notify.js";
+import { openEncryption, sealKey } from "./store.js";
 
 const sentKey = (account) => `hub-sent:${account}`;
 const allowKey = (account) => `allow-changes:${account}`;
@@ -39,14 +40,18 @@ const WORDED = {
 export const storedSent = (sent, now) => (WORDED[sent.kind] && (sent.result || sent.exp <= now) ? WORDED[sent.kind](sent) : sent);
 export const keepSent = (store, account, kept, now = Math.floor(Date.now() / 1000)) => store.put(sentKey(account), { ...kept, sent: kept.sent.map((sent) => storedSent(sent, now)) }).catch(() => undefined);
 
-export async function loadDevice(store, account) {
+export async function heldDevice(store, account) {
   try {
     const kept = await store.get(deviceKey(account));
-    return kept?.cert?.account === account && kept.signing && kept.encryption ? kept : null;
+    if (kept === undefined) return { device: null, missing: true };
+    if (kept?.cert?.account !== account || !kept.signing || !kept.encryption) return { device: null, missing: false };
+    return { device: { ...kept, encryption: await openEncryption(kept.encryption, kept.cert.encryption) }, missing: false };
   } catch {
-    return null;
+    return { device: null, missing: false };
   }
 }
+
+export const loadDevice = async (store, account) => (await heldDevice(store, account)).device;
 
 export const forgetDevice = (store, account) => store.del(deviceKey(account)).catch(() => undefined);
 
@@ -78,11 +83,12 @@ export async function ensureDevice({ store, calls, identity, name, now, kept = u
   const held = kept === undefined ? await loadDevice(store, identity.id) : kept;
   if (held && (await verifyDeviceCert(identity.key, held.cert))) return held;
   const key = await newDeviceKey();
+  const sealed = await sealKey(key.encryptionPkcs8).finally(() => key.encryptionPkcs8.fill(0));
   const id = deviceId(now * 1000);
   const cert = await signDeviceCert(identity, { device: id, name, signing: key.public, encryption: key.encryptionPublic, created_at: now });
   await calls.addDevice(cert);
   const device = { id, cert, signing: key.signing, encryption: key.encryption, fingerprint: await deviceFingerprint(key.public) };
-  await store.put(deviceKey(identity.id), device).catch(() => undefined);
+  await store.put(deviceKey(identity.id), { ...device, encryption: sealed }).catch(() => undefined);
   await pushFollows({ store, calls, identity, device, subscription }).catch(() => undefined);
   return device;
 }

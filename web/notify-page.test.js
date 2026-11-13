@@ -171,6 +171,23 @@ test("Account moves the browser's subscription to this device when the worker's 
   kept.delete("notice-failure");
 });
 
+test("Account never registers a device on its own when the kept one can't be read back, as WebKit does with an X25519 key", async () => {
+  const { deviceId } = await import("../js/protocol.js");
+  const given = await unlocked();
+  const earlier = deviceId();
+  const { root, calls } = browserWith({ permission: "granted" });
+  await (await navigator.serviceWorker.getRegistration("/")).pushManager.subscribe({});
+  kept.set("notify", { account: given.session.identity.key, device: earlier });
+  kept.set(`device-key:${given.me.account}`, null);
+  const page = startPage(root, { given });
+  await page.started;
+  root.click({ action: "notifications" });
+  assert.equal(calls.some((call) => call.method === "POST" && call.url === "/v1/a/devices"), false);
+  assert.equal(kept.get("notify").device, earlier);
+  page.leave();
+  kept.delete(`device-key:${given.me.account}`);
+});
+
 test("a refusal in iOS greys the switch and says where to turn them on", async () => {
   const { root, calls } = browserWith({ answer: "denied" });
   const page = startPage(root, { given: await unlocked() });

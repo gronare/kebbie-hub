@@ -1,4 +1,5 @@
 import { DEFAULT_NOTICE_CATEGORIES, fromB64, NOTICE_CATEGORIES, noticeCategoryOf, openNotice, ProtocolError, verifyMachineList } from "../js/protocol.js";
+import { openEncryption } from "./store.js";
 
 export const NOTIFY_RECORD = "notify";
 export const LISTING = "listing";
@@ -173,7 +174,7 @@ export async function pushedNotice(envelope, { get, now, put = null, boards = nu
     }
     named = found.listing;
     const listed = machineIn(found.listing, envelope.machine);
-    const notice = await openNotice(envelope, { id: device.id, encryption: device.encryption }, { id: listed.machine, keys: listed.keys }, now);
+    const notice = await openNotice(envelope, { id: device.id, encryption: await openEncryption(device.encryption, device.cert?.encryption) }, { id: listed.machine, keys: listed.keys }, now);
     const name = nameIn(found.listing, listed.machine);
     return { title: notice.title, body: notice.body, tag, data: { machine: listed.machine, name, category: notice.category, open: notice.open, url: routeOf(listed.machine, notice.open) }, retract: notice.retract ?? [], failure: null };
   } catch (error) {
