@@ -650,6 +650,57 @@
           "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
+        "ct": "Ck-dr8iszw1mPc248z562mAIfR04QXjtAXHMjHUschfnsrnqP7Yi0hfq55lo4sdoUkqbrntu7pHQbzmlla3x4OtSOLvsmrW0FxTdvoNe9NyVJbv2eou4xKFZkmeB2QbHKQW3qNG0dlB2CZrkYLD6Sbj-pO02z5hZADp8rubdBYkwqAwj7tvfrJS-r1wDD_kG8iF5Y263Lg",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-771d-a0dd-f200cfc5d89c",
+        "kc": "OIrZXQQH6k69yTabufiIadvrPbrrbRUZfGsA5hphviY",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "8jPVP1tclSenGgGlwP50Ep1q5HM8Ye76BjQ2L9a09DciK1k3n99-XEMUhQXeKuJJzV42vOpp9kxqDQSj1Yv7S561m6qSFU2aiV6h5qRWsU0",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "7MTabwmqnfUCe9_bhag3mLc8v1eXrkRu6-q6kA7TD0Zaxow85IHwcVWJhXaIMvX7MyAj43tV2n04UJupPrUbAUU7Obix3yhKeDYPcpbVLbI"
+        },
+        "kind": "push",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "sycsYKu0PWhsud08bVZFI9PLngCzN4zxe56y5DbK2FPBFvZsTT27WKOpYIc3mKJs_URx7WEcTTfZlGeh_D0zAw",
+        "v": 1
+      },
+      "expect": {
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "payload": {
+          "address": "payments@api",
+          "card_sha": null,
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "through_step": 2,
+          "type": "push"
+        }
+      },
+      "name": "device-pushes-a-task-through-a-step",
+      "trust": "account"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "start",
+        "routine",
+        "prompt-answer"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
         "ct": "NDj24KxMyNdxNjj215gYUNia6Tsh5sdCD-ZBJ0Q4M3DI7OTdIspT1_cuim6SDTenN3h1vzbQ0NsIz0yMqDSqT-S_",
         "exp": 1761070200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
@@ -1547,7 +1598,7 @@
       },
       "envelope": {
         "at": 1761069600,
-        "ct": "0b_C9Z-Wjc0Tw4eZnQw-GD-4sKzGl-k8Kpz_Kr3w9z3QH_2HCDUixNXj5Xn68TfqiM3y-PcuGdtM58N6EcPFxQiqUyJAdSLZ_0WTuKpEV1-YW0EYCky8S_7RTAzxonMs86bhfuGUsaaGPSYf4O0epiZumi2g3WElinq70BvTav5gi5sag1rziNIBUzNlErWnm-fTpltc2GN6DrN8Dr3G1mhNePgB_IWRofXyoA2jocXbfT8Q3YC3yOQMqMG6RmAgb8wjYQqOLR0nbE5rX1BLaEtEaLVTERnj5W78P2TXwa6A2cEzByr7e79zN8t06bPevjTZivtbE7E8sYhxNl52yLPTgEojc9UlXxfikzGuMKXPHzF_OEIkxMlBCLfFkpNf89ZNTc9vc3a7L-ZCc_ReMQ5Z0UTjVOoSqgzJzrlfJiHm2NH2k-Gfl5wyNrr1iBWrdi5CPQZbJiLCSOfRjLqbyX2eAo6ucdzPW2FTfMESKsNPm7Wyslq78jNcU3hbvt7ubEIODpdKIzH1OnTSDuhpmoJ7j8rAfEeBEdOEGr-KWG8hGD7LvqIjR8zhjbjxYCWOF7eQeBzHmxjMtkOOCahbRvyFMSwaNEp9t6ZYpgm52RB03rXjaRqkSCOAin50tZkpvvK0azTiWVoSntjbdgqNJq4zZDFdvLJeK6SbGUZKBw9owsal0_EGsDkHIeG-JbQ1VfZOOps-h9LfEuhhZ5fD95ZToC1DFRIosoljFnVMwDYBA-V81kCjTD_13rJ87eLqJsSbxCRP2C8kVqZp7_M92r8FeAVPe0H6pL-sW49a1fOMKNfBreSZRjlyJ9-meBKKwAM0YLbGKtWE7ZuQNrhNu_1k5BwAtTQfJ-TTMVrYA6sdrGuMKpybkkXqyowD94z5gsOb2dbfeEWoIBuSRPkoC5TbJNcEpaIWmmcSOg9KkUNTOQvU_BKzCct6wYiQdEsphAxWZWCn-u_s7depZSDjx4L0AMDsAC5pTTHk1Wv7q93t0vBygaFKsrd6TkTKXJ2PriwMSGUMLAKlBaHdZhhoHN-UkADWAOhQe_kOyo9R6NadKG0V7cmcsZaz-VN5hsMXdBHhLpj1SYqvmZTVxaWsCb9XABmjHZBSv_2w4jTCoG7rK7IlKNmrOdnLkkanIRd7Nsbnjqr383rTFhmie_PDlFLH8zPSWnHY9tAg_1uYUpph1Ddg-m2NrVc2Wj6g_uKx_nkyMR185RnCd-GFu81t0uy94Kc2bubU5H8eGxnImgZn2H5wcdM_W-yWE1IiitinAi8raSgk-_Vr-ELTf4doDUhTInofogz-OlVCdxHuGcYeyAcDEgs8G81tVTlB381RF76d-Z17gCPAlLN5dh1nHpRCHOekd7GZr5LtohkAo5FIrao-lwDaTgX0bw0LMvLkQJRck_unvbe_qc1XQ1DRCSUxekTwOK6L5FbRKOF7AtDL3no46MiB1N8rVp753z_1c5WP-_CBybs2gW9mxqSMfUf4r33iPStezIIdx_loTjK3vb_0QOr5O_D8TwIXdWnyGGMEtJrNHLRAmLOSxPHV3hEKjQAnKztfm5mci61RctfMSwNp_dkJUjbVIbfLJ6TuDdvp0NTbNRz5yihnfzmpYxuWXB6ZLsYLFC55ShEJ1YAs-LCiuw_23BruGQkneRs32qjNda7gCHL0IN29lA",
+        "ct": "0b_C9Z-Wjc0Tw4eZnQw-GD-4sKzGl-k8Kpz_Kr3w9z3QH_2HCDUixNXj5Xn68TfqiM3y-PcuGdtM58N6EcPFxQiqUyJAdSLZ_0WTuKpEV1-YW0EYCky8S_7RTAzxonMs86bhfuGUsaaGPSYf4O0epiZumi2g3WElinq70BvTav5gi5sag1rziNIBUzNlErWnm-fTpltc2GN6DrN8Dr3G1mhNePgB_IWRofXyoA2jocXbfT8Q3YC3yOQMqMG6RmAgb8wjYQqOLR0nbE5rX1BLaEtEaLVTERnj5W78P2TXwa6A2cEzByr7e79zN8t06bPevjTZivtbE7E8sYhxNl52yLPTgEojc9UlXxfikzGuMKXPHzF_OEIkxMlBCLfFkpNf89ZNTc9vc3a7L-ZCc_ReMQ5Z0UTjVOoSqgzJzrlfJiHm2NH2k-Gfl5wyNrr1iBWrdi5CPQZbJiLCSOfRjLqbyX2eAo6ucdzPW2FTfMESKsNPm7Wyslq78jNcU3hbvt7ubEIODpdKIzH1OnTSDuhpmoJ7j8rAfEeBEdOEGr-KWG8hGD7LvqIjR8zhjbjxYCWOF7eQeBzHmxjMtkOOCahbRvyFMSwaNEp9t6ZYpgm52RB03rXjaRqkSCOAin50tZkpvvK0azTiWVoSntjbdgqNJq4zZDFdvLJeK6SbGUZKBw9owsal0_EGsDkHIeG-JbQ1VfZOOps-h9LfEuhhZ5fD95ZToC1DFRIosoljFnVMwDYBA-V81kCjTD_13rJ87eLqJsSbxCRP2C8kVqZp7_M92r8FeAVPe0H6pL-sW49a1fOMKNfBreSZRjlyJ9-meBKKwAM0YLbGKtWE7ZuQNrhNu_1k5BwAtTQfJ-TTMVrYA6sdrGuMKpybkkXqyowD94z5gsOb2dbfeEWoIBuSRPkoC5TbJNcEpaIWmmcSOg9KkUNTOQvU_BKzCct6wYiQdEsphAxWZWCn-u_s7depZSDjx4L0AMDsAC5pTTHk1Wv7q93t0vBygaFKsrd6TkTKXJ2PriwMSGUMLAKlBaHdZhhoHN-UkADWAOhQe_kOyo9R6NadKG0V7cmcsZaz-VN5hsMXdBHhLpj1SYqvmZTVxaWsCb9XABmjHZBSv_2w4jTCoG7rK7IlKNmrOdnLkkanIRd7Nsbnjqr383rTFhmie_PDlFLH8zPSWnHY9tAg_1uYUpph1Ddg-m2NrVc2Wj6g_uKx_nkyMR185RnCd-GFu81t0uy94Kc2bubU5H8eGxnImgZn2H5wcdM_W-yWE1IiitinAi8raSgk-_Vr-ELTf4doDUhTInofogz-OlVCdxHuGcYeyAcDEgs8G81tVTlB381RF76d-Z17gCPAlOJ3NQVyDZ8WQ6G_K-Sb8YC5ugBA_JAdqr5ljVuMGFSgOlhYZKiyFMINwK756ePi-JsCBUqQRyFzfB_2eOqH7hvedKx7XofO01cs5NmYn5Y2Sp370Sfrc4qLiKKUzqU3rWtuwL7dZRPjtn2iM3lN0IYu3-9yZSz07r-jFuC0deX2D0wbaziXG3cBtpTVCLBPhKDblLCGkl4IlEBpdXZYipOdmOoZPpjOUkMnspoJWWGbJqzCaePdVJX2mYXLPQHzm01mfyG2dyLfIRmdLt4RWXo7aIeRtfpGxz_dkx0HvlSG5dc",
         "exp": 1761156000,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "id": "brd_01K83YV380X5FVF3GGBM82ZBJH",
@@ -1558,7 +1609,7 @@
         "kind": "board",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "sOlhWH_qzsayUL7QBzW6QSVAJCpYLr71xzT6tpWBXWVf-2zjCvJKfb8KBmPnLEMpjkMqXeWpRlmLPD1zPgtlBw",
+        "sig": "tb1fWB9jAmb3s1Tw6atpDQ1y3uTMrEQxMBPfQYWYoogtfnpYC2bLznTKo9mlq-Vth9O2zBOMjZzb4sDPHhJgDA",
         "v": 1
       },
       "expect": {

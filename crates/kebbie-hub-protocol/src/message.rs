@@ -352,6 +352,9 @@ pub struct PushApproval {
     pub address: String,
     pub head: String,
     pub card_sha: Option<String>,
+    /// Pushes the task's commits up to and including this step, and `head` is then that step's commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub through_step: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -469,7 +472,8 @@ impl Payload {
                 check(
                     push.card_sha.as_deref().is_none_or(is_full_sha),
                     "card_sha is not a full sha",
-                )
+                )?;
+                check(push.through_step.is_none_or(|step| step >= 1), "steps count from one")
             }
             Payload::Start(start) => {
                 check(is_token(&start.repo), "repo is not a plain name")?;
@@ -520,7 +524,8 @@ impl Payload {
             Payload::ReviewComments(comments) => comments.check(),
             Payload::ReviewRead(read) => read.check(),
             Payload::AcceptStep(accept) => accept.check(),
-            Payload::StartItem(_) | Payload::Board(_) | Payload::Result(_) => Ok(()),
+            Payload::Board(board) => board.check(),
+            Payload::StartItem(_) | Payload::Result(_) => Ok(()),
         }
     }
 }
@@ -633,12 +638,12 @@ mod tests {
         };
         assert_eq!(start("x".repeat(MAX_PROMPT_CHARS)).validate(), Ok(()));
         assert!(start("x".repeat(MAX_PROMPT_CHARS + 1)).validate().is_err());
-        let push = Payload::Push(PushApproval {
-            address: "refunds@shop".into(),
-            head: "9f3c2a1".into(),
-            card_sha: None,
-        });
-        assert!(push.validate().is_err());
+        let push = |head: &str, through_step| {
+            Payload::Push(PushApproval { address: "refunds@shop".into(), head: head.into(), card_sha: None, through_step })
+        };
+        assert!(push("9f3c2a1", None).validate().is_err());
+        assert_eq!(push(&"a".repeat(40), Some(1)).validate(), Ok(()));
+        assert!(push(&"a".repeat(40), Some(0)).validate().is_err(), "steps count from one");
         let prompt = |prompt: &str, key: &str| {
             Payload::PromptAnswer(PromptAnswer {
                 address: "refunds@shop".into(),

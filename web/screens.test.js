@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { notifySection, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -224,7 +224,7 @@ const payments = {
   group: "WORKING",
   summary: "2 commits",
   next_for_you: null,
-  git: { upstream: "main", ahead: 2, behind: 0, uncommitted: 0, approved: true },
+  git: { upstream: "main", ahead: 2, behind: 0, uncommitted: 0, rules: { state: "ok" } },
   steps: {
     pushed: 1,
     items: [
@@ -242,7 +242,7 @@ test("a task whose steps must be accepted lists them under its row, says how man
   const html = taskRow(rowOf(required));
   assert.equal(
     text(html),
-    "payments devbox api · 1 to accept · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed · rules ✓ ◐ 3 Add the new gateway in progress ○ 4 Remove the old <payment> client you: accept 2 on devbox",
+    "payments devbox api · 1 to accept · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed ◐ 3 Add the new gateway in progress ○ 4 Remove the old <payment> client you: accept 2 on devbox",
   );
   assert.match(html, /<span class="accept">1 to accept<\/span>/);
   assert.match(html, /class="step s-committed"/);
@@ -250,16 +250,16 @@ test("a task whose steps must be accepted lists them under its row, says how man
   assert.doesNotMatch(html, /<payment>/, "a step title is escaped");
 });
 
-test("a step's label follows its state, and rules show only when the rules passed", () => {
-  const steps = { pushed: 0, items: [{ number: 1, title: "Docs", state: "accepted", sha: "aaa" }, { number: 2, title: "Tests", state: "committed", sha: "bbb" }] };
-  assert.equal(text(stepLines({ ...payments, git: { ...payments.git, approved: false }, steps: { ...steps, required: true } })), "✓ 1 Docs accepted ● 2 Tests committed");
+test("a step's label follows its state, and a rules check that passed adds nothing to it", () => {
+  const steps = { pushed: 0, items: [{ number: 1, title: "Docs", state: "accepted", sha: "aaa" }, { number: 2, title: "Tests", state: "committed", sha: "bbb", rules: { state: "ok" } }] };
+  assert.equal(text(stepLines({ ...payments, steps: { ...steps, required: true } })), "✓ 1 Docs accepted ● 2 Tests committed");
   assert.equal(text(taskRow(rowOf({ ...payments, next_for_you: "answer: Keep it?", steps: { ...steps, required: true } }))).endsWith("you: answer: Keep it?"), true, "what kebbie asks of you comes before an accept");
 });
 
 test("steps that need no accepting count nothing to accept, ask nothing of you and say push takes what is committed", () => {
   for (const steps of [payments.steps, { ...payments.steps, required: false }]) {
     const said = text(taskRow(rowOf({ ...payments, steps })));
-    assert.equal(said, "payments devbox api · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed · rules ✓ ◐ 3 Add the new gateway in progress ○ 4 Remove the old <payment> client accepting each step is optional: push takes what is committed");
+    assert.equal(said, "payments devbox api · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed ◐ 3 Add the new gateway in progress ○ 4 Remove the old <payment> client accepting each step is optional: push takes what is committed");
     assert.doesNotMatch(said, /to accept|you:/);
   }
 });
@@ -504,20 +504,39 @@ test("a device's history names what it sent to the backlog: the idea and its mac
   assert.equal(historyEntry(entry({ type: "idea", text: "x".repeat(80), repo: null }, { result: null }), now).what, `Idea for MacBook: ${"x".repeat(59)}… waiting`);
 });
 
-test("Account shows the notifications row under This device, and the two cards of categories only while it is on", () => {
+test("Account shows one Notifications row under This device, and its own page holds the switch, where notices come from, the last failure and the categories", () => {
   const off = accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices, notify: { phase: "off", text: "Off", categories: [] }, now: AT_TWO_PM });
   assert.ok(text(off).indexOf("Allow changes") < text(off).indexOf("Notifications Off"), text(off));
   assert.ok(text(off).indexOf("Notifications Off") < text(off).indexOf("Devices · 2"));
-  assert.match(off, /<section class="task" id="notify-card"><label class="row switch-row"><div><div class="name" id="notify-name">Notifications<\/div><div class="meta" id="notify-state">Off<\/div><\/div><input type="checkbox" role="switch" class="switch" name="notify" aria-labelledby="notify-name" aria-describedby="notify-state" aria-checked="false"><\/label><\/section>/);
-  assert.doesNotMatch(off, /Notify me when/);
-  const on = notifySection({ phase: "on", text: "On for this iPhone. MacBook and work-mac send here.", categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed"] });
-  assert.equal(text(on), "Notifications On for this iPhone. MacBook and work-mac send here. Notify me when it needs you Questions and prompts A task asks you something, or an agent's prompt waits for a choice A new device to approve A device wants to make changes on one of your machines The lead's questions on an idea The lead wrote out an idea and needs answers before it starts Notify me when work moves Ready to push A task is reviewed and waits for your push CI failed A push came back red A start went through A task you started from here began on its machine");
+  assert.match(off, /<a class="task row-link" href="#notifications" data-action="notifications"><span class="name">Notifications<\/span><span class="meta">Off<\/span><svg class="chev"/);
+  assert.doesNotMatch(off, /notify-card|Notify me when|name="notify"/);
+  assert.match(accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, notify: { phase: "on", text: "x", categories: [] } }), /<span class="meta ok">On<\/span>/);
+  const on = notifySection({ phase: "on", text: "On for this iPhone.", senders: "MacBook and work-mac send here.", failure: "The last notification, at 14:02 from MacBook, couldn't be opened.", categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed"] });
+  assert.equal(text(on), "Notifications On for this iPhone. MacBook and work-mac send here. The last notification, at 14:02 from MacBook, couldn't be opened. Notify me when it needs you Questions and prompts A task asks you something, or an agent's prompt waits for a choice A new device to approve A device wants to make changes on one of your machines The lead's questions on an idea The lead wrote out an idea and needs answers before it starts Notify me when work moves Ready to push A task is reviewed and waits for your push CI failed A push came back red A start went through A task you started from here began on its machine");
   assert.equal((on.match(/name="notice-category"/g) ?? []).length, 6);
   assert.equal((on.match(/ checked/g) ?? []).length, 6, "the main switch and five categories");
   assert.match(on, /name="notice-category" value="started" aria-labelledby="n-start-name" aria-describedby="n-start-state" aria-checked="false">/);
+  assert.doesNotMatch(notifySection({ phase: "off", text: "Off", senders: "MacBook sends here." }), /sends here/, "machines that send here show only while it is on");
   assert.match(notifySection({ phase: "asking", text: "Asking iOS for permission…" }), /aria-checked="true" checked>/);
   for (const phase of ["denied", "install", "unsupported"]) assert.match(notifySection({ phase, text: "x" }), /aria-checked="false" disabled>/, phase);
-  assert.doesNotMatch(accountScreen({ me: { account: "acc_x" }, github: false, allowed: null, notify: { phase: "off", text: "Off" } }), /notify-card/, "no row where the hub takes no commands");
+  const page = notificationsScreen({ notify: { phase: "off", text: "Off", categories: [] } });
+  assert.match(text(page), /^kebbie hub Notifications Notifications Off Back to Account/);
+  assert.equal((page.match(/data-action="notifications-back"/g) ?? []).length, 2);
+  assert.doesNotMatch(accountScreen({ me: { account: "acc_x" }, github: false, allowed: null, notify: { phase: "off", text: "Off" } }), /notifications/, "no row where the hub takes no commands");
+});
+
+test("a step shows a rules check that is running, broken or pushed past on its own line, and a passed one not at all", () => {
+  const row = (rules) => text(stepLines({ ...payments, steps: { pushed: 0, required: true, items: [{ number: 1, title: "Docs", state: "committed", sha: "aaa", rules }] } }));
+  assert.equal(row({ state: "ok" }), "● 1 Docs committed");
+  assert.equal(row({ state: "checking" }), "● 1 Docs committed checking project rules");
+  assert.equal(row({ state: "breaks", breaks: 1 }), "● 1 Docs committed breaks 1 project rule");
+  assert.equal(row({ state: "breaks", breaks: 3, names: ["Every commit says why"] }), "● 1 Docs committed breaks 3 project rules", "a board row only counts; names open on the card");
+  assert.equal(row({ state: "breaks", breaks: 2, override: { by: "user" } }), "● 1 Docs committed breaks 2 project rules pushed past the rules check by you");
+  assert.equal(row({ state: "checking", override: { by: "lead" } }), "● 1 Docs committed pushed past the rules check by the lead");
+  const card = stepLines({ ...payments, steps: { pushed: 0, items: [{ number: 1, title: "Docs", state: "committed", sha: "aaa", rules: { state: "breaks", breaks: 2, names: ["Every commit says why", "<No> TODO"] } }] } }, { expandable: true });
+  assert.match(card, /<details class="rules-names"><summary class="warn">breaks 2 project rules<\/summary><ul><li>Every commit says why<\/li><li>&#60;No&#62; TODO<\/li><\/ul><\/details>/);
+  assert.equal(rulesLines(null), "");
+  assert.doesNotMatch(stepLines(payments), /approved|rules ✓/);
 });
 
 test("a device waiting on a machine gets Approve and Deny there, only from a device that machine approved and that takes decisions", async () => {
@@ -587,4 +606,9 @@ test("a device's page shows older history on request and removes the device only
   assert.doesNotMatch(page, /device-remove/);
   const listed = text(accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices: [devices[0], removed], now: AT_TWO_PM }));
   assert.match(listed, /Devices · 1 iPhone 16 .* Removed · 1 Chrome on Mac web app · added \d+ \w+ · removed today/);
+});
+
+test("a card that is current says nothing about its age, and one written before the last commit warns that the code changed", () => {
+  assert.equal(cardAge({ sha: "9f3c2a1", current: true }), "");
+  assert.equal(cardAge({ sha: "9f3c2a1", current: false }), `<div class="meta warn">Written before the last commit; the code changed since.</div>`);
 });

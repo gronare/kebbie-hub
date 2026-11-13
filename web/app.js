@@ -18,16 +18,17 @@ import { cleanComment, commentProblem, commentsProblem, diffHref, freshReviewUi,
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
-import { watchShell } from "./shell.js";
+import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, reviewLines, routinesBlock, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" } };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+let reloading = false;
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
 const cameraAtBottom = () => globalThis.screen?.orientation?.angle === (Math.max(innerWidth, innerHeight) > 800 ? 90 : 270);
@@ -113,7 +114,8 @@ const go = (hash) => {
 function shell(active, main, panel = "") {
   const questions = arrange(state.opened, nowSeconds()).questions.length;
   const side = panel ? `<aside class="panel" aria-label="Selected task">${panel}</aside>` : "";
-  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions })}<main class="screen in-app">${brand}${main}</main>${side}</div>`;
+  const toast = state.updated ? `<div class="toast" role="status"><span>New version</span><button type="button" class="toast-act" data-action="reload">Reload</button></div>` : "";
+  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions })}<main class="screen in-app">${brand}${main}</main>${side}${toast}</div>`;
 }
 
 function top(title, aside = "") {
@@ -258,25 +260,25 @@ function cardBlock(found) {
   const { item } = found;
   const lines = [];
   if (item.card) {
-    lines.push(item.card.current ? `<div class="meta ok">✓ current at ${esc(short(item.card.sha))}</div>` : `<div class="meta warn">the card is for ${esc(short(item.card.sha))}; HEAD has moved on</div>`);
+    lines.push(cardAge(item.card));
     lines.push(`<h3 class="sec">Card</h3>${slot(item.card.blob, { kind: "card", look: "md" })}`);
   }
   lines.push(taskFacts(item));
   if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
-  const steps = stepLines(item);
+  const steps = stepLines(item, { expandable: true });
   if (steps) lines.push(`<h3 class="sec">Steps</h3>${steps}`);
   lines.push(reviewLines(item));
   const progress = [item.summary, item.report?.summary].filter(Boolean);
   if (progress.length) lines.push(`<h3 class="sec">Progress</h3><div class="plan">${progress.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`);
   if (item.git) {
     const git = item.git;
-    const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null, git.approved ? "approved for push" : null].filter(Boolean);
-    lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}</div>`);
+    const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null].filter(Boolean);
+    lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}${rulesLines(git.rules, { expandable: true })}</div>`);
   }
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
   if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
   const card = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
-  return card + reviewEntry(found) + pushArea(found);
+  return reviewEntry(found) + card + pushArea(found);
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
@@ -495,6 +497,7 @@ function itemRoute(id) {
 function openComposer() {
   location.hash = "#/idea";
   render();
+  scrollListToTop();
   document.getElementById("idea")?.focus({ preventScroll: true });
 }
 
@@ -554,6 +557,9 @@ function reviewView(found) {
   });
   const accepted = sha ? sentOn(found, "accept-step", (sent) => sent.sha === sha)[0] : null;
   const readSent = opener ? sentOn(found, "review-read", (sent) => sent.at >= opener.at && !settled(shownOf(sent).state)) : [];
+  const step = review?.step?.number ?? null;
+  const stepPush = step === null ? null : sentOn(found, "push", (sent) => sent.step === step && sent.head === review.step.sha)[0] ?? null;
+  const taskPush = sentOn(found, "push", (sent) => (sent.step ?? null) === null && sent.head === found.item.head)[0] ?? null;
   const ready = access === "ready";
   return {
     machine: found.machine,
@@ -569,6 +575,9 @@ function reviewView(found) {
     sentComments,
     readSent,
     acceptSent: accepted ? shownOf(accepted) : null,
+    stepPush: stepPush ? shownOf(stepPush) : null,
+    taskPush: taskPush ? shownOf(taskPush) : null,
+    pushUi: uiOf(found.machine, found.item.address),
     access,
     canComment: ready && takes(found.accepts, "review-comments"),
     canRead: ready && takes(found.accepts, "review-read"),
@@ -907,6 +916,14 @@ function sendPush(target) {
   send(target, { type: "push", address, head: item.head, card_sha: item.card?.sha ?? null }, { head: item.head, short: short(item.head), machineName: found.name });
 }
 
+function sendStepPush(target) {
+  const { machine, address } = target.dataset;
+  const found = findTask(state.opened, machine, address);
+  const step = found ? reviewView(found).review?.step : null;
+  if (!step || step.number !== Number(target.dataset.step)) return;
+  send(target, { type: "push", address, head: step.sha, card_sha: null, through_step: step.number }, { head: step.sha, short: short(step.sha), step: step.number, machineName: found.name });
+}
+
 const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
 
 async function sendTo({ machine, payload, meta, ui }) {
@@ -962,13 +979,13 @@ function reveal(selector, offset = null) {
   else scrollTo(0, element.getBoundingClientRect().top + scrollY - gap);
 }
 
-function toDiff(v, selector, offset) {
-  if (twoColumns() || route().name === "diff") {
-    render();
-    return reveal(selector, offset);
-  }
-  revealAfter = { selector, offset };
-  go(diffHref(v.machine, v.address));
+function toDiff(v, selector, offset, focus = null) {
+  const here = twoColumns() || route().name === "diff";
+  if (!here) location.hash = diffHref(v.machine, v.address);
+  render();
+  if (!here) scrollListToTop();
+  reveal(selector, offset);
+  if (focus) root.querySelector(focus)?.focus({ preventScroll: true });
 }
 
 let revealAfter = null;
@@ -1044,7 +1061,7 @@ function reviewAction(action, target) {
   if (action === "rv-edit" && draft) {
     Object.assign(ui, { composing: { ...draft }, tray: false });
     ui.open.set(draft.path, true);
-    return toDiff(v, "#rv-c", 160);
+    return toDiff(v, "#rv-c", 160, "#rv-c");
   }
   if (action === "rv-show" && draft) {
     ui.tray = false;
@@ -1168,6 +1185,7 @@ function decideAction(action, target, element) {
   else if (action === "answer") return sendAnswer(target);
   else if (action === "choose") return sendPromptAnswer(target);
   else if (action === "push") return sendPush(target);
+  else if (action === "push-step") return sendStepPush(target);
   render();
 }
 
@@ -1505,6 +1523,11 @@ root.addEventListener("click", (event) => {
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
   const decided = target.closest(".decide");
   if (decided) return decideAction(action, decided, target);
+  if (action === "reload") {
+    if (!reloading) location.reload();
+    reloading = true;
+    return;
+  }
   if (action === "dismiss-hint") {
     state.hint = false;
     try {
@@ -1610,6 +1633,7 @@ addEventListener("hashchange", () => {
   if (name === "section") state.from = `section/${route().params[0]}`;
   if (name === "item") backlogUi(route().params[0]).visit = nowSeconds();
   state.sheet = false;
+  if (rendered === location.hash && !revealAfter) return;
   render();
   if (!(twoColumns() && (name === "task" || name === "plan" || name === "item" || name === "idea"))) scrollListToTop();
   const pending = revealAfter;
@@ -1679,7 +1703,13 @@ async function start() {
   if (pageMode) return startPage(root, { showBoard });
   if (!cryptoReady()) return render();
   showHint();
-  if ("serviceWorker" in navigator) watchShell(navigator.serviceWorker);
+  if ("serviceWorker" in navigator) {
+    watchShell(navigator.serviceWorker);
+    watchUpdate(navigator.serviceWorker, () => {
+      state.updated = true;
+      render();
+    });
+  }
   await forgetDeviceKeys();
   const params = new URLSearchParams(location.search);
   state.notice = githubErrorText(params.get("github_error"));

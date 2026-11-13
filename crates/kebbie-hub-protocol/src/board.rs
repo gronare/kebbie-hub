@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::backlog::BacklogRow;
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
+use crate::message::{check, is_line};
 use crate::review::ReviewOffer;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,6 +180,8 @@ pub struct Step {
     pub title: String,
     pub state: StepState,
     pub sha: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rules: Option<Rules>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -279,13 +282,90 @@ pub struct PromptOption {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "GitWire")]
 pub struct Git {
     pub upstream: String,
     pub ahead: u32,
     pub behind: u32,
     pub uncommitted: u32,
-    pub approved: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rules: Option<Rules>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GitWire {
+    upstream: String,
+    ahead: u32,
+    behind: u32,
+    uncommitted: u32,
+    #[serde(default)]
+    rules: Option<Rules>,
+    #[serde(default, rename = "approved")]
+    _approved: Option<bool>,
+}
+
+impl From<GitWire> for Git {
+    fn from(wire: GitWire) -> Git {
+        Git { upstream: wire.upstream, ahead: wire.ahead, behind: wire.behind, uncommitted: wire.uncommitted, rules: wire.rules }
+    }
+}
+
+pub const MAX_RULE_NAMES: usize = 32;
+pub const MAX_RULE_NAME_CHARS: usize = 200;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Rules {
+    pub state: RulesState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breaks: Option<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub names: Vec<String>,
+    #[serde(default, rename = "override", skip_serializing_if = "Option::is_none")]
+    pub overridden: Option<RulesOverride>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RulesState {
+    Checking,
+    Ok,
+    Breaks,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RulesOverride {
+    pub by: OverrideBy,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum OverrideBy {
+    User,
+    Lead,
+}
+
+impl Rules {
+    pub fn check(&self) -> Result<(), &'static str> {
+        match self.state {
+            RulesState::Breaks => check(self.breaks.is_some_and(|breaks| breaks >= 1), "a rules check that breaks counts at least one rule")?,
+            _ => check(self.breaks.is_none() && self.names.is_empty(), "only a rules check that breaks counts or names rules")?,
+        }
+        check(self.names.len() <= MAX_RULE_NAMES && self.names.len() as u64 <= u64::from(self.breaks.unwrap_or(0)), "more rule names than broken rules")?;
+        check(self.names.iter().all(|name| is_line(name, MAX_RULE_NAME_CHARS)), "a rule name is empty, too long or not one line")?;
+        check(self.overridden.is_none() || self.state != RulesState::Ok, "a rules check that passed has nothing to override")
+    }
+}
+
+impl Board {
+    pub fn check(&self) -> Result<(), &'static str> {
+        self.items.iter().try_for_each(|item| {
+            item.git.iter().filter_map(|git| git.rules.as_ref()).try_for_each(Rules::check)?;
+            item.steps.iter().flat_map(|steps| &steps.items).filter_map(|step| step.rules.as_ref()).try_for_each(Rules::check)
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -403,6 +483,51 @@ mod tests {
         let mut unknown = stepped;
         unknown["steps"]["items"][0]["state"] = serde_json::json!("pushed");
         assert!(serde_json::from_value::<Item>(unknown).is_err());
+    }
+
+    #[test]
+    fn a_task_and_each_step_carry_where_the_rules_check_stands_and_an_approved_flag_is_ignored() {
+        let mut ruled = plain();
+        ruled["git"] = serde_json::json!({ "upstream": "main", "ahead": 1, "behind": 0, "uncommitted": 0, "rules": { "state": "breaks", "breaks": 2, "names": ["Every commit says why"], "override": { "by": "lead" } } });
+        ruled["steps"] = serde_json::json!({ "pushed": 0, "items": [{ "number": 1, "title": "Docs", "state": "committed", "sha": "1111111aaaa", "rules": { "state": "checking" } }] });
+        let item: Item = serde_json::from_value(ruled.clone()).unwrap();
+        let rules = item.git.as_ref().unwrap().rules.as_ref().unwrap();
+        assert_eq!((rules.state, rules.breaks, rules.overridden.as_ref().map(|by| by.by)), (RulesState::Breaks, Some(2), Some(OverrideBy::Lead)));
+        assert_eq!(item.steps.as_ref().unwrap().items[0].rules.as_ref().unwrap().state, RulesState::Checking);
+        assert_eq!(serde_json::to_value(&item).unwrap(), ruled);
+        let mut unchecked = ruled.clone();
+        unchecked["git"]["rules"] = serde_json::Value::Null;
+        let item: Item = serde_json::from_value(unchecked).unwrap();
+        assert!(serde_json::to_value(&item).unwrap()["git"].get("rules").is_none(), "a task without a rules check leaves the field out");
+        let mut approved = ruled.clone();
+        approved["git"]["approved"] = serde_json::json!(true);
+        let item: Item = serde_json::from_value(approved).unwrap();
+        assert_eq!(serde_json::to_value(&item).unwrap(), ruled, "a machine not yet updated still sends approved, which is read and dropped");
+        let mut unknown = ruled;
+        unknown["git"]["rules_ok"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<Item>(unknown).is_err());
+    }
+
+    #[test]
+    fn a_rules_check_counts_what_it_breaks_and_only_a_check_that_did_not_pass_is_overridden() {
+        let rules = |state, breaks: Option<u32>, names: &[&str], overridden: Option<OverrideBy>| Rules {
+            state,
+            breaks,
+            names: names.iter().map(|name| name.to_string()).collect(),
+            overridden: overridden.map(|by| RulesOverride { by }),
+        };
+        assert_eq!(rules(RulesState::Checking, None, &[], None).check(), Ok(()));
+        assert_eq!(rules(RulesState::Ok, None, &[], None).check(), Ok(()));
+        assert_eq!(rules(RulesState::Breaks, Some(2), &["Every commit says why"], Some(OverrideBy::User)).check(), Ok(()));
+        assert_eq!(rules(RulesState::Checking, None, &[], Some(OverrideBy::Lead)).check(), Ok(()));
+        assert!(rules(RulesState::Breaks, None, &[], None).check().is_err());
+        assert!(rules(RulesState::Breaks, Some(0), &[], None).check().is_err());
+        assert!(rules(RulesState::Ok, Some(1), &[], None).check().is_err());
+        assert!(rules(RulesState::Checking, None, &["Every commit says why"], None).check().is_err());
+        assert!(rules(RulesState::Breaks, Some(1), &["One", "Two"], None).check().is_err());
+        assert!(rules(RulesState::Breaks, Some(1), &["One\nTwo"], None).check().is_err());
+        assert!(rules(RulesState::Breaks, Some(1), &[&"x".repeat(MAX_RULE_NAME_CHARS + 1)], None).check().is_err());
+        assert!(rules(RulesState::Ok, None, &[], Some(OverrideBy::Lead)).check().is_err());
     }
 
     #[test]

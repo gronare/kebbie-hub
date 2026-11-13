@@ -18,7 +18,6 @@
       "follows_main": false,
       "git": {
         "ahead": 2,
-        "approved": false,
         "behind": 1,
         "uncommitted": 0,
         "upstream": "main"

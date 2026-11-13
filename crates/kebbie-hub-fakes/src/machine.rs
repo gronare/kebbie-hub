@@ -14,7 +14,7 @@ use kebbie_hub_protocol::{
     Idea, ItemAnswer, ItemEdit, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
-    ReviewOffer, ReviewRead, Side, StepState,
+    PushApproval, ReviewOffer, ReviewRead, Side, StepState,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -931,6 +931,10 @@ impl MachineState {
                     done(format!("Answered {}'s question.", answer.address)),
                 )
             }
+            Payload::Push(PushApproval { address, head, through_step: Some(step), .. }) => (
+                format!("push {address} through step {step} at {head}"),
+                done(format!("Pushed {address} through step {step} at {head}.")),
+            ),
             Payload::Push(push) => {
                 let head = self
                     .board

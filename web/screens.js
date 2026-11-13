@@ -155,14 +155,27 @@ export function reviewLines(item) {
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
-export function stepLines(item) {
+export const cardAge = (card) => (card.current ? "" : `<div class="meta warn">Written before the last commit; the code changed since.</div>`);
+
+const OVERRIDDEN_BY = { user: "you", lead: "the lead" };
+
+export function rulesLines(rules, { expandable = false } = {}) {
+  if (!rules || rules.state === "ok") return "";
+  const count = `breaks ${esc(rules.breaks)} project ${rules.breaks === 1 ? "rule" : "rules"}`;
+  const names = expandable && rules.names?.length ? `<details class="rules-names"><summary class="warn">${count}</summary><ul>${rules.names.map((name) => `<li>${esc(name)}</li>`).join("")}</ul></details>` : `<div class="warn">${count}</div>`;
+  const broken = rules.state === "breaks" ? names : "";
+  const by = OVERRIDDEN_BY[rules.override?.by];
+  const said = by ? `<div class="meta">pushed past the rules check by ${by}</div>` : rules.state === "checking" ? `<div class="meta">checking project rules</div>` : "";
+  return `<div class="rules">${broken}${said}</div>`;
+}
+
+export function stepLines(item, { expandable = false } = {}) {
   const steps = item.steps;
   if (!steps || (steps.pushed === 0 && steps.items.length === 0)) return "";
   const pushed = steps.pushed ? `<div class="pushed">↑ ${esc(steps.pushed)} pushed</div>` : "";
-  const rules = item.git?.approved ? " · rules ✓" : "";
   const lines = steps.items.map((step) => {
-    const label = step.state === "committed" ? `committed${rules}` : STEP_LABELS[step.state];
-    return `<div class="step s-${esc(step.state)}"><span class="what"><span class="mark">${STEP_MARKS[step.state]}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>`;
+    const label = STEP_LABELS[step.state];
+    return `<div class="step s-${esc(step.state)}"><span class="what"><span class="mark">${STEP_MARKS[step.state]}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>${rulesLines(step.rules, { expandable })}`;
   });
   const optional = acceptRequired(item) || steps.items.length === 0 ? "" : `<div class="meta">accepting each step is optional: push takes what is committed</div>`;
   return `<div class="steps">${pushed}${lines.join("")}${optional}</div>`;
@@ -385,13 +398,23 @@ function switchRow({ id, name, meta, on = false, disabled: off = false, field = 
   return `<label class="row switch-row"><div><div class="name" id="${id}-name">${esc(name)}</div><div class="meta" id="${id}-state">${esc(meta)}</div></div><input type="checkbox" role="switch" class="switch" name="${field}"${valued} aria-labelledby="${id}-name" aria-describedby="${id}-state" aria-checked="${on ? "true" : "false"}"${on ? " checked" : ""}${off ? " disabled" : ""}></label>`;
 }
 
-export function notifySection({ phase, text, categories = [], failure = null }) {
+export function notifySection({ phase, text, categories = [], failure = null, senders = "" }) {
   const on = phase === "on" || phase === "asking";
+  const from = phase === "on" && senders ? `<div class="meta" id="notify-senders">${esc(senders)}</div>` : "";
   const why = failure ? `<div class="meta warn" id="notify-failure">${esc(failure)}</div>` : "";
-  const main = `<section class="task" id="notify-card">${switchRow({ id: "notify", name: "Notifications", meta: text, on, disabled: !switchable(phase) })}${why}</section>`;
+  const main = `<section class="task" id="notify-card">${switchRow({ id: "notify", name: "Notifications", meta: text, on, disabled: !switchable(phase) })}${from}${why}</section>`;
   if (phase !== "on") return main;
   const cards = CATEGORY_GROUPS.map((group) => `<h2 class="group g-muted">${esc(group.title)}</h2><section class="task">${group.rows.map((row) => switchRow({ id: row.id, name: row.name, meta: row.meta, on: categories.includes(row.category), field: "notice-category", value: row.category })).join("")}</section>`).join("");
   return main + cards;
+}
+
+export function notifyRow({ phase }) {
+  const on = phase === "on" || phase === "asking";
+  return `<a class="task row-link" href="#notifications" data-action="notifications"><span class="name">Notifications</span><span class="meta${on ? " ok" : ""}">${on ? "On" : "Off"}</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>`;
+}
+
+export function notificationsScreen({ notify, notice = null }) {
+  return `${brand}<h1 class="title">Notifications</h1>${notifySection(notify)}${warn(notice)}<a class="btn back-link" href="/account" data-action="notifications-back">Back to Account</a><a class="back-btn round" href="/account" data-action="notifications-back" aria-label="Back">${icon("back")}</a>`;
 }
 
 export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null, devices = null, notify = null, now = Date.now() / 1000 }) {
@@ -400,7 +423,7 @@ export function accountScreen({ me, github, email = false, codes = false, changi
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifySection(notify) : "")) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifyRow(notify) : "")) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {

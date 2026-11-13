@@ -8,7 +8,7 @@ use kebbie_hub::RateLimit;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::MachineState;
 use kebbie_hub_protocol::{
-    AcceptStep, CommandResult, Item, Outcome, Payload, REVIEW_MEDIA_TYPE, Reason, Review, ReviewComment, ReviewComments, ReviewOpen,
+    AcceptStep, CommandResult, Item, Outcome, Payload, PushApproval, REVIEW_MEDIA_TYPE, Reason, Review, ReviewComment, ReviewComments, ReviewOpen,
     ReviewRead, Side, StepState, open_blob,
 };
 use serde::Deserialize;
@@ -86,6 +86,9 @@ async fn a_review_is_fetched_on_demand_sealed_and_comments_reads_and_an_accept_r
     let item = board.items.iter().find(|item| item.address == review.address).unwrap();
     assert_eq!(item.steps.as_ref().unwrap().items[0].state, StepState::Accepted);
     assert_eq!(sent(&mut person, &mut machine, accept()).await.outcome, Outcome::Refused { reason: Reason::AlreadySettled });
+
+    let push = Payload::Push(PushApproval { address: review.address.clone(), head: step.sha.clone(), card_sha: None, through_step: Some(step.number) });
+    assert_eq!(sent(&mut person, &mut machine, push).await.text, format!("Pushed retry-push@kebbie through step 1 at {}.", step.sha), "a push through a step reaches the machine with its step");
 }
 
 #[tokio::test]

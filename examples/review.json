@@ -18,7 +18,7 @@
       "ahead": 1,
       "behind": 0,
       "uncommitted": 0,
-      "approved": false
+      "rules": { "state": "ok" }
     },
     "head": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
     "verdict": null,
@@ -37,7 +37,8 @@
           "number": 1,
           "title": "Retry the push when the runner drops",
           "state": "committed",
-          "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e"
+          "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
+          "rules": { "state": "breaks", "breaks": 1, "names": ["A commit says why in its body"] }
         },
         {
           "number": 2,
@@ -59,7 +60,7 @@
       "title": "Retry the push when the runner drops",
       "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
       "subject": "Retry a CI push when the runner drops",
-      "body": "A run that GitHub marks failed because its runner stopped answering never ran the code to the end. The push now waits for a runner and reruns it, twice at most. A third loss, or any failed step, stops the task as before. Each retry gets a line in the task's note."
+      "body": "A run that GitHub marks failed because its runner stopped answering\nnever ran the code to the end. The push now waits for a runner and\nreruns it, twice at most.\n\n- A third loss, or any failed step, stops the task as before.\n- Each retry gets a line in the task's note, so the board shows\n  why the push took longer."
     },
     "guide": [
       {

@@ -31,8 +31,8 @@ pub use backlog::{
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
     Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
-    Later, LaterState, NextPart, NextRow, Prompt, PromptOption, PushPermission, Question,
-    QuestionOption, Recover, Report, RoutineSummary, SecondOpinion, Step, StepState, Steps,
+    Later, LaterState, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextPart, NextRow, OverrideBy, Prompt, PromptOption, PushPermission,
+    Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Step, StepState, Steps,
     Verdict, VerdictOutcome,
 };
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};

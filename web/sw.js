@@ -3,8 +3,8 @@ import { account } from "./hub.js";
 import { fromNetwork } from "./shell.js";
 import { del, get, put } from "./store.js";
 
-const SHELL = "kebbie-shell-v16";
-const FILES = ["/", "/app.css", "/app.js", "/backlog.js", "/blobs.js", "/board.js", "/connect.js", "/decide.js", "/device.js", "/device-name.js", "/markdown.js", "/pages.js", "/screens.js", "/sections.js", "/pose.js", "/scroll.js", "/shell.js", "/hub.js", "/notify.js", "/store.js", "/passkey.js", "/review.js", "/signin.js", "/email.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
+const SHELL = "kebbie-shell-v17";
+const FILES = ["/", "/app.css", "/app.js", "/backlog.js", "/blobs.js", "/board.js", "/commit.js", "/connect.js", "/decide.js", "/device.js", "/device-name.js", "/markdown.js", "/pages.js", "/screens.js", "/sections.js", "/pose.js", "/scroll.js", "/shell.js", "/hub.js", "/notify.js", "/store.js", "/passkey.js", "/review.js", "/signin.js", "/email.js", "/unlock.js", "/js/protocol.js", "/js/hpke.js", "/fonts/bricolage-grotesque-latin-opsz.woff2", "/fonts/ibm-plex-sans-latin-400.woff2", "/fonts/ibm-plex-sans-latin-500.woff2", "/fonts/ibm-plex-sans-latin-600.woff2", "/fonts/ibm-plex-mono-latin-500.woff2", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));

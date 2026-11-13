@@ -20,8 +20,8 @@ use crate::backlog::{
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
 use crate::board::{
     Agent, BlobRef, AgentStatus, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
-    NextRow, Prompt, PromptOption, Question, QuestionOption, Report, RoutineSummary,
-    SecondOpinion, Step, StepState, Steps, Verdict, VerdictOutcome,
+    MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Prompt, PromptOption, Question, QuestionOption, Report, RoutineSummary,
+    Rules, RulesState, SecondOpinion, Step, StepState, Steps, Verdict, VerdictOutcome,
 };
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 use crate::crypto::{
@@ -253,7 +253,7 @@ fn board() -> Payload {
                 ahead: 2,
                 behind: 1,
                 uncommitted: 0,
-                approved: false,
+                rules: None,
             }),
             head: Some(HEAD.into()),
             verdict: None,
@@ -282,6 +282,10 @@ fn board() -> Payload {
     })
 }
 
+fn rules(state: RulesState) -> Rules {
+    Rules { state, breaks: None, names: Vec::new(), overridden: None }
+}
+
 fn stepped_board() -> Payload {
     let Payload::Board(mut board) = board() else {
         unreachable!()
@@ -291,6 +295,7 @@ fn stepped_board() -> Payload {
         title: title.into(),
         state,
         sha: sha.map(Into::into),
+        rules: (state == StepState::Committed).then(|| rules(RulesState::Ok)),
     };
     board.items = vec![Item {
         address: "payments@api".into(),
@@ -311,7 +316,7 @@ fn stepped_board() -> Payload {
             ahead: 2,
             behind: 0,
             uncommitted: 0,
-            approved: true,
+            rules: Some(rules(RulesState::Checking)),
         }),
         head: Some(HEAD.into()),
         verdict: None,
@@ -784,6 +789,16 @@ fn push(head: &str) -> Payload {
         address: "refunds@shop".into(),
         head: head.into(),
         card_sha: None,
+        through_step: None,
+    })
+}
+
+fn push_through(step: u32) -> Payload {
+    Payload::Push(PushApproval {
+        address: REVIEWED.into(),
+        head: HEAD.into(),
+        card_sha: None,
+        through_step: Some(step),
     })
 }
 
@@ -2132,6 +2147,11 @@ fn authorize_json(parties: &Parties) -> Value {
             applies(push(HEAD)),
         ),
         case(
+            "device-pushes-a-task-through-a-step",
+            from_phone("authorize/push-through-step", Kind::Push, &push_through(2)),
+            applies(push_through(2)),
+        ),
+        case(
             "device-runs-a-routine",
             from_phone("authorize/routine", Kind::Routine, &routine),
             applies(routine.clone()),
@@ -2724,6 +2744,7 @@ fn backlog_json() -> Value {
 
 fn review_json() -> Value {
     let (blob, ciphertext) = review_blob();
+
     let comment = json!({ "path": "src/orders.rs", "line": 41, "side": "old", "sha": HEAD, "text": "Why the cast?" });
     let comments = |list: Value| json!({ "type": "review-comments", "address": REVIEWED, "step": 2, "comments": list });
     let with = |key: &str, value: Value| {
@@ -2756,6 +2777,9 @@ fn review_json() -> Value {
         ("an accept of a short sha", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "sha": "9f3c2a1" }), false),
         ("a review asked for", serde_json::to_value(review_open()).unwrap(), true),
         ("a review asked for a task without its repo", json!({ "type": "review-open", "address": "payments" }), false),
+        ("a push through a step", serde_json::to_value(push_through(2)).unwrap(), true),
+        ("a push through step zero", json!({ "type": "push", "address": REVIEWED, "head": HEAD, "card_sha": null, "through_step": 0 }), false),
+        ("a push through a step at a short sha", json!({ "type": "push", "address": REVIEWED, "head": "9f3c2a1", "card_sha": null, "through_step": 2 }), false),
     ];
     let payloads: Vec<Value> = payloads
         .into_iter()
@@ -2765,6 +2789,40 @@ fn review_json() -> Value {
             json!({ "name": name, "payload": payload, "valid": valid })
         })
         .collect();
+    let stepped = serde_json::to_value(stepped_board()).unwrap();
+    let rules = [
+        ("a check still running", json!({ "state": "checking" }), true),
+        ("a check that passed", json!({ "state": "ok" }), true),
+        ("two rules broken, one named", json!({ "state": "breaks", "breaks": 2, "names": ["Every commit says why"] }), true),
+        ("one rule broken and the lead pushed past it", json!({ "state": "breaks", "breaks": 1, "override": { "by": "lead" } }), true),
+        ("you pushed past a check still running", json!({ "state": "checking", "override": { "by": "user" } }), true),
+        ("rules broken without a count", json!({ "state": "breaks" }), false),
+        ("zero rules broken", json!({ "state": "breaks", "breaks": 0 }), false),
+        ("a passed check that counts broken rules", json!({ "state": "ok", "breaks": 1 }), false),
+        ("more names than broken rules", json!({ "state": "breaks", "breaks": 1, "names": ["One", "Two"] }), false),
+        ("too many rule names", json!({ "state": "breaks", "breaks": 40, "names": (0..=MAX_RULE_NAMES).map(|n| format!("Rule {n}")).collect::<Vec<_>>() }), false),
+        ("a rule name past its length", json!({ "state": "breaks", "breaks": 1, "names": ["x".repeat(MAX_RULE_NAME_CHARS + 1)] }), false),
+        ("a rule name over two lines", json!({ "state": "breaks", "breaks": 1, "names": ["Every commit\nsays why"] }), false),
+        ("a passed rules check overridden", json!({ "state": "ok", "override": { "by": "lead" } }), false),
+        ("an override by someone else", json!({ "state": "breaks", "breaks": 1, "override": { "by": "ci" } }), false),
+        ("a rules state kebbie does not know", json!({ "state": "approved" }), false),
+    ];
+    let rules: Vec<Value> = rules
+        .into_iter()
+        .map(|(name, rules, valid)| {
+            for pointer in ["/items/0/git/rules", "/items/0/steps/items/0/rules"] {
+                let mut board = stepped.clone();
+                *board.pointer_mut(pointer).unwrap() = rules.clone();
+                let parsed = serde_json::from_value::<Payload>(board);
+                assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name} at {pointer}");
+            }
+            json!({ "name": name, "rules": rules, "valid": valid })
+        })
+        .collect();
+    let mut legacy = serde_json::to_value(board()).unwrap();
+    legacy["items"][0]["git"]["approved"] = json!(true);
+    let parsed: Payload = serde_json::from_value(legacy.clone()).unwrap();
+    assert_eq!((parsed.validate(), parsed), (Ok(()), board()), "a board that still says approved opens as one without a rules check");
     let body = serde_json::to_value(review()).unwrap();
     let change = |pointer: &str, value: Value| {
         let mut changed = body.clone();
@@ -2795,10 +2853,14 @@ fn review_json() -> Value {
         "max_comments": MAX_REVIEW_COMMENTS,
         "max_comment_chars": MAX_REVIEW_COMMENT_CHARS,
         "max_comments_bytes": MAX_REVIEW_COMMENTS_BYTES,
+        "max_rule_names": MAX_RULE_NAMES,
+        "max_rule_name_chars": MAX_RULE_NAME_CHARS,
         "review": review(),
         "blob": blob,
         "ciphertext": b64(&ciphertext),
         "payloads": payloads,
+        "rules": rules,
+        "board_from_a_machine_not_yet_updated": legacy,
         "bodies": bodies,
     })
 }

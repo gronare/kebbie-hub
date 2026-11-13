@@ -5,6 +5,84 @@
     "key": "o6_c4Hb4UCGFMZ_cTbSARU7sg-WFe9PWrSuI_r7Bz4s",
     "media_type": "application/vnd.kebbie.review+json"
   },
+  "board_from_a_machine_not_yet_updated": {
+    "away_since": null,
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "approved": true,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": null,
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
   "bodies": [
     {
       "body": {
@@ -900,6 +978,8 @@
   "max_comment_chars": 2000,
   "max_comments": 50,
   "max_comments_bytes": 24576,
+  "max_rule_name_chars": 200,
+  "max_rule_names": 32,
   "media_type": "application/vnd.kebbie.review+json",
   "payloads": [
     {
@@ -1639,6 +1719,39 @@
         "type": "review-open"
       },
       "valid": false
+    },
+    {
+      "name": "a push through a step",
+      "payload": {
+        "address": "payments@api",
+        "card_sha": null,
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "through_step": 2,
+        "type": "push"
+      },
+      "valid": true
+    },
+    {
+      "name": "a push through step zero",
+      "payload": {
+        "address": "payments@api",
+        "card_sha": null,
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "through_step": 0,
+        "type": "push"
+      },
+      "valid": false
+    },
+    {
+      "name": "a push through a step at a short sha",
+      "payload": {
+        "address": "payments@api",
+        "card_sha": null,
+        "head": "9f3c2a1",
+        "through_step": 2,
+        "type": "push"
+      },
+      "valid": false
     }
   ],
   "review": {
@@ -1747,5 +1860,181 @@
       "subject": "Charge through a PaymentGateway",
       "title": "Charge through a PaymentGateway"
     }
-  }
+  },
+  "rules": [
+    {
+      "name": "a check still running",
+      "rules": {
+        "state": "checking"
+      },
+      "valid": true
+    },
+    {
+      "name": "a check that passed",
+      "rules": {
+        "state": "ok"
+      },
+      "valid": true
+    },
+    {
+      "name": "two rules broken, one named",
+      "rules": {
+        "breaks": 2,
+        "names": [
+          "Every commit says why"
+        ],
+        "state": "breaks"
+      },
+      "valid": true
+    },
+    {
+      "name": "one rule broken and the lead pushed past it",
+      "rules": {
+        "breaks": 1,
+        "override": {
+          "by": "lead"
+        },
+        "state": "breaks"
+      },
+      "valid": true
+    },
+    {
+      "name": "you pushed past a check still running",
+      "rules": {
+        "override": {
+          "by": "user"
+        },
+        "state": "checking"
+      },
+      "valid": true
+    },
+    {
+      "name": "rules broken without a count",
+      "rules": {
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "zero rules broken",
+      "rules": {
+        "breaks": 0,
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "a passed check that counts broken rules",
+      "rules": {
+        "breaks": 1,
+        "state": "ok"
+      },
+      "valid": false
+    },
+    {
+      "name": "more names than broken rules",
+      "rules": {
+        "breaks": 1,
+        "names": [
+          "One",
+          "Two"
+        ],
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "too many rule names",
+      "rules": {
+        "breaks": 40,
+        "names": [
+          "Rule 0",
+          "Rule 1",
+          "Rule 2",
+          "Rule 3",
+          "Rule 4",
+          "Rule 5",
+          "Rule 6",
+          "Rule 7",
+          "Rule 8",
+          "Rule 9",
+          "Rule 10",
+          "Rule 11",
+          "Rule 12",
+          "Rule 13",
+          "Rule 14",
+          "Rule 15",
+          "Rule 16",
+          "Rule 17",
+          "Rule 18",
+          "Rule 19",
+          "Rule 20",
+          "Rule 21",
+          "Rule 22",
+          "Rule 23",
+          "Rule 24",
+          "Rule 25",
+          "Rule 26",
+          "Rule 27",
+          "Rule 28",
+          "Rule 29",
+          "Rule 30",
+          "Rule 31",
+          "Rule 32"
+        ],
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "a rule name past its length",
+      "rules": {
+        "breaks": 1,
+        "names": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ],
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "a rule name over two lines",
+      "rules": {
+        "breaks": 1,
+        "names": [
+          "Every commit\nsays why"
+        ],
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "a passed rules check overridden",
+      "rules": {
+        "override": {
+          "by": "lead"
+        },
+        "state": "ok"
+      },
+      "valid": false
+    },
+    {
+      "name": "an override by someone else",
+      "rules": {
+        "breaks": 1,
+        "override": {
+          "by": "ci"
+        },
+        "state": "breaks"
+      },
+      "valid": false
+    },
+    {
+      "name": "a rules state kebbie does not know",
+      "rules": {
+        "state": "approved"
+      },
+      "valid": false
+    }
+  ]
 }

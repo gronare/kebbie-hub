@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, checkReview, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -679,6 +679,48 @@ test("review commands hold Rust's limits and lifetimes, and each payload passes 
     const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
     assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
   }
+});
+
+test("a task and each step carry a rules check that passes or fails as Rust's validation says, and an approved flag from an older machine is ignored", () => {
+  const review = load("review.json");
+  assert.deepEqual([review.max_rule_names, review.max_rule_name_chars], [MAX_RULE_NAMES, MAX_RULE_NAME_CHARS]);
+  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account").expect.payload;
+  checkPayload(stepped);
+  assert.deepEqual([stepped.items[0].git.rules, stepped.items[0].steps.items[0].rules], [{ state: "checking" }, { state: "ok" }]);
+  const withRules = (rules, onStep) => {
+    const board = structuredClone(stepped);
+    if (onStep) board.items[0].steps.items[0].rules = rules;
+    else board.items[0].git.rules = rules;
+    return board;
+  };
+  const passes = (board) => {
+    try {
+      checkPayload(board);
+      return true;
+    } catch (error) {
+      if (error.code !== "malformed") throw error;
+      return false;
+    }
+  };
+  assert.ok(review.rules.length > 0);
+  for (const { name, rules, valid } of review.rules) for (const onStep of [false, true]) assert.equal(passes(withRules(rules, onStep)), valid, `${name}${onStep ? " on a step" : " on the task"}`);
+  const legacy = review.board_from_a_machine_not_yet_updated;
+  assert.equal(legacy.items[0].git.approved, true);
+  assert.equal(legacy.items[0].git.rules, undefined);
+  assert.equal(passes(legacy), true, "a board from a machine not yet updated still opens");
+  assert.equal(passes({ ...legacy, items: [{ ...legacy.items[0], git: { ...legacy.items[0].git, approved: "yes" } }] }), false);
+});
+
+test("a push through a step names the step, counted from one", () => {
+  const review = load("review.json");
+  const through = review.payloads.find((vector) => vector.name === "a push through a step").payload;
+  assert.equal(through.through_step, 2);
+  checkPayload(through);
+  assert.throws(() => checkPayload({ ...through, through_step: 0 }), (error) => error.code === "malformed");
+  assert.throws(() => checkPayload({ ...through, through_step: "2" }), (error) => error.code === "malformed");
+  const applied = load("authorize.json").cases.find((vector) => vector.name === "device-pushes-a-task-through-a-step");
+  assert.ok(applied.accepts.includes("push"));
+  assert.equal(applied.expect.payload.through_step, 2);
 });
 
 test("a review opens from the blob its result names, checked as Rust checks it, and only a result that is done names a blob", async () => {

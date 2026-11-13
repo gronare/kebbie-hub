@@ -7,10 +7,10 @@ import { put, get, del } from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 import { fromB64, toB64 } from "../js/protocol.js";
 import { decisionBlock, standingOn } from "./decide.js";
-import { categoriesKey, deviceWord, failureLine, keptCategories, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
+import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
+import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/account"];
@@ -76,7 +76,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, kept: null, deciding: false };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, notifying: false, kept: null, deciding: false };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -171,7 +171,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
     const viewing = state.viewing && state.devices?.find((device) => device.id === state.viewing);
     if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, older: state.older !== null, removing: state.removing, busy: state.busy, notice: state.notice, decisions: decisionsFor(viewing), now: nowSeconds() });
-    const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, failure: failureLine(state.notify.failure, nowSeconds()), text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word, machines: state.opened.map((machine) => machine.name) }) } : null;
+    const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, failure: failureLine(state.notify.failure, nowSeconds()), text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word }), senders: namesSendHere(state.opened.map((machine) => machine.name)).trim() } : null;
+    if (notify && state.notifying) return notificationsScreen({ notify, notice: state.notice });
     return accountScreen({ notify, me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
   }
 
@@ -717,6 +718,13 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
+    if (action === "notifications" || action === "notifications-back") {
+      event.preventDefault();
+      Object.assign(state, { notifying: action === "notifications", notice: null });
+      history.replaceState(null, "", action === "notifications" ? "#notifications" : location.pathname + location.search);
+      scrollTo(0, 0);
+      return draw();
+    }
     if (action === "device" || action === "devices-back") {
       event.preventDefault();
       if (action === "device") return openDevice(target.dataset.id);
@@ -816,6 +824,10 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     }
     await loadView();
     draw();
+    if (path === "/account" && location.hash === "#notifications" && state.notify) {
+      state.notifying = true;
+      draw();
+    }
     const linked = path === "/account" && location.hash.startsWith("#device/") ? decodeURIComponent(location.hash.slice("#device/".length)) : null;
     if (linked && state.devices?.some((device) => device.id === linked)) await openDevice(linked);
   })();

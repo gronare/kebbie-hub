@@ -203,6 +203,13 @@ const shape = (fields) => (value) =>
 const optionalField = (check) => Object.assign(maybe(check), { optional: true });
 
 const blobRef = shape({ id, key: string, media_type: string, bytes: u64v });
+export const MAX_RULE_NAMES = 32;
+export const MAX_RULE_NAME_CHARS = 200;
+const rulesCheck = (rules) =>
+  shape({ state: oneOf("checking", "ok", "breaks"), breaks: optionalField(u32v), names: optionalField(list(string)), override: optionalField(shape({ by: oneOf("user", "lead") })) })(rules) &&
+  (rules.state === "breaks" ? !absent(rules.breaks) && rules.breaks >= 1 : absent(rules.breaks) && absent(rules.names)) &&
+  (absent(rules.names) || (rules.names.length <= MAX_RULE_NAMES && rules.names.length <= rules.breaks && rules.names.every((name) => isLine(MAX_RULE_NAME_CHARS)(name)))) &&
+  (absent(rules.override) || rules.state !== "ok");
 const item = shape({
   address: string,
   group: oneOf("NEEDS YOU", "WORKING", "TO REVIEW", "READY TO PUSH", "CI RUNNING", "WAITING FOR WORK"),
@@ -224,7 +231,7 @@ const item = shape({
     }),
   ),
   prompt: optionalField(shape({ id: string, question: string, options: list(shape({ label: string, takes_text: bool, key: optionalField(string) })) })),
-  git: optionalField(shape({ upstream: string, ahead: u32v, behind: u32v, uncommitted: u32v, approved: bool })),
+  git: optionalField(shape({ upstream: string, ahead: u32v, behind: u32v, uncommitted: u32v, rules: optionalField(rulesCheck), approved: optionalField(bool) })),
   head: optionalField(string),
   verdict: optionalField(shape({ verdict: optionalField(oneOf("ok", "changes")), findings: optionalField(u32v), sha: optionalField(string), stale: bool, running: bool, held: optionalField(bool) })),
   push_permission: optionalField(oneOf("task", "repo")),
@@ -234,7 +241,7 @@ const item = shape({
   recover: optionalField(shape({ note: string })),
   routine: optionalField(string),
   card: optionalField(shape({ sha: string, current: bool, blob: blobRef })),
-  steps: optionalField(shape({ pushed: u32v, items: list(shape({ number: u32v, title: string, state: oneOf("planned", "in-progress", "committed", "accepted"), sha: optionalField(string) })), required: optionalField(bool) })),
+  steps: optionalField(shape({ pushed: u32v, items: list(shape({ number: u32v, title: string, state: oneOf("planned", "in-progress", "committed", "accepted"), sha: optionalField(string), rules: optionalField(rulesCheck) })), required: optionalField(bool) })),
   title: optionalField(string),
   profile: optionalField(string),
   recipe: optionalField(string),
@@ -390,7 +397,7 @@ const PAYLOADS = {
     (absent(value.blob) || value.outcome === "done") &&
     (value.reason === "questions-open") === (!absent(value.blocking) && value.blocking > 0),
   answer: typed({ address: string, question: string, choice: optionalField(u8), comment: string }),
-  push: typed({ address: string, head: string, card_sha: optionalField(string) }),
+  push: typed({ address: isAddress, head: isFullSha, card_sha: optionalField(isFullSha), through_step: optionalField(stepNumber) }),
   start: typed({ repo: string, name: string, prompt: string }),
   routine: typed({ id: string }),
   "prompt-answer": typed({ address: string, prompt: string, key: string }),

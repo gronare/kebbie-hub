@@ -1,7 +1,8 @@
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENTS_BYTES } from "../js/protocol.js";
 import { failedLine } from "./blobs.js";
-import { APPROVAL_STATES, approvalStatus, block, clock, from, refusal, settled, takes, until, viewOnlyBlock } from "./decide.js";
-import { esc, lastSeenText, STEP_MARKS } from "./screens.js";
+import { commitBody } from "./commit.js";
+import { APPROVAL_STATES, approvalStatus, block, clock, from, pushBlock, pushReady, refusal, settled, stepPushBlock, takes, until, viewOnlyBlock } from "./decide.js";
+import { esc, lastSeenText, rulesLines, STEP_MARKS } from "./screens.js";
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 const short = (sha) => (sha ?? "").slice(0, 7);
@@ -50,7 +51,7 @@ export function reviewEntry(found) {
   if (!offered(found)) return "";
   const { step, files } = found.item.review;
   const what = step ? `Review step ${esc(step)}` : "Review";
-  return `<div class="thumb"><a class="btn primary" href="${reviewHref(found.machine, found.item.address)}">${what} · ${plural(files, "file", "files")}</a></div>`;
+  return `<div class="lead-act"><a class="btn primary fit" href="${reviewHref(found.machine, found.item.address)}">${what} · ${plural(files, "file", "files")}</a></div>`;
 }
 
 export const lineTarget = (line) => (line.kind === "del" ? { side: "old", line: line.old } : { side: "new", line: line.new });
@@ -83,7 +84,7 @@ function stepsCard(v) {
   const rows = steps.map((step) => {
     const on = step.number === reviewed ? " rv-on" : "";
     const label = STEP_LABELS[step.state] ?? "";
-    return `<div class="step s-${esc(step.state)} rv-step${on}"><span class="what"><span class="mark">${STEP_MARKS[step.state] ?? ""}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>`;
+    return `<div class="step s-${esc(step.state)} rv-step${on}"><span class="what"><span class="mark">${STEP_MARKS[step.state] ?? ""}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>${rulesLines(step.rules, { expandable: true })}`;
   });
   return `<h3 class="sec">${steps.length === 1 ? "Step" : "Steps"}</h3><section class="task rv-steps steps">${rows.join("")}</section>`;
 }
@@ -97,8 +98,8 @@ function guideCard(review) {
 
 function messageCard(step) {
   if (!step) return "";
-  const body = step.body.trim() ? `<div class="rv-body">${esc(step.body)}</div>` : "";
-  return `<section class="task rv-msg"><div class="head"><span class="name">${esc(step.subject)}</span><span class="mono meta">${esc(short(step.sha))}</span></div>${body}</section>`;
+  const body = step.body.trim() ? `<div class="rv-body">${commitBody(step.body)}</div>` : "";
+  return `<h3 class="sec">Commit</h3><section class="task rv-msg"><div class="head"><b class="name">${esc(step.subject)}</b><span class="mono meta">${esc(short(step.sha))}</span></div>${body}</section>`;
 }
 
 function fileRow(v, file, index) {
@@ -162,6 +163,47 @@ export function acceptArea(v) {
   return status + `<button type="button" class="btn primary" data-action="rv-accept-ask"${busy}>Accept step ${esc(step.number)} · ${esc(short(step.sha))}</button>` + error;
 }
 
+const decideOn = (v, html, step = null) => `<div class="decide" data-machine="${esc(v.machine)}" data-address="${esc(v.address)}"${step === null ? "" : ` data-step="${esc(step)}"`}>${html}</div>`;
+const GONE = ["refused", "expired", "not-approved", "denied"];
+
+function pushArea(v, what, html) {
+  if (v.access !== "ready") return "";
+  if (!takes(v.accepts, "push")) return `<div class="pro">${esc(v.name)} takes pushes only at the machine. Push ${what} in kebbie there.</div>`;
+  return html();
+}
+
+function wholePush(v) {
+  if (!pushReady(v.item)) return "";
+  const shown = v.taskPush;
+  return pushArea(v, "the task", () => decideOn(v, pushBlock({ item: v.item, machineName: v.name, ui: v.pushUi, sent: shown?.sent ?? null, state: shown?.state ?? null, standing: shown?.standing ?? null })));
+}
+
+function laterStep(v, step) {
+  const later = (v.item.steps?.items ?? []).find((one) => one.number > step.number && one.state !== "accepted");
+  if (!later) return "";
+  if (later.state !== "committed") return `<div class="meta">Step ${esc(later.number)} is being built</div>`;
+  const files = v.item.review?.step === later.number ? ` · ${plural(v.item.review.files, "file", "files")}` : "";
+  return `<div class="lead-act"><a class="btn fit" href="${reviewHref(v.machine, v.address)}">Review step ${esc(later.number)}${files}</a></div>`;
+}
+
+export function nextAction(v) {
+  const step = v.review?.step ?? null;
+  const waits = v.sentComments.some((comment) => !GONE.includes(comment.state));
+  const waiting = `<div class="meta">Waiting for Claude's changes</div>`;
+  if (!step) return waits ? waiting : wholePush(v);
+  if ((v.item.steps?.pushed ?? 0) >= step.number && !v.stepPush) return laterStep(v, step);
+  const onBoard = (v.item.steps?.items ?? []).find((one) => one.number === step.number);
+  const justAccepted = v.acceptSent?.state === "done" && onBoard?.state === "committed";
+  const accepted = onBoard?.state === "accepted" || v.acceptSent?.state === "done" || Boolean(v.stepPush);
+  if (!accepted) return waits ? waiting : acceptArea(v);
+  const receipt = justAccepted ? acceptArea(v) : "";
+  const later = (v.item.steps?.items ?? []).some((one) => one.number > step.number && one.state !== "accepted");
+  if (!later && pushReady(v.item) && !v.stepPush) return receipt + wholePush(v);
+  const shown = v.stepPush;
+  const push = pushArea(v, `step ${esc(step.number)}`, () => decideOn(v, stepPushBlock({ step, machineName: v.name, ui: v.pushUi, sent: shown?.sent ?? null, state: shown?.state ?? null, standing: shown?.standing ?? null }), step.number));
+  return receipt + push + laterStep(v, step);
+}
+
 export function staleBlock(v) {
   const { stale } = v.ui;
   if (!stale) return "";
@@ -178,7 +220,7 @@ export function reviewOverview(v, { split, top }) {
   }
   const files = v.review.files.map((file, index) => fileRow(v, file, index)).join("");
   const read = split ? "" : `<a class="btn" href="${diffHref(v.machine, v.address)}">Read the diff · ${plural(v.review.files.length, "file", "files")}</a>`;
-  const end = acceptArea(v);
+  const end = split && readCount(v) === v.review.files.length ? "" : nextAction(v);
   return `<div class="narrow">${head}${staleBlock(v)}${guideCard(v.review)}${stepsCard(v)}${messageCard(v.review.step)}<h3 class="sec">Files · ${readCount(v)} of ${v.review.files.length} read</h3>${files}${read}</div>${end ? `<div class="rv-end">${end}</div>` : ""}`;
 }
 
@@ -242,8 +284,8 @@ export function reviewDiff(v, { inPanel, top }) {
   const which = step ? `Step ${esc(step.number)} · ${esc(short(step.sha))}` : `Since ${esc(v.review.since)}`;
   const facts = `<div class="meta pad">${which} · ${plural(files.length, "file", "files")} · <span class="rv-add">+${add}</span> <span class="rv-del">−${del}</span> · ${readCount(v)} of ${files.length} read</div>`;
   const head = (inPanel ? `${chip(v)}<h2>${esc(title)}</h2>${facts}` : `${top("Diff", chip(v))}${facts}`) + (inPanel ? "" : staleBlock(v));
-  const shared = takes(v.accepts, "review-read") ? " Read marks are shared with herdr and hold until a file changes." : "";
-  const end = `<div class="meta pad rv-endnote">End of ${step ? `step ${esc(step.number)}` : "the changes"}.${shared}</div>`;
+  const next = readCount(v) === files.length ? nextAction(v) : "";
+  const end = `<div class="meta pad rv-endnote">End of ${step ? `step ${esc(step.number)}` : "the changes"}.</div>${next ? `<div class="rv-end">${next}</div>` : ""}`;
   return head + files.map((file, index) => fileSection(v, file, index)).join("") + end;
 }
 

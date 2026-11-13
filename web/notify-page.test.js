@@ -115,6 +115,9 @@ test("the switch asks for permission from the tap itself, subscribes with the hu
   const { root, calls, push } = browserWith();
   const page = startPage(root, { given: await unlocked() });
   await page.started;
+  assert.match(root.innerHTML, /<a class="task row-link" href="#notifications" data-action="notifications"><span class="name">Notifications<\/span><span class="meta">Off<\/span>/);
+  assert.equal(switchText(root.innerHTML), undefined, "Account holds one row; the switch is on its own page");
+  root.click({ action: "notifications" });
   assert.equal(switchText(root.innerHTML), "Off");
   root.change({ name: "notify", checked: true });
   assert.equal(push.asked, 1, "the permission is asked before anything is awaited");
@@ -155,6 +158,7 @@ test("Account moves the browser's subscription to this device when the worker's 
   kept.set("notice-failure", { at, reason: "device-changed", detail: earlier, machine: "mch_01", recipient: earlier, device: "dev_other", name: "MacBook" });
   const page = startPage(root, { given });
   await page.started;
+  root.click({ action: "notifications" });
   const added = calls.find((call) => call.method === "POST" && call.url === "/v1/a/devices");
   const device = added.body.cert.device;
   const moved = calls.find((call) => call.method === "PUT" && call.url === `/v1/a/devices/${device}/push`);
@@ -171,6 +175,7 @@ test("a refusal in iOS greys the switch and says where to turn them on", async (
   const { root, calls } = browserWith({ answer: "denied" });
   const page = startPage(root, { given: await unlocked() });
   await page.started;
+  root.click({ action: "notifications" });
   root.change({ name: "notify", checked: true });
   await until(() => switchText(root.innerHTML)?.startsWith("Turned off"));
   assert.equal(switchText(root.innerHTML), "Turned off for kebbie in iOS. Turn them on in Settings › Notifications › kebbie.");
@@ -183,12 +188,14 @@ test("in Safari outside the Home Screen the row asks you to add kebbie there, an
   const tab = browserWith({ standalone: false });
   const page = startPage(tab.root, { given: await unlocked() });
   await page.started;
+  tab.root.click({ action: "notifications" });
   assert.equal(switchText(tab.root.innerHTML), "Add kebbie to your Home Screen to get notifications. Share, then Add to Home Screen.");
   assert.match(tab.root.innerHTML, /name="notify"[^>]*disabled/);
   page.leave();
   const refused = browserWith({ permission: "denied" });
   const again = startPage(refused.root, { given: await unlocked() });
   await again.started;
+  refused.root.click({ action: "notifications" });
   assert.match(switchText(refused.root.innerHTML), /^Turned off for kebbie in iOS/);
   again.leave();
 });
@@ -245,5 +252,19 @@ test("Approve on a waiting device's page sends a decision signed by this device 
   assert.equal(opened.device.device, self.id);
   assert.deepEqual(opened.payload, { type: "device-decision", device: waiting.id, fingerprint: waiting.fingerprint, approve: true });
   assert.doesNotMatch(root.innerHTML, /data-action="decide-device"/, "no second decision while the first is on its way");
+  page.leave();
+});
+
+test("Notifications opens from its row or its link, and Back returns to Account", async () => {
+  const { root } = browserWith();
+  location.hash = "#notifications";
+  const page = startPage(root, { given: await unlocked() });
+  await page.started;
+  assert.equal(switchText(root.innerHTML), "Off", "a link to #notifications opens the page");
+  root.click({ action: "notifications-back" });
+  assert.match(root.innerHTML, /data-action="notifications"><span class="name">Notifications/);
+  assert.equal(switchText(root.innerHTML), undefined);
+  root.click({ action: "notifications" });
+  assert.match(root.innerHTML, /<h1 class="title">Notifications<\/h1>/);
   page.leave();
 });
