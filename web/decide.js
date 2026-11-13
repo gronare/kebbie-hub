@@ -213,6 +213,8 @@ export const COMMAND_TEXT = {
   "view-only": "View only on this device. Allow changes in Account.",
   "no-device": "This device has no key yet. Turn on Allow changes in Account.",
   "unknown-device": "The hub doesn't know this device. Turn Allow changes off and on in Account.",
+  "device-removed": "This device was removed under Account. Send again to add it as a new device.",
+  "too-many-devices": "Your account holds as many devices as this hub allows. Remove one you no longer use under Account, then send again.",
 };
 
 export const decides = (standing) => standing.state === "waiting" && standing.mine === "approved" && takes(standing.accepts, "device-decision");

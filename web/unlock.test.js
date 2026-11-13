@@ -431,8 +431,10 @@ test("signing out ends the hub session, deletes the kept unlock and the cached b
   const { account, store, local, session } = await unlockedOnce();
   await store.put(LISTING, { listing: { boards: ["sealed"] }, at: 1 });
   const ended = [];
-  await signOut({ logout: async () => void ended.push("logout") }, store);
-  assert.deepEqual(ended, ["logout"]);
+  await store.put("notify", { account: session.identity.key, device: "dev_phone" });
+  const subscription = { unsubscribe: async () => void ended.push("browser unsubscribed") };
+  await signOut({ unsubscribePush: async (device) => void ended.push(`hub forgot ${device}`), logout: async () => void ended.push("logout") }, store, async () => subscription);
+  assert.deepEqual(ended, ["browser unsubscribed", "hub forgot dev_phone", "logout"], "the next account on this browser can take the push endpoint");
   assert.equal(store.values.size, 0);
   assert.equal(await keptUnlock(await account.me(), store, Date.now(), local), null);
   assert.equal(rememberedCredential(local), session.credential);
@@ -444,7 +446,7 @@ test("signing out ends the hub session, deletes the kept unlock and the cached b
 test("signing out while the hub can't be reached still deletes what the device kept", async () => {
   const { store, local, session } = await unlockedOnce();
   await store.put(LISTING, { listing: { boards: ["sealed"] }, at: 1 });
-  await assert.rejects(signOut({ logout: async () => Promise.reject(new TypeError("offline")) }, store), TypeError);
+  await assert.rejects(signOut({ unsubscribePush: async () => Promise.reject(new TypeError("offline")), logout: async () => Promise.reject(new TypeError("offline")) }, store, async () => null), TypeError);
   assert.equal(store.values.size, 0);
   assert.equal(rememberedCredential(local), session.credential);
 });

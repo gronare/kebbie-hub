@@ -3,12 +3,12 @@ import { emptyMarks, mergeMarks, openBoards } from "./board.js";
 import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
-import { put, get } from "./store.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand } from "./device.js";
-import { fromB64, toB64, verifyDeviceCert } from "../js/protocol.js";
+import { put, get, del } from "./store.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand, verifiedDevices } from "./device.js";
+import { fromB64, toB64 } from "../js/protocol.js";
 import { decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, keptCategories, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
-import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
@@ -76,7 +76,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, notify: null, kept: null, deciding: false };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, kept: null, deciding: false };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -170,7 +170,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (!state.me) return accountSignIn();
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
     const viewing = state.viewing && state.devices?.find((device) => device.id === state.viewing);
-    if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, notice: state.notice, decisions: decisionsFor(viewing), now: nowSeconds() });
+    if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, older: state.older !== null, removing: state.removing, busy: state.busy, notice: state.notice, decisions: decisionsFor(viewing), now: nowSeconds() });
     const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word, machines: state.opened.map((machine) => machine.name) }) } : null;
     return accountScreen({ notify, me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
   }
@@ -184,38 +184,83 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const opened = boards ? await openBoards(boards, identity, nowSeconds(), await storedMarks()).catch(() => null) : null;
     state.opened = opened?.opened ?? [];
     state.keys = new Map((opened?.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
-    const devices = [];
-    for (const row of listed.devices) {
-      if (!(await verifyDeviceCert(identity.key, row.cert))) continue;
-      const standing = state.opened
-        .map((machine) => ({ machine: machine.name, machineId: machine.machine, accepts: machine.board?.accepts ?? null, mine: standingOn(machine.board, state.device)?.state ?? null, ...(machine.board?.devices?.[row.device] ?? {}) }))
-        .filter((one) => one.state && one.fingerprint === row.fingerprint);
-      devices.push({ id: row.device, name: row.name, kind: row.kind, self: row.device === state.device?.id, added: row.created_at, seen: row.last_seen_at, key: row.fingerprint, standing, push: row.push ?? null });
-    }
-    state.devices = devices.sort((a, b) => Number(b.self) - Number(a.self));
+    const devices = (await verifiedDevices(identity.key, listed.devices)).map((device) => {
+      const standing = device.removed
+        ? []
+        : state.opened
+            .map((machine) => ({ machine: machine.name, machineId: machine.machine, accepts: machine.board?.accepts ?? null, mine: standingOn(machine.board, state.device)?.state ?? null, ...(machine.board?.devices?.[device.id] ?? {}) }))
+            .filter((one) => one.state && one.fingerprint === device.key);
+      return { ...device, self: device.id === state.device?.id, standing };
+    });
+    state.devices = devices.sort((a, b) => Number(Boolean(a.removed)) - Number(Boolean(b.removed)) || Number(b.self) - Number(a.self));
+  }
+
+  async function historyPage(id, identity, before) {
+    const listing = await account.deviceCommands(id, before);
+    const opened = await openHistory(listing.commands, identity, (machine) => state.keys.get(machine) ?? null);
+    const kept = await loadSent({ get }, state.me.account, nowSeconds());
+    const local = new Map(kept.sent.map((one) => [one.id, one]));
+    const names = new Map(state.opened.map((machine) => [machine.machine, machine.name]));
+    const deviceNames = new Map((state.devices ?? []).map((device) => [device.id, device.name]));
+    const rows = opened.map((entry) => ({ ...entry, machineName: names.get(entry.machine) ?? entry.machine.slice(-6), label: local.get(entry.id)?.label ?? null, short: entry.payload.head?.slice(0, 7) ?? null, targetName: entry.payload.type === "device-decision" ? (deviceNames.get(entry.payload.device) ?? null) : null }));
+    return { rows, older: listing.cursor ?? null };
   }
 
   async function openDevice(id) {
     const identity = unlockedIdentity();
-    state.viewing = id;
-    state.history = null;
-    state.notice = null;
+    Object.assign(state, { viewing: id, history: null, older: null, removing: false, notice: null });
     scrollTo(0, 0);
     draw();
     if (!identity) return;
     try {
-      const listing = await account.deviceCommands(id);
-      const opened = await openHistory(listing.commands, identity, (machine) => state.keys.get(machine) ?? null);
-      const kept = await loadSent({ get }, state.me.account, nowSeconds());
-      const local = new Map(kept.sent.map((one) => [one.id, one]));
-      const names = new Map(state.opened.map((machine) => [machine.machine, machine.name]));
+      const page = await historyPage(id, identity, null);
       if (state.viewing !== id) return;
-      const deviceNames = new Map((state.devices ?? []).map((device) => [device.id, device.name]));
-      state.history = opened.map((entry) => ({ ...entry, machineName: names.get(entry.machine) ?? entry.machine.slice(-6), label: local.get(entry.id)?.label ?? null, short: entry.payload.head?.slice(0, 7) ?? null, targetName: entry.payload.type === "device-decision" ? (deviceNames.get(entry.payload.device) ?? null) : null }));
+      Object.assign(state, { history: page.rows, older: page.older });
     } catch (error) {
       state.history = [];
       state.notice = message(error);
     }
+    draw();
+  }
+
+  async function showOlder() {
+    const identity = unlockedIdentity();
+    const id = state.viewing;
+    if (!identity || state.older === null || state.busy) return;
+    state.busy = true;
+    draw();
+    try {
+      const page = await historyPage(id, identity, state.older);
+      if (state.viewing === id) Object.assign(state, { history: [...(state.history ?? []), ...page.rows], older: page.older });
+    } catch (error) {
+      state.notice = message(error);
+    }
+    state.busy = false;
+    draw();
+  }
+
+  async function removeDevice() {
+    const identity = unlockedIdentity();
+    const removed = state.devices?.find((device) => device.id === state.viewing);
+    if (!identity || !removed || state.busy) return;
+    state.busy = true;
+    state.notice = null;
+    draw();
+    try {
+      await account.removeDevice(removed.id);
+      if (removed.self) {
+        await stopNotifications(account, { get, del });
+        await forgetDevice({ del }, identity.id);
+        state.device = null;
+        if (state.notify) state.notify.phase = "off";
+      }
+      await loadDevices();
+      Object.assign(state, { viewing: null, history: null, older: null, removing: false });
+      scrollTo(0, 0);
+    } catch (error) {
+      state.notice = message(error);
+    }
+    state.busy = false;
     draw();
   }
 
@@ -660,14 +705,19 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (action === "device" || action === "devices-back") {
       event.preventDefault();
       if (action === "device") return openDevice(target.dataset.id);
-      state.viewing = null;
-      state.history = null;
-      state.notice = null;
+      Object.assign(state, { viewing: null, history: null, older: null, removing: false, notice: null });
       scrollTo(0, 0);
       return draw();
     }
     try {
       if (action === "decide-device") return await decideDevice(target.dataset.machine, target.dataset.approve === "true");
+      if (action === "device-older") return await showOlder();
+      if (action === "device-remove") return await removeDevice();
+      if (action === "device-remove-ask" || action === "device-remove-cancel") {
+        state.removing = action === "device-remove-ask";
+        state.notice = null;
+        return draw();
+      }
       if (action === "sign-in" || action === "other-passkey") return await signInClicked();
       if (action === "add-passkey") return await addPasskey();
       if (action === "sign-out") return await signOutClicked();

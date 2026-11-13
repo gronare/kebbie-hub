@@ -129,6 +129,10 @@ test("a notice that can't be verified or opened still shows, as a plain one that
   const listing = kv.get(LISTING);
   kv.set(LISTING, { ...listing, listing: { ...listing.listing, list: { ...listing.listing.list, signature: listing.listing.list.signature.replace(/^./, (char) => (char === "A" ? "B" : "A")) } } });
   assert.deepEqual(await pushedNotice(envelope, { get, now: NOW }), plain(), "a machine list the account didn't sign vouches for nothing");
+  kv.set(LISTING, listing);
+  assert.equal((await pushedNotice(envelope, { get, now: NOW })).title, notice.title);
+  kv.set(`marks:${kv.get(NOTIFY_RECORD).account.account}`, { list: listing.listing.list.list.counter + 1, machines: {} });
+  assert.deepEqual(await pushedNotice(envelope, { get, now: NOW }), plain(), "a signed list older than one this browser has seen vouches for nothing");
   kv.delete(LISTING);
   assert.deepEqual(await pushedNotice(envelope, { get, now: NOW }), plain());
   assert.deepEqual(await pushedNotice(envelope, { get: async () => undefined, now: NOW }), plain());

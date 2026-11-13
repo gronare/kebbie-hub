@@ -457,6 +457,7 @@ export function standingText(standing, now) {
 }
 
 function deviceFacts(device, now) {
+  if (device.removed) return [KIND_TEXT[device.kind] ?? device.kind, `added ${day(device.added, now)}`, `removed ${day(device.removed, now)}`];
   const seen = device.self ? "now" : device.seen ? lastSeenText(device.seen, now) : "not yet";
   return [KIND_TEXT[device.kind] ?? device.kind, `added ${day(device.added, now)}`, `last seen ${seen}`];
 }
@@ -468,7 +469,10 @@ export function deviceRow(device, now) {
 }
 
 export function devicesSection(devices, now) {
-  return `<h2 class="group g-muted">Devices · ${devices.length}</h2>${devices.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>`;
+  const kept = devices.filter((device) => !device.removed);
+  const removed = devices.filter((device) => device.removed);
+  const gone = removed.length ? `<h2 class="group g-muted">Removed · ${removed.length}</h2>${removed.map((device) => deviceRow(device, now)).join("")}` : "";
+  return `<h2 class="group g-muted">Devices · ${kept.length}</h2>${kept.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>${gone}`;
 }
 
 const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on" };
@@ -525,7 +529,15 @@ export function historyEntry(entry, now) {
 
 const TONES = { "✓": "ok", "↑": "ok", "?": "warn", "⧗": "warn", "✗": "g-yellow" };
 
-export function deviceScreen({ device, history, loading = false, notice = null, decisions = new Map(), now = Date.now() / 1000 }) {
+function removeArea(device, { removing, busy }) {
+  if (device.removed) return `<div class="meta pad">Removed from your account. It sends nothing through this hub and gets no notifications; what it sent stays listed here.</div>`;
+  const off = busy ? " disabled" : "";
+  if (!removing) return `<button type="button" class="btn" data-action="device-remove-ask">Remove ${esc(device.name)}</button>`;
+  const self = device.self ? " This browser makes a new device key the next time you send something from it." : "";
+  return `<div class="confirm" role="group" aria-label="Confirm remove"><p><b>Remove ${esc(device.name)}?</b></p><p class="meta">It can't send through this hub any more and gets no notifications. What it sent stays listed. Each machine keeps its own approval of it; deny it in kebbie on a machine to stop it there too.${self}</p><div class="row2"><button type="button" class="btn" data-action="device-remove-cancel"${off}>Cancel</button><button type="button" class="btn primary" data-action="device-remove"${off}>Remove</button></div></div>`;
+}
+
+export function deviceScreen({ device, history, loading = false, older = false, removing = false, busy = false, notice = null, decisions = new Map(), now = Date.now() / 1000 }) {
   const facts = [...deviceFacts(device, now), `key ${device.key}`].map(esc).join(" · ");
   const standing = `<section class="task"><div class="meta">${facts}</div>${device.standing.map((one) => `<div>${standingText(one, now)}</div>${decisions.get(one.machineId) ?? ""}`).join("")}</section>`;
   const entries = history.map((entry) => historyEntry(entry, now));
@@ -537,7 +549,9 @@ export function deviceScreen({ device, history, loading = false, notice = null, 
     days.get(heading).push(entry);
   }
   const list = [...days].map(([heading, shown]) => `<div class="nsub">${esc(heading)}</div>${shown.map((entry) => `<div class="nrow"><span class="n"></span><span class="${TONES[entry.icon] ?? ""}" aria-hidden="true">${esc(entry.icon)}</span><span class="t"><b>${esc(entry.what)}</b><small>${esc(entry.said)}</small></span><span class="w">${esc(new Date(entry.at * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }))}</span></div>`).join("")}`).join("");
-  const sent = loading ? `<div class="center">Loading …</div>` : entries.length ? `<section class="next" aria-label="Sent from ${esc(device.name)}">${list}</section>` : `<div class="meta pad">Nothing sent from ${esc(device.name)} in the last 90 days.</div>`;
-  return `${brand}<h1 class="title">${esc(device.name)}</h1>${standing}<h2 class="group g-muted">Sent from ${esc(device.name)}${loading ? "" : ` · ${entries.length}`}</h2>${sent}${warn(notice)}<a class="btn back-link" href="/account" data-action="devices-back">Back to Account</a><a class="back-btn round" href="/account" data-action="devices-back" aria-label="Back">${icon("back")}</a>`;
+  const more = older && !loading ? `<button type="button" class="btn" data-action="device-older"${busy ? " disabled" : ""}>Show older</button>` : "";
+  const sent = loading ? `<div class="center">Loading …</div>` : entries.length ? `<section class="next" aria-label="Sent from ${esc(device.name)}">${list}</section>${more}` : `<div class="meta pad">Nothing sent from ${esc(device.name)} in the last 90 days.</div>`;
+  const count = loading ? "" : ` · ${entries.length}${older ? "+" : ""}`;
+  return `${brand}<h1 class="title">${esc(device.name)}</h1>${standing}<h2 class="group g-muted">Sent from ${esc(device.name)}${count}</h2>${sent}${removeArea(device, { removing, busy })}${warn(notice)}<a class="btn back-link" href="/account" data-action="devices-back">Back to Account</a><a class="back-btn round" href="/account" data-action="devices-back" aria-label="Back">${icon("back")}</a>`;
 }
 

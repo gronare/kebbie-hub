@@ -107,6 +107,8 @@ async function verifiedListing(record, get) {
   const signed = kept?.listing?.list;
   const key = record?.account;
   if (!signed || !key?.keys?.signing) return null;
+  const seen = (await get(`marks:${key.account}`).catch(() => null))?.list ?? 0;
+  if (!(signed.list?.counter >= seen)) return null;
   const verifying = await crypto.subtle.importKey("raw", fromB64(key.keys.signing), { name: "Ed25519" }, false, ["verify"]);
   return (await verifyMachineList({ id: key.account, verifying }, signed)) ? kept.listing : null;
 }

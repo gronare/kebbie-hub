@@ -570,3 +570,21 @@ test("the device's history names an item edit by its section, or the title", () 
   assert.equal(entry({ ...edit, section: "what-we-know" }, "What we know"), "Edited “What we know” of Session drops on reload");
   assert.equal(entry({ ...edit, section: null }), "Edited the title of Session drops on reload");
 });
+
+test("a device's page shows older history on request and removes the device only after a confirm that says what stays", () => {
+  const history = [{ payload: { type: "answer", address: "auth@api", question: "q", choice: 0, comment: "" }, kind: "answer", machineName: "work-mac", at: AT_TWO_PM - 60, exp: AT_TWO_PM + 3540, result: { outcome: "done" } }];
+  const more = deviceScreen({ device: devices[1], history, older: true, now: AT_TWO_PM });
+  assert.match(text(more), /Sent from Chrome on Mac · 1\+ /);
+  assert.match(more, /data-action="device-older">Show older</);
+  assert.doesNotMatch(deviceScreen({ device: devices[1], history, now: AT_TWO_PM }), /device-older/);
+  assert.match(more, /data-action="device-remove-ask">Remove Chrome on Mac</);
+  const asking = text(deviceScreen({ device: devices[0], history, removing: true, now: AT_TWO_PM }));
+  assert.match(asking, /Remove iPhone 16\? It can't send through this hub any more and gets no notifications\. What it sent stays listed\. Each machine keeps its own approval of it; deny it in kebbie on a machine to stop it there too\. This browser makes a new device key the next time you send something from it\. Cancel Remove/);
+  const removed = { ...devices[1], removed: AT_TWO_PM - 120, standing: [] };
+  const page = deviceScreen({ device: removed, history, now: AT_TWO_PM });
+  assert.match(text(page), /web app · added \d+ \w+ · removed today · key 91AB-44F0/);
+  assert.match(text(page), /Removed from your account\. It sends nothing through this hub and gets no notifications; what it sent stays listed here\./);
+  assert.doesNotMatch(page, /device-remove/);
+  const listed = text(accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, devices: [devices[0], removed], now: AT_TWO_PM }));
+  assert.match(listed, /Devices · 1 iPhone 16 .* Removed · 1 Chrome on Mac web app · added \d+ \w+ · removed today/);
+});

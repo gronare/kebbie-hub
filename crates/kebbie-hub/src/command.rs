@@ -88,9 +88,11 @@ pub async fn post_command(
     let device = verify_command(envelope, &key, at).map_err(refused)?;
     let registered = store
         .device(device.id())?
-        .is_some_and(|row| row.account == account && row.cert.signing == *device.signing());
-    if !registered {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "unknown-device"));
+        .filter(|row| row.account == account && row.cert.signing == *device.signing());
+    match registered {
+        None => return Err(ApiError::new(StatusCode::FORBIDDEN, "unknown-device")),
+        Some(row) if row.removed_at.is_some() => return Err(ApiError::new(StatusCode::FORBIDDEN, "device-removed")),
+        Some(_) => {}
     }
     hub.limit_command(&account, header.kind)?;
     let reader = Id::parse(&account).map_err(|_| ApiError::internal())?;

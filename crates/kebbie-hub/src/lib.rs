@@ -110,6 +110,7 @@ pub struct Config {
     pub start_push_rate: RateLimit,
     pub max_queued: u64,
     pub max_undelivered_per_account: u64,
+    pub max_devices_per_account: u64,
     pub signup: SignupMode,
     pub commands: bool,
     pub github_client_id: Option<String>,
@@ -165,6 +166,7 @@ impl Config {
             },
             max_queued: 1_000,
             max_undelivered_per_account: 100,
+            max_devices_per_account: 20,
             signup: SignupMode::Invite,
             commands: false,
             github_client_id: None,
@@ -505,13 +507,17 @@ impl Hub {
     }
 
     pub(crate) fn check_command_gate(&self, store: &Store, machine: &Id) -> Result<(), ApiError> {
+        match store.machine_owner(machine)? {
+            Some(account) => self.check_account_gate(store, &account),
+            None => Ok(()),
+        }
+    }
+
+    pub(crate) fn check_account_gate(&self, store: &Store, account: &str) -> Result<(), ApiError> {
         let Some(gate) = &self.command_gate else {
             return Ok(());
         };
-        let Some(account) = store.machine_owner(machine)? else {
-            return Ok(());
-        };
-        gate(store, &account).map_err(|refusal| {
+        gate(store, account).map_err(|refusal| {
             ApiError::new(StatusCode::PAYMENT_REQUIRED, kebbie_hub_api::PLAN_INACTIVE).with_url(refusal.url)
         })
     }
@@ -664,6 +670,7 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         )
         .route("/v1/a/results", get(command::results))
         .route("/v1/a/devices", get(devices::devices).post(devices::post_device))
+        .route("/v1/a/devices/{id}", delete(devices::remove_device))
         .route("/v1/a/devices/{id}/commands", get(devices::device_commands))
         .route("/v1/a/devices/{id}/push", put(push::subscribe).delete(push::unsubscribe))
         .route("/v1/a/devices/{id}/categories", put(push::set_categories))

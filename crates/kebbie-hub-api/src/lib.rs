@@ -504,6 +504,8 @@ pub struct DeviceView {
     pub created_at: u64,
     pub last_seen_at: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub push: Option<DevicePush>,
 }
 

@@ -1,7 +1,7 @@
 import { accountFingerprints, accountIdentity, fromB64, newAccountSecrets, signStatement, toB64, unwrapAccountSecrets, wrapAccountSecrets, wrapperStatement } from "../js/protocol.js";
 import { HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
-import { LISTING } from "./notify.js";
+import { LISTING, NOTIFY_RECORD } from "./notify.js";
 import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
 const REMEMBERED = "kebbie-credential";
@@ -101,8 +101,18 @@ export async function keepUnlock(session, store = deviceStore) {
 
 export const forgetUnlock = (store = deviceStore) => store.del(KEPT).catch(() => undefined);
 
-export async function signOut(account, store = deviceStore) {
+const browserPush = async () => (await globalThis.navigator?.serviceWorker?.getRegistration("/"))?.pushManager.getSubscription() ?? null;
+
+export async function stopNotifications(account, store = deviceStore, subscription = browserPush) {
+  const record = await store.get(NOTIFY_RECORD).catch(() => null);
+  await (await subscription().catch(() => null))?.unsubscribe().catch(() => undefined);
+  if (record?.device) await account.unsubscribePush(record.device).catch(() => undefined);
+  await store.del(NOTIFY_RECORD).catch(() => undefined);
+}
+
+export async function signOut(account, store = deviceStore, subscription = browserPush) {
   try {
+    await stopNotifications(account, store, subscription);
     await account.logout();
   } finally {
     await forgetUnlock(store);

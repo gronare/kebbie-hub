@@ -85,12 +85,11 @@ CREATE TABLE IF NOT EXISTS queue (
 CREATE TABLE IF NOT EXISTS devices (
     device_id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    kind TEXT NOT NULL,
     signing_key BLOB NOT NULL,
     cert TEXT NOT NULL,
     created_at INTEGER NOT NULL,
-    last_seen_at INTEGER
+    last_seen_at INTEGER,
+    removed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS devices_by_account ON devices (account_id);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -221,6 +220,7 @@ DROP TABLE IF EXISTS devices;
 DELETE FROM queue;
 ";
 const DROPPED_FOR_ACCOUNT_COMMANDS: &str = "
+DROP TABLE IF EXISTS queue;
 DROP TABLE IF EXISTS push_subscriptions;
 DROP TABLE IF EXISTS admissions;
 DROP TABLE IF EXISTS pairings;
@@ -323,6 +323,7 @@ pub struct NewDevice<'a> {
     pub cert: &'a DeviceCert,
     pub text: &'a str,
     pub now: u64,
+    pub most: u64,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -330,6 +331,8 @@ pub enum DeviceWrite {
     Added,
     Renamed,
     Taken,
+    Removed,
+    Full,
 }
 
 pub struct DeviceRow {
@@ -337,6 +340,7 @@ pub struct DeviceRow {
     pub cert: DeviceCert,
     pub created_at: u64,
     pub last_seen_at: Option<u64>,
+    pub removed_at: Option<u64>,
     pub push: Option<DevicePushRow>,
 }
 
@@ -445,6 +449,18 @@ impl Store {
         )?;
         if !marked {
             tx.execute_batch("ALTER TABLE sessions ADD COLUMN keyless INTEGER NOT NULL DEFAULT 0")?;
+        }
+        let device_columns: Vec<String> = tx
+            .prepare("SELECT name FROM pragma_table_info('devices')")?
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<_>>()?;
+        if !device_columns.iter().any(|column| column == "removed_at") {
+            tx.execute_batch("ALTER TABLE devices ADD COLUMN removed_at INTEGER")?;
+        }
+        for copy in ["name", "kind"] {
+            if device_columns.iter().any(|column| column == copy) {
+                tx.execute_batch(&format!("ALTER TABLE devices DROP COLUMN {copy}"))?;
+            }
         }
         tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         tx.commit()?;
@@ -754,33 +770,40 @@ impl Store {
 
     pub fn register_device(&mut self, new: &NewDevice<'_>) -> Result<DeviceWrite> {
         let tx = self.connection.transaction()?;
-        let held: Option<(String, Vec<u8>)> = tx
+        let held: Option<(String, Vec<u8>, Option<u64>)> = tx
             .query_row(
-                "SELECT account_id, signing_key FROM devices WHERE device_id = ?1",
+                "SELECT account_id, signing_key, removed_at FROM devices WHERE device_id = ?1",
                 [new.cert.device.as_str()],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()?;
         let written = match held {
-            Some((account, signing)) if account != new.account || signing != new.cert.signing => {
+            Some((account, signing, _)) if account != new.account || signing != new.cert.signing => {
                 return Ok(DeviceWrite::Taken);
             }
+            Some((_, _, Some(_))) => return Ok(DeviceWrite::Removed),
             Some(_) => {
                 tx.execute(
-                    "UPDATE devices SET name = ?2, kind = ?3, cert = ?4 WHERE device_id = ?1",
-                    params![new.cert.device.as_str(), new.cert.name, new.cert.kind.name(), new.text],
+                    "UPDATE devices SET cert = ?2 WHERE device_id = ?1",
+                    params![new.cert.device.as_str(), new.text],
                 )?;
                 DeviceWrite::Renamed
             }
             None => {
+                let active: u64 = tx.query_row(
+                    "SELECT count(*) FROM devices WHERE account_id = ?1 AND removed_at IS NULL",
+                    [new.account],
+                    |row| row.get(0),
+                )?;
+                if active >= new.most {
+                    return Ok(DeviceWrite::Full);
+                }
                 tx.execute(
-                    "INSERT INTO devices (device_id, account_id, name, kind, signing_key, cert, created_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    "INSERT INTO devices (device_id, account_id, signing_key, cert, created_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
                     params![
                         new.cert.device.as_str(),
                         new.account,
-                        new.cert.name,
-                        new.cert.kind.name(),
                         new.cert.signing.as_slice(),
                         new.text,
                         new.now
@@ -791,6 +814,19 @@ impl Store {
         };
         tx.commit()?;
         Ok(written)
+    }
+
+    pub fn remove_device(&mut self, account: &str, device: &Id, now: u64) -> Result<bool> {
+        let tx = self.connection.transaction()?;
+        let removed = tx.execute(
+            "UPDATE devices SET removed_at = ?3 WHERE device_id = ?1 AND account_id = ?2 AND removed_at IS NULL",
+            params![device.as_str(), account, now],
+        )?;
+        if removed > 0 {
+            tx.execute("DELETE FROM push_subscriptions WHERE device_id = ?1", [device.as_str()])?;
+        }
+        tx.commit()?;
+        Ok(removed > 0)
     }
 
     pub fn devices(&self, account: &str) -> Result<Vec<DeviceRow>> {
@@ -804,7 +840,7 @@ impl Store {
     fn devices_where(&self, condition: &str, value: &str) -> Result<Vec<DeviceRow>> {
         let mut statement = self.connection.prepare(&format!(
             "SELECT devices.account_id, devices.cert, devices.created_at, devices.last_seen_at,
-                    push_subscriptions.categories, push_subscriptions.subscribed_at
+                    push_subscriptions.categories, push_subscriptions.subscribed_at, devices.removed_at
              FROM devices LEFT JOIN push_subscriptions ON push_subscriptions.device_id = devices.device_id
              WHERE {condition}"
         ))?;
@@ -824,6 +860,7 @@ impl Store {
                     cert: serde_json::from_str(&cert).map_err(|_| corrupt(1))?,
                     created_at: row.get(2)?,
                     last_seen_at: row.get(3)?,
+                    removed_at: row.get(6)?,
                     push,
                 })
             })?

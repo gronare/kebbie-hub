@@ -47,6 +47,18 @@ export async function loadDevice(store, account) {
   }
 }
 
+export const forgetDevice = (store, account) => store.del(deviceKey(account)).catch(() => undefined);
+
+export async function verifiedDevices(key, rows) {
+  const devices = [];
+  for (const row of rows) {
+    const { cert } = row;
+    if (row.device !== cert?.device || !(await verifyDeviceCert(key, cert))) continue;
+    devices.push({ id: cert.device, name: cert.name, kind: cert.kind, key: await deviceFingerprint(cert.signing), added: row.created_at, seen: row.last_seen_at, removed: row.removed_at ?? null, push: row.push ?? null });
+  }
+  return devices;
+}
+
 export async function ensureDevice({ store, calls, identity, name, now, kept = undefined }) {
   const held = kept === undefined ? await loadDevice(store, identity.id) : kept;
   if (held && (await verifyDeviceCert(identity.key, held.cert))) return held;

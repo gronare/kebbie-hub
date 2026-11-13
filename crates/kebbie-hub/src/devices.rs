@@ -24,6 +24,7 @@ fn view(row: DeviceRow) -> DeviceView {
         cert: row.cert,
         created_at: row.created_at,
         last_seen_at: row.last_seen_at,
+        removed_at: row.removed_at,
         push: row.push.map(|push| DevicePush {
             categories: push.categories,
             subscribed_at: push.subscribed_at,
@@ -37,6 +38,9 @@ pub async fn post_device(
     KeyAccount(account): KeyAccount,
     Json(upload): Json<DeviceUpload>,
 ) -> Result<(StatusCode, Json<DeviceView>), ApiError> {
+    if !hub.config().commands {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "commands-off"));
+    }
     let cert = &upload.cert;
     let named = cert.name.chars().count();
     if named == 0 || named > MAX_DEVICE_NAME_CHARS {
@@ -46,6 +50,7 @@ pub async fn post_device(
         return Err(ApiError::bad_request("wrong-account"));
     }
     let mut store = hub.store();
+    hub.check_account_gate(&store, &account)?;
     let key = store
         .account_key(&account)?
         .ok_or(ApiError::conflict("no-key"))?;
@@ -59,11 +64,14 @@ pub async fn post_device(
         cert,
         text: &text,
         now: at,
+        most: hub.config().max_devices_per_account,
     })?;
     let status = match written {
         DeviceWrite::Added => StatusCode::CREATED,
         DeviceWrite::Renamed => StatusCode::OK,
         DeviceWrite::Taken => return Err(ApiError::conflict("device-taken")),
+        DeviceWrite::Removed => return Err(ApiError::new(StatusCode::GONE, "device-removed")),
+        DeviceWrite::Full => return Err(ApiError::conflict("too-many-devices")),
     };
     let row = store.device(&cert.device)?.ok_or_else(ApiError::internal)?;
     store.log(
@@ -87,6 +95,28 @@ pub async fn devices(
     Ok(Json(Devices {
         devices: rows.into_iter().map(view).collect(),
     }))
+}
+
+pub async fn remove_device(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    KeyAccount(account): KeyAccount,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let unknown = || ApiError::new(StatusCode::NOT_FOUND, "unknown-device");
+    let device = Id::parse(&id)
+        .ok()
+        .filter(|device| device.prefix() == Prefix::Device)
+        .ok_or_else(unknown)?;
+    let at = now();
+    let mut store = hub.store();
+    if store.device(&device)?.is_none_or(|row| row.account != account) {
+        return Err(unknown());
+    }
+    if store.remove_device(&account, &device, at)? {
+        store.log(at, "device.removed", None, Some(&format!("device={device}")))?;
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize)]

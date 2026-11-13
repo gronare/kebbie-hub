@@ -601,3 +601,88 @@ async fn a_machine_that_takes_approvals_only_at_the_machine_refuses_a_device_dec
     let result = person.await_result(&sent.header.id, SOON).await.unwrap().unwrap();
     assert_eq!(result.outcome, Outcome::Refused { reason: Reason::UnknownDevice });
 }
+
+#[tokio::test]
+async fn a_device_removed_under_account_keeps_what_it_sent_listed_but_sends_and_hears_nothing_more() {
+    let test = push_hub(|_| {}).await;
+    let service = PushService::start().await;
+    let (mut machine, mut person) = notifying(&test).await;
+    let secret = subscribed(&mut person, &service, "phone", &NoticeCategory::defaults()).await;
+    person.command(&machine.machine, &answer()).await.unwrap();
+    let device = person.device_id().clone();
+    let path = format!("/v1/a/devices/{device}");
+
+    let mut stranger = member(&test).await;
+    assert_eq!(refusal_of(stranger.delete(&path).await), (404, "unknown-device".to_string()));
+    person.delete(&path).await.unwrap();
+    person.delete(&path).await.unwrap();
+
+    let view = person.devices().await.unwrap().devices.pop().unwrap();
+    assert!(view.removed_at.is_some() && view.push.is_none(), "{view:?}");
+    assert_eq!(rows(&test, "push_subscriptions"), 0);
+    assert_eq!(person.device_commands(&device, None).await.unwrap().commands.len(), 1, "what it sent stays listed");
+    assert!(machine.notified_devices().await.unwrap().devices.is_empty(), "machines no longer seal notices to it");
+    assert_eq!(machine.notify(notice(NoticeCategory::Questions, "x"), "q", Urgency::High).await.unwrap().pushes, 0);
+
+    assert_eq!(refusal_of(person.command(&machine.machine, &answer()).await), (403, "device-removed".to_string()));
+    assert_eq!(refusal_of(person.register_device().await), (410, "device-removed".to_string()));
+    assert_eq!(refusal_of(person.subscribe_push(&secret.subscription(&[])).await), (410, "device-removed".to_string()));
+}
+
+#[tokio::test]
+async fn an_account_holds_at_most_its_device_cap_and_removing_one_frees_a_place() {
+    let test = push_hub(|config| config.max_devices_per_account = 2).await;
+    let (_machine, mut person) = notifying(&test).await;
+    let first = person.register_device().await.unwrap().device;
+    let tablet = another_device(&person, "iPad");
+    person.use_device(tablet.0, tablet.1);
+    person.register_device().await.unwrap();
+    let laptop = another_device(&person, "Laptop");
+    person.use_device(laptop.0.clone(), laptop.1.clone());
+    assert_eq!(refusal_of(person.register_device().await), (409, "too-many-devices".to_string()));
+    person.delete(&format!("/v1/a/devices/{first}")).await.unwrap();
+    person.use_device(laptop.0, laptop.1);
+    person.register_device().await.unwrap();
+    person.rename_device("Laptop at home").await.unwrap();
+    assert_eq!(person.devices().await.unwrap().devices.iter().filter(|device| device.removed_at.is_none()).count(), 2);
+}
+
+#[tokio::test]
+async fn devices_and_notifications_close_with_the_command_switch_and_the_accounts_gate() {
+    let off = push_hub(|config| config.commands = false).await;
+    let mut person = member(&off).await;
+    connected_with_board(&off, &mut person).await;
+    assert_eq!(refusal_of(person.register_device().await), (404, "commands-off".to_string()));
+    let secret = PushSecret::generate("http://127.0.0.1:9/push/phone");
+    assert_eq!(refusal_of(person.subscribe_push(&secret.subscription(&[])).await), (404, "commands-off".to_string()));
+
+    let open = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let gate: kebbie_hub::CommandGate = {
+        let open = Arc::clone(&open);
+        Box::new(move |_, _| if open.load(std::sync::atomic::Ordering::SeqCst) { Ok(()) } else { Err(kebbie_hub::Refusal { url: Some("https://example.com/plan".into()) }) })
+    };
+    let test = start_hub_with(
+        |config| {
+            config.vapid_subject = SUBJECT.to_string();
+            config.push_allow_hosts = vec!["127.0.0.1".to_string()];
+        },
+        Some(gate),
+        Router::new(),
+    )
+    .await;
+    let service = PushService::start().await;
+    let (mut machine, mut person) = notifying(&test).await;
+    let secret = subscribed(&mut person, &service, "phone", &NoticeCategory::defaults()).await;
+    let envelope = machine.notify(notice(NoticeCategory::Questions, "x"), "q", Urgency::High).await.unwrap().envelope.unwrap();
+    open.store(false, std::sync::atomic::Ordering::SeqCst);
+    let inactive = (402, kebbie_hub_api::PLAN_INACTIVE.to_string());
+    assert_eq!(refusal_of(person.subscribe_push(&secret.subscription(&[])).await), inactive);
+    assert_eq!(refusal_of(person.set_categories(&[NoticeCategory::Ready]).await), inactive);
+    assert_eq!(refusal_of(post(&machine, envelope).await), inactive);
+    assert!(machine.notified_devices().await.unwrap().devices.is_empty());
+    person.unsubscribe_push().await.unwrap();
+    assert_eq!(rows(&test, "push_subscriptions"), 0, "a closed gate still lets a device stop its notifications");
+    let laptop = another_device(&person, "Laptop");
+    person.use_device(laptop.0, laptop.1);
+    assert_eq!(refusal_of(person.register_device().await), inactive);
+}

@@ -70,7 +70,8 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
     rusqlite::Connection::open(&path)
         .unwrap()
         .execute_batch(
-            "DROP TABLE commands;
+            "PRAGMA foreign_keys = OFF;
+             DROP TABLE commands;
              DROP TABLE results;
              DROP TABLE push_subscriptions;
              DROP TABLE notices;
@@ -88,6 +89,7 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
              CREATE TABLE events (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, device_id TEXT);
              INSERT INTO devices VALUES ('dev_old', x'01', NULL);
              INSERT INTO commands VALUES ('dev_old', 'cmd_old');
+             INSERT INTO queue VALUES ('mch_old', 1, '{}', 1, 9999999999);
              INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
              PRAGMA user_version = 14;",
         )
@@ -115,6 +117,32 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
     for table in ["results", "pairings", "events"] {
         assert!(!columns(&connection, table).iter().any(|column| column.starts_with("device")), "{table}");
     }
+    let queued: i64 = connection.query_row("SELECT count(*) FROM queue", [], |row| row.get(0)).unwrap();
+    assert_eq!(queued, 0, "commands queued by the dropped devices never reach a machine");
+}
+
+#[test]
+fn a_schema_17_database_keeps_its_devices_and_reads_name_and_kind_from_their_certificates() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    drop(Store::open(&path).unwrap());
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             DROP TABLE devices;
+             CREATE TABLE devices (device_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, signing_key BLOB NOT NULL, cert TEXT NOT NULL, created_at INTEGER NOT NULL, last_seen_at INTEGER);
+             INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
+             INSERT INTO devices VALUES ('dev_kept', 'acc_kept', 'iPhone', 'web', x'01', '{}', 1, 2);",
+        )
+        .unwrap();
+    drop(Store::open(&path).unwrap());
+    assert_eq!(user_version(&path), 17);
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    let devices = columns(&connection, "devices");
+    assert!(devices.contains(&"removed_at".to_string()) && !devices.contains(&"name".to_string()) && !devices.contains(&"kind".to_string()), "{devices:?}");
+    let kept: (String, Option<i64>) = connection.query_row("SELECT device_id, removed_at FROM devices", [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(kept, ("dev_kept".to_string(), None));
 }
 
 #[test]
@@ -163,7 +191,7 @@ fn a_schema_16_database_drops_its_devices_without_encryption_keys_and_their_comm
              DROP TABLE push_subscriptions;
              DROP TABLE notices;
              INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
-             INSERT INTO devices (device_id, account_id, name, kind, signing_key, cert, created_at) VALUES ('dev_old', 'acc_kept', 'iPhone', 'web', x'01', '{}', 1);
+             INSERT INTO devices (device_id, account_id, signing_key, cert, created_at) VALUES ('dev_old', 'acc_kept', x'01', '{}', 1);
              INSERT INTO commands VALUES ('acc_kept', 'cmd_old', 'mch_old', 'dev_old', 'answer', x'01', '{}', 1, 1, NULL);
              INSERT INTO results (account_id, machine_id, command_id, digest, envelope, stored_at, expires_at) VALUES ('acc_kept', 'mch_old', 'cmd_old', x'01', '{}', 1, 9999999999);
              INSERT INTO queue VALUES ('mch_old', 1, '{}', 1, 9999999999);

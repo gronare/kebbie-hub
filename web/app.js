@@ -6,7 +6,7 @@ import { connectText, listWithout, PairingFailed, publishList, safeNext, withRea
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
 import { textHash } from "../js/protocol.js";
 import { answerBlock, answerReady, APPROVAL_STATES, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
@@ -737,11 +737,12 @@ async function refresh() {
   const session = state.session;
   if (session?.state !== "unlocked") return;
   let listing;
+  let fresh = false;
   try {
     listing = await account.boards();
     state.offline = false;
     state.fetchedAt = nowSeconds();
-    await put(LISTING, { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
+    fresh = true;
   } catch (error) {
     if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
     clearTimeout(retrying);
@@ -755,6 +756,7 @@ async function refresh() {
   state.marks = mergeMarks(state.marks, await storedMarks());
   const result = await openBoards(listing, session.identity, nowSeconds(), state.marks);
   if (state.session !== session) return render();
+  if (fresh && result.list) await put(LISTING, { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
   state.opened = result.opened;
   state.marks = result.marks;
   state.keys = new Map((result.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
@@ -800,6 +802,12 @@ async function removeMachine(machine, name) {
     state.notice = error instanceof PairingFailed ? connectText(error.reason) : hubMessage(error);
   }
   await refresh();
+}
+
+async function refusedDevice(error) {
+  if (!(error instanceof HubError && error.code === "device-removed") || !state.session?.identity) return;
+  state.device = null;
+  await forgetDevice(deviceStore, state.session.identity.id);
 }
 
 function commandText(error) {
@@ -861,6 +869,7 @@ async function send(target, payload, meta) {
   } catch (error) {
     ui.busy = false;
     ui.error = commandText(error);
+    await refusedDevice(error);
     if (error instanceof HubError && error.status === 402) state.refused = { url: error.url };
   }
   render();
@@ -916,6 +925,7 @@ async function sendTo({ machine, payload, meta, ui }) {
   } catch (error) {
     ui.busy = false;
     ui.error = commandText(error);
+    await refusedDevice(error);
     if (error instanceof HubError && error.status === 402) state.refused = { url: error.url };
     render();
     return null;

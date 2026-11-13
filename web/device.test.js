@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceFingerprint, fromB64, importIdentity, openCommand, sealEnvelope, verifyDeviceCert } from "../js/protocol.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand } from "./device.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand, verifiedDevices } from "./device.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -117,4 +117,18 @@ test("a review comment's and a section edit's words stay in this browser's store
   const edit = { id: "cmd_4", kind: "item-edit", machine: "mch_a", address: "vault:Projects/session.md", section: "goal", text: "You stay signed in.", at: AT, exp: AT + 3600, result: { outcome: "done" } };
   await keepSent(store, "acc_a", { cursor: 5, sent: [{ ...edit, result: null }, { ...edit, id: "cmd_5" }] }, AT);
   assert.deepEqual((await loadSent(store, "acc_a", AT)).sent.map((one) => one.text), ["You stay signed in.", undefined], "a section's words go once the machine answered");
+});
+
+test("Account shows a device as its certificate says, never the hub's copies beside it, and skips a row whose certificate names another device", async () => {
+  const identity = await account();
+  const store = memoryStore();
+  const device = await ensureDevice({ store, calls: { addDevice: async () => undefined }, identity, name: "iPhone 16", now: AT });
+  const row = { device: device.id, name: "Evil phone", kind: "cli", fingerprint: "0000-0000", cert: device.cert, created_at: AT, last_seen_at: AT + 5, removed_at: null };
+  const [shown] = await verifiedDevices(identity.key, [row]);
+  assert.deepEqual([shown.id, shown.name, shown.kind, shown.key, shown.removed], [device.id, "iPhone 16", "web", device.fingerprint, null]);
+  assert.deepEqual(await verifiedDevices(identity.key, [{ ...row, device: "dev_01JB8Q6Z3V9K2M4N5P6R7S8T9W" }]), []);
+  assert.deepEqual(await verifiedDevices(identity.key, [{ ...row, cert: { ...device.cert, name: "Renamed by the hub" } }]), []);
+  assert.equal((await verifiedDevices(identity.key, [{ ...row, removed_at: AT + 9 }]))[0].removed, AT + 9);
+  await forgetDevice(store, identity.id);
+  assert.equal(await loadDevice(store, identity.id), null, "a device removed from this browser mints a new key on its next send");
 });

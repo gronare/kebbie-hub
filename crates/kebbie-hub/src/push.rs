@@ -67,6 +67,19 @@ fn owned_device(hub: &Hub, account: &str, id: &str) -> Result<Id, ApiError> {
     }
 }
 
+fn notifying_device(hub: &Hub, account: &str, id: &str) -> Result<Id, ApiError> {
+    if !hub.config().commands {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "commands-off"));
+    }
+    let device = owned_device(hub, account, id)?;
+    let store = hub.store();
+    hub.check_account_gate(&store, account)?;
+    if store.device(&device)?.is_some_and(|row| row.removed_at.is_some()) {
+        return Err(ApiError::new(StatusCode::GONE, "device-removed"));
+    }
+    Ok(device)
+}
+
 pub async fn subscribe(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
@@ -74,7 +87,7 @@ pub async fn subscribe(
     Path(id): Path<String>,
     Json(subscription): Json<PushSubscribe>,
 ) -> Result<StatusCode, ApiError> {
-    let device = owned_device(&hub, &account, &id)?;
+    let device = notifying_device(&hub, &account, &id)?;
     check_endpoint(&subscription.endpoint, &hub.config().push_allow_hosts).map_err(ApiError::bad_request)?;
     let keys = parse_keys(&subscription.keys.p256dh, &subscription.keys.auth)
         .ok_or_else(|| ApiError::bad_request("bad-push-keys"))?;
@@ -113,7 +126,7 @@ pub async fn set_categories(
     Path(id): Path<String>,
     Json(chosen): Json<NoticeCategories>,
 ) -> Result<StatusCode, ApiError> {
-    let device = owned_device(&hub, &account, &id)?;
+    let device = notifying_device(&hub, &account, &id)?;
     if !hub.store().set_categories(&device, &chosen.categories)? {
         return Err(ApiError::conflict("not-subscribed"));
     }
@@ -142,9 +155,13 @@ pub async fn notified_devices(
     let Some(account) = store.machine_owner(&machine)? else {
         return Ok(Json(NotifiedDevices { devices: Vec::new() }));
     };
+    if !hub.config().commands || hub.check_account_gate(&store, &account).is_err() {
+        return Ok(Json(NotifiedDevices { devices: Vec::new() }));
+    }
     let devices = store
         .devices(&account)?
         .into_iter()
+        .filter(|row| row.removed_at.is_none())
         .map(|row| NotifiedDevice {
             cert: row.cert,
             notifications: row.push.map(|push| push.categories),
@@ -167,6 +184,9 @@ pub async fn post_notice(
 ) -> Result<(StatusCode, Json<NoticePosted>), ApiError> {
     let envelope = &upload.envelope;
     let header = &envelope.header;
+    if !hub.config().commands {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "commands-off"));
+    }
     if header.kind != Kind::Notice {
         return Err(ApiError::bad_request("not-a-notice"));
     }
@@ -198,11 +218,14 @@ pub async fn post_notice(
     {
         let store = hub.store();
         let account = store.machine_owner(&machine)?;
+        if let Some(owner) = &account {
+            hub.check_account_gate(&store, owner)?;
+        }
         if !store.record_notice(&machine, &header.id, header.exp)? {
             return Err(ApiError::conflict("replayed-envelope"));
         }
         for (device, payload) in payloads {
-            let owned = store.device(&device)?.is_some_and(|row| Some(&row.account) == account.as_ref());
+            let owned = store.device(&device)?.is_some_and(|row| Some(&row.account) == account.as_ref() && row.removed_at.is_none());
             if !owned {
                 continue;
             }
