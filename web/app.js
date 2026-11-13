@@ -18,6 +18,7 @@ import { cleanComment, commentProblem, commentsProblem, diffHref, freshReviewUi,
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
+import { watchShell } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
 import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, reviewLines, routinesBlock, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
@@ -1672,15 +1673,6 @@ async function resumeBoards() {
   }
   render();
   startFeed();
-}
-
-function watchShell(workers) {
-  const hadController = Boolean(workers.controller);
-  workers.addEventListener("controllerchange", () => hadController && location.reload());
-  workers
-    .register("/sw.js", { type: "module", scope: "/", updateViaCache: "none" })
-    .then((registration) => document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && registration.update().catch(() => {})))
-    .catch(() => {});
 }
 
 async function start() {
