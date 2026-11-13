@@ -14,7 +14,7 @@ import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememb
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled } from "./notify.js";
-import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, stepHref, stepPage, wholePage } from "./review.js";
+import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, stepHref, stepPage, wholePage } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -553,6 +553,7 @@ function reviewView(found, page) {
   const boardStep = boardStepOf(found, step);
   const head = reviewHead(found, step);
   const ui = reviewUiOf(found.machine, found.item.address, step);
+  foldCommitsOn(ui, location.hash);
   const wanted = `${head ?? ""}|${step ?? ""}`;
   const access = commandGate();
   const opener = sentOn(found, "review-open", (sent) => (sent.step ?? null) === step && (sent.head ?? null) === head)[0] ?? null;

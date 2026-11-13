@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS } from "../js/protocol.js";
-import { againOf, cleanComment, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, stepEnd, stepHref, stepPage, wholePage } from "./review.js";
+import { againOf, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, stepEnd, stepHref, stepPage, wholePage } from "./review.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -42,6 +42,29 @@ test("the step page names the step, folds each commit to its subject and sha, an
   const opened = view();
   opened.ui.commits.add(last.sha);
   assert.match(text(stepPage(opened, { top })), /9f3c2a1 A float drops cents on large orders; the gateway takes whole cents\. Read the diff/);
+});
+
+test("a step of one commit shows that commit as its subject and sha alone, and reads its diff from the bottom", () => {
+  const one = { ...review, step: { ...review.step, commits: [{ ...last, files: review.step.files }] } };
+  const html = stepPage(view({ review: one }), { top });
+  assert.match(text(html), /Commits · 1 Charge orders through the gateway in cents 9f3c2a1 Files of the step · 1 of 3 read/);
+  assert.match(html, /<div class="cm one shut"><div class="cm-h" role="button" tabindex="0" data-action="rv-commit" data-commit="0" aria-expanded="false">/);
+  assert.doesNotMatch(html, /cm-foot|of 1 read|Read the whole step|A float drops cents/);
+  assert.match(html, /<div class="whole"><a class="btn fit" href="#\/diff\/mch_a\/payments%40api\/2\/all">Read the diff · 3 files<\/a><\/div>/);
+  assert.match(stepPage(view(), { top }), />Read the whole step · 3 files<\/a>/, "a step of two commits keeps its own reading");
+});
+
+test("a commit message unfolded on one page starts folded on the next, so a message is folded wherever a page opens", () => {
+  const ui = freshReviewUi();
+  foldCommitsOn(ui, "#/diff/mch_a/payments%40api/2/2");
+  ui.commits.add(last.sha);
+  assert.match(text(commitPage(view({ ui, page: page("commit", 1) }), { top })), /A float drops cents/);
+  foldCommitsOn(ui, "#/diff/mch_a/payments%40api/2/2");
+  assert.equal(ui.commits.has(last.sha), true, "a render of the same page keeps what was unfolded");
+  foldCommitsOn(ui, "#/review/mch_a/payments%40api/2");
+  assert.doesNotMatch(stepPage(view({ ui }), { top }), /A float drops cents|aria-expanded="true"/);
+  foldCommitsOn(ui, "#/diff/mch_a/payments%40api/2/2");
+  assert.doesNotMatch(commitPage(view({ ui, page: page("commit", 1) }), { top }), /A float drops cents/, "coming back to a page opens it folded");
 });
 
 test("a file read in one commit counts for the step, unless a later commit changed it again", () => {

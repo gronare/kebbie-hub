@@ -15,7 +15,12 @@ const BAND = `<div class="rv-band" aria-hidden="true"></div>`;
 export const taskHref = (machine, address) => `#/task/${encoded(machine, address)}`;
 export const stepHref = (machine, address, step) => `#/review/${encoded(machine, address)}/${step}`;
 export const diffHref = (machine, address, step = null, commit = "all") => `#/diff/${encoded(machine, address)}${step === null ? "" : `/${step}/${commit}`}`;
-export const freshReviewUi = () => ({ read: new Map(), open: new Map(), commits: new Set(), drafts: [], composing: null, tray: false, receipt: null, busy: false, error: null, requested: null, nextId: 1, on: null, onLabel: null, stale: null });
+export const freshReviewUi = () => ({ read: new Map(), open: new Map(), commits: new Set(), commitsOn: null, drafts: [], composing: null, tray: false, receipt: null, busy: false, error: null, requested: null, nextId: 1, on: null, onLabel: null, stale: null });
+export function foldCommitsOn(ui, page) {
+  if (ui.commitsOn === page) return;
+  ui.commits.clear();
+  ui.commitsOn = page;
+}
 const reviewIdentity = (review) => (review.step ? stepHead(review.step) : `${review.since}..${review.head}`);
 const reviewLabel = (review) => (review.step ? `step ${review.step.number} · ${short(stepHead(review.step))}` : `the changes up to ${short(review.head)}`);
 
@@ -102,8 +107,9 @@ const fold = (open) => `<span class="rv-icon rv-fold${open ? " is-open" : ""}">$
 const commitHead = (commit, index, open) => `<div class="cm-h" role="button" tabindex="0" data-action="rv-commit" data-commit="${index}" aria-expanded="${open}">${fold(open)}<span class="t">${esc(commit.subject)}</span><span class="mono meta">${esc(short(commit.sha))}</span></div>`;
 const commitText = (commit, open) => (open && commit.body.trim() ? `<div class="rv-body">${commitBody(commit.body)}</div>` : "");
 
-function commitRow(v, commit, index, on) {
+function commitRow(v, commit, index, on, alone) {
   const open = v.ui.commits.has(commit.sha);
+  if (alone) return `<div class="cm one${open ? "" : " shut"}">${commitHead(commit, index, open)}${commitText(commit, open)}</div>`;
   const count = commit.files.length;
   const done = readCount(v, commit.files);
   const said = done === count ? `<span class="ok">✓ ${done} of ${count} read</span>` : `${done} of ${count} read`;
@@ -135,10 +141,10 @@ export function stepPage(v, { top, inPanel = false, left = false, selected = nul
   const { commits, files } = step;
   const standing = v.boardStep?.state === "accepted" ? ` · <span class="ok">✓ accepted</span>` : v.boardStep?.state === "pushed" ? " · ↑ pushed" : "";
   const facts = `<div class="meta pad">${plural(commits.length, "commit", "commits")} · ${plural(files.length, "file", "files")} · ${sums(files)}${standing}</div>`;
-  const list = `<h3 class="sec">Commits · ${commits.length}</h3><section class="task cm-list">${commits.map((commit, index) => commitRow(v, commit, index, index === selected)).join("")}</section>`;
+  const list = `<h3 class="sec">Commits · ${commits.length}</h3><section class="task cm-list">${commits.map((commit, index) => commitRow(v, commit, index, index === selected, commits.length === 1)).join("")}</section>`;
   const rows = `<h3 class="sec">Files of the step · ${readCount(v, files)} of ${files.length} read</h3>${files.map((file, index) => stepFileRow(v, file, index)).join("")}`;
   if (left) return heading + name + facts + list + rows;
-  const whole = `<div class="whole"><a class="btn fit" href="${diffHref(v.machine, v.address, v.step)}">Read the whole step · ${plural(files.length, "file", "files")}</a></div>`;
+  const whole = `<div class="whole"><a class="btn fit" href="${diffHref(v.machine, v.address, v.step)}">${commits.length === 1 ? "Read the diff" : "Read the whole step"} · ${plural(files.length, "file", "files")}</a></div>`;
   const end = stepEnd(v);
   return heading + name + facts + (inPanel ? "" : staleBlock(v)) + guideCard(v.review) + list + rows + whole + (end ? `<div class="rv-end">${end}</div>` : "");
 }
