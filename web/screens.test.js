@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepLines, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepList, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -228,9 +228,9 @@ const payments = {
   steps: {
     pushed: 1,
     items: [
-      { number: 2, title: "Charge through a PaymentGateway", state: "committed", sha: "2222222bbbb" },
-      { number: 3, title: "Add the new gateway", state: "in-progress", sha: null },
-      { number: 4, title: "Remove the old <payment> client", state: "planned", sha: null },
+      { number: 2, title: "Charge through a PaymentGateway", state: "ready", commits: [{ sha: "2222222bbbb", subject: "Charge through a PaymentGateway" }] },
+      { number: 3, title: "Add the new gateway", state: "in-progress", commits: [] },
+      { number: 4, title: "Remove the old <payment> client", state: "planned", commits: [] },
     ],
   },
 };
@@ -238,39 +238,62 @@ const rowOf = (item) => ({ machine: "mch_a", name: "devbox", item, task: "paymen
 
 const required = { ...payments, steps: { ...payments.steps, required: true } };
 
-test("a task whose steps must be accepted lists them under its row, says how many wait to be accepted and which one is next", () => {
+test("a board row says in one line how far the steps have come and what is yours to do, never the whole list", () => {
   const html = taskRow(rowOf(required));
-  assert.equal(
-    text(html),
-    "payments devbox api · 1 to accept · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed ◐ 3 Add the new gateway in progress ○ 4 Remove the old <payment> client you: accept 2 on devbox",
-  );
-  assert.match(html, /<span class="accept">1 to accept<\/span>/);
-  assert.match(html, /class="step s-committed"/);
-  assert.match(html, /class="step s-in-progress"/);
-  assert.doesNotMatch(html, /<payment>/, "a step title is escaped");
+  assert.equal(text(html), "payments devbox api · 2 commits ◆ 1 of 4 steps ready to review · step 3 in progress you: review step 2 on devbox");
+  assert.match(html, /<div class="step-line"><span class="accept">◆ 1 of 4 steps ready to review<\/span> · <span class="prog">step 3 in progress<\/span><\/div>/);
+  assert.doesNotMatch(html, /class="step |<payment>|to accept/, "the board row lists no steps");
+  const accepted = { ...required, steps: { ...required.steps, items: [{ number: 1, title: "Docs", state: "accepted", commits: [{ sha: "a", subject: "Docs" }] }, ...required.steps.items] } };
+  assert.equal(text(stepSummary(accepted)), "✓ step 1 accepted · ◆ 1 ready to review · step 3 in progress");
+  assert.match(text(taskRow(rowOf(accepted))), /you: push step 1 or review step 2 on devbox$/);
+  const two = { ...required, steps: { ...required.steps, items: required.steps.items.map((step) => ({ ...step, state: "in-progress" })) } };
+  assert.equal(text(stepSummary(two)), "steps 2, 3, 4 in progress");
 });
 
-test("a step's label follows its state, and a rules check that passed adds nothing to it", () => {
-  const steps = { pushed: 0, items: [{ number: 1, title: "Docs", state: "accepted", sha: "aaa" }, { number: 2, title: "Tests", state: "committed", sha: "bbb", rules: { state: "ok" } }] };
-  assert.equal(text(stepLines({ ...payments, steps: { ...steps, required: true } })), "✓ 1 Docs accepted ● 2 Tests committed");
-  assert.equal(text(taskRow(rowOf({ ...payments, next_for_you: "answer: Keep it?", steps: { ...steps, required: true } }))).endsWith("you: answer: Keep it?"), true, "what kebbie asks of you comes before an accept");
+test("what kebbie asks of you comes before a step to review, and steps that need no accepting ask nothing of you", () => {
+  assert.equal(text(taskRow(rowOf({ ...required, next_for_you: "answer: Keep it?" }))).endsWith("you: answer: Keep it?"), true);
+  for (const steps of [payments.steps, { ...payments.steps, required: false }]) assert.doesNotMatch(text(taskRow(rowOf({ ...payments, steps }))), /you:/);
 });
 
-test("steps that need no accepting count nothing to accept, ask nothing of you and say push takes what is committed", () => {
-  for (const steps of [payments.steps, { ...payments.steps, required: false }]) {
-    const said = text(taskRow(rowOf({ ...payments, steps })));
-    assert.equal(said, "payments devbox api · 2 commits ↑ 1 pushed ● 2 Charge through a PaymentGateway committed ◐ 3 Add the new gateway in progress ○ 4 Remove the old <payment> client accepting each step is optional: push takes what is committed");
-    assert.doesNotMatch(said, /to accept|you:/);
-  }
+test("the task card lists the steps as the way in: a step to review or accepted opens, one being built or planned does not", () => {
+  const items = [
+    { number: 1, title: "Docs", state: "pushed", commits: [{ sha: "a", subject: "Docs" }] },
+    { number: 2, title: "Charge through a PaymentGateway", state: "ready", commits: [{ sha: "b", subject: "x" }, { sha: "c", subject: "y" }] },
+    { number: 3, title: "Add <the> gateway", state: "accepted", commits: [{ sha: "d", subject: "z" }] },
+    { number: 4, title: "Remove the client", state: "in-progress", commits: [{ sha: "e", subject: "w" }] },
+    { number: 5, title: "Five", state: "in-progress", commits: [] },
+  ];
+  const html = stepList({ ...required, steps: { pushed: 1, required: true, items } }, { href: (n) => `#/review/m/a/${n}`, selected: 2 });
+  assert.equal(text(html), "↑ 1 Docs pushed ● 2 Charge through a PaymentGateway 2 commits · to review ✓ 3 Add <the> gateway accepted · push ◐ 4 Remove the client in progress · 1 commit ◐ 5 Five in progress");
+  assert.match(html, /<a class="step s-ready on" href="#\/review\/m\/a\/2" aria-current="true">.*<svg class="chev"/);
+  assert.match(html, /<a class="step s-accepted" href="#\/review\/m\/a\/3">/);
+  assert.match(html, /<div class="step s-pushed">/);
+  assert.match(html, /<div class="step s-in-progress">/);
+  assert.doesNotMatch(html, /<div class="pushed">/, "a step listed as pushed is not counted again");
+  assert.doesNotMatch(html, /<payment>|<the>/);
+  assert.doesNotMatch(stepList(required), /<a /, "without a link the rows are text");
+});
+
+test("after the two nearest planned steps the rest fold into one line that opens them", () => {
+  const items = [{ number: 1, title: "One", state: "ready", commits: [{ sha: "a", subject: "One" }] }, ...[2, 3, 4, 5, 6].map((number) => ({ number, title: `Step ${number}`, state: "planned", commits: [] }))];
+  const steps = { ...required, steps: { pushed: 0, required: true, items } };
+  const folded = stepList(steps);
+  assert.equal(text(folded), "● 1 One 1 commit · to review ○ 2 Step 2 ○ 3 Step 3 3 more planned");
+  assert.match(folded, /<button type="button" class="more" data-action="steps-more" aria-expanded="false">3 more planned<svg/);
+  const open = stepList(steps, { more: true });
+  assert.match(text(open), /○ 6 Step 6 Fewer planned$/);
+  assert.match(open, /aria-expanded="true"/);
 });
 
 test("a task without steps shows its row as before, and the board's count only when something waits", () => {
   const plain = { ...payments, steps: undefined };
   assert.equal(text(taskRow(rowOf(plain))), "payments devbox api · 2 commits");
-  assert.equal(stepLines(plain), "");
-  assert.equal(stepLines({ ...payments, steps: { pushed: 0, items: [] } }), "");
+  assert.equal(stepList(plain), "");
+  assert.equal(stepSummary(plain), "");
+  assert.equal(stepList({ ...payments, steps: { pushed: 0, items: [] } }), "");
   assert.equal(text(acceptCount(3)), "◆ 3 to accept");
   assert.equal(acceptCount(0), "");
+  assert.match(text(stepList(payments)), /accepting each step is optional: push takes what is committed$/);
 });
 
 test("a question's options show as cards with only the recommended one marked, and answering points to the machine", () => {
@@ -526,17 +549,18 @@ test("Account shows one Notifications row under This device, and its own page ho
 });
 
 test("a step shows a rules check that is running, broken or pushed past on its own line, and a passed one not at all", () => {
-  const row = (rules) => text(stepLines({ ...payments, steps: { pushed: 0, required: true, items: [{ number: 1, title: "Docs", state: "committed", sha: "aaa", rules }] } }));
-  assert.equal(row({ state: "ok" }), "● 1 Docs committed");
-  assert.equal(row({ state: "checking" }), "● 1 Docs committed checking project rules");
-  assert.equal(row({ state: "breaks", breaks: 1 }), "● 1 Docs committed breaks 1 project rule");
-  assert.equal(row({ state: "breaks", breaks: 3, names: ["Every commit says why"] }), "● 1 Docs committed breaks 3 project rules", "a board row only counts; names open on the card");
-  assert.equal(row({ state: "breaks", breaks: 2, override: { by: "user" } }), "● 1 Docs committed breaks 2 project rules pushed past the rules check by you");
-  assert.equal(row({ state: "checking", override: { by: "lead" } }), "● 1 Docs committed pushed past the rules check by the lead");
-  const card = stepLines({ ...payments, steps: { pushed: 0, items: [{ number: 1, title: "Docs", state: "committed", sha: "aaa", rules: { state: "breaks", breaks: 2, names: ["Every commit says why", "<No> TODO"] } }] } }, { expandable: true });
+  const row = (rules) => text(stepList({ ...payments, steps: { pushed: 0, required: true, items: [{ number: 1, title: "Docs", state: "ready", commits: [{ sha: "aaa", subject: "Docs" }], rules }] } }));
+  const docs = "● 1 Docs 1 commit · to review";
+  assert.equal(row({ state: "ok" }), docs);
+  assert.equal(row({ state: "checking" }), `${docs} checking project rules`);
+  assert.equal(row({ state: "breaks", breaks: 1 }), `${docs} breaks 1 project rule`);
+  assert.equal(row({ state: "breaks", breaks: 3, names: ["Every commit says why"] }), `${docs} breaks 3 project rules`, "without expanding, a row only counts");
+  assert.equal(row({ state: "breaks", breaks: 2, override: { by: "user" } }), `${docs} breaks 2 project rules pushed past the rules check by you`);
+  assert.equal(row({ state: "checking", override: { by: "lead" } }), `${docs} pushed past the rules check by the lead`);
+  const card = stepList({ ...payments, steps: { pushed: 0, items: [{ number: 1, title: "Docs", state: "ready", commits: [{ sha: "aaa", subject: "Docs" }], rules: { state: "breaks", breaks: 2, names: ["Every commit says why", "<No> TODO"] } }] } }, { expandable: true });
   assert.match(card, /<details class="rules-names"><summary class="warn">breaks 2 project rules<\/summary><ul><li>Every commit says why<\/li><li>&#60;No&#62; TODO<\/li><\/ul><\/details>/);
   assert.equal(rulesLines(null), "");
-  assert.doesNotMatch(stepLines(payments), /approved|rules ✓/);
+  assert.doesNotMatch(stepList(payments), /approved|rules ✓/);
 });
 
 test("a device waiting on a machine gets Approve and Deny there, only from a device that machine approved and that takes decisions", async () => {
@@ -576,7 +600,7 @@ test("the device's history names review comments by count and an accept by its s
   const entry = (payload) => historyEntry({ payload, machineName: "MacBook", at: 1_761_070_000, exp: 1_761_073_600, result: done }, 1_761_070_000).what;
   const comment = { path: "src/a.rs", line: 1, side: "new", text: "x" };
   assert.equal(entry({ type: "review-comments", address: "retry-push@kebbie", step: 1, comments: [comment, comment, comment] }), "Sent 3 review comments on retry-push@kebbie");
-  assert.equal(entry({ type: "accept-step", address: "retry-push@kebbie", step: 1, sha: "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e" }), "Accepted step 1 of retry-push@kebbie");
+  assert.equal(entry({ type: "accept-step", address: "retry-push@kebbie", step: 1, head: "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e" }), "Accepted step 1 of retry-push@kebbie");
   assert.equal(entry({ type: "review-read", address: "retry-push@kebbie", path: "src/ci.rs", read: true, content: "a".repeat(40) }), "Marked src/ci.rs read on retry-push@kebbie");
   assert.equal(entry({ type: "review-open", address: "retry-push@kebbie" }), "Opened the review of retry-push@kebbie");
 });

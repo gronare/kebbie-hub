@@ -85,7 +85,7 @@ export const isAsleep = (machine, now) => machine.lastSeen === null || now - mac
 
 export const acceptRequired = (item) => item.steps?.required === true;
 
-export const toAccept = (item) => (acceptRequired(item) ? item.steps.items.filter((step) => step.state === "committed").length : 0);
+export const toAccept = (item) => (acceptRequired(item) ? item.steps.items.filter((step) => step.state === "ready").length : 0);
 
 const byUrgency = (a, b) => a.item.urgency - b.item.urgency || a.item.address.localeCompare(b.item.address) || a.name.localeCompare(b.name);
 

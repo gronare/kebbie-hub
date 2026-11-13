@@ -21,7 +21,7 @@ use crate::blob::{BLOB_DOMAIN, seal_blob_with};
 use crate::board::{
     Agent, BlobRef, AgentStatus, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
     MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Prompt, PromptOption, Question, QuestionOption, Report, RoutineSummary,
-    Rules, RulesState, SecondOpinion, Step, StepState, Steps, Verdict, VerdictOutcome,
+    Rules, RulesState, SecondOpinion, Step, StepCommit, StepState, Steps, Verdict, VerdictOutcome,
 };
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 use crate::crypto::{
@@ -37,7 +37,7 @@ use crate::ids::{Id, Prefix};
 use crate::review::{
     AcceptStep, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
-    ReviewOpen, ReviewRead, ReviewStep, Side,
+    ReviewCommit, ReviewOpen, ReviewRead, ReviewStep, Side,
 };
 use crate::message::{
     Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
@@ -290,12 +290,12 @@ fn stepped_board() -> Payload {
     let Payload::Board(mut board) = board() else {
         unreachable!()
     };
-    let step = |number: u32, title: &str, state: StepState, sha: Option<&str>| Step {
+    let step = |number: u32, title: &str, state: StepState, commits: &[(&str, &str)]| Step {
         number,
         title: title.into(),
         state,
-        sha: sha.map(Into::into),
-        rules: (state == StepState::Committed).then(|| rules(RulesState::Ok)),
+        commits: commits.iter().map(|(sha, subject)| StepCommit { sha: (*sha).into(), subject: (*subject).into() }).collect(),
+        rules: (state == StepState::Ready).then(|| rules(RulesState::Ok)),
     };
     board.items = vec![Item {
         address: "payments@api".into(),
@@ -330,9 +330,10 @@ fn stepped_board() -> Payload {
         steps: Some(Steps {
             pushed: 1,
             items: vec![
-                step(2, "Charge through a PaymentGateway", StepState::Committed, Some(HEAD)),
-                step(3, "Add the new gateway", StepState::InProgress, None),
-                step(4, "Remove the old payment client", StepState::Planned, None),
+                step(1, "Name the currency on every amount", StepState::Pushed, &[(PUSHED_COMMIT, "Name the currency on every amount")]),
+                step(2, "Charge through a PaymentGateway", StepState::Ready, &[(FIRST_COMMIT, FIRST_SUBJECT), (HEAD, HEAD_SUBJECT)]),
+                step(3, "Add the new gateway", StepState::InProgress, &[]),
+                step(4, "Remove the old payment client", StepState::Planned, &[]),
             ],
             required: None,
         }),
@@ -640,9 +641,53 @@ fn questions_open() -> Payload {
 
 const REVIEWED: &str = "payments@api";
 const GATEWAY_CONTENT: &str = "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d";
+const GATEWAY_FIRST_CONTENT: &str = "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b";
+const ORDERS_CONTENT: &str = "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567";
+const PUSHED_COMMIT: &str = "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e";
+const FIRST_COMMIT: &str = "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90";
+const FIRST_SUBJECT: &str = "Add the PaymentGateway trait";
+const HEAD_SUBJECT: &str = "Charge orders through the gateway in cents";
 
 fn review() -> Review {
     let line = |kind: LineKind, old: Option<u32>, new: Option<u32>, text: &str| DiffLine { kind, old, new, text: text.into() };
+    let file = |path: &str, status: FileStatus, content: &str, read: bool, head: &str, lines: Vec<DiffLine>| ReviewFile {
+        path: path.into(),
+        old_path: None,
+        status,
+        add: lines.iter().filter(|line| line.kind == LineKind::Add).count() as u32,
+        del: lines.iter().filter(|line| line.kind == LineKind::Del).count() as u32,
+        content: content.into(),
+        read,
+        omitted: false,
+        hunks: vec![Hunk { head: head.into(), lines }],
+    };
+    let gateway_added = |content: &str, read: bool, charge: &str| {
+        file("src/gateway.rs", FileStatus::Added, content, read, "@@ -0,0 +1,3 @@", vec![
+            line(LineKind::Add, None, Some(1), "pub trait PaymentGateway {"),
+            line(LineKind::Add, None, Some(2), charge),
+            line(LineKind::Add, None, Some(3), "}"),
+        ])
+    };
+    let orders = || {
+        file("src/orders.rs", FileStatus::Modified, ORDERS_CONTENT, true, "@@ -40,3 +40,3 @@ impl Order {", vec![
+            line(LineKind::Context, Some(40), Some(40), "    pub fn pay(&self) -> Result<Receipt> {"),
+            line(LineKind::Del, Some(41), None, "        client::charge(self.total as f64)"),
+            line(LineKind::Add, None, Some(41), "        self.gateway.charge(self.total)"),
+            line(LineKind::Context, Some(42), Some(42), "    }"),
+        ])
+    };
+    let logo = || ReviewFile {
+        path: "assets/logo.png".into(),
+        old_path: None,
+        status: FileStatus::Modified,
+        add: 0,
+        del: 0,
+        content: "f".repeat(64),
+        read: false,
+        omitted: true,
+        hunks: Vec::new(),
+    };
+    let cents = "    fn charge(&self, cents: u64) -> Result<Receipt>;";
     Review {
         address: REVIEWED.into(),
         since: "main".into(),
@@ -650,66 +695,46 @@ fn review() -> Review {
         step: Some(ReviewStep {
             number: 2,
             title: "Charge through a PaymentGateway".into(),
-            sha: HEAD.into(),
-            subject: "Charge through a PaymentGateway".into(),
-            body: "Orders charge through the gateway trait, so the new provider slots in next.".into(),
+            commits: vec![
+                ReviewCommit {
+                    sha: FIRST_COMMIT.into(),
+                    subject: FIRST_SUBJECT.into(),
+                    body: "Orders will charge through a trait, so the new provider slots in next.".into(),
+                    files: vec![gateway_added(GATEWAY_FIRST_CONTENT, true, "    fn charge(&self, amount: f64) -> Result<Receipt>;")],
+                },
+                ReviewCommit {
+                    sha: HEAD.into(),
+                    subject: HEAD_SUBJECT.into(),
+                    body: "A float drops cents on large orders; the gateway takes whole cents.".into(),
+                    files: vec![
+                        file("src/gateway.rs", FileStatus::Modified, GATEWAY_CONTENT, false, "@@ -1,3 +1,3 @@", vec![
+                            line(LineKind::Context, Some(1), Some(1), "pub trait PaymentGateway {"),
+                            line(LineKind::Del, Some(2), None, "    fn charge(&self, amount: f64) -> Result<Receipt>;"),
+                            line(LineKind::Add, None, Some(2), cents),
+                            line(LineKind::Context, Some(3), Some(3), "}"),
+                        ]),
+                        orders(),
+                        logo(),
+                    ],
+                },
+            ],
+            files: vec![gateway_added(GATEWAY_CONTENT, false, cents), orders(), logo()],
         }),
         guide: vec![
             GuideNote { path: "src/gateway.rs".into(), text: "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float.".into() },
             GuideNote { path: "src/orders.rs".into(), text: "Orders call the trait instead of the client.".into() },
         ],
         left_out: Some("Left out: the CHANGES.md line, which the release writes.".into()),
-        files: vec![
-            ReviewFile {
-                path: "src/gateway.rs".into(),
-                old_path: None,
-                status: FileStatus::Added,
-                add: 3,
-                del: 0,
-                content: GATEWAY_CONTENT.into(),
-                read: false,
-                omitted: false,
-                hunks: vec![Hunk {
-                    head: "@@ -0,0 +1,3 @@".into(),
-                    lines: vec![
-                        line(LineKind::Add, None, Some(1), "pub trait PaymentGateway {"),
-                        line(LineKind::Add, None, Some(2), "    fn charge(&self, cents: u64) -> Result<Receipt>;"),
-                        line(LineKind::Add, None, Some(3), "}"),
-                    ],
-                }],
-            },
-            ReviewFile {
-                path: "src/orders.rs".into(),
-                old_path: None,
-                status: FileStatus::Modified,
-                add: 1,
-                del: 1,
-                content: "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567".into(),
-                read: true,
-                omitted: false,
-                hunks: vec![Hunk {
-                    head: "@@ -40,3 +40,3 @@ impl Order {".into(),
-                    lines: vec![
-                        line(LineKind::Context, Some(40), Some(40), "    pub fn pay(&self) -> Result<Receipt> {"),
-                        line(LineKind::Del, Some(41), None, "        client::charge(self.total as f64)"),
-                        line(LineKind::Add, None, Some(41), "        self.gateway.charge(self.total)"),
-                        line(LineKind::Context, Some(42), Some(42), "    }"),
-                    ],
-                }],
-            },
-            ReviewFile {
-                path: "assets/logo.png".into(),
-                old_path: None,
-                status: FileStatus::Modified,
-                add: 0,
-                del: 0,
-                content: "f".repeat(64),
-                read: false,
-                omitted: true,
-                hunks: Vec::new(),
-            },
-        ],
+        files: Vec::new(),
     }
+}
+
+fn review_from_a_machine_not_yet_updated() -> Value {
+    let mut body = serde_json::to_value(review()).unwrap();
+    let step = body["step"].take();
+    body["files"] = step["files"].clone();
+    body["step"] = json!({ "number": 2, "title": step["title"], "sha": HEAD, "subject": HEAD_SUBJECT, "body": step["commits"][1]["body"] });
+    body
 }
 
 fn review_blob() -> (BlobRef, Vec<u8>) {
@@ -731,7 +756,7 @@ fn review_board() -> Payload {
 }
 
 fn review_open() -> Payload {
-    Payload::ReviewOpen(ReviewOpen { address: REVIEWED.into() })
+    Payload::ReviewOpen(ReviewOpen { address: REVIEWED.into(), step: Some(2) })
 }
 
 fn review_comments() -> Payload {
@@ -746,11 +771,11 @@ fn review_comments() -> Payload {
 }
 
 fn review_read() -> Payload {
-    Payload::ReviewRead(ReviewRead { address: REVIEWED.into(), path: "src/gateway.rs".into(), read: true, content: GATEWAY_CONTENT.into() })
+    Payload::ReviewRead(ReviewRead { address: REVIEWED.into(), path: "src/gateway.rs".into(), read: true, content: GATEWAY_CONTENT.into(), sha: Some(HEAD.into()) })
 }
 
 fn accept_step() -> Payload {
-    Payload::AcceptStep(AcceptStep { address: REVIEWED.into(), step: 2, sha: HEAD.into() })
+    Payload::AcceptStep(AcceptStep { address: REVIEWED.into(), step: 2, head: HEAD.into() })
 }
 
 fn review_ready() -> Payload {
@@ -2770,12 +2795,17 @@ fn review_json() -> Value {
         ("a field kebbie does not know", with("range", json!([40, 42])), false),
         ("a read mark", serde_json::to_value(review_read()).unwrap(), true),
         ("a read mark on a 64-character object id", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": false, "content": "a".repeat(64) }), true),
+        ("a read mark on the whole step, naming no commit", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": GATEWAY_CONTENT }), true),
+        ("a read mark in a commit named by a short sha", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": GATEWAY_CONTENT, "sha": "9f3c2a1" }), false),
         ("a read mark on a short hash", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": "5d1c0a9" }), false),
         ("a read mark without its content", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true }), false),
         ("an accept", serde_json::to_value(accept_step()).unwrap(), true),
-        ("an accept of step zero", json!({ "type": "accept-step", "address": REVIEWED, "step": 0, "sha": HEAD }), false),
-        ("an accept of a short sha", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "sha": "9f3c2a1" }), false),
-        ("a review asked for", serde_json::to_value(review_open()).unwrap(), true),
+        ("an accept of step zero", json!({ "type": "accept-step", "address": REVIEWED, "step": 0, "head": HEAD }), false),
+        ("an accept of a short head", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "head": "9f3c2a1" }), false),
+        ("an accept naming a sha instead of the step's head", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "sha": HEAD }), false),
+        ("a review of a step asked for", serde_json::to_value(review_open()).unwrap(), true),
+        ("a review of the first step waiting asked for", json!({ "type": "review-open", "address": REVIEWED }), true),
+        ("a review of step zero asked for", json!({ "type": "review-open", "address": REVIEWED, "step": 0 }), false),
         ("a review asked for a task without its repo", json!({ "type": "review-open", "address": "payments" }), false),
         ("a push through a step", serde_json::to_value(push_through(2)).unwrap(), true),
         ("a push through step zero", json!({ "type": "push", "address": REVIEWED, "head": HEAD, "card_sha": null, "through_step": 0 }), false),
@@ -2810,7 +2840,7 @@ fn review_json() -> Value {
     let rules: Vec<Value> = rules
         .into_iter()
         .map(|(name, rules, valid)| {
-            for pointer in ["/items/0/git/rules", "/items/0/steps/items/0/rules"] {
+            for pointer in ["/items/0/git/rules", "/items/0/steps/items/1/rules"] {
                 let mut board = stepped.clone();
                 *board.pointer_mut(pointer).unwrap() = rules.clone();
                 let parsed = serde_json::from_value::<Payload>(board);
@@ -2830,15 +2860,30 @@ fn review_json() -> Value {
         changed.pointer_mut(parent).unwrap()[key] = value;
         changed
     };
+    let mut branch = body.clone();
+    branch["files"] = branch["step"]["files"].clone();
+    branch["step"] = Value::Null;
     let bodies = [
-        ("the review", body.clone(), true),
-        ("an absolute path", change("/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
-        ("counts that differ from the lines", change("/files/1/add", json!(2)), false),
-        ("an added line with an old number", change("/files/0/hunks/0/lines/0/old", json!(1)), false),
-        ("an omitted file with hunks", change("/files/0/omitted", json!(true)), false),
+        ("the review of a step of two commits", body.clone(), true),
+        ("the review of a branch without steps", branch.clone(), true),
+        ("a review of a step from a machine not yet updated", review_from_a_machine_not_yet_updated(), true),
+        ("an absolute path", change("/step/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
+        ("an absolute path in a commit", change("/step/commits/1/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
+        ("counts that differ from the lines", change("/step/files/1/add", json!(2)), false),
+        ("counts in a commit that differ from its lines", change("/step/commits/1/files/0/del", json!(0)), false),
+        ("an added line with an old number", change("/step/files/0/hunks/0/lines/0/old", json!(1)), false),
+        ("an omitted file with hunks", change("/step/files/0/omitted", json!(true)), false),
         ("a short head", change("/head", json!("9f3c2a1")), false),
-        ("a content hash in capitals", change("/files/1/content", json!("0A1B2C3D4E5F60718293A4B5C6D7E8F901234567")), false),
-        ("a renamed file without its old path", change("/files/1/status", json!("renamed")), false),
+        ("a head that is not the step's last commit", change("/head", json!(FIRST_COMMIT)), false),
+        ("a commit named by a short sha", change("/step/commits/0/sha", json!("a41c9e0")), false),
+        ("one commit listed twice", change("/step/commits/0/sha", json!(HEAD)), false),
+        ("a step without commits", change("/step/commits", json!([])), false),
+        ("step zero", change("/step/number", json!(0)), false),
+        ("a step whose files sit on the review", change("/files", body["step"]["files"].clone()), false),
+        ("a commit without its files", { let mut changed = body.clone(); changed["step"]["commits"][0].as_object_mut().unwrap().remove("files"); changed }, false),
+        ("a content hash in capitals", change("/step/files/1/content", json!("0A1B2C3D4E5F60718293A4B5C6D7E8F901234567")), false),
+        ("a renamed file without its old path", change("/step/files/1/status", json!("renamed")), false),
+        ("a branch file listed twice", { let mut changed = branch.clone(); changed["files"][1] = branch["files"][0].clone(); changed }, false),
     ];
     let bodies: Vec<Value> = bodies
         .into_iter()
@@ -2848,6 +2893,8 @@ fn review_json() -> Value {
             json!({ "name": name, "body": body, "valid": valid })
         })
         .collect();
+    let old = review_from_a_machine_not_yet_updated();
+    let legacy_review = json!({ "body": old.clone(), "opens_as": serde_json::from_value::<Review>(old).unwrap() });
     json!({
         "media_type": REVIEW_MEDIA_TYPE,
         "max_comments": MAX_REVIEW_COMMENTS,
@@ -2861,8 +2908,23 @@ fn review_json() -> Value {
         "payloads": payloads,
         "rules": rules,
         "board_from_a_machine_not_yet_updated": legacy,
+        "steps_from_a_machine_not_yet_updated": steps_from_a_machine_not_yet_updated(),
+        "review_from_a_machine_not_yet_updated": legacy_review,
         "bodies": bodies,
     })
+}
+
+fn steps_from_a_machine_not_yet_updated() -> Value {
+    let mut old = serde_json::to_value(stepped_board()).unwrap();
+    old["items"][0]["steps"]["items"] = json!([
+        { "number": 2, "title": "Charge through a PaymentGateway", "state": "committed", "sha": HEAD, "rules": { "state": "ok" } },
+        { "number": 3, "title": "Add the new gateway", "state": "in-progress", "sha": null },
+        { "number": 4, "title": "Remove the old payment client", "state": "planned", "sha": null },
+        { "number": 5, "title": "Docs", "state": "accepted", "sha": PUSHED_COMMIT },
+    ]);
+    let parsed: Payload = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(parsed.validate(), Ok(()), "a board from a machine not yet updated still opens");
+    json!({ "board": old, "opens_as": parsed })
 }
 
 fn review_comments_json() -> Value {

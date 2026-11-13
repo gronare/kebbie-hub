@@ -32,7 +32,7 @@ pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob,
 pub use board::{
     Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
     Later, LaterState, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextPart, NextRow, OverrideBy, Prompt, PromptOption, PushPermission,
-    Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Step, StepState, Steps,
+    Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Step, StepCommit, StepState, Steps,
     Verdict, VerdictOutcome,
 };
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
@@ -56,7 +56,7 @@ pub use message::{
 pub use review::{
     AcceptStep, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
-    ReviewOpen, ReviewRead, ReviewStep, Side, is_content_hash,
+    ReviewCommit, ReviewOpen, ReviewRead, ReviewStep, Side, is_content_hash,
 };
 
 pub const PROTOCOL_VERSION: u16 = 1;

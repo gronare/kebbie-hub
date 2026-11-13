@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, stepHead, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -131,15 +131,35 @@ test("a board item's steps carry only their own fields and known states, and a b
   const plain = envelopes.cases.find((vector) => vector.name === "board-opened-by-a-device").expect.payload;
   assert.equal(Object.hasOwn(plain.items[0], "steps"), false);
   checkPayload(plain);
-  const subject = structuredClone(stepped);
-  subject.items[0].steps.items[0].subject = "Charge through a PaymentGateway";
-  const state = structuredClone(stepped);
-  state.items[0].steps.items[0].state = "pushed";
-  const pushed = structuredClone(stepped);
-  pushed.items[0].steps.pushed = -1;
-  for (const payload of [subject, state, pushed]) {
-    assert.throws(() => checkPayload(payload), (error) => error.code === "malformed");
+  assert.deepEqual(stepped.items[0].steps.items.map((step) => [step.number, step.state, step.commits.length]), [[1, "pushed", 1], [2, "ready", 2], [3, "in-progress", 0], [4, "planned", 0]]);
+  assert.equal(stepHead(stepped.items[0].steps.items[1]), stepped.items[0].head, "a step's head is its last commit");
+  const broken = [
+    (board) => (board.items[0].steps.items[1].subject = "Charge through a PaymentGateway"),
+    (board) => (board.items[0].steps.items[1].state = "merged"),
+    (board) => (board.items[0].steps.pushed = -1),
+    (board) => (board.items[0].steps.items[1].sha = board.items[0].head),
+    (board) => (board.items[0].steps.items[1].commits[0].body = "Why."),
+    (board) => (board.items[0].steps.items[3].commits = [{ sha: "a41c9e0", subject: "Early" }]),
+    (board) => (board.items[0].steps.items[1].commits = []),
+    (board) => (board.items[0].steps.items[0].commits = []),
+    (board) => (board.items[0].steps.items[0].number = 0),
+  ];
+  for (const [index, change] of broken.entries()) {
+    const board = structuredClone(stepped);
+    change(board);
+    assert.throws(() => checkPayload(board), (error) => error.code === "malformed", `change ${index}`);
   }
+});
+
+test("steps from a machine not yet updated open as Rust opens them: one commit each, committed as ready", async () => {
+  const { board, opens_as } = load("review.json").steps_from_a_machine_not_yet_updated;
+  checkPayload(board);
+  assert.deepEqual(payloadOf(board), opens_as);
+  assert.deepEqual(opens_as.items[0].steps.items[0], { number: 2, title: "Charge through a PaymentGateway", state: "ready", commits: [{ sha: board.items[0].head, subject: "Charge through a PaymentGateway" }], rules: { state: "ok" } });
+  assert.deepEqual(payloadOf(opens_as), opens_as, "a board already in the new shape opens as it is");
+  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account");
+  const opened = await openEnvelope(stepped.envelope, await identity("account"), await sender("machine"), envelopes.now);
+  assert.deepEqual(opened, stepped.expect.payload);
 });
 
 test("a question's plan and a task's card are blob refs, the plan's time sits on the question, and neither carries its text", () => {
@@ -686,10 +706,10 @@ test("a task and each step carry a rules check that passes or fails as Rust's va
   assert.deepEqual([review.max_rule_names, review.max_rule_name_chars], [MAX_RULE_NAMES, MAX_RULE_NAME_CHARS]);
   const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account").expect.payload;
   checkPayload(stepped);
-  assert.deepEqual([stepped.items[0].git.rules, stepped.items[0].steps.items[0].rules], [{ state: "checking" }, { state: "ok" }]);
+  assert.deepEqual([stepped.items[0].git.rules, stepped.items[0].steps.items[1].rules], [{ state: "checking" }, { state: "ok" }]);
   const withRules = (rules, onStep) => {
     const board = structuredClone(stepped);
-    if (onStep) board.items[0].steps.items[0].rules = rules;
+    if (onStep) board.items[0].steps.items[1].rules = rules;
     else board.items[0].git.rules = rules;
     return board;
   };
@@ -728,6 +748,11 @@ test("a review opens from the blob its result names, checked as Rust checks it, 
   const body = JSON.parse(new TextDecoder().decode(await openBlob(review.blob, fromB64(review.ciphertext))));
   assert.deepEqual(body, review.review);
   for (const { name, body: candidate, valid } of review.bodies) assert.equal((await failure(Promise.resolve().then(() => checkReview(candidate)))) === null, valid, name);
+  assert.deepEqual(readReview(review.review), review.review, "a review in the new shape opens as it is");
+  assert.deepEqual(readReview(review.review_from_a_machine_not_yet_updated.body), review.review_from_a_machine_not_yet_updated.opens_as, "an older machine's review opens as one commit, as Rust opens it");
+  const [first, last] = review.review.step.commits;
+  assert.deepEqual([first.files.map((file) => [file.path, file.read]), last.files.map((file) => [file.path, file.read])], [[["src/gateway.rs", true]], [["src/gateway.rs", false], ["src/orders.rs", true], ["assets/logo.png", false]]]);
+  assert.notEqual(first.files[0].content, review.review.step.files[0].content, "a file read in one commit and changed again in the next names new content on the step");
   const ready = envelopes.cases.find((vector) => vector.name === "review-result-naming-its-blob-opened-by-the-account");
   const opened = await openEnvelope(ready.envelope, await identity("account"), await sender("machine"), envelopes.now);
   assert.deepEqual(opened.blob, review.blob);

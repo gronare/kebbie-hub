@@ -78,13 +78,13 @@ test("a board with steps opens with them, and the board counts the commits waiti
   const [opened] = await open([entry({ rev: stepped.expect.payload.rev, envelope: stepped.envelope })]);
   assert.equal(opened.problem, null);
   const [task] = opened.board.items;
-  assert.deepEqual(task.steps.items.map((step) => [step.number, step.state]), [[2, "committed"], [3, "in-progress"], [4, "planned"]]);
+  assert.deepEqual(task.steps.items.map((step) => [step.number, step.state]), [[1, "pushed"], [2, "ready"], [3, "in-progress"], [4, "planned"]]);
   assert.equal(toAccept(task), 0, "a board that does not say accepting is required counts nothing to accept");
   task.steps.required = true;
   assert.equal(toAccept(task), 1);
   const two = structuredClone(task.steps);
-  two.items[1] = { ...two.items[1], state: "committed", sha: "3333333cccc" };
-  two.items.push({ number: 5, title: "Docs", state: "accepted", sha: "5555555eeee" });
+  two.items[2] = { ...two.items[2], state: "ready", commits: [{ sha: "3333333cccc", subject: "Add the gateway" }] };
+  two.items.push({ number: 5, title: "Docs", state: "accepted", commits: [{ sha: "5555555eeee", subject: "Docs" }] });
   const view = arrange([
     machineWith("mch_a", "devbox", now - 10, [task, item("other@web", "WORKING", 0, { steps: two }), item("search@web", "WORKING")]),
     machineWith("mch_vm", "VM:en", now - SLEEP_AFTER - 1, [item("deps@infra", "WORKING", 0, { steps: two })]),

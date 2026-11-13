@@ -209,7 +209,7 @@ export function stepPushBlock({ step, machineName, ui, sent, state, standing = n
     const busy = ui.busy ? " disabled" : "";
     return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push step ${esc(step.number)} · ${esc(short)} to main?</b></p><p>The task's commits up to and including step ${esc(step.number)} go out; later steps stay here. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push-step"${busy}>Push</button></div></div>` + error;
   }
-  return status + `<button type="button" class="btn primary" data-action="push-ask">Push step ${esc(step.number)} · ${esc(short)}</button>` + error;
+  return status + `<button type="button" class="btn primary" data-action="push-ask">Push step ${esc(step.number)}</button>` + error;
 }
 
 export function refusedBlock(url) {

@@ -14,7 +14,7 @@ use kebbie_hub_protocol::{
     Idea, ItemAnswer, ItemEdit, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
-    PushApproval, ReviewOffer, ReviewRead, Side, StepState,
+    PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, StepState,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -683,45 +683,78 @@ impl MachineState {
     pub async fn post_review(&mut self, mut item: Item, review: Review) -> Result<u64, Error> {
         review.check().map_err(|problem| Error::Protocol(problem.to_string()))?;
         item.address = review.address.clone();
-        item.review = Some(ReviewOffer { step: review.step.as_ref().map(|step| step.number), files: review.files.len() as u32 });
+        self.reviews.insert(review_key(&review.address, review.step.as_ref().map(|step| step.number)), review);
+        item.review = self.offer(&item);
         let mut board = self.board.clone().unwrap_or_else(empty_board);
         board.items.retain(|held| held.address != item.address);
         board.items.insert(0, item);
-        self.reviews.insert(review.address.clone(), review);
         self.post_board(board).await
     }
 
-    fn seal_review(&mut self, address: &str) -> Result<BlobRef, Reason> {
-        let review = self.reviews.get(address).ok_or(Reason::AlreadySettled)?;
+    fn offer(&self, item: &Item) -> Option<ReviewOffer> {
+        let step = self.first_waiting(item);
+        let review = self.reviews.get(&review_key(&item.address, step))?;
+        Some(ReviewOffer { step, files: review.step.as_ref().map_or(&review.files, |step| &step.files).len() as u32 })
+    }
+
+    fn first_waiting(&self, item: &Item) -> Option<u32> {
+        let steps = item.steps.as_ref()?;
+        steps.items.iter().filter(|step| step.state == StepState::Ready).map(|step| step.number).find(|&number| self.reviews.contains_key(&review_key(&item.address, Some(number))))
+    }
+
+    fn opened_step(&self, open: &ReviewOpen) -> Option<u32> {
+        open.step.or_else(|| self.board.as_ref()?.items.iter().find(|item| item.address == open.address).and_then(|item| self.first_waiting(item)))
+    }
+
+    fn seal_review(&mut self, open: &ReviewOpen) -> Result<(BlobRef, Option<u32>), Reason> {
+        let step = self.opened_step(open);
+        let key = review_key(&open.address, step);
+        let review = self.reviews.get(&key).ok_or(Reason::AlreadySettled)?;
         let plaintext = serde_json::to_vec(review).expect("a review always serializes");
-        if let Some((held, blob, ciphertext)) = self.sealed_reviews.get(address)
+        if let Some((held, blob, ciphertext)) = self.sealed_reviews.get(&key)
             && *held == plaintext
         {
             self.review_blobs.push((blob.id.clone(), ciphertext.clone()));
-            return Ok(blob.clone());
+            return Ok((blob.clone(), step));
         }
         let (blob, ciphertext) = seal_blob(&plaintext, REVIEW_MEDIA_TYPE);
         self.review_blobs.push((blob.id.clone(), ciphertext.clone()));
-        if let Some((_, old, _)) = self.sealed_reviews.insert(address.to_string(), (plaintext, blob.clone(), ciphertext)) {
+        if let Some((_, old, _)) = self.sealed_reviews.insert(key, (plaintext, blob.clone(), ciphertext)) {
             self.superseded_blobs.push(old.id);
         }
-        Ok(blob)
+        Ok((blob, step))
     }
 
     fn mark_read(&mut self, read: &ReviewRead) -> Result<String, Reason> {
-        let review = self.reviews.get_mut(&read.address).ok_or(Reason::AlreadySettled)?;
-        let file = review.files.iter_mut().find(|file| file.path == read.path).ok_or(Reason::HeadMoved)?;
-        if file.content != read.content {
+        let prefix = review_key(&read.address, None);
+        let held = |key: &String| *key == prefix || key.starts_with(&format!("{prefix}#"));
+        if !self.reviews.keys().any(held) {
+            return Err(Reason::AlreadySettled);
+        }
+        let names = |file: &&mut ReviewFile| file.path == read.path && file.content == read.content;
+        let (mut in_commits, mut whole) = (Vec::new(), Vec::new());
+        for review in self.reviews.iter_mut().filter(|(key, _)| held(key)).map(|(_, review)| review) {
+            match review.step.as_mut() {
+                Some(step) => {
+                    in_commits.extend(step.commits.iter_mut().filter(|commit| read.sha.as_ref().is_none_or(|sha| *sha == commit.sha)).flat_map(|commit| commit.files.iter_mut()).filter(names));
+                    whole.extend(step.files.iter_mut().filter(names));
+                }
+                None => whole.extend(review.files.iter_mut().filter(names)),
+            }
+        }
+        if in_commits.is_empty() && (read.sha.is_some() || whole.is_empty()) {
             return Err(Reason::HeadMoved);
         }
-        file.read = read.read;
+        for file in in_commits.into_iter().chain(whole) {
+            file.read = read.read;
+        }
         Ok(format!("Marked {} {}.", read.path, if read.read { "read" } else { "unread" }))
     }
 
     fn accept_step(&mut self, accept: &AcceptStep) -> Result<String, Reason> {
         let item = self.board.as_mut().and_then(|board| board.items.iter_mut().find(|item| item.address == accept.address)).ok_or(Reason::UnknownRepo)?;
         let step = item.steps.as_mut().and_then(|steps| steps.items.iter_mut().find(|step| step.number == accept.step)).ok_or(Reason::HeadMoved)?;
-        if step.sha.as_deref() != Some(accept.sha.as_str()) {
+        if step.head() != Some(accept.head.as_str()) {
             return Err(Reason::HeadMoved);
         }
         if step.state == StepState::Accepted {
@@ -988,9 +1021,9 @@ impl MachineState {
                 self.decide(decision).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::ReviewOpen(open) => (
-                format!("open the review of {}", open.address),
-                match self.seal_review(&open.address) {
-                    Ok(blob) => CommandResult { blob: Some(blob), ..done(format!("The review of {} is ready.", open.address)) },
+                format!("open the review of {}{}", open.address, open.step.map_or(String::new(), |step| format!(" step {step}"))),
+                match self.seal_review(open) {
+                    Ok((blob, step)) => CommandResult { blob: Some(blob), ..done(format!("The review of {}{} is ready.", step.map_or(String::new(), |step| format!("step {step} of ")), open.address)) },
                     Err(reason) => refusal(command, device, reason),
                 },
             ),
@@ -1003,7 +1036,7 @@ impl MachineState {
                 self.mark_read(read).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::AcceptStep(accept) => (
-                format!("accept step {} at {} on {}", accept.step, accept.sha, accept.address),
+                format!("accept step {} at {} on {}", accept.step, accept.head, accept.address),
                 self.accept_step(accept).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
@@ -1129,6 +1162,10 @@ fn refusal(command: &Id, device: &Id, reason: Reason) -> CommandResult {
 
 fn plural(count: usize, one: &str) -> String {
     if count == 1 { format!("1 {one}") } else { format!("{count} {one}s") }
+}
+
+fn review_key(address: &str, step: Option<u32>) -> String {
+    step.map_or_else(|| address.to_string(), |step| format!("{address}#{step}"))
 }
 
 fn comment_lines(comments: &ReviewComments) -> String {

@@ -1,7 +1,7 @@
 {
   "blob": {
-    "bytes": 1700,
-    "id": "blb_b952aeeabc9e0b44d852a4cde2671ce78b9986e9fe095b25362dcb29dcbfe64d",
+    "bytes": 3501,
+    "id": "blb_0ee7118a6400fcaf904354d596082dbf26509f1093717edefab53419928920d1",
     "key": "o6_c4Hb4UCGFMZ_cTbSARU7sg-WFe9PWrSuI_r7Bz4s",
     "media_type": "application/vnd.kebbie.review+json"
   },
@@ -87,90 +87,7 @@
     {
       "body": {
         "address": "payments@api",
-        "files": [
-          {
-            "add": 3,
-            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-            "del": 0,
-            "hunks": [
-              {
-                "head": "@@ -0,0 +1,3 @@",
-                "lines": [
-                  {
-                    "kind": "add",
-                    "new": 1,
-                    "text": "pub trait PaymentGateway {"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 2,
-                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 3,
-                    "text": "}"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/gateway.rs",
-            "read": false,
-            "status": "added"
-          },
-          {
-            "add": 1,
-            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
-            "del": 1,
-            "hunks": [
-              {
-                "head": "@@ -40,3 +40,3 @@ impl Order {",
-                "lines": [
-                  {
-                    "kind": "context",
-                    "new": 40,
-                    "old": 40,
-                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
-                  },
-                  {
-                    "kind": "del",
-                    "old": 41,
-                    "text": "        client::charge(self.total as f64)"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 41,
-                    "text": "        self.gateway.charge(self.total)"
-                  },
-                  {
-                    "kind": "context",
-                    "new": 42,
-                    "old": 42,
-                    "text": "    }"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/orders.rs",
-            "read": true,
-            "status": "modified"
-          },
-          {
-            "add": 0,
-            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "del": 0,
-            "hunks": [],
-            "old_path": null,
-            "omitted": true,
-            "path": "assets/logo.png",
-            "read": false,
-            "status": "modified"
-          }
-        ],
+        "files": [],
         "guide": [
           {
             "path": "src/gateway.rs",
@@ -185,14 +102,232 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
           "title": "Charge through a PaymentGateway"
         }
       },
-      "name": "the review",
+      "name": "the review of a step of two commits",
       "valid": true
     },
     {
@@ -227,7 +362,112 @@
             ],
             "old_path": null,
             "omitted": false,
-            "path": "/Users/someone/api/src/gateway.rs",
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": null
+      },
+      "name": "the review of a branch without steps",
+      "valid": true
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
             "read": false,
             "status": "added"
           },
@@ -296,10 +536,256 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "body": "A float drops cents on large orders; the gateway takes whole cents.",
           "number": 2,
           "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
+          "subject": "Charge orders through the gateway in cents",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a review of a step from a machine not yet updated",
+      "valid": true
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "/Users/someone/api/src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
           "title": "Charge through a PaymentGateway"
         }
       },
@@ -309,90 +795,7 @@
     {
       "body": {
         "address": "payments@api",
-        "files": [
-          {
-            "add": 3,
-            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-            "del": 0,
-            "hunks": [
-              {
-                "head": "@@ -0,0 +1,3 @@",
-                "lines": [
-                  {
-                    "kind": "add",
-                    "new": 1,
-                    "text": "pub trait PaymentGateway {"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 2,
-                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 3,
-                    "text": "}"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/gateway.rs",
-            "read": false,
-            "status": "added"
-          },
-          {
-            "add": 2,
-            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
-            "del": 1,
-            "hunks": [
-              {
-                "head": "@@ -40,3 +40,3 @@ impl Order {",
-                "lines": [
-                  {
-                    "kind": "context",
-                    "new": 40,
-                    "old": 40,
-                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
-                  },
-                  {
-                    "kind": "del",
-                    "old": 41,
-                    "text": "        client::charge(self.total as f64)"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 41,
-                    "text": "        self.gateway.charge(self.total)"
-                  },
-                  {
-                    "kind": "context",
-                    "new": 42,
-                    "old": 42,
-                    "text": "    }"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/orders.rs",
-            "read": true,
-            "status": "modified"
-          },
-          {
-            "add": 0,
-            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "del": 0,
-            "hunks": [],
-            "old_path": null,
-            "omitted": true,
-            "path": "assets/logo.png",
-            "read": false,
-            "status": "modified"
-          }
-        ],
+        "files": [],
         "guide": [
           {
             "path": "src/gateway.rs",
@@ -407,10 +810,474 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "/Users/someone/api/src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "an absolute path in a commit",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 2,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
           "title": "Charge through a PaymentGateway"
         }
       },
@@ -420,91 +1287,7 @@
     {
       "body": {
         "address": "payments@api",
-        "files": [
-          {
-            "add": 3,
-            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-            "del": 0,
-            "hunks": [
-              {
-                "head": "@@ -0,0 +1,3 @@",
-                "lines": [
-                  {
-                    "kind": "add",
-                    "new": 1,
-                    "old": 1,
-                    "text": "pub trait PaymentGateway {"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 2,
-                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 3,
-                    "text": "}"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/gateway.rs",
-            "read": false,
-            "status": "added"
-          },
-          {
-            "add": 1,
-            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
-            "del": 1,
-            "hunks": [
-              {
-                "head": "@@ -40,3 +40,3 @@ impl Order {",
-                "lines": [
-                  {
-                    "kind": "context",
-                    "new": 40,
-                    "old": 40,
-                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
-                  },
-                  {
-                    "kind": "del",
-                    "old": 41,
-                    "text": "        client::charge(self.total as f64)"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 41,
-                    "text": "        self.gateway.charge(self.total)"
-                  },
-                  {
-                    "kind": "context",
-                    "new": 42,
-                    "old": 42,
-                    "text": "    }"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/orders.rs",
-            "read": true,
-            "status": "modified"
-          },
-          {
-            "add": 0,
-            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "del": 0,
-            "hunks": [],
-            "old_path": null,
-            "omitted": true,
-            "path": "assets/logo.png",
-            "read": false,
-            "status": "modified"
-          }
-        ],
+        "files": [],
         "guide": [
           {
             "path": "src/gateway.rs",
@@ -519,10 +1302,475 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "counts in a commit that differ from its lines",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "old": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
           "title": "Charge through a PaymentGateway"
         }
       },
@@ -532,90 +1780,7 @@
     {
       "body": {
         "address": "payments@api",
-        "files": [
-          {
-            "add": 3,
-            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-            "del": 0,
-            "hunks": [
-              {
-                "head": "@@ -0,0 +1,3 @@",
-                "lines": [
-                  {
-                    "kind": "add",
-                    "new": 1,
-                    "text": "pub trait PaymentGateway {"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 2,
-                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 3,
-                    "text": "}"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": true,
-            "path": "src/gateway.rs",
-            "read": false,
-            "status": "added"
-          },
-          {
-            "add": 1,
-            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
-            "del": 1,
-            "hunks": [
-              {
-                "head": "@@ -40,3 +40,3 @@ impl Order {",
-                "lines": [
-                  {
-                    "kind": "context",
-                    "new": 40,
-                    "old": 40,
-                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
-                  },
-                  {
-                    "kind": "del",
-                    "old": 41,
-                    "text": "        client::charge(self.total as f64)"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 41,
-                    "text": "        self.gateway.charge(self.total)"
-                  },
-                  {
-                    "kind": "context",
-                    "new": 42,
-                    "old": 42,
-                    "text": "    }"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/orders.rs",
-            "read": true,
-            "status": "modified"
-          },
-          {
-            "add": 0,
-            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "del": 0,
-            "hunks": [],
-            "old_path": null,
-            "omitted": true,
-            "path": "assets/logo.png",
-            "read": false,
-            "status": "modified"
-          }
-        ],
+        "files": [],
         "guide": [
           {
             "path": "src/gateway.rs",
@@ -630,10 +1795,228 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": true,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
           "title": "Charge through a PaymentGateway"
         }
       },
@@ -643,90 +2026,7 @@
     {
       "body": {
         "address": "payments@api",
-        "files": [
-          {
-            "add": 3,
-            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-            "del": 0,
-            "hunks": [
-              {
-                "head": "@@ -0,0 +1,3 @@",
-                "lines": [
-                  {
-                    "kind": "add",
-                    "new": 1,
-                    "text": "pub trait PaymentGateway {"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 2,
-                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 3,
-                    "text": "}"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/gateway.rs",
-            "read": false,
-            "status": "added"
-          },
-          {
-            "add": 1,
-            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
-            "del": 1,
-            "hunks": [
-              {
-                "head": "@@ -40,3 +40,3 @@ impl Order {",
-                "lines": [
-                  {
-                    "kind": "context",
-                    "new": 40,
-                    "old": 40,
-                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
-                  },
-                  {
-                    "kind": "del",
-                    "old": 41,
-                    "text": "        client::charge(self.total as f64)"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 41,
-                    "text": "        self.gateway.charge(self.total)"
-                  },
-                  {
-                    "kind": "context",
-                    "new": 42,
-                    "old": 42,
-                    "text": "    }"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
-            "path": "src/orders.rs",
-            "read": true,
-            "status": "modified"
-          },
-          {
-            "add": 0,
-            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "del": 0,
-            "hunks": [],
-            "old_path": null,
-            "omitted": true,
-            "path": "assets/logo.png",
-            "read": false,
-            "status": "modified"
-          }
-        ],
+        "files": [],
         "guide": [
           {
             "path": "src/gateway.rs",
@@ -741,10 +2041,228 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
           "title": "Charge through a PaymentGateway"
         }
       },
@@ -754,90 +2272,253 @@
     {
       "body": {
         "address": "payments@api",
-        "files": [
+        "files": [],
+        "guide": [
           {
-            "add": 3,
-            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-            "del": 0,
-            "hunks": [
-              {
-                "head": "@@ -0,0 +1,3 @@",
-                "lines": [
-                  {
-                    "kind": "add",
-                    "new": 1,
-                    "text": "pub trait PaymentGateway {"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 2,
-                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 3,
-                    "text": "}"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
             "path": "src/gateway.rs",
-            "read": false,
-            "status": "added"
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
           },
           {
-            "add": 1,
-            "content": "0A1B2C3D4E5F60718293A4B5C6D7E8F901234567",
-            "del": 1,
-            "hunks": [
-              {
-                "head": "@@ -40,3 +40,3 @@ impl Order {",
-                "lines": [
-                  {
-                    "kind": "context",
-                    "new": 40,
-                    "old": 40,
-                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
-                  },
-                  {
-                    "kind": "del",
-                    "old": 41,
-                    "text": "        client::charge(self.total as f64)"
-                  },
-                  {
-                    "kind": "add",
-                    "new": 41,
-                    "text": "        self.gateway.charge(self.total)"
-                  },
-                  {
-                    "kind": "context",
-                    "new": 42,
-                    "old": 42,
-                    "text": "    }"
-                  }
-                ]
-              }
-            ],
-            "old_path": null,
-            "omitted": false,
             "path": "src/orders.rs",
-            "read": true,
-            "status": "modified"
-          },
-          {
-            "add": 0,
-            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "del": 0,
-            "hunks": [],
-            "old_path": null,
-            "omitted": true,
-            "path": "assets/logo.png",
-            "read": false,
-            "status": "modified"
+            "text": "Orders call the trait instead of the client."
           }
         ],
+        "head": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a head that is not the step's last commit",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
         "guide": [
           {
             "path": "src/gateway.rs",
@@ -852,14 +2533,834 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e0",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
           "title": "Charge through a PaymentGateway"
         }
       },
-      "name": "a content hash in capitals",
+      "name": "a commit named by a short sha",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "one commit listed twice",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a step without commits",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 0,
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "step zero",
       "valid": false
     },
     {
@@ -935,7 +3436,7 @@
             "omitted": false,
             "path": "src/orders.rs",
             "read": true,
-            "status": "renamed"
+            "status": "modified"
           },
           {
             "add": 0,
@@ -963,18 +3464,1038 @@
         "left_out": "Left out: the CHANGES.md line, which the release writes.",
         "since": "main",
         "step": {
-          "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
           "number": 2,
-          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "subject": "Charge through a PaymentGateway",
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a step whose files sit on the review",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a commit without its files",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0A1B2C3D4E5F60718293A4B5C6D7E8F901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
+          "title": "Charge through a PaymentGateway"
+        }
+      },
+      "name": "a content hash in capitals",
+      "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": {
+          "commits": [
+            {
+              "body": "Orders will charge through a trait, so the new provider slots in next.",
+              "files": [
+                {
+                  "add": 3,
+                  "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+                  "del": 0,
+                  "hunks": [
+                    {
+                      "head": "@@ -0,0 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "add",
+                          "new": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": true,
+                  "status": "added"
+                }
+              ],
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait"
+            },
+            {
+              "body": "A float drops cents on large orders; the gateway takes whole cents.",
+              "files": [
+                {
+                  "add": 1,
+                  "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -1,3 +1,3 @@",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 1,
+                          "old": 1,
+                          "text": "pub trait PaymentGateway {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 2,
+                          "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 2,
+                          "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 3,
+                          "old": 3,
+                          "text": "}"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/gateway.rs",
+                  "read": false,
+                  "status": "modified"
+                },
+                {
+                  "add": 1,
+                  "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                  "del": 1,
+                  "hunks": [
+                    {
+                      "head": "@@ -40,3 +40,3 @@ impl Order {",
+                      "lines": [
+                        {
+                          "kind": "context",
+                          "new": 40,
+                          "old": 40,
+                          "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                        },
+                        {
+                          "kind": "del",
+                          "old": 41,
+                          "text": "        client::charge(self.total as f64)"
+                        },
+                        {
+                          "kind": "add",
+                          "new": 41,
+                          "text": "        self.gateway.charge(self.total)"
+                        },
+                        {
+                          "kind": "context",
+                          "new": 42,
+                          "old": 42,
+                          "text": "    }"
+                        }
+                      ]
+                    }
+                  ],
+                  "old_path": null,
+                  "omitted": false,
+                  "path": "src/orders.rs",
+                  "read": true,
+                  "status": "modified"
+                },
+                {
+                  "add": 0,
+                  "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "del": 0,
+                  "hunks": [],
+                  "old_path": null,
+                  "omitted": true,
+                  "path": "assets/logo.png",
+                  "read": false,
+                  "status": "modified"
+                }
+              ],
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents"
+            }
+          ],
+          "files": [
+            {
+              "add": 3,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "added"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "renamed"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "number": 2,
           "title": "Charge through a PaymentGateway"
         }
       },
       "name": "a renamed file without its old path",
       "valid": false
+    },
+    {
+      "body": {
+        "address": "payments@api",
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "guide": [
+          {
+            "path": "src/gateway.rs",
+            "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+          },
+          {
+            "path": "src/orders.rs",
+            "text": "Orders call the trait instead of the client."
+          }
+        ],
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "left_out": "Left out: the CHANGES.md line, which the release writes.",
+        "since": "main",
+        "step": null
+      },
+      "name": "a branch file listed twice",
+      "valid": false
     }
   ],
-  "ciphertext": "BE7362wCZmQHAGO7QF7c4VVleLQDzctVm8lBHv5bHo_YkkbGlOGa0hUwvv2nE8aCQgAjx2ARsS3y_oHVvGliF6TUZjwYHG5ZyIJXHNakkukW9qtZcDIGQD4Cf9-Da85u-7LCr3Cr_IwdG5qcOXpuHUChcFa2g9Np1ZjKuhpISDub5yucjJ3X1DXd1na40zH5UrZLqXw-fBumy_C07ujQF7IwpgRHWrT6c1F-YjEmpPI1wL-841_7-D1OGMbMbiybPum5VUNtCRO55S7BoJYD3UcLTLjgutPzCULKT6o_hk3V_ziwyMwlgQfjUL4rUl5R-TxCF58fp7Mr01MnIAKBoU3EHV4jKEfRBUNg4W1sCGka0wOGgrKWUZGYFn6NHHqSHl7BPTQcWGgCKJIe8DG-QLiYCHEY0Oyl6oaerp9nEpCIj9aW20G02_EAJ-E0kc_ir4sXWLmI-1BPvhHRsDC517EdV8llUbEHVNK267PBBn9Gr47jWoi4ojulVDuNuorTbiFie9sbrTc2tQ6TYQQwyW7MrP9qNPAvQNUHq1TK6r5eJfqIEex_q4Bj5CpRgW23I8XWGgPpYeXM9c2IqR3CE1wEV9DqAjcldlsOa4uhoM8dGh_hgnUkdv15_GpDE5NxIZ9TKFYQpxsvPC8RBuWCsP253a6hH27uXuEMY6bbIAp4_QtV-qXvaPYRik-TXhVGRok_MjTTyxadtFWmcNvFnJer8qZY9GLifZW6yKyYaOJTX6cMKi2Jnvpj6Z4FN8fX3tGYUyV9qHh9-c_CfdolVrWGwI3bGjzIPM9ug4ZNV6_eTMjw5qK0M37UyKF3y7CjqwAOS4wXwccTA13vl5gyz8B94f4eifqgBVVIHppHnV4jYfQZJAJ8vANHGIzuZGgtJxqVU5ws2Ke_ctA9eMvXKIAqyEP15ZhcpNTw8sZW8gXVk8zJtLglPGD3k7np1HQeITVCtu3NGRHGulI1QK6K0vbeTmAZjlGAF7sm7RFZ4kvp-GUP_hXOF7AfU88FS--PPpb5MI6Q2Yb_m6SJCxw1RBsH65bdjfIBcrfW-dcCrSQrS06OdKcWVhX0NXsl04OgT7bwx3ZQKzIpXo4RAyTV2YVhAq4kUjwofo3HoFxt-deRrt-K3T-iBYBwl7KEybq9RVhpSWmXnWTJrPzB3hb4HsrwrnCtlQJGRUNwFYPB-EAoDMemlCOH_pGzhSv4gA62oHA1EEGbdG439MsdiBBehHrUXjlqyS_FspAYU856VtdUSPHFsJe0dYxDj069bddxf6reXBMxaLxRHnDGQHLgD4Jsd9wkdDb_Lm3kg597wVwAcon2keViP17LAsyuMEjxD_NSdf6oge_bnQfV5QJ00K_RFEg0x1Zvi0QyqaKSRVor4Y1PLkkMNC5SuP8A4ROlbtfHRaQyiAtVBBiBGv7_X_CFjbR7xSQSKHf3YOIo-a4EXyqB2u4qv7UuA5VgSvPYWyl-wZXmOIJDyiCxjQU4cVyqCcz1Sbbo25s5_hC9RW0a18A6Co-7CRRJO9d9KlPIMuEt434Kr2nY68d3jlxMbKzBZrvypG83jo6YNbJ227T4aomno6LIBnvK-tj9oJTZ2eXhCYOTMZwef8NV0LEP9SaFrcfDs3kMnjqLEbFEm3Sgr6Y4aB3mBq6l3mfMHA0NBC1R28PcMKi0_QgB7HtNnQ-FKQMjeuSLtUnrvWgfUIlcsbbT52b8IxhE80Z5OhzFea8i2JrArQTMCONLLVzXA740GoUgBdsA6oD-QSjyOyE0sGXdtBobet_zYytXBkbyBULSVhXdHglGOlNcMUnGnWjoJbjg0YXnNPZDxEa8W8xrVGW2uEyRaWxUlhFGuequWn_ZWs4sp8CY8cdRh8Udp1kIulO8v3xCFnsz053wrWJog8OczpNbgTCrFK5g_YP7D7ObBfqNv47niI9ko1X8EZIERn1FKfDrZkcAeRZvnoutdFc8GlhGBCQrindRzLC8-cYS2m5J_namxKY5Hp79T24B9_fi1xoy_ZD7A8lcyatJGHHwZLAENI5p8AZJ6Dph3f5rRHrwRUcVqGhLMz0aEFaLIhms3Ei4sePiG5sHI47D1yKMhI7juQL2gxEau_Blj1XgZlSyP2qEYgtCeJccBwayigzAB5pKD2HaHO8_WrnNeqkS-B4MLxhJshnGFQt6mCHK5T-vjaWsSIgDUnFgZO0sVQSoDBhL08A5nN47XbPhZp8DNa7XjMfXg4TK50nO5STvUtZJHVMstODLbd0-QL8lU8Eb3XLmhxiELT3qC4xKRQAJDc245VusHi9UIIOk",
+  "ciphertext": "BE7362wCZmQHAGO7QF7c4VVleLQDzctVm8lBHv5bHo_YkkbGlOGa0hUwvv2nE8aCQgAjx2ARsS3y_oHVvGliF6TUZjwYHG5ZyIJXHNakkukW9qtZcDIGQD4Cf9-Da85u-7LCr3Cr_IwdG5qcOXpuHUChcFa2g9Np1ZjKuhpISDub5yucjJ3X1DXd1na40zH5UrZLqXw-fBumy_C07ujQF7IwpgRHSrP2PAIoKHUvnLt2grLoo1K9rWpJGsfLbn7Nar_uVkZtDRXqtnuW8sRQhx1eH_z9q8GzCB7LFLskjE26tSq3zcNglhuzBekNXhoQrQRGTqIbsKoJ3FMFNhed9ACfX0U1MAyfBSAw52d6AmtDmS2GgbLEVtmdEGeGVDmOF0mGP3UcVW0MJNUCojH3QObZEmoUhPev6pyTvJ95BYjelsCc3wij0uxUJ60yi5yso51DGP6No1wK51rTvH7m_-gFfNMzSfJJHoP-qu_UBCREuZv_A5uyrmX0AnLXocSNEzFTbspU8jc3ngPLJgAl0XqZtq5wYvkuBMMG6BXGq41VdbTTHa87ooMutSBdw22wLMPUERfrL6aQ9YjM_xuYBRxJRYe0TidzMAsHMY7h7d4CBAXyyyRoeOgm6H0EE4h8cdcUKEBfsUo3ZH8QBrHU_ary5qigHj6nGOMBfK_XdgposxRUufbAM70XnFqSHUtEaa8_a2ya21Xa7Bz7JLWnw-alvKNT92WfKLu1yP3TSuMXEaUCOz2Rkqxl6clkRbe1u-CuBTw7sjZk4sjOKd8sVqLOsJjKEnnULeRqlpBfFqGMXp7oufe0dDXcxe8omvP9lFkAGYMG3scTEwK_gNIt2pYitL9Hh6i1SVkJGZdRpUtqM-9ecgol8A4GVYr0cSZ4Mg6bWN1lguKJNY9qdduPWN96gQjh9MpFvJnwq4dS9R_U34LJ7_50en22zb2nk3ZLOnUAsKDdD07XoUIpLLHnzJLHWn4Mmw-AAOMwt0QOo1Wqu2Vb-ACQRbJFQZJLWeXQMdbpY4mKgtD8xbLYQQg5CRZc-ZbL9PpWeLjS_oEatUYoAwLMP_IWEla8YykWs9XkH7XsznsDfWAXBcsbHi_GmsZjCqRgE3VkZJuSrkQ-upGc6Z3cviXmGZpzw-aS2ry5FihrVWqGgDDho6jIyAXmW5G9oTizxRoUC1M6SoHH_VBvV4Sx0SDEr8bshyj1lxbxujFwXhXIPCI7tcUVlhJIjmb8QHd8hHvO9cROU4Y5DIYBFbSf787IYowUzxjuU9ZNaqLaQA8wJLQRCX6PWmjlWc09NIJiO3W5KW76xMFqwVwVc5Wgie5sYBjTM5PJfEioTuxddfPkz--SzVGeuxMg1OTHAlxwh0wu0Uxik-GVA1M4udNZe0EYc2pA7-pA8AX8f96KDe8mhA9VBA7FGvboGOaWzvt21DxVdmThJOAr5L9NEzbWjqdp_L4XStQ7S6bZTHVqseL3LYFWymGu3hxoZ3jdTtixHO-3jNsv8X3xRSpRy8F5VI_iEghIO4MrZxKDKfkspWYB5Sra_dV5lgUVILPXPPWL5W8vno3cY_o18oD4F9zu4vSGWQiboo6qga3Zy6rsSdj-KJEVacEU0PlI9W3H6tuN7QBNjn3AC7Ae1XT54uhsLUX0SqLk2WraWVIREnIW2cCHMvPtolFN7CQVjxuLIgMuZOSppVi-t3IDco1G_PnQ9jShKEVFtkRANgHUN-E865vH6kGeErgcdESYA-diFJQ6Q8MY6MS7DWywOS0wtTWA5QMRK876fXNVXwG8URHIVkDLCkMKfggSFxaPi2z9a43gmpPrKORTiwu1FttpXn_4ulifYi1G1B4BqvfiEn-MFMtq-dGY8cdRh8UdoEQG7EKhsypaDiQxjuCt0D9k2JKJw4EdxGv9Aqtiq8LqA7ebEbHXv8mnzM58qH7tHM9OGWtQfvfuJAFRN1V4hJb7Kw0lVxANDSEqzG9J3P3684FfyXhfqD_okvlwRp6kAiBVsrnr111NsKy3TYAdiq4JFWascOFAdtMvuhpEsz87kLhhFD3kARFJ_QUIZnxEBU7JdQelkQ7p__bkG40JO8PD0TKRh4Ok50a7zQMb8_A3yhepcRPkRiuWJkxAc9tSQCiGiBvWUdAfSSyISqVqHJ_rPKYZ7hRKBgxLsQ2ACE8w3CvF7Ty6yfmRVcwOXXliILFoUA2gHhtVwYRz2NcxX_e9NMlJceKe2ZeI1tDE_1vK8SOoRNYGUBp4sPDNb4EkErohBstV23nhkhOeW163BJSMeACRriZd-l8vXTvz5aU5Jr2t7dkmj4iCNvwxAnI6117Jvx83VPyqbxbeFyk3SnfsQ3wXCKjLWt_VV-djO9imyIdtwsDkK1Nz_gxA96FqWloCvW-sHXO0WnkoFnvXraiI03QOm2NtPZ288ZWljbI19drBplKJmWNoIqGAM2dR6jvbTyB3uKlYOjxna0ZcWgBn0h009gG1koCjrsQSQCR0mv1GI0b1y3FRJ27NbzxH1IFU2lEANyAp6D2y-puhQ9otKJwn5MolLDajvYN0seHH8TO1CAPAz_DMiqiVWN-yFUDFhE7cmn81HNgqlgsw3HQ69y2xjKv8nbP3B7xkFOUo1RHMSqbMZAFZ7Pk87Wtm3QB2ZE_nZAl2MGRTPOlrQP4ruvPbmV8kJb688NHWfyFbkPeha66lBnc2S2b1tGARyha-zAb2mLBud5bLrdCe5z0t1x_eDse8xmy8rIW2hfVZ3GcmaG7BI-F43MjpYDu6KBi9MaNFPZEagpFw0eT5cw3jBiIB9oPM2bE_02_Rf8kshEuoAs84-jbnDWybjoU8FIXf53zkcyRA4BH8BYwsCo8_95-JKAHk2bnYKWf3-qWso22t2n6206TAUSELo9VnU6C74iMCGZ6bRTSdlqIAlgUFNexDSo-b53r4setUwg7RuNX9dkYeGwONE7F66KNovxQVRigDTuuvk2wIHemCcdZp2D_w_2MFrdzBeSoiwG0tQwk6m905hb01MawPF6BaG8m8l2HC52M0q_52fwtYBbmNxJbJBwxR0uSFRZKXUaShamm2ImWxWjZOFAowu3ODFGZ5KDLnSBYd08Fv_JqQj1r-vrkWVy0b07s0rSAdK6kqkjMw1nljGFsUal3v1909ap7g_8lwdf4ZbysgF3aCVl1OXBiC2TfRge-aQV3pS1atbm58sM6w6bCzlutTCktmFWvzBU7_aTcbJYyFBcXtW97aHIt-Fn71Fz6awdbEK-FzDTgNQ7KoB3jCWCstmUSE_oPuRt_paDRr9EEmIFovTbn_VOwErIaA7-vPNceugL_hm051lrE0SJ8-9evF4RZ8oStT_uLEUhMHa0116d2XJdc_D2A6vHAboQsCvfxT_nGw2SFapeWzlqD9EnJELZdHSwV0_Ayb6TA0-zTMrWpGxYgW_9Co_nnkfr46iQe-iUzplYMcyzJOAfVV0meYbaParrubN4qf4EMjg2EWn04ctlS57rfXGQKh35m0XBWaEkrRSx1YbKChth887foWDQCIYQQ-r6y6S5L5PcfkNtQ7IxGBo3jCw3Qq0ENfy-Mvvgw50wweuKNNEsu5bmxpRTP15mS9aMRElU_C0SZXaZ_Ii-MuU-WEiUqi7M96CGoB4lTDBtLXLUq4ou72zu3f1aIilWhWRhjhSLw6pB6wI_NCegJNZ-7WHJdtIzRvOfe2TByUeGScqs3DTjBT_zjlBgL7Va7YlPQum0l2vI6mWuNMfkckd1-DFWUPN6avRHiVqGGsyhz3Dq9UHm2lh4otlBlOPadlVjspFVtSCzVs9LUVHRy5fpI58jlYr_JqdE6BMIOA8Pj7Ygbql4MwxwxV1PeBc_51AAhtX23oVORIqZqD6jrPv1_uKqda-YE04OawSWqMmBel64hv2P3W0azxdZzy6B0aCxsfTnQWvaG71-NjlxjxEot_Xxg3ElrUzgNGGUCv_viJlz00q5WiF-BbJXiulOhWNYswCbjNySJQkIMGsl8mwrtzQ9aQzuwLUKHrqwUpHqux8lXtkv0gViNic-GWspsjEEcCZMqh8Ab655n_qfikLiHbDy9zQVBVTOUl5riVPgcDla2mOCBrmYd0Zi765qMD0gJb-LpQohr8gYd-XNUGFTxK0ObKjs2gL-_LyfrXWswbmwItL_oeoXqL_BKAIAL5LS7CHRcW08yZG2eB8Pk22AltqdwQ5NV3nmBKuRYVj0IiGU1joQbifd_nY9fkfVgXOsOsu4oQZ0F-0AktlxCtVJHnX5t3TYij7q5xalR_uw0cO95l9eoXbrkS1fi-8iObmQvyYAuT_Gr-wGkGYGY-8EM2S_IE4t7Cu-wl29fAGIf5m7LAm23CMhJhE9Tp6_hIBfFetahJTWbo89lSLNyyo2fJTEisNzoE9WbnVFXcxYXqhQcpuwIA3gG9SOHvkyQAZBsg7UvmdetT7_9-QUxRfH8gecZ1xHAEajH8FK1XkkFPmWDfRwMwtwPXDsP7OaCHzA4P_SSzJhRigoQeMSfP6xmFy9o8-w1U8RqjcIjgI5kkQ6usu0Ntva_oYHyYpuFtDw0YPAY_fHxH2ULklu61_UIDQzMtKMjXYftzMGR08YIiLKpDJafQnoj1cgbCOh4bgVjmb76X3eXQRuj0au6hBm6ANTI2kAdYQZ8uB5qhJqbCWn_CHwRoISgn5Ay6cZNhwAe4pDjPQg",
   "max_comment_chars": 2000,
   "max_comments": 50,
   "max_comments_bytes": 24576,
@@ -1638,6 +5159,7 @@
         "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
         "path": "src/gateway.rs",
         "read": true,
+        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
         "type": "review-read"
       },
       "valid": true
@@ -1652,6 +5174,29 @@
         "type": "review-read"
       },
       "valid": true
+    },
+    {
+      "name": "a read mark on the whole step, naming no commit",
+      "payload": {
+        "address": "payments@api",
+        "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+        "path": "src/gateway.rs",
+        "read": true,
+        "type": "review-read"
+      },
+      "valid": true
+    },
+    {
+      "name": "a read mark in a commit named by a short sha",
+      "payload": {
+        "address": "payments@api",
+        "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+        "path": "src/gateway.rs",
+        "read": true,
+        "sha": "9f3c2a1",
+        "type": "review-read"
+      },
+      "valid": false
     },
     {
       "name": "a read mark on a short hash",
@@ -1678,7 +5223,7 @@
       "name": "an accept",
       "payload": {
         "address": "payments@api",
-        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
         "step": 2,
         "type": "accept-step"
       },
@@ -1688,29 +5233,57 @@
       "name": "an accept of step zero",
       "payload": {
         "address": "payments@api",
-        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
         "step": 0,
         "type": "accept-step"
       },
       "valid": false
     },
     {
-      "name": "an accept of a short sha",
+      "name": "an accept of a short head",
       "payload": {
         "address": "payments@api",
-        "sha": "9f3c2a1",
+        "head": "9f3c2a1",
         "step": 2,
         "type": "accept-step"
       },
       "valid": false
     },
     {
-      "name": "a review asked for",
+      "name": "an accept naming a sha instead of the step's head",
+      "payload": {
+        "address": "payments@api",
+        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "step": 2,
+        "type": "accept-step"
+      },
+      "valid": false
+    },
+    {
+      "name": "a review of a step asked for",
+      "payload": {
+        "address": "payments@api",
+        "step": 2,
+        "type": "review-open"
+      },
+      "valid": true
+    },
+    {
+      "name": "a review of the first step waiting asked for",
       "payload": {
         "address": "payments@api",
         "type": "review-open"
       },
       "valid": true
+    },
+    {
+      "name": "a review of step zero asked for",
+      "payload": {
+        "address": "payments@api",
+        "step": 0,
+        "type": "review-open"
+      },
+      "valid": false
     },
     {
       "name": "a review asked for a task without its repo",
@@ -1756,90 +5329,7 @@
   ],
   "review": {
     "address": "payments@api",
-    "files": [
-      {
-        "add": 3,
-        "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
-        "del": 0,
-        "hunks": [
-          {
-            "head": "@@ -0,0 +1,3 @@",
-            "lines": [
-              {
-                "kind": "add",
-                "new": 1,
-                "text": "pub trait PaymentGateway {"
-              },
-              {
-                "kind": "add",
-                "new": 2,
-                "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
-              },
-              {
-                "kind": "add",
-                "new": 3,
-                "text": "}"
-              }
-            ]
-          }
-        ],
-        "old_path": null,
-        "omitted": false,
-        "path": "src/gateway.rs",
-        "read": false,
-        "status": "added"
-      },
-      {
-        "add": 1,
-        "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
-        "del": 1,
-        "hunks": [
-          {
-            "head": "@@ -40,3 +40,3 @@ impl Order {",
-            "lines": [
-              {
-                "kind": "context",
-                "new": 40,
-                "old": 40,
-                "text": "    pub fn pay(&self) -> Result<Receipt> {"
-              },
-              {
-                "kind": "del",
-                "old": 41,
-                "text": "        client::charge(self.total as f64)"
-              },
-              {
-                "kind": "add",
-                "new": 41,
-                "text": "        self.gateway.charge(self.total)"
-              },
-              {
-                "kind": "context",
-                "new": 42,
-                "old": 42,
-                "text": "    }"
-              }
-            ]
-          }
-        ],
-        "old_path": null,
-        "omitted": false,
-        "path": "src/orders.rs",
-        "read": true,
-        "status": "modified"
-      },
-      {
-        "add": 0,
-        "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "del": 0,
-        "hunks": [],
-        "old_path": null,
-        "omitted": true,
-        "path": "assets/logo.png",
-        "read": false,
-        "status": "modified"
-      }
-    ],
+    "files": [],
     "guide": [
       {
         "path": "src/gateway.rs",
@@ -1854,11 +5344,534 @@
     "left_out": "Left out: the CHANGES.md line, which the release writes.",
     "since": "main",
     "step": {
-      "body": "Orders charge through the gateway trait, so the new provider slots in next.",
+      "commits": [
+        {
+          "body": "Orders will charge through a trait, so the new provider slots in next.",
+          "files": [
+            {
+              "add": 3,
+              "content": "7e6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b",
+              "del": 0,
+              "hunks": [
+                {
+                  "head": "@@ -0,0 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "add",
+                      "new": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": true,
+              "status": "added"
+            }
+          ],
+          "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+          "subject": "Add the PaymentGateway trait"
+        },
+        {
+          "body": "A float drops cents on large orders; the gateway takes whole cents.",
+          "files": [
+            {
+              "add": 1,
+              "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -1,3 +1,3 @@",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 1,
+                      "old": 1,
+                      "text": "pub trait PaymentGateway {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 2,
+                      "text": "    fn charge(&self, amount: f64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 2,
+                      "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 3,
+                      "old": 3,
+                      "text": "}"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/gateway.rs",
+              "read": false,
+              "status": "modified"
+            },
+            {
+              "add": 1,
+              "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+              "del": 1,
+              "hunks": [
+                {
+                  "head": "@@ -40,3 +40,3 @@ impl Order {",
+                  "lines": [
+                    {
+                      "kind": "context",
+                      "new": 40,
+                      "old": 40,
+                      "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                    },
+                    {
+                      "kind": "del",
+                      "old": 41,
+                      "text": "        client::charge(self.total as f64)"
+                    },
+                    {
+                      "kind": "add",
+                      "new": 41,
+                      "text": "        self.gateway.charge(self.total)"
+                    },
+                    {
+                      "kind": "context",
+                      "new": 42,
+                      "old": 42,
+                      "text": "    }"
+                    }
+                  ]
+                }
+              ],
+              "old_path": null,
+              "omitted": false,
+              "path": "src/orders.rs",
+              "read": true,
+              "status": "modified"
+            },
+            {
+              "add": 0,
+              "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "del": 0,
+              "hunks": [],
+              "old_path": null,
+              "omitted": true,
+              "path": "assets/logo.png",
+              "read": false,
+              "status": "modified"
+            }
+          ],
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "subject": "Charge orders through the gateway in cents"
+        }
+      ],
+      "files": [
+        {
+          "add": 3,
+          "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+          "del": 0,
+          "hunks": [
+            {
+              "head": "@@ -0,0 +1,3 @@",
+              "lines": [
+                {
+                  "kind": "add",
+                  "new": 1,
+                  "text": "pub trait PaymentGateway {"
+                },
+                {
+                  "kind": "add",
+                  "new": 2,
+                  "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                },
+                {
+                  "kind": "add",
+                  "new": 3,
+                  "text": "}"
+                }
+              ]
+            }
+          ],
+          "old_path": null,
+          "omitted": false,
+          "path": "src/gateway.rs",
+          "read": false,
+          "status": "added"
+        },
+        {
+          "add": 1,
+          "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+          "del": 1,
+          "hunks": [
+            {
+              "head": "@@ -40,3 +40,3 @@ impl Order {",
+              "lines": [
+                {
+                  "kind": "context",
+                  "new": 40,
+                  "old": 40,
+                  "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                },
+                {
+                  "kind": "del",
+                  "old": 41,
+                  "text": "        client::charge(self.total as f64)"
+                },
+                {
+                  "kind": "add",
+                  "new": 41,
+                  "text": "        self.gateway.charge(self.total)"
+                },
+                {
+                  "kind": "context",
+                  "new": 42,
+                  "old": 42,
+                  "text": "    }"
+                }
+              ]
+            }
+          ],
+          "old_path": null,
+          "omitted": false,
+          "path": "src/orders.rs",
+          "read": true,
+          "status": "modified"
+        },
+        {
+          "add": 0,
+          "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "del": 0,
+          "hunks": [],
+          "old_path": null,
+          "omitted": true,
+          "path": "assets/logo.png",
+          "read": false,
+          "status": "modified"
+        }
+      ],
       "number": 2,
-      "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-      "subject": "Charge through a PaymentGateway",
       "title": "Charge through a PaymentGateway"
+    }
+  },
+  "review_from_a_machine_not_yet_updated": {
+    "body": {
+      "address": "payments@api",
+      "files": [
+        {
+          "add": 3,
+          "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+          "del": 0,
+          "hunks": [
+            {
+              "head": "@@ -0,0 +1,3 @@",
+              "lines": [
+                {
+                  "kind": "add",
+                  "new": 1,
+                  "text": "pub trait PaymentGateway {"
+                },
+                {
+                  "kind": "add",
+                  "new": 2,
+                  "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                },
+                {
+                  "kind": "add",
+                  "new": 3,
+                  "text": "}"
+                }
+              ]
+            }
+          ],
+          "old_path": null,
+          "omitted": false,
+          "path": "src/gateway.rs",
+          "read": false,
+          "status": "added"
+        },
+        {
+          "add": 1,
+          "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+          "del": 1,
+          "hunks": [
+            {
+              "head": "@@ -40,3 +40,3 @@ impl Order {",
+              "lines": [
+                {
+                  "kind": "context",
+                  "new": 40,
+                  "old": 40,
+                  "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                },
+                {
+                  "kind": "del",
+                  "old": 41,
+                  "text": "        client::charge(self.total as f64)"
+                },
+                {
+                  "kind": "add",
+                  "new": 41,
+                  "text": "        self.gateway.charge(self.total)"
+                },
+                {
+                  "kind": "context",
+                  "new": 42,
+                  "old": 42,
+                  "text": "    }"
+                }
+              ]
+            }
+          ],
+          "old_path": null,
+          "omitted": false,
+          "path": "src/orders.rs",
+          "read": true,
+          "status": "modified"
+        },
+        {
+          "add": 0,
+          "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "del": 0,
+          "hunks": [],
+          "old_path": null,
+          "omitted": true,
+          "path": "assets/logo.png",
+          "read": false,
+          "status": "modified"
+        }
+      ],
+      "guide": [
+        {
+          "path": "src/gateway.rs",
+          "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+        },
+        {
+          "path": "src/orders.rs",
+          "text": "Orders call the trait instead of the client."
+        }
+      ],
+      "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+      "left_out": "Left out: the CHANGES.md line, which the release writes.",
+      "since": "main",
+      "step": {
+        "body": "A float drops cents on large orders; the gateway takes whole cents.",
+        "number": 2,
+        "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "subject": "Charge orders through the gateway in cents",
+        "title": "Charge through a PaymentGateway"
+      }
+    },
+    "opens_as": {
+      "address": "payments@api",
+      "files": [],
+      "guide": [
+        {
+          "path": "src/gateway.rs",
+          "text": "`PaymentGateway` is the seam. Worth a look: `charge` takes cents, not a float."
+        },
+        {
+          "path": "src/orders.rs",
+          "text": "Orders call the trait instead of the client."
+        }
+      ],
+      "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+      "left_out": "Left out: the CHANGES.md line, which the release writes.",
+      "since": "main",
+      "step": {
+        "commits": [
+          {
+            "body": "A float drops cents on large orders; the gateway takes whole cents.",
+            "files": [
+              {
+                "add": 3,
+                "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+                "del": 0,
+                "hunks": [
+                  {
+                    "head": "@@ -0,0 +1,3 @@",
+                    "lines": [
+                      {
+                        "kind": "add",
+                        "new": 1,
+                        "text": "pub trait PaymentGateway {"
+                      },
+                      {
+                        "kind": "add",
+                        "new": 2,
+                        "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                      },
+                      {
+                        "kind": "add",
+                        "new": 3,
+                        "text": "}"
+                      }
+                    ]
+                  }
+                ],
+                "old_path": null,
+                "omitted": false,
+                "path": "src/gateway.rs",
+                "read": false,
+                "status": "added"
+              },
+              {
+                "add": 1,
+                "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+                "del": 1,
+                "hunks": [
+                  {
+                    "head": "@@ -40,3 +40,3 @@ impl Order {",
+                    "lines": [
+                      {
+                        "kind": "context",
+                        "new": 40,
+                        "old": 40,
+                        "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                      },
+                      {
+                        "kind": "del",
+                        "old": 41,
+                        "text": "        client::charge(self.total as f64)"
+                      },
+                      {
+                        "kind": "add",
+                        "new": 41,
+                        "text": "        self.gateway.charge(self.total)"
+                      },
+                      {
+                        "kind": "context",
+                        "new": 42,
+                        "old": 42,
+                        "text": "    }"
+                      }
+                    ]
+                  }
+                ],
+                "old_path": null,
+                "omitted": false,
+                "path": "src/orders.rs",
+                "read": true,
+                "status": "modified"
+              },
+              {
+                "add": 0,
+                "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "del": 0,
+                "hunks": [],
+                "old_path": null,
+                "omitted": true,
+                "path": "assets/logo.png",
+                "read": false,
+                "status": "modified"
+              }
+            ],
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents"
+          }
+        ],
+        "files": [
+          {
+            "add": 3,
+            "content": "5d1c0a9e8f7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d",
+            "del": 0,
+            "hunks": [
+              {
+                "head": "@@ -0,0 +1,3 @@",
+                "lines": [
+                  {
+                    "kind": "add",
+                    "new": 1,
+                    "text": "pub trait PaymentGateway {"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 2,
+                    "text": "    fn charge(&self, cents: u64) -> Result<Receipt>;"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 3,
+                    "text": "}"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/gateway.rs",
+            "read": false,
+            "status": "added"
+          },
+          {
+            "add": 1,
+            "content": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "del": 1,
+            "hunks": [
+              {
+                "head": "@@ -40,3 +40,3 @@ impl Order {",
+                "lines": [
+                  {
+                    "kind": "context",
+                    "new": 40,
+                    "old": 40,
+                    "text": "    pub fn pay(&self) -> Result<Receipt> {"
+                  },
+                  {
+                    "kind": "del",
+                    "old": 41,
+                    "text": "        client::charge(self.total as f64)"
+                  },
+                  {
+                    "kind": "add",
+                    "new": 41,
+                    "text": "        self.gateway.charge(self.total)"
+                  },
+                  {
+                    "kind": "context",
+                    "new": 42,
+                    "old": 42,
+                    "text": "    }"
+                  }
+                ]
+              }
+            ],
+            "old_path": null,
+            "omitted": false,
+            "path": "src/orders.rs",
+            "read": true,
+            "status": "modified"
+          },
+          {
+            "add": 0,
+            "content": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "del": 0,
+            "hunks": [],
+            "old_path": null,
+            "omitted": true,
+            "path": "assets/logo.png",
+            "read": false,
+            "status": "modified"
+          }
+        ],
+        "number": 2,
+        "title": "Charge through a PaymentGateway"
+      }
     }
   },
   "rules": [
@@ -2036,5 +6049,195 @@
       },
       "valid": false
     }
-  ]
+  ],
+  "steps_from_a_machine_not_yet_updated": {
+    "board": {
+      "away_since": null,
+      "checkouts": [
+        {
+          "busy_worktrees": 4,
+          "free_worktrees": 2,
+          "repo": "shop"
+        }
+      ],
+      "items": [
+        {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 2,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "steps": {
+            "items": [
+              {
+                "number": 2,
+                "rules": {
+                  "state": "ok"
+                },
+                "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+                "state": "committed",
+                "title": "Charge through a PaymentGateway"
+              },
+              {
+                "number": 3,
+                "sha": null,
+                "state": "in-progress",
+                "title": "Add the new gateway"
+              },
+              {
+                "number": 4,
+                "sha": null,
+                "state": "planned",
+                "title": "Remove the old payment client"
+              },
+              {
+                "number": 5,
+                "sha": "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e",
+                "state": "accepted",
+                "title": "Docs"
+              }
+            ],
+            "pushed": 1
+          },
+          "summary": "2 commits",
+          "urgency": 0,
+          "verdict": null
+        }
+      ],
+      "kebbie": "0.24.0",
+      "rev": 1842,
+      "routines": [
+        {
+          "id": "nightly-deps",
+          "last_outcome": "ok",
+          "mode": "fix",
+          "next_run": 1761100200,
+          "repo": "shop",
+          "title": "Nightly deps"
+        }
+      ],
+      "sessions_outside_tasks": 1,
+      "type": "board"
+    },
+    "opens_as": {
+      "away_since": null,
+      "checkouts": [
+        {
+          "busy_worktrees": 4,
+          "free_worktrees": 2,
+          "repo": "shop"
+        }
+      ],
+      "items": [
+        {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 2,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "steps": {
+            "items": [
+              {
+                "commits": [
+                  {
+                    "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+                    "subject": "Charge through a PaymentGateway"
+                  }
+                ],
+                "number": 2,
+                "rules": {
+                  "state": "ok"
+                },
+                "state": "ready",
+                "title": "Charge through a PaymentGateway"
+              },
+              {
+                "commits": [],
+                "number": 3,
+                "state": "in-progress",
+                "title": "Add the new gateway"
+              },
+              {
+                "commits": [],
+                "number": 4,
+                "state": "planned",
+                "title": "Remove the old payment client"
+              },
+              {
+                "commits": [
+                  {
+                    "sha": "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e",
+                    "subject": "Docs"
+                  }
+                ],
+                "number": 5,
+                "state": "accepted",
+                "title": "Docs"
+              }
+            ],
+            "pushed": 1
+          },
+          "summary": "2 commits",
+          "urgency": 0,
+          "verdict": null
+        }
+      ],
+      "kebbie": "0.24.0",
+      "rev": 1842,
+      "routines": [
+        {
+          "id": "nightly-deps",
+          "last_outcome": "ok",
+          "mode": "fix",
+          "next_run": 1761100200,
+          "repo": "shop",
+          "title": "Nightly deps"
+        }
+      ],
+      "sessions_outside_tasks": 1,
+      "type": "board"
+    }
+  }
 }

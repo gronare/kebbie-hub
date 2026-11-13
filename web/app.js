@@ -14,14 +14,14 @@ import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememb
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled } from "./notify.js";
-import { cleanComment, commentProblem, commentsProblem, diffHref, freshReviewUi, hangLines, offerKey, openOf, opensOffer, readKey, readOf, reviewDiff, reviewEntry, reviewHref, reviewOverview, sendControl, settleReview } from "./review.js";
+import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, stepHref, stepPage, wholePage } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, stepLines, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, OPENABLE_STEPS, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, stepList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -256,7 +256,7 @@ function questionBlock(found) {
   return promptBlock(found, promptArea(found));
 }
 
-function cardBlock(found) {
+function cardBlock(found, selected = null) {
   const { item } = found;
   const lines = [];
   if (item.card) {
@@ -265,7 +265,7 @@ function cardBlock(found) {
   }
   lines.push(taskFacts(item));
   if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
-  const steps = stepLines(item, { expandable: true });
+  const steps = stepList(item, { expandable: true, href: (number) => stepHref(found.machine, item.address, number), selected, more: uiOf(found.machine, item.address).moreSteps });
   if (steps) lines.push(`<h3 class="sec">Steps</h3>${steps}`);
   lines.push(reviewLines(item));
   const progress = [item.summary, item.report?.summary].filter(Boolean);
@@ -282,7 +282,7 @@ function cardBlock(found) {
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
-const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null });
+const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null, moreSteps: false });
 
 function uiOf(machine, address) {
   const key = uiKey(machine, address);
@@ -339,8 +339,8 @@ function pushArea(found) {
   return decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing }));
 }
 
-function taskBody(found) {
-  return found.item.question || found.item.prompt ? questionBlock(found) : cardBlock(found);
+function taskBody(found, selected = null) {
+  return found.item.question || found.item.prompt ? questionBlock(found) : cardBlock(found, selected);
 }
 
 function taskScreen([machine, address]) {
@@ -509,8 +509,8 @@ function ideaRoute() {
 
 const taskHref = (machine, address) => `#/task/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
 
-function reviewUiOf(machine, address) {
-  const key = uiKey(machine, address);
+function reviewUiOf(machine, address, step) {
+  const key = `${uiKey(machine, address)}|${step ?? ""}`;
   if (!state.reviewUi.has(key)) state.reviewUi.set(key, freshReviewUi());
   return state.reviewUi.get(key);
 }
@@ -529,36 +529,48 @@ function reviewFetch(found, opener, access) {
   return { ...fetch, state: named[shown.state] ?? shown.state, standing: shown.standing };
 }
 
-function heldReview(found, opener) {
+function heldReview(found, opener, step) {
   const blob = opener?.result?.outcome === "done" ? opener.result.blob : null;
   if (!blob) return { review: null, failed: false };
   const held = blobs.peek(blob.id);
   if (!held) blobs.load(blob).then((loaded) => loaded && render());
-  if (held?.review && held.review.address !== found.item.address) return { review: null, failed: true };
+  if (held?.review && (held.review.address !== found.item.address || (held.review.step?.number ?? null) !== step)) return { review: null, failed: true };
   return { review: held?.review ?? null, failed: Boolean(held?.failed) };
 }
 
-function reviewView(found) {
-  const ui = reviewUiOf(found.machine, found.item.address);
-  const offer = offerKey(found.item);
+function reviewPage(params, diff) {
+  const step = params[2] ? Number(params[2]) : null;
+  if (!diff || step === null) return { step, kind: diff || step === null ? "whole" : "step", commit: null };
+  const commit = params[3] && params[3] !== "all" ? Number(params[3]) - 1 : null;
+  return { step, kind: commit === null ? "whole" : "commit", commit };
+}
+
+const boardStepOf = (found, step) => (step === null ? null : (found.item.steps?.items.find((one) => one.number === step) ?? null));
+const reviewHead = (found, step) => (step === null ? (found.item.head ?? null) : (boardStepOf(found, step)?.commits.at(-1)?.sha ?? null));
+
+function reviewView(found, page) {
+  const { step } = page;
+  const boardStep = boardStepOf(found, step);
+  const head = reviewHead(found, step);
+  const ui = reviewUiOf(found.machine, found.item.address, step);
+  const wanted = `${head ?? ""}|${step ?? ""}`;
   const access = commandGate();
-  const opener = sentOn(found, "review-open", opensOffer(found.item))[0] ?? null;
-  const { review, failed } = heldReview(found, opener);
+  const opener = sentOn(found, "review-open", (sent) => (sent.step ?? null) === step && (sent.head ?? null) === head)[0] ?? null;
+  const { review, failed } = heldReview(found, opener, step);
   settleReview(ui, review);
-  const fetch = failed ? { state: "failed", sent: opener } : reviewFetch(found, opener, access);
-  if (!opener && !ui.busy && ui.requested !== offer && access === "ready" && takes(found.accepts, "review-open")) {
-    ui.requested = offer;
-    queueMicrotask(() => requestReview(found));
+  const openable = step === null ? Boolean(found.item.review) : OPENABLE_STEPS.includes(boardStep?.state);
+  const fetch = failed ? { state: "failed", sent: opener } : !openable && !opener ? { state: "not-ready", sent: null } : reviewFetch(found, opener, access);
+  if (openable && !opener && !ui.busy && ui.requested !== wanted && access === "ready" && takes(found.accepts, "review-open")) {
+    ui.requested = wanted;
+    queueMicrotask(() => requestReview(found, step, head));
   }
-  const sha = review?.step?.sha ?? null;
-  const sentComments = sentOn(found, "review-comments", (sent) => (sent.sha ?? null) === sha).flatMap((sent) => {
+  const sentComments = sentOn(found, "review-comments", (sent) => (sent.step ?? null) === step).flatMap((sent) => {
     const shown = shownOf(sent).state;
     return (sent.comments ?? []).map((comment) => ({ ...comment, at: sent.at, state: shown }));
   });
-  const accepted = sha ? sentOn(found, "accept-step", (sent) => sent.sha === sha)[0] : null;
+  const accepted = step === null || !head ? null : sentOn(found, "accept-step", (sent) => sent.step === step && (sent.head ?? sent.sha) === head)[0];
   const readSent = opener ? sentOn(found, "review-read", (sent) => sent.at >= opener.at && !settled(shownOf(sent).state)) : [];
-  const step = review?.step?.number ?? null;
-  const stepPush = step === null ? null : sentOn(found, "push", (sent) => sent.step === step && sent.head === review.step.sha)[0] ?? null;
+  const stepPush = step === null ? null : (sentOn(found, "push", (sent) => sent.step === step && sent.head === head)[0] ?? null);
   const taskPush = sentOn(found, "push", (sent) => (sent.step ?? null) === null && sent.head === found.item.head)[0] ?? null;
   const ready = access === "ready";
   return {
@@ -569,6 +581,9 @@ function reviewView(found) {
     title: taskName(found.item, found.task),
     item: found.item,
     accepts: found.accepts,
+    step,
+    page,
+    boardStep,
     review,
     fetch,
     ui,
@@ -586,14 +601,21 @@ function reviewView(found) {
   };
 }
 
-function reviewRoute([machine, address], diff = false) {
+function reviewRoute(params, diff = false) {
+  const [machine, address] = params;
+  const page = reviewPage(params, diff);
   const found = findTask(state.opened, machine, address);
-  const back = backButton(diff && !twoColumns() ? reviewHref(machine, address) : taskHref(machine, address));
+  const up = page.kind === "step" || page.step === null ? taskHref(machine, address) : stepHref(machine, address, page.step);
+  const back = backButton(up);
   if (!found) return shell("board", back + top("Review") + `<div class="center">This task is no longer on the board.</div>`);
-  const v = reviewView(found);
-  if (twoColumns()) return shell("board", back + reviewOverview(v, { split: true, top }), reviewDiff(v, { inPanel: true, top })) + sendControl(v);
-  const main = diff ? reviewDiff(v, { inPanel: false, top }) : reviewOverview(v, { split: false, top });
-  return shell("board", back + main) + sendControl(v);
+  const v = reviewView(found, page);
+  const here = page.kind === "step" ? stepPage : page.kind === "commit" ? commitPage : wholePage;
+  if (twoColumns()) {
+    const task = page.kind === "step" || page.step === null;
+    const left = task ? top(taskName(found.item, found.task), esc(found.name)) + taskBody(found, page.step) : stepPage(v, { top, left: true, selected: page.commit });
+    return shell("board", back + `<div class="narrow">${left}</div>`, here(v, { top, inPanel: true })) + sendControl(v);
+  }
+  return shell("board", back + `<div class="narrow">${here(v, { top })}</div>`) + sendControl(v);
 }
 
 function boardRoute() {
@@ -919,9 +941,10 @@ function sendPush(target) {
 function sendStepPush(target) {
   const { machine, address } = target.dataset;
   const found = findTask(state.opened, machine, address);
-  const step = found ? reviewView(found).review?.step : null;
-  if (!step || step.number !== Number(target.dataset.step)) return;
-  send(target, { type: "push", address, head: step.sha, card_sha: null, through_step: step.number }, { head: step.sha, short: short(step.sha), step: step.number, machineName: found.name });
+  const step = Number(target.dataset.step);
+  const head = found ? reviewHead(found, step) : null;
+  if (!head || !["accepted", "ready"].includes(boardStepOf(found, step)?.state)) return;
+  send(target, { type: "push", address, head, card_sha: null, through_step: step }, { head, short: short(head), step, machineName: found.name });
 }
 
 const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
@@ -963,9 +986,10 @@ async function sendBacklog({ machine, payload, meta, ui }) {
 
 const machineOf = (found) => ({ machine: found.machine, name: found.name });
 
-async function requestReview(found) {
-  const ui = reviewUiOf(found.machine, found.item.address);
-  await sendTo({ machine: machineOf(found), payload: { type: "review-open", address: found.item.address }, meta: { head: found.item.head ?? null, step: found.item.review?.step ?? null }, ui });
+async function requestReview(found, step, head) {
+  const ui = reviewUiOf(found.machine, found.item.address, step);
+  const payload = step === null ? { type: "review-open", address: found.item.address } : { type: "review-open", address: found.item.address, step };
+  await sendTo({ machine: machineOf(found), payload, meta: { head, step }, ui });
   render();
 }
 
@@ -979,9 +1003,12 @@ function reveal(selector, offset = null) {
   else scrollTo(0, element.getBoundingClientRect().top + scrollY - gap);
 }
 
-function toDiff(v, selector, offset, focus = null) {
-  const here = twoColumns() || route().name === "diff";
-  if (!here) location.hash = diffHref(v.machine, v.address);
+function toDiff(v, sha, selector, offset, focus = null) {
+  const commit = v.review?.step?.commits.findIndex((one) => one.sha === sha) ?? -1;
+  const last = commit === (v.review?.step?.commits.length ?? 0) - 1;
+  const href = v.step === null ? diffHref(v.machine, v.address) : diffHref(v.machine, v.address, v.step, commit < 0 || last ? "all" : commit + 1);
+  const here = route().name === "diff" && shaOf(v) === sha;
+  if (!here) location.hash = href;
   render();
   if (!here) scrollListToTop();
   reveal(selector, offset);
@@ -993,12 +1020,11 @@ let revealAfter = null;
 async function sendComments(found, v) {
   const { ui, review } = v;
   if (!review || !ui.drafts.length || ui.busy) return;
-  const sha = review.step?.sha ?? null;
-  const comments = ui.drafts.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, sha, text: draft.text }));
+  const comments = ui.drafts.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, sha: draft.sha ?? null, text: draft.text }));
   const payload = { address: v.address, step: review.step?.number ?? null, comments };
   ui.error = commentsProblem(payload);
   if (ui.error) return render();
-  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-comments", ...payload }, meta: { sha, comments, count: comments.length }, ui });
+  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-comments", ...payload }, meta: { step: payload.step, comments, count: comments.length }, ui });
   if (sent) {
     const receipt = { count: comments.length, at: sent.at, device: sent.deviceName ?? "this device" };
     Object.assign(ui, { drafts: [], tray: false, composing: null, receipt });
@@ -1012,17 +1038,19 @@ async function sendComments(found, v) {
 }
 
 async function markRead(found, v, index) {
-  const { ui, review } = v;
-  const file = review.files[index];
+  const { ui } = v;
+  const file = filesOf(v)[index];
   const read = !readOf(v, file);
   ui.read.set(readKey(file), read);
-  ui.open.set(file.path, !read);
+  ui.open.set(readKey(file), !read);
   if (ui.composing?.path === file.path) ui.composing = null;
   render();
   reveal(`#rv-f-${index}`);
   if (!v.canRead) return;
   const quiet = { busy: false, error: null };
-  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-read", address: v.address, path: file.path, read, content: file.content }, meta: { path: file.path, read, content: file.content }, ui: quiet });
+  const sha = v.page.kind === "commit" ? shaOf(v) : null;
+  const payload = { type: "review-read", address: v.address, path: file.path, read, content: file.content, ...(sha ? { sha } : {}) };
+  const sent = await sendTo({ machine: machineOf(found), payload, meta: { path: file.path, read, content: file.content, sha }, ui: quiet });
   if (!sent) ui.error = quiet.error;
   render();
 }
@@ -1030,30 +1058,40 @@ async function markRead(found, v, index) {
 async function acceptStep(found, v) {
   const step = v.review?.step;
   if (!step || v.ui.busy) return;
-  const sent = await sendTo({ machine: machineOf(found), payload: { type: "accept-step", address: v.address, step: step.number, sha: step.sha }, meta: { sha: step.sha, step: step.number }, ui: v.ui });
-  if (sent) v.ui.confirming = false;
+  const head = step.commits.at(-1).sha;
+  await sendTo({ machine: machineOf(found), payload: { type: "accept-step", address: v.address, step: step.number, head }, meta: { head, step: step.number }, ui: v.ui });
   render();
 }
 
+function routeView() {
+  const { name, params } = route();
+  const found = findTask(state.opened, params[0], params[1]);
+  return found ? { found, v: reviewView(found, reviewPage(params, name === "diff")) } : null;
+}
+
 function reviewAction(action, target) {
-  const [machine, address] = route().params;
-  const found = findTask(state.opened, machine, address);
-  if (!found) return;
-  const v = reviewView(found);
-  const { ui, review } = v;
+  const viewed = routeView();
+  if (!viewed) return;
+  const { found, v } = viewed;
+  const { ui } = v;
   const id = Number(target.dataset.id);
   const draft = ui.drafts.find((one) => one.id === id);
-  const file = review?.files[Number(target.dataset.file)];
+  const file = filesOf(v)[Number(target.dataset.file)];
   if (action === "rv-retry") {
-    Object.assign(ui, { requested: offerKey(found.item), error: null });
-    return requestReview(found);
+    Object.assign(ui, { requested: null, error: null });
+    return requestReview(found, v.step, reviewHead(found, v.step));
+  }
+  if (action === "rv-commit") {
+    const commit = v.review?.step?.commits[Number(target.dataset.commit)];
+    if (commit && !ui.commits.delete(commit.sha)) ui.commits.add(commit.sha);
+    return render();
   }
   if (action === "rv-send") return sendComments(found, v);
   if (action === "rv-read" && file) return markRead(found, v, Number(target.dataset.file));
   if (action === "rv-accept") return acceptStep(found, v);
   if (action === "rv-line" && file) {
     if (ui.composing || !v.canComment) return;
-    ui.composing = { path: file.path, side: target.dataset.side, line: Number(target.dataset.line), text: "" };
+    ui.composing = { path: file.path, side: target.dataset.side, line: Number(target.dataset.line), sha: shaOf(v), text: "" };
     ui.tray = false;
     render();
     return root.querySelector("#rv-c")?.focus({ preventScroll: true });
@@ -1061,12 +1099,12 @@ function reviewAction(action, target) {
   if (action === "rv-edit" && draft) {
     Object.assign(ui, { composing: { ...draft }, tray: false });
     ui.open.set(draft.path, true);
-    return toDiff(v, "#rv-c", 160, "#rv-c");
+    return toDiff(v, draft.sha ?? null, "#rv-c", 160, "#rv-c");
   }
   if (action === "rv-show" && draft) {
     ui.tray = false;
     ui.open.set(draft.path, true);
-    return toDiff(v, `#rv-c-${id}`, 200);
+    return toDiff(v, draft.sha ?? null, `#rv-c-${id}`, 200);
   }
   if (action === "rv-compose-cancel") ui.composing = null;
   else if (action === "rv-compose-add" && ui.composing) {
@@ -1075,16 +1113,14 @@ function reviewAction(action, target) {
     ui.composing.problem = commentProblem(text);
     if (ui.composing.problem) return render();
     if (ui.composing.id) Object.assign(ui.drafts.find((one) => one.id === ui.composing.id) ?? {}, { text });
-    else ui.drafts.push({ id: ui.nextId++, path: ui.composing.path, side: ui.composing.side, line: ui.composing.line, text });
+    else ui.drafts.push({ id: ui.nextId++, path: ui.composing.path, side: ui.composing.side, line: ui.composing.line, sha: ui.composing.sha ?? null, text });
     Object.assign(ui, { composing: null, receipt: null, error: null });
   } else if (action === "rv-remove") {
     ui.drafts = ui.drafts.filter((one) => one.id !== id);
     if (ui.composing?.id === id) ui.composing = null;
   } else if (action === "rv-tray") ui.tray = !ui.tray;
   else if (action === "rv-stale-dismiss") ui.stale = null;
-  else if (action === "rv-fold" && file) ui.open.set(file.path, !openOf(v, file));
-  else if (action === "rv-accept-ask") Object.assign(ui, { confirming: true, error: null });
-  else if (action === "rv-accept-cancel") Object.assign(ui, { confirming: false, error: null });
+  else if (action === "rv-fold" && file) ui.open.set(readKey(file), !openOf(v, file));
   render();
 }
 
@@ -1514,12 +1550,17 @@ root.addEventListener("click", (event) => {
     event.preventDefault();
     return openComposer();
   }
-  const fileRow = event.target.closest("a.rv-file");
-  if (fileRow) return openFile(event, fileRow);
+  const fileRow = event.target.closest("a[data-open-file]");
+  if (fileRow) return openFile(fileRow);
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
   if (action.startsWith("rv-")) return reviewAction(action, target);
+  if (action === "steps-more") {
+    const ui = uiOf(route().params[0], route().params[1]);
+    ui.moreSteps = !ui.moreSteps;
+    return render();
+  }
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
   const decided = target.closest(".decide");
   if (decided) return decideAction(action, decided, target);
@@ -1560,26 +1601,19 @@ root.addEventListener("click", (event) => {
   }
 });
 
-function openFile(event, link) {
-  const [machine, address] = route().params;
-  const found = findTask(state.opened, machine, address);
-  const index = Number(link.dataset.file);
-  const file = found ? reviewView(found).review?.files[index] : null;
+function openFile(link) {
+  const viewed = routeView();
+  const index = Number(link.dataset.openFile);
+  const file = viewed ? filesOf(viewed.v)[index] : null;
   if (!file) return;
-  reviewUiOf(machine, address).open.set(file.path, true);
-  if (!twoColumns()) {
-    revealAfter = { selector: `#rv-f-${index}`, offset: null };
-    return;
-  }
-  event.preventDefault();
-  render();
-  reveal(`#rv-f-${index}`, 8);
+  viewed.v.ui.open.set(readKey(file), true);
+  revealAfter = { selector: `#rv-f-${index}`, offset: twoColumns() ? 8 : null };
 }
 
 root.addEventListener("input", (event) => {
   if (event.target.dataset?.draft === "review-comment") {
-    const [machine, address] = route().params;
-    const ui = reviewUiOf(machine, address);
+    const [machine, address, step] = route().params;
+    const ui = reviewUiOf(machine, address, step ? Number(step) : null);
     if (ui.composing) ui.composing.text = event.target.value;
     return;
   }

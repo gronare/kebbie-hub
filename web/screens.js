@@ -1,4 +1,4 @@
-import { acceptRequired, toAccept } from "./board.js";
+import { acceptRequired } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
 
@@ -37,8 +37,12 @@ export function sleepingRow(machine, now) {
   return `<div class="task asleep"><div class="name">${esc(machine.name)}</div><div class="meta">asleep · last seen ${esc(lastSeenText(machine.lastSeen, now))}${working}</div></div>`;
 }
 
-export const STEP_MARKS = { planned: "○", "in-progress": "◐", committed: "●", accepted: "✓" };
-const STEP_LABELS = { planned: "", "in-progress": "in progress", committed: "committed", accepted: "accepted" };
+export const STEP_MARKS = { planned: "○", "in-progress": "◐", ready: "●", accepted: "✓", pushed: "↑" };
+export const OPENABLE_STEPS = ["ready", "accepted"];
+const SHOWN_PLANNED = 2;
+const CHEV_RIGHT = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+const CHEV_DOWN = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>`;
+const CHEV_UP = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-5 5 5"/></svg>`;
 
 export function waited(seconds) {
   if (seconds < 60) return "now";
@@ -169,16 +173,67 @@ export function rulesLines(rules, { expandable = false } = {}) {
   return `<div class="rules">${broken}${said}</div>`;
 }
 
-export function stepLines(item, { expandable = false } = {}) {
+const commitCount = (step) => plural(step.commits.length, "commit", "commits");
+
+export function stepLabel(step) {
+  if (step.state === "ready") return `${commitCount(step)} · to review`;
+  if (step.state === "accepted") return "accepted · push";
+  if (step.state === "pushed") return "pushed";
+  if (step.state === "in-progress") return step.commits.length ? `in progress · ${commitCount(step)}` : "in progress";
+  return "";
+}
+
+function stepRow(step, href, on) {
+  const label = stepLabel(step);
+  const what = `<span class="what"><span class="mark">${STEP_MARKS[step.state] ?? ""}</span><span class="number">${esc(step.number)}</span><span class="tt"><span class="step-title">${esc(step.title)}</span>${label ? `<span class="label">${esc(label)}</span>` : ""}</span></span>`;
+  if (href && OPENABLE_STEPS.includes(step.state)) return `<a class="step s-${esc(step.state)}${on ? " on" : ""}" href="${esc(href(step.number))}"${on ? ' aria-current="true"' : ""}>${what}${CHEV_RIGHT}</a>`;
+  return `<div class="step s-${esc(step.state)}">${what}</div>`;
+}
+
+export function stepList(item, { href = null, selected = null, more = false, expandable = false } = {}) {
   const steps = item.steps;
   if (!steps || (steps.pushed === 0 && steps.items.length === 0)) return "";
-  const pushed = steps.pushed ? `<div class="pushed">↑ ${esc(steps.pushed)} pushed</div>` : "";
-  const lines = steps.items.map((step) => {
-    const label = STEP_LABELS[step.state];
-    return `<div class="step s-${esc(step.state)}"><span class="what"><span class="mark">${STEP_MARKS[step.state]}</span><span class="number">${esc(step.number)}</span><span class="step-title">${esc(step.title)}</span></span>${label ? `<span class="label">${esc(label)}</span>` : ""}</div>${rulesLines(step.rules, { expandable })}`;
-  });
+  const listed = steps.items.some((step) => step.state === "pushed");
+  const pushed = steps.pushed && !listed ? `<div class="pushed">↑ ${esc(steps.pushed)} pushed</div>` : "";
+  let planned = 0;
+  let folded = 0;
+  const rows = [];
+  for (const step of steps.items) {
+    if (step.state === "planned") planned += 1;
+    if (step.state === "planned" && planned > SHOWN_PLANNED && !more) {
+      folded += 1;
+      continue;
+    }
+    rows.push(stepRow(step, href, step.number === selected) + rulesLines(step.rules, { expandable }));
+  }
+  const extra = Math.max(0, planned - SHOWN_PLANNED);
+  const fold = folded ? `<button type="button" class="more" data-action="steps-more" aria-expanded="false">${esc(folded)} more planned${CHEV_DOWN}</button>` : more && extra ? `<button type="button" class="more" data-action="steps-more" aria-expanded="true">Fewer planned${CHEV_UP}</button>` : "";
   const optional = acceptRequired(item) || steps.items.length === 0 ? "" : `<div class="meta">accepting each step is optional: push takes what is committed</div>`;
-  return `<div class="steps">${pushed}${lines.join("")}${optional}</div>`;
+  return `<div class="steps go">${pushed}${rows.join("")}${fold}${optional}</div>`;
+}
+
+export function stepSummary(item) {
+  const steps = item.steps;
+  const items = steps?.items ?? [];
+  if (!items.length) return "";
+  const total = items.length + (items.some((step) => step.state === "pushed") ? 0 : steps.pushed);
+  const of = (state) => items.filter((step) => step.state === state);
+  const [accepted, ready, building] = [of("accepted"), of("ready"), of("in-progress")];
+  const numbers = (list) => list.map((step) => step.number).join(", ");
+  const parts = [];
+  if (accepted.length) parts.push(`<span class="ok">✓ ${accepted.length === 1 ? `step ${esc(accepted[0].number)}` : `${accepted.length} steps`} accepted</span>`);
+  if (ready.length) parts.push(`<span class="accept">◆ ${accepted.length ? esc(ready.length) : `${esc(ready.length)} of ${esc(total)} steps`} ready to review</span>`);
+  if (building.length) parts.push(`<span class="prog">${building.length === 1 ? "step" : "steps"} ${esc(numbers(building))} in progress</span>`);
+  return parts.length ? `<div class="step-line">${parts.join(" · ")}</div>` : "";
+}
+
+export function stepsWanted(item, machineName) {
+  if (!acceptRequired(item)) return null;
+  const items = item.steps.items;
+  const accepted = items.find((step) => step.state === "accepted");
+  const ready = items.find((step) => step.state === "ready");
+  const asks = [accepted ? `push step ${accepted.number}` : "", ready ? `review step ${ready.number}` : ""].filter(Boolean);
+  return asks.length ? `${asks.join(" or ")} on ${machineName}` : null;
 }
 
 export const acceptCount = (count) => (count ? `<span class="accept">◆ ${esc(count)} to accept</span>` : "");
@@ -188,12 +243,10 @@ export const taskKey = (machine, address) => `${machine}|${address}`;
 export function taskRow(row, selected = null) {
   const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
   const on = selected === taskKey(row.machine, row.item.address);
-  const waiting = toAccept(row.item);
-  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(row.item.assessment ?? ""), waiting ? `<span class="accept">${waiting} to accept</span>` : "", esc(row.item.summary)].filter(Boolean).join(" · ");
-  const next = acceptRequired(row.item) ? row.item.steps.items.find((step) => step.state === "committed") : null;
-  const wanted = row.item.next_for_you ?? (next ? `accept ${next.number} on ${row.name}` : null);
+  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(row.item.assessment ?? ""), esc(row.item.summary)].filter(Boolean).join(" · ");
+  const wanted = row.item.next_for_you ?? stepsWanted(row.item, row.name);
   const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
-  return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepLines(row.item)}${you}</a>`;
+  return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepSummary(row.item)}${you}</a>`;
 }
 
 export const ICONS = {
@@ -539,7 +592,7 @@ export function historyEntry(entry, now) {
     if (kind === "review-open") return { icon: "✓", what: `Opened the review of ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-comments") return { icon: "✓", what: `Sent ${plural(entry.payload.comments.length, "review comment", "review comments")} on ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-read") return { icon: "✓", what: `Marked ${entry.payload.path} ${entry.payload.read ? "read" : "unread"} on ${what}`, said: `on ${machine}`, at: entry.at };
-    if (kind === "accept-step") return { icon: "✓", what: `Accepted step ${entry.payload.step} of ${what}`, said: [entry.payload.sha.slice(0, 7), `on ${machine}`].join(" · "), at: entry.at };
+    if (kind === "accept-step") return { icon: "✓", what: `Accepted step ${entry.payload.step} of ${what}`, said: [(entry.payload.head ?? entry.payload.sha).slice(0, 7), `on ${machine}`].join(" · "), at: entry.at };
     return { icon: "✓", what: `Started ${what}`, said: `on ${machine}`, at: entry.at };
   }
   const noun = `${NOUNS[kind] ?? kind} ${what}`;

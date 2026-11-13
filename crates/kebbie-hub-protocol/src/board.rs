@@ -174,14 +174,64 @@ pub struct Steps {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "StepWire")]
 pub struct Step {
     pub number: u32,
     pub title: String,
     pub state: StepState,
-    pub sha: Option<String>,
+    pub commits: Vec<StepCommit>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rules: Option<Rules>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepCommit {
+    pub sha: String,
+    pub subject: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StepWire {
+    number: u32,
+    title: String,
+    state: StepState,
+    #[serde(default)]
+    commits: Option<Vec<StepCommit>>,
+    #[serde(default)]
+    sha: Option<String>,
+    #[serde(default)]
+    rules: Option<Rules>,
+}
+
+impl TryFrom<StepWire> for Step {
+    type Error = &'static str;
+
+    fn try_from(wire: StepWire) -> Result<Self, Self::Error> {
+        let commits = match (wire.commits, wire.sha) {
+            (Some(_), Some(_)) => return Err("a step names its commits, not a sha"),
+            (Some(commits), None) => commits,
+            (None, sha) => sha.into_iter().map(|sha| StepCommit { sha, subject: wire.title.clone() }).collect(),
+        };
+        Ok(Step { number: wire.number, title: wire.title, state: wire.state, commits, rules: wire.rules })
+    }
+}
+
+impl Step {
+    pub fn head(&self) -> Option<&str> {
+        self.commits.last().map(|commit| commit.sha.as_str())
+    }
+
+    fn check(&self) -> Result<(), &'static str> {
+        check(self.number >= 1, "steps count from one")?;
+        match self.state {
+            StepState::Planned => check(self.commits.is_empty(), "a planned step holds no commits")?,
+            StepState::Ready | StepState::Accepted | StepState::Pushed => check(!self.commits.is_empty(), "a step to review, accepted or pushed holds a commit")?,
+            StepState::InProgress => {}
+        }
+        self.rules.as_ref().map_or(Ok(()), Rules::check)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,8 +239,10 @@ pub struct Step {
 pub enum StepState {
     Planned,
     InProgress,
-    Committed,
+    #[serde(alias = "committed")]
+    Ready,
     Accepted,
+    Pushed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -363,7 +415,7 @@ impl Board {
     pub fn check(&self) -> Result<(), &'static str> {
         self.items.iter().try_for_each(|item| {
             item.git.iter().filter_map(|git| git.rules.as_ref()).try_for_each(Rules::check)?;
-            item.steps.iter().flat_map(|steps| &steps.items).filter_map(|step| step.rules.as_ref()).try_for_each(Rules::check)
+            item.steps.iter().flat_map(|steps| &steps.items).try_for_each(Step::check)
         })
     }
 }
@@ -464,32 +516,67 @@ mod tests {
     }
 
     #[test]
-    fn an_item_carries_its_steps_in_order_with_the_sha_of_each_commit() {
+    fn an_item_carries_its_steps_in_order_each_with_its_commits() {
         let mut stepped = plain();
         stepped["steps"] = serde_json::json!({ "pushed": 1, "items": [
-            { "number": 2, "title": "Charge through a PaymentGateway", "state": "committed", "sha": "2222222bbbb" },
-            { "number": 3, "title": "Add the new gateway", "state": "in-progress", "sha": null },
-            { "number": 4, "title": "Remove the old payment client", "state": "planned", "sha": null },
-            { "number": 5, "title": "Docs", "state": "accepted", "sha": "5555555eeee" },
+            { "number": 1, "title": "Docs", "state": "pushed", "commits": [{ "sha": "1111111aaaa", "subject": "Say what a step is" }] },
+            { "number": 2, "title": "Charge through a PaymentGateway", "state": "ready", "commits": [{ "sha": "2222222bbbb", "subject": "Add PaymentGateway" }, { "sha": "2222222cccc", "subject": "Charge orders through it" }] },
+            { "number": 3, "title": "Add the new gateway", "state": "in-progress", "commits": [{ "sha": "3333333dddd", "subject": "Add the gateway's client" }] },
+            { "number": 4, "title": "Remove the old payment client", "state": "planned", "commits": [] },
+            { "number": 5, "title": "Docs", "state": "accepted", "commits": [{ "sha": "5555555eeee", "subject": "Docs" }] },
         ] });
         let item: Item = serde_json::from_value(stepped.clone()).unwrap();
         let steps = item.steps.as_ref().unwrap();
         assert_eq!(steps.pushed, 1);
-        assert_eq!(steps.items.iter().map(|step| (step.number, step.state)).collect::<Vec<_>>(), [(2, StepState::Committed), (3, StepState::InProgress), (4, StepState::Planned), (5, StepState::Accepted)]);
+        assert_eq!(steps.items.iter().map(|step| (step.number, step.state, step.commits.len())).collect::<Vec<_>>(), [(1, StepState::Pushed, 1), (2, StepState::Ready, 2), (3, StepState::InProgress, 1), (4, StepState::Planned, 0), (5, StepState::Accepted, 1)]);
+        assert_eq!(steps.items[1].head(), Some("2222222cccc"), "a step's head is its last commit");
         assert_eq!(serde_json::to_value(&item).unwrap(), stepped);
         let mut subject = stepped.clone();
-        subject["steps"]["items"][0]["subject"] = serde_json::json!("Charge through a PaymentGateway");
+        subject["steps"]["items"][1]["subject"] = serde_json::json!("Charge through a PaymentGateway");
         assert!(serde_json::from_value::<Item>(subject).is_err(), "a step carries only its allow-listed fields");
+        let mut both = stepped.clone();
+        both["steps"]["items"][1]["sha"] = serde_json::json!("2222222cccc");
+        assert!(serde_json::from_value::<Item>(both).is_err(), "a step names its commits or, from an older machine, one sha");
         let mut unknown = stepped;
-        unknown["steps"]["items"][0]["state"] = serde_json::json!("pushed");
+        unknown["steps"]["items"][0]["state"] = serde_json::json!("merged");
         assert!(serde_json::from_value::<Item>(unknown).is_err());
+    }
+
+    #[test]
+    fn a_step_from_a_machine_not_yet_updated_reads_as_one_commit_and_committed_as_ready() {
+        let mut old = plain();
+        old["steps"] = serde_json::json!({ "pushed": 0, "items": [
+            { "number": 1, "title": "Charge through a PaymentGateway", "state": "committed", "sha": "2222222bbbb" },
+            { "number": 2, "title": "Add the new gateway", "state": "in-progress", "sha": null },
+            { "number": 3, "title": "Remove the old payment client", "state": "planned", "sha": null },
+        ] });
+        let item: Item = serde_json::from_value(old).unwrap();
+        let steps = &item.steps.as_ref().unwrap().items;
+        assert_eq!((steps[0].state, steps[0].commits.clone()), (StepState::Ready, vec![StepCommit { sha: "2222222bbbb".into(), subject: "Charge through a PaymentGateway".into() }]));
+        assert_eq!((steps[1].commits.len(), steps[2].commits.len()), (0, 0));
+        assert_eq!(serde_json::to_value(&item).unwrap()["steps"]["items"][0]["state"], "ready");
+    }
+
+    #[test]
+    fn a_planned_step_holds_no_commits_and_one_to_review_accepted_or_pushed_holds_one() {
+        let board = |state: StepState, commits: usize| Board {
+            items: vec![Item {
+                steps: Some(Steps { pushed: 0, items: vec![Step { number: 1, title: "Docs".into(), state, commits: (0..commits).map(|n| StepCommit { sha: format!("{n}"), subject: "Docs".into() }).collect(), rules: None }], required: None }),
+                ..serde_json::from_value(plain()).unwrap()
+            }],
+            ..serde_json::from_value(serde_json::json!({ "rev": 1, "kebbie": "0.1.0", "away_since": null, "checkouts": [], "routines": [], "items": [], "sessions_outside_tasks": 0 })).unwrap()
+        };
+        assert_eq!([(StepState::Planned, 0), (StepState::InProgress, 0), (StepState::InProgress, 2), (StepState::Ready, 1), (StepState::Accepted, 2), (StepState::Pushed, 1)].map(|(state, commits)| board(state, commits).check()), [Ok(()); 6]);
+        for (state, commits) in [(StepState::Planned, 1), (StepState::Ready, 0), (StepState::Accepted, 0), (StepState::Pushed, 0)] {
+            assert!(board(state, commits).check().is_err(), "{state:?} with {commits} commits");
+        }
     }
 
     #[test]
     fn a_task_and_each_step_carry_where_the_rules_check_stands_and_an_approved_flag_is_ignored() {
         let mut ruled = plain();
         ruled["git"] = serde_json::json!({ "upstream": "main", "ahead": 1, "behind": 0, "uncommitted": 0, "rules": { "state": "breaks", "breaks": 2, "names": ["Every commit says why"], "override": { "by": "lead" } } });
-        ruled["steps"] = serde_json::json!({ "pushed": 0, "items": [{ "number": 1, "title": "Docs", "state": "committed", "sha": "1111111aaaa", "rules": { "state": "checking" } }] });
+        ruled["steps"] = serde_json::json!({ "pushed": 0, "items": [{ "number": 1, "title": "Docs", "state": "ready", "commits": [{ "sha": "1111111aaaa", "subject": "Docs" }], "rules": { "state": "checking" } }] });
         let item: Item = serde_json::from_value(ruled.clone()).unwrap();
         let rules = item.git.as_ref().unwrap().rules.as_ref().unwrap();
         assert_eq!((rules.state, rules.breaks, rules.overridden.as_ref().map(|by| by.by)), (RulesState::Breaks, Some(2), Some(OverrideBy::Lead)));

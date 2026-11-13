@@ -210,6 +210,27 @@ const rulesCheck = (rules) =>
   (rules.state === "breaks" ? !absent(rules.breaks) && rules.breaks >= 1 : absent(rules.breaks) && absent(rules.names)) &&
   (absent(rules.names) || (rules.names.length <= MAX_RULE_NAMES && rules.names.length <= rules.breaks && rules.names.every((name) => isLine(MAX_RULE_NAME_CHARS)(name)))) &&
   (absent(rules.override) || rules.state !== "ok");
+const STEP_STATES = ["planned", "in-progress", "ready", "accepted", "pushed"];
+const COMMITS_HELD = { planned: (n) => n === 0, "in-progress": () => true, ready: (n) => n >= 1, accepted: (n) => n >= 1, pushed: (n) => n >= 1 };
+const stepCommit = shape({ sha: string, subject: string });
+const boardStep = (value) =>
+  shape({ number: u32v, title: string, state: oneOf(...STEP_STATES, "committed"), commits: optionalField(list(stepCommit)), sha: optionalField(string), rules: optionalField(rulesCheck) })(value) &&
+  (absent(value.commits) || absent(value.sha)) &&
+  value.number >= 1 &&
+  COMMITS_HELD[stepOf(value).state](stepOf(value).commits.length);
+export function stepOf(step) {
+  const { sha, ...rest } = step;
+  return { ...rest, state: step.state === "committed" ? "ready" : step.state, commits: step.commits ?? (absent(sha) ? [] : [{ sha, subject: step.title }]) };
+}
+export const stepHead = (step) => step.commits.at(-1)?.sha ?? null;
+const ordered = (step) => {
+  const { number, title, state, commits, rules } = stepOf(step);
+  return absent(rules) ? { number, title, state, commits } : { number, title, state, commits, rules };
+};
+export function payloadOf(payload) {
+  if (payload.type !== "board") return payload;
+  return { ...payload, items: payload.items.map((one) => (absent(one.steps) ? one : { ...one, steps: { ...one.steps, items: one.steps.items.map(ordered) } })) };
+}
 const item = shape({
   address: string,
   group: oneOf("NEEDS YOU", "WORKING", "TO REVIEW", "READY TO PUSH", "CI RUNNING", "WAITING FOR WORK"),
@@ -241,7 +262,7 @@ const item = shape({
   recover: optionalField(shape({ note: string })),
   routine: optionalField(string),
   card: optionalField(shape({ sha: string, current: bool, blob: blobRef })),
-  steps: optionalField(shape({ pushed: u32v, items: list(shape({ number: u32v, title: string, state: oneOf("planned", "in-progress", "committed", "accepted"), sha: optionalField(string), rules: optionalField(rulesCheck) })), required: optionalField(bool) })),
+  steps: optionalField(shape({ pushed: u32v, items: list((value) => boardStep(value)), required: optionalField(bool) })),
   title: optionalField(string),
   profile: optionalField(string),
   recipe: optionalField(string),
@@ -318,19 +339,42 @@ const countsFit = (file) => {
   const lines = file.hunks.flatMap((hunk) => hunk.lines);
   return lines.filter((line) => line.kind === "add").length === file.add && lines.filter((line) => line.kind === "del").length === file.del;
 };
-const review = (body) =>
+const reviewFiles = (files) => list(reviewFile)(files) && new Set(files.map((file) => file.path)).size === files.length;
+const reviewCommit = shape({ sha: isFullSha, subject: string, body: string, files: reviewFiles });
+const oneCommitStep = shape({ number: count, title: string, sha: string, subject: string, body: string });
+const commitsStep = shape({ number: count, title: string, commits: list(reviewCommit), files: reviewFiles });
+const reviewShape = (body) =>
   shape({
     address: isAddress,
     since: (value) => isText(MAX_SINCE_CHARS)(value) && !/\p{Cc}/u.test(value),
     head: isFullSha,
-    step: optionalField(shape({ number: stepNumber, title: string, sha: isFullSha, subject: string, body: string })),
+    step: optionalField((step) => commitsStep(step) || oneCommitStep(step)),
     guide: list(shape({ path: isHomeLabel, text: string })),
     left_out: optionalField(string),
-    files: list(reviewFile),
-  })(body) && new Set(body.files.map((file) => file.path)).size === body.files.length;
+    files: reviewFiles,
+  })(body);
+const reviewOf = (body) => {
+  const { address, since, head, step, guide, left_out, files } = body;
+  if (absent(step)) return { address, since, head, step: null, guide, left_out: left_out ?? null, files };
+  if (Object.hasOwn(step, "commits")) return { address, since, head, step: { number: step.number, title: step.title, commits: step.commits, files: step.files }, guide, left_out: left_out ?? null, files };
+  const commit = { sha: step.sha, subject: step.subject, body: step.body, files };
+  return { address, since, head, step: { number: step.number, title: step.title, commits: [commit], files }, guide, left_out: left_out ?? null, files: [] };
+};
+const steppedReview = (body) => {
+  if (absent(body.step)) return true;
+  const { step } = body;
+  return body.files.length === 0 && step.number >= 1 && step.commits.length >= 1 && step.commits.every((commit) => isFullSha(commit.sha)) && step.commits.at(-1).sha === body.head && new Set(step.commits.map((commit) => commit.sha)).size === step.commits.length;
+};
+
+export function readReview(body) {
+  if (!reviewShape(body)) throw new ProtocolError("malformed");
+  const opened = reviewOf(body);
+  if (!steppedReview(opened)) throw new ProtocolError("malformed");
+  return opened;
+}
 
 export function checkReview(body) {
-  if (!review(body)) throw new ProtocolError("malformed");
+  readReview(body);
 }
 
 const reviewComment = shape({ path: isHomeLabel, line: stepNumber, side: oneOf("old", "new"), sha: optionalField(isFullSha), text: (value) => isText(MAX_REVIEW_COMMENT_CHARS)(value) && !/[^\P{Cc}\n\t]/u.test(value) });
@@ -406,10 +450,10 @@ const PAYLOADS = {
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
   "item-edit": itemEdit,
   "device-decision": typed({ device: (value) => prefixOf(value) === "dev", fingerprint: (value) => typeof value === "string" && FINGERPRINT.test(value), approve: bool }),
-  "review-open": typed({ address: isAddress }),
+  "review-open": typed({ address: isAddress, step: optionalField(stepNumber) }),
   "review-comments": reviewComments,
-  "review-read": typed({ address: isAddress, path: isHomeLabel, read: bool, content: isContentHash }),
-  "accept-step": typed({ address: isAddress, step: stepNumber, sha: isFullSha }),
+  "review-read": typed({ address: isAddress, path: isHomeLabel, read: bool, content: isContentHash, sha: optionalField(isFullSha) }),
+  "accept-step": typed({ address: isAddress, step: stepNumber, head: isFullSha }),
 };
 
 export function checkPayload(payload) {
@@ -570,7 +614,7 @@ export async function decryptEnvelope(envelope, recipient) {
   }
   checkPayload(payload);
   if (payload.type !== envelope.kind) throw new ProtocolError("kind-mismatch");
-  return payload;
+  return payloadOf(payload);
 }
 
 export async function openEnvelope(envelope, recipient, sender, now) {
