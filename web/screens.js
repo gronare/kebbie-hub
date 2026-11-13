@@ -385,9 +385,10 @@ function switchRow({ id, name, meta, on = false, disabled: off = false, field = 
   return `<label class="row switch-row"><div><div class="name" id="${id}-name">${esc(name)}</div><div class="meta" id="${id}-state">${esc(meta)}</div></div><input type="checkbox" role="switch" class="switch" name="${field}"${valued} aria-labelledby="${id}-name" aria-describedby="${id}-state" aria-checked="${on ? "true" : "false"}"${on ? " checked" : ""}${off ? " disabled" : ""}></label>`;
 }
 
-export function notifySection({ phase, text, categories = [] }) {
+export function notifySection({ phase, text, categories = [], failure = null }) {
   const on = phase === "on" || phase === "asking";
-  const main = `<section class="task" id="notify-card">${switchRow({ id: "notify", name: "Notifications", meta: text, on, disabled: !switchable(phase) })}</section>`;
+  const why = failure ? `<div class="meta warn" id="notify-failure">${esc(failure)}</div>` : "";
+  const main = `<section class="task" id="notify-card">${switchRow({ id: "notify", name: "Notifications", meta: text, on, disabled: !switchable(phase) })}${why}</section>`;
   if (phase !== "on") return main;
   const cards = CATEGORY_GROUPS.map((group) => `<h2 class="group g-muted">${esc(group.title)}</h2><section class="task">${group.rows.map((row) => switchRow({ id: row.id, name: row.name, meta: row.meta, on: categories.includes(row.category), field: "notice-category", value: row.category })).join("")}</section>`).join("");
   return main + cards;

@@ -412,6 +412,9 @@ impl MachineState {
     }
 
     pub fn seal_notice(&self, notice: &Notice, collapse: &str, urgency: Urgency, recipients: &[DeviceCert], at: u64) -> Result<Envelope, Error> {
+        if !notice.fits_collapse(collapse) {
+            return Err(Error::Protocol(format!("the collapse tag {collapse} names another category than {}", notice.category.name())));
+        }
         let mut header = Header::new(Id::new(Prefix::Notice).map_err(|error| Error::Protocol(error.to_string()))?, Kind::Notice, self.machine.clone(), self.machine.clone(), at);
         header.urgency = Some(urgency);
         header.collapse = Some(collapse.to_string());

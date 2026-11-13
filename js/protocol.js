@@ -45,6 +45,12 @@ export const MAX_NOTICE_BYTES = 2048;
 export const MAX_RETRACTS = 8;
 export const NOTICE_CATEGORIES = ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"];
 export const DEFAULT_NOTICE_CATEGORIES = NOTICE_CATEGORIES.filter((category) => category !== "started");
+export const NOTICE_COLLAPSE_PREFIXES = { q: "questions", p: "questions", d: "new-device", i: "idea-questions", r: "ready", c: "ci-failed", s: "started" };
+export function noticeCategoryOf(tag) {
+  const at = typeof tag === "string" ? tag.indexOf("-") : -1;
+  return at < 0 ? null : (Object.hasOwn(NOTICE_COLLAPSE_PREFIXES, tag.slice(0, at)) ? NOTICE_COLLAPSE_PREFIXES[tag.slice(0, at)] : null);
+}
+export const fitsCollapse = (notice, tag) => [null, notice.category].includes(noticeCategoryOf(tag));
 export const MAX_LABEL_BYTES = 256;
 export const BACKLOG_BODY_MEDIA_TYPE = "application/vnd.kebbie.backlog-item+json";
 export const REVIEW_MEDIA_TYPE = "application/vnd.kebbie.review+json";
@@ -563,7 +569,9 @@ export async function openEnvelope(envelope, recipient, sender, now) {
 export async function openNotice(envelope, device, machine, now) {
   checkShape(envelope);
   if (envelope.kind !== "notice" || envelope.machine !== machine.id) throw new ProtocolError("malformed");
-  return openEnvelope(envelope, device, await importSender(machine.id, machine.keys), now);
+  const notice = await openEnvelope(envelope, device, await importSender(machine.id, machine.keys), now);
+  if (!fitsCollapse(notice, envelope.collapse)) throw new ProtocolError("category-mismatch");
+  return notice;
 }
 
 const random = (length) => globalThis.crypto.getRandomValues(new Uint8Array(length));

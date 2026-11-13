@@ -1,4 +1,5 @@
 import { deviceFingerprint, deviceId, importSender, newDeviceKey, openCommand, openEnvelope, sealCommand, signDeviceCert, verifyDeviceCert } from "../js/protocol.js";
+import { browserPush, categoriesKey, keptCategories, NOTIFY_RECORD } from "./notify.js";
 
 const sentKey = (account) => `hub-sent:${account}`;
 const allowKey = (account) => `allow-changes:${account}`;
@@ -59,7 +60,21 @@ export async function verifiedDevices(key, rows) {
   return devices;
 }
 
-export async function ensureDevice({ store, calls, identity, name, now, kept = undefined }) {
+// The browser holds one push subscription, so when notifications were on for another of its devices the hub moves it here and the worker's record names the key it now holds.
+export async function pushFollows({ store, calls, identity, device, subscription = browserPush }) {
+  const record = await store.get(NOTIFY_RECORD).catch(() => null);
+  if (!record || record.account?.account !== identity.id || record.device === device.id) return false;
+  const held = await subscription().catch(() => null);
+  if (!held) return false;
+  const categories = keptCategories(await store.get(categoriesKey(record.device)).catch(() => null));
+  const { endpoint, keys } = held.toJSON();
+  await calls.subscribePush(device.id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, categories });
+  await store.put(categoriesKey(device.id), categories).catch(() => undefined);
+  await store.put(NOTIFY_RECORD, { account: identity.key, device: device.id }).catch(() => undefined);
+  return true;
+}
+
+export async function ensureDevice({ store, calls, identity, name, now, kept = undefined, subscription = browserPush }) {
   const held = kept === undefined ? await loadDevice(store, identity.id) : kept;
   if (held && (await verifyDeviceCert(identity.key, held.cert))) return held;
   const key = await newDeviceKey();
@@ -68,6 +83,7 @@ export async function ensureDevice({ store, calls, identity, name, now, kept = u
   await calls.addDevice(cert);
   const device = { id, cert, signing: key.signing, encryption: key.encryption, fingerprint: await deviceFingerprint(key.public) };
   await store.put(deviceKey(identity.id), device).catch(() => undefined);
+  await pushFollows({ store, calls, identity, device, subscription }).catch(() => undefined);
   return device;
 }
 

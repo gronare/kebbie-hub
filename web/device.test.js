@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceFingerprint, fromB64, importIdentity, openCommand, sealEnvelope, verifyDeviceCert } from "../js/protocol.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand, verifiedDevices } from "./device.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -66,6 +66,29 @@ test("turning changes on makes a key that never leaves this browser, certifies i
   const forged = { ...device, cert: { ...device.cert, name: "Renamed by someone" } };
   assert.notEqual((await ensureDevice({ store, calls, identity, name: "iPhone", now: AT, kept: forged })).id, device.id, "a cert the account didn't sign is replaced");
   await assert.rejects(ensureDevice({ store: memoryStore(), calls: { addDevice: async () => { throw new Error("hub down"); } }, identity, name: "iPhone", now: AT }), /hub down/);
+});
+
+test("a device that registers anew while notifications are on takes the browser's subscription along, so the worker's record and key name the same device", async () => {
+  const identity = await account();
+  const subscribed = [];
+  const calls = { addDevice: async () => undefined, subscribePush: async (device, body) => void subscribed.push({ device, body }) };
+  const store = memoryStore();
+  const before = await ensureDevice({ store, calls, identity, name: "iPhone", now: AT, subscription: async () => null });
+  await store.put("notify", { account: identity.key, device: before.id });
+  await store.put(`notify-categories:${before.id}`, ["questions", "ready"]);
+  const held = { toJSON: () => ({ endpoint: "https://web.push.apple.com/QGuQyavXutnMH", keys: { p256dh: "p256", auth: "auth" } }) };
+  await store.del(`device-key:${identity.id}`);
+  const after = await ensureDevice({ store, calls, identity, name: "iPhone", now: AT + 60, subscription: async () => held });
+  assert.notEqual(after.id, before.id);
+  assert.deepEqual(subscribed, [{ device: after.id, body: { endpoint: "https://web.push.apple.com/QGuQyavXutnMH", keys: { p256dh: "p256", auth: "auth" }, categories: ["questions", "ready"] } }]);
+  assert.equal((await store.get("notify")).device, after.id);
+  assert.equal((await loadDevice(store, identity.id)).id, (await store.get("notify")).device);
+  assert.deepEqual(await store.get(`notify-categories:${after.id}`), ["questions", "ready"]);
+  assert.equal(await pushFollows({ store, calls, identity, device: after, subscription: async () => held }), false, "a record that names this device moves nothing");
+  await store.del("notify");
+  await store.del(`device-key:${identity.id}`);
+  await ensureDevice({ store, calls, identity, name: "iPhone", now: AT + 120, subscription: async () => held });
+  assert.equal(subscribed.length, 1, "with notifications off nothing is subscribed");
 });
 
 test("an answer is signed by this device, sealed to the machine and the account, and its result names the device", async () => {

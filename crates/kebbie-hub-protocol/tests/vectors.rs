@@ -4,7 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AccountKey, AppliedCommands, BacklogBody, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Payload, PublicKeys, Refusal, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
+    AccountKey, AppliedCommands, BacklogBody, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Notice, NoticeCategory, Payload, PublicKeys, Refusal, SecretKeys, Target, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
 };
 use serde_json::Value;
 
@@ -359,5 +359,22 @@ fn a_backlog_items_body_opens_from_its_blob_and_its_keys_hold_as_the_vectors_say
     }
     for case in vectors["bodies"].as_array().unwrap() {
         assert_eq!(serde_json::from_value::<BacklogBody>(case["body"].clone()).is_ok(), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+}
+
+#[test]
+fn a_collapse_tag_names_its_notices_category_as_the_vectors_say() {
+    let vectors = load("notices.json");
+    let category = |value: &Value| serde_json::from_value::<Option<NoticeCategory>>(value.clone()).unwrap();
+    let prefixes: Vec<(String, NoticeCategory)> = vectors["prefixes"].as_array().unwrap().iter().map(|row| (row["prefix"].as_str().unwrap().to_string(), category(&row["category"]).unwrap())).collect();
+    assert_eq!(prefixes, NoticeCategory::COLLAPSE_PREFIXES.map(|(prefix, category)| (prefix.to_string(), category)));
+    for row in vectors["tags"].as_array().unwrap() {
+        let tag = row["tag"].as_str().unwrap();
+        assert_eq!(NoticeCategory::of_collapse(tag), category(&row["category"]), "{tag}");
+    }
+    for row in vectors["fits"].as_array().unwrap() {
+        let notice = Notice { category: category(&row["category"]).unwrap(), title: "t".into(), body: "b".into(), open: Target::Task { address: "refunds@shop".into() }, retract: Vec::new() };
+        let tag = row["tag"].as_str().unwrap();
+        assert_eq!(notice.fits_collapse(tag), row["fits"].as_bool().unwrap(), "{tag}");
     }
 }

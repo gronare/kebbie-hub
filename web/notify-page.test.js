@@ -139,7 +139,32 @@ test("the switch asks for permission from the tap itself, subscribes with the hu
   assert.equal(push.unsubscribed, 1);
   assert.equal(calls.find((call) => call.method === "DELETE").url, `/v1/a/devices/${device}/push`);
   assert.doesNotMatch(root.innerHTML, /Notify me when/);
+  assert.equal(kept.has("notify"), false, "off forgets which device the worker opens notices with");
   page.leave();
+});
+
+test("Account moves the browser's subscription to this device when the worker's record names an earlier one, and says why the last notice didn't open", async () => {
+  const { deviceId } = await import("../js/protocol.js");
+  const given = await unlocked();
+  const earlier = deviceId();
+  const { root, calls } = browserWith({ permission: "granted" });
+  await (await navigator.serviceWorker.getRegistration("/")).pushManager.subscribe({});
+  kept.set("notify", { account: given.session.identity.key, device: earlier });
+  kept.set(`notify-categories:${earlier}`, ["questions", "ready"]);
+  const at = Math.floor(Date.now() / 1000) - 60;
+  kept.set("notice-failure", { at, reason: "device-changed", detail: earlier, machine: "mch_01", recipient: earlier, device: "dev_other", name: "MacBook" });
+  const page = startPage(root, { given });
+  await page.started;
+  const added = calls.find((call) => call.method === "POST" && call.url === "/v1/a/devices");
+  const device = added.body.cert.device;
+  const moved = calls.find((call) => call.method === "PUT" && call.url === `/v1/a/devices/${device}/push`);
+  assert.deepEqual(moved.body.categories, ["questions", "ready"]);
+  assert.equal(moved.body.endpoint, "https://web.push.apple.com/QGuQyavXutnMH");
+  assert.equal(kept.get("notify").device, device);
+  assert.equal(kept.get(`device-key:${given.me.account}`).id, device);
+  assert.match(root.innerHTML, /<div class="meta warn" id="notify-failure">The last notification, at \d\d:\d\d from MacBook, couldn&#39;t be opened: it was sealed to an earlier key of this device\.<\/div>/);
+  page.leave();
+  kept.delete("notice-failure");
 });
 
 test("a refusal in iOS greys the switch and says where to turn them on", async () => {

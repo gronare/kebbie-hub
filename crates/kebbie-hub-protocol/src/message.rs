@@ -95,6 +95,31 @@ impl NoticeCategory {
             .filter(|category| category.on_by_default())
             .collect()
     }
+
+    /// A collapse tag that starts with one of these and a hyphen names its notice's category, so a device that cannot open a notice still says what it is about.
+    pub const COLLAPSE_PREFIXES: [(&'static str, NoticeCategory); 7] = [
+        ("q", NoticeCategory::Questions),
+        ("p", NoticeCategory::Questions),
+        ("d", NoticeCategory::NewDevice),
+        ("i", NoticeCategory::IdeaQuestions),
+        ("r", NoticeCategory::Ready),
+        ("c", NoticeCategory::CiFailed),
+        ("s", NoticeCategory::Started),
+    ];
+
+    pub fn of_collapse(tag: &str) -> Option<NoticeCategory> {
+        let (prefix, _) = tag.split_once('-')?;
+        NoticeCategory::COLLAPSE_PREFIXES
+            .iter()
+            .find(|(named, _)| *named == prefix)
+            .map(|(_, category)| *category)
+    }
+}
+
+impl Notice {
+    pub fn fits_collapse(&self, tag: &str) -> bool {
+        NoticeCategory::of_collapse(tag).is_none_or(|named| named == self.category)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

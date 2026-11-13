@@ -1,9 +1,12 @@
-import { DEFAULT_NOTICE_CATEGORIES, fromB64, NOTICE_CATEGORIES, openNotice, verifyMachineList } from "../js/protocol.js";
+import { DEFAULT_NOTICE_CATEGORIES, fromB64, NOTICE_CATEGORIES, noticeCategoryOf, openNotice, ProtocolError, verifyMachineList } from "../js/protocol.js";
 
 export const NOTIFY_RECORD = "notify";
 export const LISTING = "listing";
 export const categoriesKey = (device) => `notify-categories:${device}`;
 export const GENERIC = { title: "kebbie", body: "Open kebbie to see what changed." };
+export const NOTICE_FAILURE = "notice-failure";
+
+export const browserPush = async () => (await globalThis.navigator?.serviceWorker?.getRegistration("/"))?.pushManager.getSubscription() ?? null;
 
 export const CATEGORY_GROUPS = [
   {
@@ -102,37 +105,117 @@ export async function closeSettled(registration, opened) {
   return closed;
 }
 
-async function verifiedListing(record, get) {
-  const kept = await get(LISTING);
-  const signed = kept?.listing?.list;
-  const key = record?.account;
-  if (!signed || !key?.keys?.signing) return null;
+const CATEGORY_TEXT = {
+  questions: "A question or a prompt waits for you.",
+  "new-device": "A new device wants to make changes.",
+  "idea-questions": "The lead has questions on an idea.",
+  ready: "A task is ready to push.",
+  "ci-failed": "CI failed on a push.",
+  started: "A start you asked for has news.",
+};
+
+const machineIn = (listing, machine) => listing.list.list.machines.find((one) => one.machine === machine) ?? null;
+const nameIn = (listing, machine) => listing?.boards?.find((entry) => entry.machine === machine)?.name || null;
+
+async function trusted(listing, record, get) {
+  const signed = listing?.list;
+  const key = record.account;
+  if (!signed || !key?.keys?.signing) return { reason: "no-list" };
   const seen = (await get(`marks:${key.account}`).catch(() => null))?.list ?? 0;
-  if (!(signed.list?.counter >= seen)) return null;
+  if (!(signed.list?.counter >= seen)) return { reason: "list-older" };
   const verifying = await crypto.subtle.importKey("raw", fromB64(key.keys.signing), { name: "Ed25519" }, false, ["verify"]);
-  return (await verifyMachineList({ id: key.account, verifying }, signed)) ? kept.listing : null;
+  return (await verifyMachineList({ id: key.account, verifying }, signed)) ? { listing } : { reason: "list-unsigned" };
 }
 
-export async function pushedNotice(envelope, { get, now }) {
-  const tag = typeof envelope?.collapse === "string" ? envelope.collapse : "kebbie";
-  const generic = { title: GENERIC.title, body: GENERIC.body, tag, data: { url: "/#/board" }, retract: [] };
+// A machine missing from the kept list may have joined since the app last ran, so the worker reads the hub's list once and keeps it when the account vouches for it.
+async function vouched(machine, record, { get, put, boards, now }) {
+  const kept = (await get(LISTING))?.listing ?? null;
+  const held = await trusted(kept, record, get);
+  if (held.listing && machineIn(held.listing, machine)) return held;
+  const missing = held.reason ?? "unknown-machine";
+  if (!boards) return { reason: missing, named: kept };
+  let fetched;
   try {
+    fetched = await boards();
+  } catch (error) {
+    return { reason: error?.status === 401 ? "signed-out" : missing, named: kept };
+  }
+  const fresh = await trusted(fetched, record, get);
+  if (!fresh.listing) return { reason: fresh.reason, named: kept };
+  if (put && fresh.listing.list.list.counter >= (kept?.list?.list?.counter ?? 0)) await put(LISTING, { listing: fresh.listing, at: now }).catch(() => undefined);
+  return machineIn(fresh.listing, machine) ? fresh : { reason: "unknown-machine", named: fresh.listing };
+}
+
+function unopened(envelope, tag, failure, named) {
+  const category = noticeCategoryOf(tag);
+  const name = nameIn(named, envelope?.machine);
+  return { title: name ?? GENERIC.title, body: CATEGORY_TEXT[category] ?? GENERIC.body, tag, data: { url: "/#/board" }, retract: [], failure: { ...failure, name } };
+}
+
+export async function pushedNotice(envelope, { get, now, put = null, boards = null }) {
+  const tag = typeof envelope?.collapse === "string" ? envelope.collapse : "kebbie";
+  const failure = { at: now, reason: null, detail: null, machine: typeof envelope?.machine === "string" ? envelope.machine : null, recipient: Object.keys(envelope?.keys ?? {})[0] ?? null, device: null };
+  let named = null;
+  const failed = (reason, detail = null) => unopened(envelope, tag, { ...failure, reason, detail }, named);
+  try {
+    named = (await get(LISTING).catch(() => null))?.listing ?? null;
+    if (!envelope) return failed("no-envelope");
     const record = await get(NOTIFY_RECORD);
-    const device = await get(`device-key:${record?.account?.account}`);
-    if (!device?.encryption || device.id !== record.device) return generic;
-    const listing = await verifiedListing(record, get);
-    const listed = listing?.list.list.machines.find((one) => one.machine === envelope.machine);
-    if (!listed) return generic;
+    if (!record?.account?.account) return failed("no-record");
+    const device = await get(`device-key:${record.account.account}`);
+    failure.device = device?.id ?? null;
+    if (!device?.encryption) return failed("no-key");
+    if (!Object.hasOwn(envelope.keys ?? {}, device.id)) return failed(record.device !== device.id && Object.hasOwn(envelope.keys ?? {}, record.device) ? "device-changed" : "not-a-recipient", record.device);
+    const found = await vouched(envelope.machine, record, { get, put, boards, now });
+    if (!found.listing) {
+      named = found.named ?? named;
+      return failed(found.reason);
+    }
+    named = found.listing;
+    const listed = machineIn(found.listing, envelope.machine);
     const notice = await openNotice(envelope, { id: device.id, encryption: device.encryption }, { id: listed.machine, keys: listed.keys }, now);
-    const name = listing.boards?.find((entry) => entry.machine === listed.machine)?.name || null;
-    return { title: notice.title, body: notice.body, tag, data: { machine: listed.machine, name, category: notice.category, open: notice.open, url: routeOf(listed.machine, notice.open) }, retract: notice.retract ?? [] };
-  } catch {
-    return generic;
+    const name = nameIn(found.listing, listed.machine);
+    return { title: notice.title, body: notice.body, tag, data: { machine: listed.machine, name, category: notice.category, open: notice.open, url: routeOf(listed.machine, notice.open) }, retract: notice.retract ?? [], failure: null };
+  } catch (error) {
+    return error instanceof ProtocolError ? failed(error.code) : failed("error", `${error?.name ?? "Error"}: ${error?.message ?? error}`);
   }
 }
 
-export async function showPushed(registration, envelope, { get, now }) {
-  const shown = await pushedNotice(envelope, { get, now });
+const REASON_TEXT = {
+  "no-envelope": "the push carried no notice.",
+  "no-record": "this browser no longer knows it turned notifications on.",
+  "no-key": "this device holds no key to open it.",
+  "device-changed": "it was sealed to an earlier key of this device.",
+  "not-a-recipient": "it was sealed to another device.",
+  "no-list": "this browser holds no list of your machines. Open your boards once.",
+  "list-older": "the list of your machines here is older than one this browser has seen.",
+  "list-unsigned": "the list of your machines isn't signed by your account.",
+  "signed-out": "the hub asked this browser to sign in again.",
+  "unknown-machine": "the machine that sent it isn't on your account's list.",
+  expired: "it had expired when it arrived.",
+  "not-yet-valid": "the sending machine's clock is ahead of this device's.",
+  "bad-signature": "the sending machine's signature didn't check out.",
+  undecryptable: "this device's key didn't open it.",
+  "key-mismatch": "this device's key didn't open it.",
+  "category-mismatch": "its tag names another kind of notice than the one inside.",
+};
+
+const clock = (seconds, now) => {
+  const at = new Date(seconds * 1000);
+  const time = at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return at.toDateString() === new Date(now * 1000).toDateString() ? time : `${at.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
+};
+
+export function failureLine(failure, now) {
+  if (!failure?.reason || !Number.isSafeInteger(failure.at)) return null;
+  const why = REASON_TEXT[failure.reason] ?? (failure.reason === "error" ? `this browser failed while opening it (${failure.detail ?? "no detail"}).` : `this app can't read it (${failure.reason}).`);
+  return `The last notification, at ${clock(failure.at, now)}${failure.name ? ` from ${failure.name}` : ""}, couldn't be opened: ${why}`;
+}
+
+export async function showPushed(registration, envelope, { get, now, put = null, del = null, boards = null }) {
+  const shown = await pushedNotice(envelope, { get, now, put, boards });
+  if (shown.failure && put) await put(NOTICE_FAILURE, shown.failure).catch(() => undefined);
+  if (!shown.failure && del) await del(NOTICE_FAILURE).catch(() => undefined);
   if (shown.retract.length) {
     for (const notification of await registration.getNotifications()) if (shown.retract.includes(notification.tag)) notification.close();
   }

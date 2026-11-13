@@ -2835,6 +2835,27 @@ fn blobs_json() -> Value {
     })
 }
 
+fn notices_json() -> Value {
+    let tags = ["q-0fc378cba90d48b44e5fe170", "p-1a2b", "d-1a2b", "i-1a2b", "r-a94051d90047441d5ac99a97", "c-1a2b", "s-1a2b", "q-", "x-1a2b", "Q-1a2b", "q", "question-1", "-q", "rq-1"];
+    let fits = [
+        (NoticeCategory::Questions, "q-1a2b", true),
+        (NoticeCategory::Questions, "p-1a2b", true),
+        (NoticeCategory::Ready, "q-1a2b", false),
+        (NoticeCategory::NewDevice, "r-1a2b", false),
+        (NoticeCategory::Ready, "ready-1", true),
+        (NoticeCategory::Started, "q", true),
+    ];
+    let notice_of = |category| Notice { category, title: "refunds · shop".into(), body: "Ready to push.".into(), open: Target::Task { address: "refunds@shop".into() }, retract: Vec::new() };
+    json!({
+        "prefixes": NoticeCategory::COLLAPSE_PREFIXES.iter().map(|(prefix, category)| json!({ "prefix": prefix, "category": category })).collect::<Vec<_>>(),
+        "tags": tags.iter().map(|tag| json!({ "tag": tag, "category": NoticeCategory::of_collapse(tag) })).collect::<Vec<_>>(),
+        "fits": fits.iter().map(|(category, tag, fits)| {
+            assert_eq!(notice_of(*category).fits_collapse(tag), *fits, "{tag}");
+            json!({ "category": category, "tag": tag, "fits": fits })
+        }).collect::<Vec<_>>(),
+    })
+}
+
 pub fn render() -> Vec<(&'static str, String)> {
     let parties = Parties::new();
     [
@@ -2848,6 +2869,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("blobs.json", blobs_json()),
         ("backlog.json", backlog_json()),
         ("review.json", review_json()),
+        ("notices.json", notices_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

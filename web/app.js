@@ -10,7 +10,7 @@ import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevi
 import { textHash } from "../js/protocol.js";
 import { answerBlock, answerReady, APPROVAL_STATES, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
-import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled } from "./notify.js";
@@ -808,6 +808,7 @@ async function refusedDevice(error) {
   if (!(error instanceof HubError && error.code === "device-removed") || !state.session?.identity) return;
   state.device = null;
   await forgetDevice(deviceStore, state.session.identity.id);
+  await stopNotifications(account, deviceStore);
 }
 
 function commandText(error) {

@@ -4,10 +4,10 @@ import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
 import { account, connectCalls, HubError } from "./hub.js";
 import { put, get, del } from "./store.js";
-import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, sendCommand, verifiedDevices } from "./device.js";
+import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 import { fromB64, toB64 } from "../js/protocol.js";
 import { decisionBlock, standingOn } from "./decide.js";
-import { categoriesKey, deviceWord, keptCategories, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
+import { categoriesKey, deviceWord, failureLine, keptCategories, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, setupScreen, signupScreen } from "./screens.js";
@@ -171,7 +171,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (state.emailStep) return codeScreen({ purpose: "confirm", email: state.emailStep.email, notice: state.notice, busy: state.busy });
     const viewing = state.viewing && state.devices?.find((device) => device.id === state.viewing);
     if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, older: state.older !== null, removing: state.removing, busy: state.busy, notice: state.notice, decisions: decisionsFor(viewing), now: nowSeconds() });
-    const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word, machines: state.opened.map((machine) => machine.name) }) } : null;
+    const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, failure: failureLine(state.notify.failure, nowSeconds()), text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word, machines: state.opened.map((machine) => machine.name) }) } : null;
     return accountScreen({ notify, me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
   }
 
@@ -343,11 +343,25 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const env = notifyEnvironment();
     const reachable = env.supported && !(env.ios && !env.standalone);
     const subscription = reachable ? await currentSubscription().catch(() => null) : null;
+    if (subscription && env.permission === "granted") await healPush(subscription);
     const listed = state.devices ? (state.devices.find((device) => device.self)?.push ?? null) : undefined;
     const kept = state.device ? await get(categoriesKey(state.device.id)).catch(() => null) : null;
     const subscribed = Boolean(subscription) && listed !== null;
-    state.notify = { env, phase: notifyPhase({ ...env, subscribed }), categories: keptCategories(listed?.categories ?? kept), busy: false };
+    const failure = await get(NOTICE_FAILURE).catch(() => null);
+    state.notify = { env, phase: notifyPhase({ ...env, subscribed }), categories: keptCategories(listed?.categories ?? kept), busy: false, failure };
     if (state.notify.phase === "on") await keepNotifyRecord(unlockedIdentity());
+  }
+
+  async function healPush(subscription) {
+    const identity = unlockedIdentity();
+    const record = await get(NOTIFY_RECORD).catch(() => null);
+    if (!identity || record?.account?.account !== identity.id || record.device === state.device?.id) return;
+    const store = { get, put };
+    try {
+      if (state.device) await pushFollows({ store, calls: account, identity, device: state.device, subscription: async () => subscription });
+      else state.device = await ensureDevice({ store, calls: account, identity, name: deviceName(), now: nowSeconds(), subscription: async () => subscription });
+      await loadDevices();
+    } catch {}
   }
 
   function toggleNotify(input) {
@@ -406,6 +420,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     try {
       await (await currentSubscription())?.unsubscribe();
       if (state.device) await account.unsubscribePush(state.device.id);
+      await del(NOTIFY_RECORD).catch(() => undefined);
       await loadDevices().catch(() => undefined);
     } catch (error) {
       state.notice = message(error);

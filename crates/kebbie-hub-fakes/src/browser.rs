@@ -245,6 +245,9 @@ impl Browser {
         match open(envelope, &self.device_id, self.device.keys(), machine, &keys, at) {
             Ok(Payload::Notice(notice)) => {
                 Payload::Notice(notice.clone()).validate().map_err(str::to_string)?;
+                if !envelope.header.collapse.as_deref().is_some_and(|tag| notice.fits_collapse(tag)) {
+                    return Err("its collapse tag names another category".into());
+                }
                 Ok(notice)
             }
             Ok(_) => Err("is not a notice".into()),
