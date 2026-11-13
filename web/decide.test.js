@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { answerBlock, answerReady, answerStatus, choosable, gate, standingOn, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, promptStatus, pushBlock, pushStatus, pushReady, refusedBlock, sentState, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { pushableOf } from "../js/protocol.js";
 
 const HEAD = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
 const AT = 1_761_069_600;
@@ -104,6 +106,17 @@ test("a task with a pushable run offers to push just that run from the top of it
   const confirm = pushBlock({ item: run, machineName: "mac", ui: { ...idle, confirming: true }, sent: null, state: null });
   assert.match(confirm, /<b>Push 3 commits · 3333333 to main\?<\/b><\/p><p>3 commits from the top of the push order; the rest stay here\. mac rebases/);
   assert.equal(pushReady({ ...run, pushable: undefined }), false, "a working task without a run offers no push");
+});
+
+test("the push sends the run the rule computes: past a subtask's accepted commit, never into a group it would split", () => {
+  const envelopes = JSON.parse(readFileSync(new URL("../vectors/envelopes.json", import.meta.url), "utf8"));
+  const item = envelopes.cases.find((vector) => vector.name === "board-with-subtasks-opened-by-the-account").expect.payload.items[0];
+  assert.deepEqual(item.pushable, pushableOf(item.order));
+  const idle = { confirming: false, busy: false, error: null };
+  assert.match(pushBlock({ item, machineName: "mac", ui: idle, sent: null, state: null }), new RegExp(`data-action="push-ask">Push 2 commits · ${item.order[1].sha.slice(0, 7)}<`));
+  const order = item.order.map((row) => ({ ...row, accepted: true }));
+  const whole = { ...item, order, pushable: pushableOf(order) };
+  assert.match(pushBlock({ item: whole, machineName: "mac", ui: idle, sent: null, state: null }), new RegExp(`Push 4 commits · ${item.head.slice(0, 7)}<`), "once its last commit is accepted the group goes out whole");
 });
 
 test("a ready task offers a push, asks once, then reports the machine's result", () => {

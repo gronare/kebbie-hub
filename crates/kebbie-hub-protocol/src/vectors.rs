@@ -19,7 +19,7 @@ use crate::backlog::{
 };
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
 use crate::board::{
-    Added, Agent, BlobRef, AgentStatus, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
+    Added, Agent, BlobRef, AgentStatus, CommitTests, Moved, TestsState, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
     MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Obstacle, ObstacleState, OrderRow, Prompt, PromptOption, Pushable, Question,
     QuestionOption, Report, RoutineSummary, Rules, RulesState, SecondOpinion, Subtask, SubtaskState, Verdict, VerdictOutcome,
 };
@@ -302,7 +302,15 @@ fn planned_board() -> Payload {
         added: None,
         rules: (state == SubtaskState::Ready).then(|| rules(RulesState::Ok)),
     };
-    let row = |sha: &str, subject: &str, subtask: &str| OrderRow { sha: sha.into(), subject: subject.into(), subtask: subtask.into() };
+    let row = |sha: &str, subject: &str, subtask: &str, accepted: bool, tests: TestsState| OrderRow {
+        sha: sha.into(),
+        subject: subject.into(),
+        subtask: subtask.into(),
+        accepted,
+        group: None,
+        tests: Some(CommitTests { state: tests, at: matches!(tests, TestsState::Passed | TestsState::Failed).then_some(AT - 900) }),
+        moved: None,
+    };
     board.items = vec![Item {
         address: "payments@api".into(),
         group: Group::Working,
@@ -342,12 +350,12 @@ fn planned_board() -> Payload {
             subtask("remove-old", "Remove the old payment client", SubtaskState::Planned, &[]),
         ]),
         order: Some(vec![
-            row(CURRENCY_COMMIT, CURRENCY_SUBJECT, "currency"),
-            row(FIRST_COMMIT, FIRST_SUBJECT, "gateway"),
-            row(BETWEEN_COMMIT, BETWEEN_SUBJECT, "tests"),
-            row(HEAD, HEAD_SUBJECT, "gateway"),
+            OrderRow { moved: Some(Moved { from: 2, reason: "The gateway reads the currency on every amount".into() }), ..row(CURRENCY_COMMIT, CURRENCY_SUBJECT, "currency", true, TestsState::Passed) },
+            row(FIRST_COMMIT, FIRST_SUBJECT, "gateway", true, TestsState::Passed),
+            OrderRow { group: Some("ci-gateway".into()), ..row(BETWEEN_COMMIT, BETWEEN_SUBJECT, "tests", true, TestsState::Running) },
+            OrderRow { group: Some("ci-gateway".into()), ..row(HEAD, HEAD_SUBJECT, "gateway", false, TestsState::NotRun) },
         ]),
-        pushable: Some(Pushable { count: 1, through: CURRENCY_COMMIT.into(), subtasks: vec!["currency".into()] }),
+        pushable: Some(Pushable { count: 2, through: FIRST_COMMIT.into(), subtasks: vec!["currency".into(), "gateway".into()] }),
         require_accept: None,
         obstacle: None,
         title: None,
@@ -891,7 +899,7 @@ fn push(head: &str) -> Payload {
 fn push_pushable() -> Payload {
     Payload::Push(PushApproval {
         address: REVIEWED.into(),
-        head: CURRENCY_COMMIT.into(),
+        head: FIRST_COMMIT.into(),
         card_sha: None,
     })
 }
@@ -3053,6 +3061,7 @@ fn review_json() -> Value {
         "rules": rules,
         "board_from_a_machine_not_yet_updated": legacy,
         "steps_from_a_machine_not_yet_updated": steps_from_a_machine_not_yet_updated(),
+        "subtasks_from_a_machine_not_yet_updated": subtasks_from_a_machine_not_yet_updated(),
         "reviews_from_a_machine_not_yet_updated": legacy_review,
         "plans": plans_json(),
         "bodies": bodies,
@@ -3087,6 +3096,20 @@ fn steps_from_a_machine_not_yet_updated() -> Value {
     json!([one, many])
 }
 
+fn subtasks_from_a_machine_not_yet_updated() -> Value {
+    let mut old = serde_json::to_value(planned_board()).unwrap();
+    for row in old["items"][0]["order"].as_array_mut().unwrap() {
+        let row = row.as_object_mut().unwrap();
+        for key in ["accepted", "group", "tests", "moved"] {
+            row.remove(key);
+        }
+    }
+    old["items"][0]["pushable"] = json!({ "count": 1, "through": CURRENCY_COMMIT, "subtasks": ["currency"] });
+    let parsed: Payload = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(parsed.validate(), Ok(()), "a board from a machine not yet updated still opens");
+    json!({ "board": old, "opens_as": parsed })
+}
+
 fn plans_json() -> Value {
     let board = serde_json::to_value(planned_board()).unwrap();
     let planned = board["items"][0].clone();
@@ -3106,6 +3129,7 @@ fn plans_json() -> Value {
         changed
     };
     let mut accepted = change("/subtasks/2/state", json!("accepted"));
+    accepted["order"][3]["accepted"] = json!(true);
     accepted["pushable"] = json!({ "count": 4, "through": HEAD, "subtasks": ["currency", "gateway", "tests"] });
     let mut obstacle = planned.clone();
     obstacle["obstacle"] = json!({ "id": "o1", "state": "asked", "text": "Lint should read the fields from the index, but the index keeps only title and text.", "at": AT - 1_140, "decision": { "kind": "ask", "by": "investigator", "text": "Both ways hold.\nThe tradeoff is yours." } });
@@ -3143,14 +3167,28 @@ fn plans_json() -> Value {
         ("a push order row under another subtask than its commit's", change("/order/0/subtask", json!("gateway")), false),
         ("a commit twice in the push order", change("/order/1/sha", json!(CURRENCY_COMMIT)), false),
         ("a pushed subtask left in the push order", change("/subtasks/1/state", json!("pushed")), false),
-        ("a push order row in a group, which is not built yet", change("/order/0/group", json!("g1")), false),
+        ("a subtask to review with one of its commits accepted", planned.clone(), true),
+        ("an accepted subtask with a commit not accepted", change("/subtasks/2/state", json!("accepted")), false),
+        ("a push order row without its acceptance", { let mut changed = planned.clone(); changed["order"][0].as_object_mut().unwrap().remove("accepted"); changed }, true),
+        ("a push order row accepted by a word, not a flag", change("/order/0/accepted", json!("yes")), false),
+        ("a group's commits apart in the push order", change("/order/1/group", json!("ci-gateway")), false),
+        ("a group of one commit", change("/order/2/group", json!("ci")), false),
+        ("a group named by a path", { let mut changed = change("/order/2/group", json!("../ci")); changed["order"][3]["group"] = json!("../ci"); changed }, false),
+        ("a pushable run that splits a group", change("/pushable", json!({ "count": 3, "through": BETWEEN_COMMIT, "subtasks": ["currency", "gateway", "tests"] })), false),
+        ("a commit whose tests failed, which holds nothing back", change("/order/1/tests", json!({ "state": "failed", "at": AT - 900 })), true),
+        ("a commit not tested with the time of a run", change("/order/3/tests", json!({ "state": "not-run", "at": AT - 900 })), false),
+        ("a commit's tests in a state kebbie does not know", change("/order/1/tests", json!({ "state": "stale" })), false),
+        ("a commit moved from no place", change("/order/0/moved/from", json!(0)), false),
+        ("a commit moved for a reason over two lines", change("/order/0/moved/reason", json!("Prepares\nthe gateway")), false),
+        ("a commit moved without a reason", change("/order/0/moved/reason", json!(" ")), false),
         ("a push order without subtasks", { let mut changed = planned.clone(); changed.as_object_mut().unwrap().remove("subtasks"); changed.as_object_mut().unwrap().remove("pushable"); changed }, false),
         ("a pushable run without a push order", without("order"), false),
         ("a pushable run of nothing", change("/pushable/count", json!(0)), false),
         ("a pushable run longer than the push order", change("/pushable/count", json!(5)), false),
-        ("a pushable run ending at another commit than its last", change("/pushable/through", json!(FIRST_COMMIT)), false),
+        ("a pushable run ending at another commit than its last", change("/pushable/through", json!(CURRENCY_COMMIT)), false),
         ("a pushable run naming subtasks it does not hold", change("/pushable/subtasks", json!(["currency", "tests"])), false),
-        ("a pushable run through a subtask not yet accepted", change("/pushable", json!({ "count": 2, "through": FIRST_COMMIT, "subtasks": ["currency", "gateway"] })), false),
+        ("a pushable run shorter than it could be", change("/pushable", json!({ "count": 1, "through": CURRENCY_COMMIT, "subtasks": ["currency"] })), true),
+        ("a pushable run through a commit not yet accepted", { let mut changed = change("/pushable", json!({ "count": 4, "through": HEAD, "subtasks": ["currency", "gateway", "tests"] })); changed["order"][2].as_object_mut().unwrap().remove("group"); changed["order"][3].as_object_mut().unwrap().remove("group"); changed }, false),
         ("subtasks and steps together", change("/steps", json!({ "pushed": 0, "items": [] })), false),
     ];
     let cases: Vec<Value> = cases
@@ -3163,7 +3201,7 @@ fn plans_json() -> Value {
             json!({ "name": name, "item": item, "valid": valid })
         })
         .collect();
-    json!({ "max_subtask_id_chars": crate::MAX_SUBTASK_ID_CHARS, "max_added_reason_chars": crate::MAX_ADDED_REASON_CHARS, "max_obstacle_chars": crate::MAX_OBSTACLE_CHARS, "cases": cases })
+    json!({ "max_subtask_id_chars": crate::MAX_SUBTASK_ID_CHARS, "max_added_reason_chars": crate::MAX_ADDED_REASON_CHARS, "max_obstacle_chars": crate::MAX_OBSTACLE_CHARS, "max_moved_reason_chars": crate::MAX_MOVED_REASON_CHARS, "cases": cases })
 }
 
 fn review_comments_json() -> Value {

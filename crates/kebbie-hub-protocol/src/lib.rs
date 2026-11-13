@@ -30,11 +30,11 @@ pub use backlog::{
 };
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
-    Added, Agent, DecidedBy, DecisionKind, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
-    Later, LaterState, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, MAX_SUBTASK_ID_CHARS, NextPart, NextRow,
-    Obstacle, ObstacleDecision, ObstacleState, OrderRow, OverrideBy, Prompt, PromptOption, PushPermission, Pushable,
+    Added, Agent, CommitTests, DecidedBy, DecisionKind, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
+    Later, LaterState, MAX_ADDED_REASON_CHARS, MAX_MOVED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, MAX_SUBTASK_ID_CHARS, NextPart, NextRow,
+    Moved, Obstacle, ObstacleDecision, ObstacleState, OrderRow, OverrideBy, Prompt, PromptOption, PushPermission, Pushable,
     Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Subtask, SubtaskState,
-    Verdict, VerdictOutcome, is_subtask_id,
+    TestsState, Verdict, VerdictOutcome, is_subtask_id, pushable_of,
 };
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 pub use crypto::{

@@ -222,7 +222,10 @@ const SUBTASK_STATES = ["planned", "in-progress", "ready", "accepted", "pushed"]
 const COMMITS_HELD = { planned: (n) => n === 0, "in-progress": () => true, ready: (n) => n >= 1, accepted: (n) => n >= 1, pushed: (n) => n >= 1 };
 export const isSubtaskId = (value) => typeof value === "string" && new RegExp(`^[A-Za-z0-9][A-Za-z0-9_-]{0,${MAX_SUBTASK_ID_CHARS - 1}}$`).test(value);
 const subtask = shape({ id: isSubtaskId, title: string, state: oneOf(...SUBTASK_STATES), commits: list(string), added: optionalField(shape({ at: u64v, reason: string })), rules: optionalField(rulesCheck) });
-const orderRow = shape({ sha: string, subject: string, subtask: string });
+export const MAX_MOVED_REASON_CHARS = 500;
+const commitTests = (value) => shape({ state: oneOf("passed", "failed", "running", "not-run"), at: optionalField(u64v) })(value) && (value.state !== "not-run" || absent(value.at));
+const moved = (value) => shape({ from: u32v, reason: string })(value) && value.from >= 1 && isLine(MAX_MOVED_REASON_CHARS)(value.reason);
+const orderRow = shape({ sha: string, subject: string, subtask: string, accepted: optionalField(bool), group: optionalField(isSubtaskId), tests: optionalField(commitTests), moved: optionalField(moved) });
 const pushable = shape({ count: u32v, through: string, subtasks: list(string) });
 const obstacleText = (value) => isText(MAX_OBSTACLE_CHARS)(value) && !/[^\P{Cc}\n]/u.test(value);
 const obstacleDecision = shape({ kind: oneOf("workaround", "subtask", "task", "ask"), by: oneOf("investigator", "lead", "you"), text: obstacleText });
@@ -241,20 +244,32 @@ function subtasksOf(steps) {
     const one = { id: String(step.number), title: step.title, state: step.state === "committed" ? "ready" : step.state, commits: commitsOf(step).map((commit) => commit.sha) };
     return absent(step.rules) ? one : { ...one, rules: step.rules };
   });
-  const order = steps.items.filter((step) => step.state !== "pushed").flatMap((step) => commitsOf(step).map((commit) => ({ sha: commit.sha, subject: commit.subject, subtask: String(step.number) })));
-  const accepted = new Set(subtasks.filter((one) => one.state === "accepted").map((one) => one.id));
-  const count = order.findIndex((row) => !accepted.has(row.subtask));
-  const run = count === -1 ? order.length : count;
+  const order = steps.items.filter((step) => step.state !== "pushed").flatMap((step) => commitsOf(step).map((commit) => ({ sha: commit.sha, subject: commit.subject, subtask: String(step.number), accepted: step.state === "accepted" })));
   const plan = { subtasks, order };
-  if (run > 0) plan.pushable = { count: run, through: order[run - 1].sha, subtasks: runOf(order, run) };
+  const run = pushableOf(order);
+  if (run) plan.pushable = run;
   if (!absent(steps.required)) plan.require_accept = steps.required;
   return plan;
+}
+const splitsAGroup = (order, count) => {
+  const inRun = new Set(order.slice(0, count).map((row) => row.group).filter((group) => !absent(group)));
+  return order.slice(count).some((row) => inRun.has(row.group));
+};
+export function pushableOf(order) {
+  let count = order.findIndex((row) => row.accepted !== true);
+  if (count === -1) count = order.length;
+  while (count > 0 && splitsAGroup(order, count)) count -= 1;
+  return count === 0 ? null : { count, through: order[count - 1].sha, subtasks: runOf(order, count) };
 }
 function itemOf(item) {
   let out = item;
   if (!absent(item.steps)) {
     const { steps, ...rest } = item;
     out = { ...rest, ...subtasksOf(steps) };
+  }
+  if (!absent(out.order) && out.order.some((row) => absent(row.accepted))) {
+    const accepted = new Set((out.subtasks ?? []).filter((one) => one.state === "accepted").map((one) => one.id));
+    out = { ...out, order: out.order.map((row) => (absent(row.accepted) ? { ...row, accepted: accepted.has(row.subtask) } : row)) };
   }
   if (!absent(out.review)) out = { ...out, review: { subtask: out.review.subtask ?? (absent(out.review.step) ? null : String(out.review.step)), files: out.review.files } };
   return out;
@@ -284,15 +299,26 @@ function planHolds(item) {
   }
   const order = item.order ?? [];
   const placed = new Set();
+  const closed = new Set();
+  let open = null;
   for (const row of order) {
     const owner = subtaskOf(item, row.subtask);
     if (!isFullSha(row.sha) || placed.has(row.sha) || !owner || !owner.commits.includes(row.sha) || owner.state === "pushed") return false;
+    if (typeof row.accepted !== "boolean" || (owner.state === "accepted" && !row.accepted)) return false;
     placed.add(row.sha);
+    const group = row.group ?? null;
+    if (group !== open) {
+      if (open !== null) closed.add(open);
+      if (group !== null && closed.has(group)) return false;
+      open = group;
+    }
   }
+  const groups = order.map((row) => row.group).filter((group) => !absent(group));
+  if (groups.some((group) => groups.filter((other) => other === group).length < 2)) return false;
   if (absent(item.pushable)) return true;
   const { count, through, subtasks } = item.pushable;
   const run = runOf(order, count);
-  return count >= 1 && count <= order.length && order[count - 1].sha === through && run.length === subtasks.length && run.every((id, index) => subtasks[index] === id) && run.every((id) => subtaskOf(item, id).state === "accepted");
+  return count >= 1 && count <= order.length && order[count - 1].sha === through && run.length === subtasks.length && run.every((id, index) => subtasks[index] === id) && order.slice(0, count).every((row) => row.accepted) && !splitsAGroup(order, count);
 }
 const itemHolds = (raw) => (absent(raw.steps) || PLAN_KEYS.every((key) => absent(raw[key]))) && planHolds(itemOf(raw));
 const item = shape({

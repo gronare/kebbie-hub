@@ -14,7 +14,7 @@ use kebbie_hub_protocol::{
     Idea, ItemAnswer, ItemEdit, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, AcceptSubtask, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
-    FoundAdd, FoundDismiss, FoundStart, PushApproval, Pushable, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState,
+    FoundAdd, FoundDismiss, FoundStart, PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState, pushable_of,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -769,7 +769,11 @@ impl MachineState {
         }
         subtask.state = SubtaskState::Accepted;
         let title = subtask.title.clone();
-        item.pushable = pushable(item);
+        let commits = subtask.commits.clone();
+        for row in item.order.iter_mut().flatten().filter(|row| commits.contains(&row.sha)) {
+            row.accepted = true;
+        }
+        item.pushable = item.order.as_deref().and_then(pushable_of);
         self.board_changed = true;
         Ok(format!("Accepted {title} of {}.", accept.address))
     }
@@ -1212,20 +1216,6 @@ fn plural(count: usize, one: &str) -> String {
 
 fn review_key(address: &str, subtask: Option<&str>) -> String {
     subtask.map_or_else(|| address.to_string(), |subtask| format!("{address}#{subtask}"))
-}
-
-fn pushable(item: &Item) -> Option<Pushable> {
-    let order = item.order.as_deref()?;
-    let accepted = |id: &str| item.subtask(id).is_some_and(|subtask| subtask.state == SubtaskState::Accepted);
-    let count = order.iter().take_while(|row| accepted(&row.subtask)).count();
-    let through = order[..count].last()?.sha.clone();
-    let mut subtasks: Vec<String> = Vec::new();
-    for row in &order[..count] {
-        if !subtasks.contains(&row.subtask) {
-            subtasks.push(row.subtask.clone());
-        }
-    }
-    Some(Pushable { count: count as u32, through, subtasks })
 }
 
 fn comment_lines(comments: &ReviewComments) -> String {

@@ -650,7 +650,7 @@
           "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "ZeXP4ZDo2Sb0ebGaRLtrfrT24hDsDUKk6YXDI1ooV9h-k1e_u9kNvnXO6kR0qn_Y_kga_CdOyOBSFxDxAp5E5Mt2thomwfI8EB7r7NwL0ce1mtOXTuIO8c06XwYVRTdMYM_5ry35dodezRlLPbSFu468LV6tar6aCL9gv0EjoM24upGT9e0",
+        "ct": "ZeXP4ZDo2Sb0ebGaRLtrfrT24hDsDUKk6YXDI1ooV9h-k1e_u9kNvnXO6kR0qn_Y_kga_CdOyOBSFxDxVs9B48FwtE9zkqA2Q0C2vo4M08K0mtaTFelT8pw7ClFFE2UcO5mirS35dodezRlLPbSFu468LV6taisbM19j7dw3LjtqcTCty38",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7997-9b69-e40e886cd2fe",
@@ -662,7 +662,7 @@
         "kind": "push",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "5hDvvHQ35TcSzuSYaeuj6Eu7FdX8cbIQKK97ItztHE8IBfItIeg6qcoldqHd7iR5b_isgNv_8z-RzyriLQsHCQ",
+        "sig": "F8kxRky4Qn83EYxqPlqNplr32eXnh_d6-Jb4v8JR-ryYQic8YxVpiDaMjpbkpcznqySMRAMWKfLQMPVh6zLCCQ",
         "v": 1
       },
       "expect": {
@@ -670,7 +670,7 @@
         "payload": {
           "address": "payments@api",
           "card_sha": null,
-          "head": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+          "head": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
           "type": "push"
         }
       },

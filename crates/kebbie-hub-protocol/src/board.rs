@@ -189,7 +189,7 @@ struct ItemWire {
     #[serde(default)]
     subtasks: Option<Vec<Subtask>>,
     #[serde(default)]
-    order: Option<Vec<OrderRow>>,
+    order: Option<Vec<OrderRowWire>>,
     #[serde(default)]
     pushable: Option<Pushable>,
     #[serde(default)]
@@ -217,7 +217,10 @@ impl TryFrom<ItemWire> for Item {
 
     fn try_from(wire: ItemWire) -> Result<Self, Self::Error> {
         let (subtasks, order, pushable, require_accept) = match wire.steps {
-            None => (wire.subtasks, wire.order, wire.pushable, wire.require_accept),
+            None => {
+                let order = wire.order.map(|rows| rows.into_iter().map(|row| row.read(wire.subtasks.as_deref().unwrap_or_default())).collect());
+                (wire.subtasks, order, wire.pushable, wire.require_accept)
+            }
             Some(_) if wire.subtasks.is_some() || wire.order.is_some() || wire.pushable.is_some() || wire.require_accept.is_some() => return Err("an item carries subtasks or, from an older machine, steps"),
             Some(steps) => {
                 let (subtasks, order, pushable) = steps.as_subtasks();
@@ -270,6 +273,7 @@ pub struct SecondOpinion {
 pub const MAX_SUBTASK_ID_CHARS: usize = 32;
 pub const MAX_ADDED_REASON_CHARS: usize = 500;
 pub const MAX_OBSTACLE_CHARS: usize = 2_000;
+pub const MAX_MOVED_REASON_CHARS: usize = 500;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -307,6 +311,60 @@ pub struct OrderRow {
     pub sha: String,
     pub subject: String,
     pub subtask: String,
+    pub accepted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tests: Option<CommitTests>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved: Option<Moved>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OrderRowWire {
+    sha: String,
+    subject: String,
+    subtask: String,
+    #[serde(default)]
+    accepted: Option<bool>,
+    #[serde(default)]
+    group: Option<String>,
+    #[serde(default)]
+    tests: Option<CommitTests>,
+    #[serde(default)]
+    moved: Option<Moved>,
+}
+
+impl OrderRowWire {
+    fn read(self, subtasks: &[Subtask]) -> OrderRow {
+        let accepted = self.accepted.unwrap_or_else(|| subtasks.iter().any(|subtask| subtask.id == self.subtask && subtask.state == SubtaskState::Accepted));
+        OrderRow { sha: self.sha, subject: self.subject, subtask: self.subtask, accepted, group: self.group, tests: self.tests, moved: self.moved }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CommitTests {
+    pub state: TestsState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TestsState {
+    Passed,
+    Failed,
+    Running,
+    NotRun,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Moved {
+    pub from: u32,
+    pub reason: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -420,12 +478,29 @@ impl Item {
         }
         let order = self.order.as_deref().unwrap_or_default();
         let mut placed = BTreeSet::new();
+        let mut closed: BTreeSet<&str> = BTreeSet::new();
+        let mut open: Option<&str> = None;
         for row in order {
             check(is_full_sha(&row.sha), "a commit in the push order is not a full sha")?;
             check(placed.insert(row.sha.as_str()), "a commit sits once in the push order")?;
             let owner = self.subtask(&row.subtask).ok_or("a commit in the push order names a subtask the task does not have")?;
             check(owner.commits.contains(&row.sha), "a commit in the push order is not one of its subtask's")?;
             check(owner.state != SubtaskState::Pushed, "a pushed subtask has nothing left in the push order")?;
+            check(row.accepted || owner.state != SubtaskState::Accepted, "every commit of an accepted subtask is accepted")?;
+            check(row.tests.as_ref().is_none_or(|tests| tests.state != TestsState::NotRun || tests.at.is_none()), "a commit not tested carries no time of its test run")?;
+            check(row.moved.as_ref().is_none_or(|moved| moved.from >= 1 && is_line(&moved.reason, MAX_MOVED_REASON_CHARS)), "a moved commit says from which place and why, on one line")?;
+            let group = row.group.as_deref();
+            check(group.is_none_or(is_subtask_id), "a group's id is not a short plain name")?;
+            if open != group {
+                if let Some(left) = open {
+                    closed.insert(left);
+                }
+                check(group.is_none_or(|group| !closed.contains(group)), "a group's commits sit together in the push order")?;
+                open = group;
+            }
+        }
+        for group in order.iter().filter_map(|row| row.group.as_deref()) {
+            check(order.iter().filter(|row| row.group.as_deref() == Some(group)).count() >= 2, "a group holds two commits or more")?;
         }
         let Some(pushable) = &self.pushable else {
             return Ok(());
@@ -433,15 +508,34 @@ impl Item {
         let count = pushable.count as usize;
         check((1..=order.len()).contains(&count), "a pushable run holds one to all of the push order")?;
         check(order[count - 1].sha == pushable.through, "a pushable run ends at its last commit")?;
-        let mut run: Vec<&str> = Vec::new();
-        for row in &order[..count] {
-            if !run.contains(&row.subtask.as_str()) {
-                run.push(&row.subtask);
-            }
-        }
-        check(run == pushable.subtasks.iter().map(String::as_str).collect::<Vec<_>>(), "a pushable run names the subtasks of its commits in order")?;
-        check(run.iter().all(|id| self.subtask(id).is_some_and(|subtask| subtask.state == SubtaskState::Accepted)), "every commit in a pushable run belongs to an accepted subtask")
+        check(run_of(&order[..count]) == pushable.subtasks, "a pushable run names the subtasks of its commits in order")?;
+        check(order[..count].iter().all(|row| row.accepted), "every commit in a pushable run is accepted")?;
+        check(!splits_a_group(order, count), "a pushable run never splits a group")
     }
+}
+
+pub fn pushable_of(order: &[OrderRow]) -> Option<Pushable> {
+    let mut count = order.iter().take_while(|row| row.accepted).count();
+    while count > 0 && splits_a_group(order, count) {
+        count -= 1;
+    }
+    let last = order[..count].last()?;
+    Some(Pushable { count: count as u32, through: last.sha.clone(), subtasks: run_of(&order[..count]) })
+}
+
+fn splits_a_group(order: &[OrderRow], count: usize) -> bool {
+    let (run, rest) = order.split_at(count);
+    run.iter().filter_map(|row| row.group.as_deref()).any(|group| rest.iter().any(|row| row.group.as_deref() == Some(group)))
+}
+
+fn run_of(run: &[OrderRow]) -> Vec<String> {
+    let mut subtasks: Vec<String> = Vec::new();
+    for row in run {
+        if !subtasks.contains(&row.subtask) {
+            subtasks.push(row.subtask.clone());
+        }
+    }
+    subtasks
 }
 
 #[derive(Deserialize)]
@@ -515,23 +609,11 @@ impl Steps {
             rules: step.rules.clone(),
         }).collect();
         let order: Vec<OrderRow> = self.items.iter().filter(|step| !matches!(step.state, StepState::Pushed)).flat_map(|step| {
-            commits(step).into_iter().map(|(sha, subject)| OrderRow { sha, subject, subtask: step.number.to_string() })
+            commits(step).into_iter().map(|(sha, subject)| OrderRow { sha, subject, subtask: step.number.to_string(), accepted: matches!(step.state, StepState::Accepted), group: None, tests: None, moved: None })
         }).collect();
-        (subtasks.clone(), order.clone(), pushable_of(&subtasks, &order))
+        let pushable = pushable_of(&order);
+        (subtasks, order, pushable)
     }
-}
-
-fn pushable_of(subtasks: &[Subtask], order: &[OrderRow]) -> Option<Pushable> {
-    let accepted = |row: &OrderRow| subtasks.iter().any(|subtask| subtask.id == row.subtask && subtask.state == SubtaskState::Accepted);
-    let count = order.iter().take_while(|row| accepted(row)).count();
-    let last = order[..count].last()?;
-    let mut run: Vec<String> = Vec::new();
-    for row in &order[..count] {
-        if !run.contains(&row.subtask) {
-            run.push(row.subtask.clone());
-        }
-    }
-    Some(Pushable { count: count as u32, through: last.sha.clone(), subtasks: run })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -822,13 +904,13 @@ mod tests {
             { "id": "docs", "title": "Docs", "state": "pushed", "commits": [sha('0')] },
         ]);
         item["order"] = serde_json::json!([
-            { "sha": sha('1'), "subject": "Give the tests their own vault", "subtask": "env" },
-            { "sha": sha('2'), "subject": "Clean the vault between tests", "subtask": "env" },
-            { "sha": sha('3'), "subject": "Keep frontmatter in the index", "subtask": "fm" },
-            { "sha": sha('4'), "subject": "Read lint's fields from the index", "subtask": "lint" },
-            { "sha": sha('5'), "subject": "Run CI on Python 3.14", "subtask": "ci" },
-            { "sha": sha('6'), "subject": "Drop lint's fetch of every note", "subtask": "lint" },
-            { "sha": sha('7'), "subject": "Move the backend factory", "subtask": "split" },
+            { "sha": sha('1'), "subject": "Give the tests their own vault", "subtask": "env", "accepted": true },
+            { "sha": sha('2'), "subject": "Clean the vault between tests", "subtask": "env", "accepted": true },
+            { "sha": sha('3'), "subject": "Keep frontmatter in the index", "subtask": "fm", "accepted": true },
+            { "sha": sha('4'), "subject": "Read lint's fields from the index", "subtask": "lint", "accepted": false },
+            { "sha": sha('5'), "subject": "Run CI on Python 3.14", "subtask": "ci", "accepted": true },
+            { "sha": sha('6'), "subject": "Drop lint's fetch of every note", "subtask": "lint", "accepted": false },
+            { "sha": sha('7'), "subject": "Move the backend factory", "subtask": "split", "accepted": false },
         ]);
         item["pushable"] = serde_json::json!({ "count": 3, "through": sha('3'), "subtasks": ["env", "fm"] });
         item["require_accept"] = serde_json::json!(true);
@@ -855,13 +937,15 @@ mod tests {
         assert_eq!(checked(none), Ok(()), "nothing may be pushable yet");
         let mut later = planned();
         later["subtasks"][2]["state"] = serde_json::json!("accepted");
+        later["order"][3]["accepted"] = serde_json::json!(true);
+        later["order"][5]["accepted"] = serde_json::json!(true);
         later["pushable"] = serde_json::json!({ "count": 6, "through": sha('6'), "subtasks": ["env", "fm", "lint", "ci"] });
         assert_eq!(checked(later), Ok(()), "accepting lint frees ci, which waited behind it");
     }
 
     #[test]
     fn a_push_order_and_its_run_hold_together_with_the_subtasks() {
-        let wrong: [(&str, serde_json::Value); 20] = [
+        let wrong: [(&str, serde_json::Value); 21] = [
             ("/subtasks/0/id", serde_json::json!("a b")),
             ("/subtasks/0/id", serde_json::json!("x".repeat(MAX_SUBTASK_ID_CHARS + 1))),
             ("/subtasks/1/id", serde_json::json!("env")),
@@ -882,6 +966,7 @@ mod tests {
             ("/pushable/subtasks", serde_json::json!(["fm", "env"])),
             ("/pushable", serde_json::json!({ "count": 4, "through": sha('4'), "subtasks": ["env", "fm", "lint"] })),
             ("/subtasks/0/rules", serde_json::json!({ "state": "breaks" })),
+            ("/order/0/accepted", serde_json::json!(false)),
         ];
         for (pointer, value) in wrong {
             let mut item = planned();
@@ -900,8 +985,107 @@ mod tests {
         unordered.as_object_mut().unwrap().remove("order");
         assert!(checked(unordered).is_err(), "a pushable run is a part of the push order");
         let mut extra = planned();
-        extra["order"][0]["group"] = serde_json::json!("g1");
+        extra["order"][0]["merged"] = serde_json::json!(true);
         assert!(checked(extra).is_err(), "a row carries only its allow-listed fields");
+    }
+
+    fn with(mut item: serde_json::Value, changes: &[(&str, serde_json::Value)]) -> serde_json::Value {
+        for (pointer, value) in changes {
+            *item.pointer_mut(pointer).unwrap_or_else(|| panic!("{pointer}")) = value.clone();
+        }
+        item
+    }
+
+    fn row(item: &serde_json::Value, index: usize, key: &str, value: serde_json::Value) -> serde_json::Value {
+        let mut item = item.clone();
+        item["order"][index][key] = value;
+        item
+    }
+
+    fn computed(item: &serde_json::Value) -> Option<(u32, String)> {
+        let item: Item = serde_json::from_value(item.clone()).unwrap();
+        pushable_of(item.order.as_deref().unwrap_or_default()).map(|run| (run.count, run.through))
+    }
+
+    #[test]
+    fn a_ready_subtask_may_hold_accepted_commits_and_the_run_goes_as_far_as_every_commit_is_accepted() {
+        let partly = with(planned(), &[("/order/3/accepted", serde_json::json!(true))]);
+        let item: Item = serde_json::from_value(partly.clone()).unwrap();
+        assert_eq!(item.subtask("lint").map(|lint| lint.state), Some(SubtaskState::Ready), "one of lint's two commits is accepted, so lint is still to review");
+        assert_eq!(computed(&partly), Some((5, sha('5'))), "the run passes lint's accepted commit and stops at its unaccepted one");
+        assert_eq!(checked(partly.clone()), Ok(()), "a run shorter than it could be still holds");
+        let longer = with(partly.clone(), &[("/pushable", serde_json::json!({ "count": 5, "through": sha('5'), "subtasks": ["env", "fm", "lint", "ci"] }))]);
+        assert_eq!(checked(longer), Ok(()), "a subtask in the run need not be accepted, only its commits in the run");
+        let past = with(partly, &[("/pushable", serde_json::json!({ "count": 6, "through": sha('6'), "subtasks": ["env", "fm", "lint", "ci"] }))]);
+        assert!(checked(past).is_err(), "a run never passes a commit that is not accepted");
+        assert_eq!(computed(&planned()), Some((3, sha('3'))));
+        let mut in_progress = with(planned(), &[("/subtasks/2/state", serde_json::json!("in-progress")), ("/order/3/accepted", serde_json::json!(true))]);
+        assert_eq!(checked(in_progress.clone()), Ok(()), "a subtask that got a new commit after it was accepted keeps the accepted one");
+        in_progress["subtasks"][2]["state"] = serde_json::json!("accepted");
+        assert!(checked(in_progress).is_err(), "every commit of an accepted subtask is accepted");
+        let none = with(planned(), &[("/order/0/accepted", serde_json::json!(false)), ("/subtasks/0/state", serde_json::json!("ready"))]);
+        assert_eq!(computed(&none), None, "nothing is pushable when the first commit is not accepted");
+    }
+
+    #[test]
+    fn a_group_goes_out_whole_and_its_commits_sit_together() {
+        let grouped = row(&row(&planned(), 2, "group", serde_json::json!("index")), 3, "group", serde_json::json!("index"));
+        assert_eq!(computed(&grouped), Some((2, sha('2'))), "fm's accepted commit waits for lint's, which goes out with it");
+        assert!(checked(grouped.clone()).is_err(), "a run through fm would split the group");
+        let held = with(grouped.clone(), &[("/pushable", serde_json::json!({ "count": 2, "through": sha('2'), "subtasks": ["env"] }))]);
+        assert_eq!(checked(held.clone()), Ok(()));
+        let item: Item = serde_json::from_value(held.clone()).unwrap();
+        assert_eq!(item.order.as_ref().unwrap()[2].group.as_deref(), Some("index"));
+        assert_eq!(serde_json::to_value(&item).unwrap(), held);
+        let whole = with(grouped, &[("/order/3/accepted", serde_json::json!(true))]);
+        assert_eq!(computed(&whole), Some((5, sha('5'))), "once both are accepted the group goes out whole");
+        let apart = row(&row(&planned(), 0, "group", serde_json::json!("g")), 2, "group", serde_json::json!("g"));
+        assert!(checked(apart).is_err(), "a group's commits sit together in the push order");
+        let lone = row(&planned(), 0, "group", serde_json::json!("g"));
+        assert!(checked(lone).is_err(), "a group holds two commits or more");
+        let named = row(&row(&planned(), 0, "group", serde_json::json!("a b")), 1, "group", serde_json::json!("a b"));
+        assert!(checked(named).is_err(), "a group's id is a short plain name");
+        let two = row(&row(&row(&row(&planned(), 0, "group", serde_json::json!("a")), 1, "group", serde_json::json!("a")), 2, "group", serde_json::json!("b")), 3, "group", serde_json::json!("b"));
+        assert_eq!(computed(&two), Some((2, sha('2'))), "two groups side by side each go out whole");
+    }
+
+    #[test]
+    fn a_commit_says_where_its_tests_stand_and_nothing_waits_on_them() {
+        for (state, at) in [("passed", Some(1_761_069_000u64)), ("failed", Some(1_761_069_000)), ("running", Some(1_761_069_000)), ("running", None), ("not-run", None)] {
+            let tests = at.map_or_else(|| serde_json::json!({ "state": state }), |at| serde_json::json!({ "state": state, "at": at }));
+            let one = row(&planned(), 0, "tests", tests);
+            assert_eq!(checked(one.clone()), Ok(()), "{state}");
+            assert_eq!(serde_json::to_value(serde_json::from_value::<Item>(one.clone()).unwrap()).unwrap(), one);
+        }
+        let failed = row(&planned(), 0, "tests", serde_json::json!({ "state": "failed" }));
+        assert_eq!(computed(&failed), Some((3, sha('3'))), "a failed test is advisory, the run still goes through it");
+        for wrong in [serde_json::json!({ "state": "not-run", "at": 1 }), serde_json::json!({ "state": "stale" }), serde_json::json!({ "state": "passed", "by": "ci" }), serde_json::json!("passed")] {
+            assert!(checked(row(&planned(), 0, "tests", wrong.clone())).is_err(), "{wrong}");
+        }
+    }
+
+    #[test]
+    fn a_commit_kebbie_moved_up_says_from_where_and_why() {
+        let moved = row(&planned(), 2, "moved", serde_json::json!({ "from": 4, "reason": "Prepares lint's read from the index" }));
+        assert_eq!(checked(moved.clone()), Ok(()));
+        let item: Item = serde_json::from_value(moved.clone()).unwrap();
+        assert_eq!(item.order.as_ref().unwrap()[2].moved, Some(Moved { from: 4, reason: "Prepares lint's read from the index".into() }));
+        assert_eq!(serde_json::to_value(&item).unwrap(), moved);
+        for wrong in [serde_json::json!({ "from": 0, "reason": "Prepares lint" }), serde_json::json!({ "from": 4, "reason": " " }), serde_json::json!({ "from": 4, "reason": "Two\nlines" }), serde_json::json!({ "from": 4, "reason": "x".repeat(MAX_MOVED_REASON_CHARS + 1) }), serde_json::json!({ "from": 4 })] {
+            assert!(checked(row(&planned(), 2, "moved", wrong.clone())).is_err(), "{wrong}");
+        }
+    }
+
+    #[test]
+    fn a_push_order_from_a_machine_not_yet_updated_reads_each_commit_as_accepted_with_its_subtask() {
+        let mut older = planned();
+        for row in older["order"].as_array_mut().unwrap() {
+            row.as_object_mut().unwrap().remove("accepted");
+        }
+        let item: Item = serde_json::from_value(older.clone()).unwrap();
+        assert_eq!(item.order.as_ref().unwrap().iter().map(|row| row.accepted).collect::<Vec<_>>(), [true, true, true, false, true, false, false]);
+        assert_eq!(checked(older), Ok(()));
+        assert_eq!(serde_json::to_value(&item).unwrap(), planned(), "a board is written back with every commit's acceptance");
     }
 
     #[test]
@@ -970,7 +1154,7 @@ mod tests {
         ] });
         let item: Item = serde_json::from_value(oldest).unwrap();
         assert_eq!(item.subtasks.as_ref().unwrap()[0].state, SubtaskState::Ready, "committed reads as ready");
-        assert_eq!(item.order.unwrap(), vec![OrderRow { sha: sha('2'), subject: "Charge through a PaymentGateway".into(), subtask: "1".into() }]);
+        assert_eq!(item.order.unwrap(), vec![OrderRow { sha: sha('2'), subject: "Charge through a PaymentGateway".into(), subtask: "1".into(), accepted: false, group: None, tests: None, moved: None }]);
         assert_eq!(item.pushable, None);
         let mut both = stepped;
         both["subtasks"] = serde_json::json!([]);
@@ -982,7 +1166,7 @@ mod tests {
         let mut ruled = plain();
         ruled["git"] = serde_json::json!({ "upstream": "main", "ahead": 1, "behind": 0, "uncommitted": 0, "rules": { "state": "breaks", "breaks": 2, "names": ["Every commit says why"], "override": { "by": "lead" } } });
         ruled["subtasks"] = serde_json::json!([{ "id": "docs", "title": "Docs", "state": "ready", "commits": [sha('1')], "rules": { "state": "checking" } }]);
-        ruled["order"] = serde_json::json!([{ "sha": sha('1'), "subject": "Docs", "subtask": "docs" }]);
+        ruled["order"] = serde_json::json!([{ "sha": sha('1'), "subject": "Docs", "subtask": "docs", "accepted": false }]);
         let item: Item = serde_json::from_value(ruled.clone()).unwrap();
         let rules = item.git.as_ref().unwrap().rules.as_ref().unwrap();
         assert_eq!((rules.state, rules.breaks, rules.overridden.as_ref().map(|by| by.by)), (RulesState::Breaks, Some(2), Some(OverrideBy::Lead)));

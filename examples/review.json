@@ -59,14 +59,30 @@
       {
         "sha": "8c2e5b0d9a7f6e4c3b2a1908f7e6d5c4b3a29180",
         "subject": "Test that a push survives a dropped runner",
-        "subtask": "retry"
+        "subtask": "retry",
+        "accepted": true,
+        "tests": {
+          "state": "passed",
+          "at": 1761068700
+        }
       },
       {
         "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
         "subject": "Retry a CI push when the runner drops",
-        "subtask": "retry"
+        "subtask": "retry",
+        "accepted": false,
+        "tests": {
+          "state": "running"
+        }
       }
     ],
+    "pushable": {
+      "count": 1,
+      "through": "8c2e5b0d9a7f6e4c3b2a1908f7e6d5c4b3a29180",
+      "subtasks": [
+        "retry"
+      ]
+    },
     "require_accept": true,
     "title": "Retry a flaky CI push",
     "recipe": "small-fix"

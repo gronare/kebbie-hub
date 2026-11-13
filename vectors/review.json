@@ -6138,7 +6138,7 @@
       "payload": {
         "address": "payments@api",
         "card_sha": null,
-        "head": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+        "head": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
         "type": "push"
       },
       "valid": true
@@ -6201,35 +6201,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -6319,24 +6344,48 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
@@ -6430,24 +6479,48 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
@@ -6561,35 +6634,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -6685,35 +6783,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -6809,35 +6932,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -6938,35 +7086,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7067,35 +7240,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7191,35 +7389,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7320,35 +7543,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7449,35 +7697,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7578,35 +7851,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7707,35 +8005,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7836,35 +8159,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -7964,35 +8312,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8093,35 +8466,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8222,35 +8620,60 @@
           },
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8340,35 +8763,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8458,35 +8906,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8576,35 +9049,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8694,35 +9192,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8812,35 +9335,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -8932,35 +9480,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9047,35 +9620,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9165,35 +9763,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9283,35 +9906,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9402,35 +10050,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "nope"
+              "subtask": "nope",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9520,35 +10193,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9638,35 +10336,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9756,35 +10479,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9874,36 +10622,60 @@
           "next_for_you": null,
           "order": [
             {
-              "group": "g1",
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -9967,7 +10739,150 @@
           "urgency": 0,
           "verdict": null
         },
-        "name": "a push order row in a group, which is not built yet",
+        "name": "a subtask to review with one of its commits accepted",
+        "valid": true
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "accepted",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "an accepted subtask with a commit not accepted",
         "valid": false
       },
       {
@@ -9993,24 +10908,1765 @@
           "next_for_you": null,
           "order": [
             {
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a push order row without its acceptance",
+        "valid": true
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": "yes",
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a push order row accepted by a word, not a flag",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a group's commits apart in the push order",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a group of one commit",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "../ci",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "../ci",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a group named by a path",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 3,
+            "subtasks": [
+              "currency",
+              "gateway",
+              "tests"
+            ],
+            "through": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a pushable run that splits a group",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "failed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a commit whose tests failed, which holds nothing back",
+        "valid": true
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a commit not tested with the time of a run",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "state": "stale"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a commit's tests in a state kebbie does not know",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 0,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a commit moved from no place",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "Prepares\nthe gateway"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a commit moved for a reason over two lines",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": " "
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 2,
+            "subtasks": [
+              "currency",
+              "gateway"
+            ],
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a commit moved without a reason",
+        "valid": false
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "group": "ci-gateway",
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "group": "ci-gateway",
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
@@ -10052,11 +12708,12 @@
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -10146,24 +12803,48 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
@@ -10172,9 +12853,10 @@
           "pushable": {
             "count": 0,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -10264,24 +12946,48 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
@@ -10290,9 +12996,10 @@
           "pushable": {
             "count": 5,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -10382,35 +13089,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
           },
           "question": null,
           "recover": null,
@@ -10500,36 +13232,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
               "currency",
               "tests"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -10619,36 +13375,59 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 2,
+            "count": 1,
             "subtasks": [
-              "currency",
-              "gateway"
+              "currency"
             ],
-            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
           },
           "question": null,
           "recover": null,
@@ -10712,7 +13491,149 @@
           "urgency": 0,
           "verdict": null
         },
-        "name": "a pushable run through a subtask not yet accepted",
+        "name": "a pushable run shorter than it could be",
+        "valid": true
+      },
+      {
+        "item": {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
+            },
+            {
+              "accepted": true,
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
+            },
+            {
+              "accepted": false,
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 4,
+            "subtasks": [
+              "currency",
+              "gateway",
+              "tests"
+            ],
+            "through": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        },
+        "name": "a pushable run through a commit not yet accepted",
         "valid": false
       },
       {
@@ -10738,35 +13659,60 @@
           "next_for_you": null,
           "order": [
             {
+              "accepted": true,
+              "moved": {
+                "from": 2,
+                "reason": "The gateway reads the currency on every amount"
+              },
               "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
               "subject": "Name the currency on every amount",
-              "subtask": "currency"
+              "subtask": "currency",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
               "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
               "subject": "Add the PaymentGateway trait",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "at": 1761068700,
+                "state": "passed"
+              }
             },
             {
+              "accepted": true,
+              "group": "ci-gateway",
               "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
               "subject": "Run the payment tests on CI",
-              "subtask": "tests"
+              "subtask": "tests",
+              "tests": {
+                "state": "running"
+              }
             },
             {
+              "accepted": false,
+              "group": "ci-gateway",
               "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
               "subject": "Charge orders through the gateway in cents",
-              "subtask": "gateway"
+              "subtask": "gateway",
+              "tests": {
+                "state": "not-run"
+              }
             }
           ],
           "prompt": null,
           "push_permission": null,
           "push_waits": null,
           "pushable": {
-            "count": 1,
+            "count": 2,
             "subtasks": [
-              "currency"
+              "currency",
+              "gateway"
             ],
-            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
           },
           "question": null,
           "recover": null,
@@ -10839,6 +13785,7 @@
       }
     ],
     "max_added_reason_chars": 500,
+    "max_moved_reason_chars": 500,
     "max_obstacle_chars": 2000,
     "max_subtask_id_chars": 32
   },
@@ -12176,11 +15123,13 @@
             "next_for_you": null,
             "order": [
               {
+                "accepted": false,
                 "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
                 "subject": "Charge through a PaymentGateway",
                 "subtask": "2"
               },
               {
+                "accepted": true,
                 "sha": "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e",
                 "subject": "Docs",
                 "subtask": "5"
@@ -12389,16 +15338,19 @@
             "next_for_you": null,
             "order": [
               {
+                "accepted": true,
                 "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
                 "subject": "Run the payment tests on CI",
                 "subtask": "2"
               },
               {
+                "accepted": false,
                 "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
                 "subject": "Add the PaymentGateway trait",
                 "subtask": "3"
               },
               {
+                "accepted": false,
                 "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
                 "subject": "Charge orders through the gateway in cents",
                 "subtask": "3"
@@ -12476,5 +15428,291 @@
         "type": "board"
       }
     }
-  ]
+  ],
+  "subtasks_from_a_machine_not_yet_updated": {
+    "board": {
+      "away_since": null,
+      "checkouts": [
+        {
+          "busy_worktrees": 4,
+          "free_worktrees": 2,
+          "repo": "shop"
+        }
+      ],
+      "items": [
+        {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency"
+            },
+            {
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway"
+            },
+            {
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests"
+            },
+            {
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway"
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 1,
+            "subtasks": [
+              "currency"
+            ],
+            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        }
+      ],
+      "kebbie": "0.24.0",
+      "rev": 1842,
+      "routines": [
+        {
+          "id": "nightly-deps",
+          "last_outcome": "ok",
+          "mode": "fix",
+          "next_run": 1761100200,
+          "repo": "shop",
+          "title": "Nightly deps"
+        }
+      ],
+      "sessions_outside_tasks": 1,
+      "type": "board"
+    },
+    "opens_as": {
+      "away_since": null,
+      "checkouts": [
+        {
+          "busy_worktrees": 4,
+          "free_worktrees": 2,
+          "repo": "shop"
+        }
+      ],
+      "items": [
+        {
+          "address": "payments@api",
+          "agent": {
+            "status": "working"
+          },
+          "card": null,
+          "ci": null,
+          "follows_main": false,
+          "git": {
+            "ahead": 4,
+            "behind": 0,
+            "rules": {
+              "state": "checking"
+            },
+            "uncommitted": 0,
+            "upstream": "main"
+          },
+          "group": "WORKING",
+          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "next_for_you": null,
+          "order": [
+            {
+              "accepted": true,
+              "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+              "subject": "Name the currency on every amount",
+              "subtask": "currency"
+            },
+            {
+              "accepted": false,
+              "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "subject": "Add the PaymentGateway trait",
+              "subtask": "gateway"
+            },
+            {
+              "accepted": true,
+              "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+              "subject": "Run the payment tests on CI",
+              "subtask": "tests"
+            },
+            {
+              "accepted": false,
+              "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+              "subject": "Charge orders through the gateway in cents",
+              "subtask": "gateway"
+            }
+          ],
+          "prompt": null,
+          "push_permission": null,
+          "push_waits": null,
+          "pushable": {
+            "count": 1,
+            "subtasks": [
+              "currency"
+            ],
+            "through": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+          },
+          "question": null,
+          "recover": null,
+          "report": null,
+          "routine": null,
+          "subtasks": [
+            {
+              "commits": [
+                "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+              ],
+              "id": "docs",
+              "state": "pushed",
+              "title": "Say what a gateway is"
+            },
+            {
+              "added": {
+                "at": 1761068400,
+                "reason": "Amounts carry no currency the gateway can read"
+              },
+              "commits": [
+                "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+              ],
+              "id": "currency",
+              "state": "accepted",
+              "title": "Name the currency on every amount"
+            },
+            {
+              "commits": [
+                "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+                "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+              ],
+              "id": "gateway",
+              "rules": {
+                "state": "ok"
+              },
+              "state": "ready",
+              "title": "Charge through a PaymentGateway"
+            },
+            {
+              "commits": [
+                "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+              ],
+              "id": "tests",
+              "state": "accepted",
+              "title": "Run the payment tests on CI"
+            },
+            {
+              "commits": [],
+              "id": "new-gateway",
+              "state": "in-progress",
+              "title": "Add the new gateway"
+            },
+            {
+              "commits": [],
+              "id": "remove-old",
+              "state": "planned",
+              "title": "Remove the old payment client"
+            }
+          ],
+          "summary": "4 commits",
+          "urgency": 0,
+          "verdict": null
+        }
+      ],
+      "kebbie": "0.24.0",
+      "rev": 1842,
+      "routines": [
+        {
+          "id": "nightly-deps",
+          "last_outcome": "ok",
+          "mode": "fix",
+          "next_run": 1761100200,
+          "repo": "shop",
+          "title": "Nightly deps"
+        }
+      ],
+      "sessions_outside_tasks": 1,
+      "type": "board"
+    }
+  }
 }

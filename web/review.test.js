@@ -25,7 +25,7 @@ const allRead = (fields = {}) => {
 };
 const accepted = (more = {}) => {
   const subtasks = item.subtasks.map((one) => (one.id === ID ? { ...one, state: "accepted" } : one));
-  return { ...item, subtasks, pushable: { count: 4, through: last.sha, subtasks: ["currency", ID, "tests"] }, group: "READY TO PUSH", ...more };
+  return { ...item, subtasks, order: item.order.map((row) => ({ ...row, accepted: true })), pushable: { count: 4, through: last.sha, subtasks: ["currency", ID, "tests"] }, group: "READY TO PUSH", ...more };
 };
 const acceptedView = (fields = {}) => {
   const next = fields.item ?? accepted();
@@ -41,7 +41,8 @@ test("a subtask opens by its id, its commits each read on their own page, and th
 test("the subtask page names the subtask, places each commit in the push order with what lies between, folds each commit to its subject and sha, and lists the step's files without their diffs", () => {
   const html = subtaskPage(view(), { top });
   assert.match(text(html), /^Subtask MacBook Charge through a PaymentGateway 2 commits · 3 files · \+4 −1 Guide from Claude · 2 notes/);
-  assert.match(text(html), /Commits · 2 Add the PaymentGateway trait a41c9e0 1 file · ✓ 1 of 1 read no\. 2 of 4 in the push order no\. 3 between them belongs to Run the payment tests on CI: Run the payment tests on CI Charge orders through the gateway in cents 9f3c2a1 Read the diff · 3 files 1 of 3 read no\. 4 of 4 in the push order Files of the subtask · 1 of 3 read/);
+  assert.match(text(html), /Commits · 2 Add the PaymentGateway trait a41c9e0 1 file · ✓ 1 of 1 read no\. 2 of 4 in the push order · ✓ accepted no\. 3 between them belongs to Run the payment tests on CI: Run the payment tests on CI Charge orders through the gateway in cents 9f3c2a1 Read the diff · 3 files 1 of 3 read no\. 4 of 4 in the push order Files of the subtask · 1 of 3 read/);
+  assert.equal((text(subtaskPage(acceptedView(), { top })).match(/✓ accepted/g) ?? []).length, 1, "once the whole subtask is accepted only its header says so, no commit is singled out");
   assert.match(html, /<div class="cm shut"><div class="cm-h" role="button" tabindex="0" data-action="rv-commit" data-commit="0" aria-expanded="false">/);
   assert.match(html, /<a class="btn fit" href="#\/diff\/mch_a\/payments%40api\/gateway\/2">Read the diff · 3 files<\/a>/);
   assert.doesNotMatch(html, /rv-diff|rv-line|A float drops cents/, "neither diffs nor the folded messages show");

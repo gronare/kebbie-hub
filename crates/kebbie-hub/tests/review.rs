@@ -8,7 +8,7 @@ use kebbie_hub::RateLimit;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::MachineState;
 use kebbie_hub_protocol::{
-    AcceptStep, AcceptSubtask, CommandResult, Item, Outcome, Payload, PushApproval, REVIEW_MEDIA_TYPE, Reason, Review, ReviewComment, ReviewComments, ReviewOpen,
+    AcceptStep, AcceptSubtask, CommandResult, Item, OrderRow, Outcome, Payload, PushApproval, REVIEW_MEDIA_TYPE, Reason, Review, ReviewComment, ReviewComments, ReviewOpen,
     ReviewRead, Side, SubtaskState, open_blob,
 };
 use serde::Deserialize;
@@ -97,6 +97,32 @@ async fn a_review_is_fetched_on_demand_sealed_and_comments_reads_and_an_accept_r
 
     let push = Payload::Push(PushApproval { address: review.address.clone(), head: head.clone(), card_sha: None });
     assert_eq!(sent(&mut person, &mut machine, push).await.text, format!("Pushed retry-push@kebbie at {head}."), "a push of the whole run reaches the machine with its last commit");
+}
+
+#[tokio::test]
+async fn accepting_a_subtask_accepts_each_of_its_commits_and_the_run_stops_before_a_group_it_would_split() {
+    let test = start_hub(|_| {}).await;
+    let (mut machine, mut person) = reviewing(&test).await;
+    let mut board = machine.board.clone().unwrap();
+    let address = example().review.address;
+    let item = board.items.iter_mut().find(|item| item.address == address).unwrap();
+    let later = "c".repeat(40);
+    let building = item.subtasks.iter_mut().flatten().find(|subtask| subtask.id == "board-retries").unwrap();
+    building.commits.push(later.clone());
+    let order = item.order.as_mut().unwrap();
+    order.push(OrderRow { sha: later, subject: "Show a retry on the board".into(), subtask: "board-retries".into(), accepted: false, group: Some("retry-board".into()), tests: None, moved: None });
+    order[1].group = Some("retry-board".into());
+    order[0].accepted = true;
+    let first = order[0].sha.clone();
+    machine.post_board(board).await.unwrap();
+    let head = example().review.head;
+    let accept = Payload::AcceptSubtask(AcceptSubtask { address: address.clone(), subtask: "retry".into(), head });
+    assert_eq!(sent(&mut person, &mut machine, accept).await.outcome, Outcome::Done);
+    let boards = person.boards().await.unwrap();
+    let board = boards.into_iter().find(|board| board.machine == machine.machine).unwrap().board.unwrap();
+    let item = board.items.iter().find(|item| item.address == address).unwrap();
+    assert_eq!(item.order.as_ref().unwrap().iter().map(|row| row.accepted).collect::<Vec<_>>(), [true, true, false], "each of retry's commits is accepted");
+    assert_eq!(item.pushable.as_ref().map(|run| (run.count, run.through.as_str())), Some((1, first.as_str())), "retry's last commit goes out only with the board's, which is not accepted");
 }
 
 #[tokio::test]

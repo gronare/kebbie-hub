@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -135,10 +135,13 @@ test("a board item's subtasks, push order and pushable run carry only their own 
   assert.deepEqual(item.subtasks.map((one) => [one.id, one.state, one.commits.length]), [["docs", "pushed", 1], ["currency", "accepted", 1], ["gateway", "ready", 2], ["tests", "accepted", 1], ["new-gateway", "in-progress", 0], ["remove-old", "planned", 0]]);
   assert.deepEqual(item.order.map((row) => row.subtask), ["currency", "gateway", "tests", "gateway"], "a subtask's commits may sit apart in the push order");
   assert.equal(subtaskHead(subtaskOf(item, "gateway")), item.head, "a subtask's head is its last commit");
-  assert.deepEqual(item.pushable, { count: 1, through: item.order[0].sha, subtasks: ["currency"] });
+  assert.deepEqual(item.pushable, { count: 2, through: item.order[1].sha, subtasks: ["currency", "gateway"] }, "the run passes gateway's accepted commit and stops before the group it would split");
+  assert.deepEqual(pushableOf(item.order), item.pushable, "the run is what the rule computes from the push order");
+  assert.deepEqual(item.order.map((row) => [row.accepted, row.group ?? null, row.tests.state]), [[true, null, "passed"], [true, null, "passed"], [true, "ci-gateway", "running"], [false, "ci-gateway", "not-run"]]);
+  assert.equal(item.order[0].moved.from, 2);
   assert.equal(subtaskOf(item, "currency").added.reason, "Amounts carry no currency the gateway can read");
   const plans = load("review.json").plans;
-  assert.deepEqual([plans.max_subtask_id_chars, plans.max_added_reason_chars, plans.max_obstacle_chars], [MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS]);
+  assert.deepEqual([plans.max_subtask_id_chars, plans.max_added_reason_chars, plans.max_obstacle_chars, plans.max_moved_reason_chars], [MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS]);
   assert.ok(plans.cases.length > 20);
   for (const { name, item: candidate, valid } of plans.cases) {
     const passes = (() => {
@@ -171,6 +174,24 @@ test("steps from a machine not yet updated open as Rust opens them: subtasks nam
   const planned = envelopes.cases.find((vector) => vector.name === "board-with-subtasks-opened-by-the-account");
   const opened = await openEnvelope(planned.envelope, await identity("account"), await sender("machine"), envelopes.now);
   assert.deepEqual(opened, planned.expect.payload);
+});
+
+test("a push order from a machine not yet updated opens as Rust opens it: each commit accepted with its subtask", () => {
+  const { board, opens_as } = load("review.json").subtasks_from_a_machine_not_yet_updated;
+  checkPayload(board);
+  assert.deepEqual(payloadOf(board), opens_as);
+  assert.deepEqual(opens_as.items[0].order.map((row) => row.accepted), [true, false, true, false]);
+  assert.deepEqual(pushableOf(opens_as.items[0].order), opens_as.items[0].pushable);
+});
+
+test("the pushable run is the longest one from the top where every commit is accepted and no group is split", () => {
+  const row = (sha, accepted, group) => ({ sha: sha.repeat(40), subject: sha, subtask: sha, accepted, ...(group ? { group } : {}) });
+  assert.equal(pushableOf([]), null);
+  assert.equal(pushableOf([row("a", false)]), null);
+  assert.deepEqual(pushableOf([row("a", true), row("b", true), row("c", false)]), { count: 2, through: "b".repeat(40), subtasks: ["a", "b"] });
+  assert.equal(pushableOf([row("a", true, "g"), row("b", false, "g")]), null, "a group goes out whole or not at all");
+  assert.equal(pushableOf([row("a", true), row("b", true, "g"), row("c", true, "g"), row("d", false)]).count, 3, "an accepted group goes out whole");
+  assert.equal(pushableOf([row("a", true), row("b", true, "g"), row("c", true, "g"), row("d", false, "g")]).count, 1);
 });
 
 test("a task says where its obstacle stands, when it was raised and, once decided or asked, the ruling", () => {

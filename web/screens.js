@@ -181,10 +181,20 @@ export const runCount = (item) => item.pushable?.count ?? 0;
 export const pushedCount = (item) => Math.max(0, (item.subtasks ?? []).reduce((sum, one) => sum + one.commits.length, 0) - (item.order ?? []).length);
 
 export function blockerOf(item) {
-  const row = (item.order ?? [])[runCount(item)];
+  const row = (item.order ?? []).slice(runCount(item)).find((one) => !one.accepted);
   const owner = row ? item.subtasks?.find((one) => one.id === row.subtask) : null;
   return owner && owner.state !== "accepted" ? owner : null;
 }
+
+const rowsOf = (item, subtask) => (item.order ?? []).filter((row) => row.subtask === subtask.id);
+export function acceptedCommits(item, subtask) {
+  const rows = new Map(rowsOf(item, subtask).map((row) => [row.sha, row]));
+  return subtask.commits.filter((sha) => !rows.has(sha) || rows.get(sha).accepted === true).length;
+}
+const partlyAccepted = (item, subtask) => {
+  const accepted = acceptedCommits(item, subtask);
+  return accepted > 0 && accepted < subtask.commits.length ? `${accepted} of ${commitCount(subtask)} accepted` : "";
+};
 
 export function inRun(item, subtask) {
   const order = item.order ?? [];
@@ -193,9 +203,10 @@ export function inRun(item, subtask) {
 }
 
 export function subtaskLabel(item, subtask) {
-  if (subtask.state === "ready") return esc(`${commitCount(subtask)} · to review`);
+  const partly = partlyAccepted(item, subtask);
+  if (subtask.state === "ready") return esc(`${partly || commitCount(subtask)} · to review`);
   if (subtask.state === "pushed") return "pushed";
-  if (subtask.state === "in-progress") return esc(subtask.commits.length ? `in progress · ${commitCount(subtask)}` : "in progress");
+  if (subtask.state === "in-progress") return esc(subtask.commits.length ? `in progress · ${partly || commitCount(subtask)}` : "in progress");
   if (subtask.state !== "accepted") return "";
   if (inRun(item, subtask)) return "accepted · ready to push";
   const blocker = blockerOf(item);
@@ -232,28 +243,50 @@ export function subtaskList(item, { href = null, selected = null, more = false, 
   return `<div class="steps go">${rows.join("")}${fold}${optional}</div>`;
 }
 
+const TESTS_WORDS = { passed: "tests ✓", failed: "tests ✕", running: "tests running", "not-run": "tests –" };
+const TESTS_TITLES = { passed: "tests passed", failed: "tests failed", running: "tests running", "not-run": "not tested" };
+const testsMark = (tests) => (tests && TESTS_WORDS[tests.state] ? ` · <span class="tests t-${esc(tests.state)}" title="${TESTS_TITLES[tests.state]}">${esc(TESTS_WORDS[tests.state])}</span>` : "");
+const rowState = (item, row) => (row.accepted ? "accepted" : (item.subtasks.find((one) => one.id === row.subtask)?.state ?? "planned"));
+
 function orderLabel(item, row, index) {
   const owner = item.subtasks.find((one) => one.id === row.subtask);
   const title = esc(owner?.title ?? row.subtask);
+  const order = item.order ?? [];
+  const count = runCount(item);
+  const blocking = order.findIndex((one, at) => at >= count && !one.accepted);
+  if (row.accepted && index >= count && blocking >= 0) return `${title} ${dim(`· waits for no. ${blocking + 1}`)}`;
+  if (row.accepted) return owner?.state === "accepted" ? title : `${title} · accepted`;
   if (owner?.state === "ready") return `${title} · to review`;
   if (owner?.state === "in-progress") return `${title} · in progress`;
-  if (owner?.state === "accepted" && index >= runCount(item) && blockerOf(item)) return `${title} ${dim(`· waits for no. ${runCount(item) + 1}`)}`;
   return title;
 }
 
 function orderRow(item, row, index) {
-  const state = item.subtasks.find((one) => one.id === row.subtask)?.state ?? "planned";
-  return `<div class="step s-${esc(state)}"><span class="what"><span class="mark">${STEP_MARKS[state] ?? ""}</span><span class="number">${index + 1}</span><span class="tt"><span class="step-title">${esc(row.subject)}</span><span class="label">${orderLabel(item, row, index)}</span></span></span><span class="mono meta">${esc(row.sha.slice(0, 7))}</span></div>`;
+  const state = rowState(item, row);
+  const moved = row.moved ? `<span class="moved">moved up · ${esc(row.moved.reason)}</span>` : "";
+  return `<div class="step s-${esc(state)}"><span class="what"><span class="mark">${STEP_MARKS[state] ?? ""}</span><span class="number">${index + 1}</span><span class="tt"><span class="step-title">${esc(row.subject)}</span><span class="label">${orderLabel(item, row, index)}${testsMark(row.tests)}</span>${moved}</span></span><span class="mono meta">${esc(row.sha.slice(0, 7))}</span></div>`;
+}
+
+function orderRows(item, rows, from) {
+  const html = [];
+  for (let at = 0; at < rows.length; ) {
+    const group = rows[at].group;
+    let end = at + 1;
+    while (group && end < rows.length && rows[end].group === group) end += 1;
+    const shown = rows.slice(at, end).map((row, offset) => orderRow(item, row, from + at + offset)).join("");
+    html.push(group ? `<div class="together" role="group" aria-label="goes out together"><span class="together-h">goes out together</span>${shown}</div>` : shown);
+    at = end;
+  }
+  return html.join("");
 }
 
 export function pushOrder(item) {
   const order = item.order ?? [];
   if (!item.subtasks || !order.length) return "";
   const count = runCount(item);
-  const rows = order.map((row, index) => orderRow(item, row, index));
   const names = (item.pushable?.subtasks ?? []).map((id) => titleOf(item, id));
-  const run = count ? `<div class="run"><div class="run-h"><b>Ready to push: ${esc(plural(count, "commit", "commits"))}</b><span>${esc(`${names.length === 1 ? "subtask" : "subtasks"} ${names.join(", ")}`)}</span></div>${rows.slice(0, count).join("")}</div>` : "";
-  return `<div class="steps go order">${run}${rows.slice(count).join("")}</div>`;
+  const run = count ? `<div class="run"><div class="run-h"><b>Ready to push: ${esc(plural(count, "commit", "commits"))}</b><span>${esc(`${names.length === 1 ? "subtask" : "subtasks"} ${names.join(", ")}`)}</span></div>${orderRows(item, order.slice(0, count), 0)}</div>` : "";
+  return `<div class="steps go order">${run}${orderRows(item, order.slice(count), count)}</div>`;
 }
 
 const OBSTACLE_WORDS = { investigating: "obstacle: being investigated", asked: "obstacle: the investigator asks you", "with-lead": "obstacle: with the lead" };

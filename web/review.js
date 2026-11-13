@@ -112,7 +112,8 @@ const placeOf = (v, sha) => (v.item.order ?? []).findIndex((row) => row.sha === 
 function commitRow(v, commit, index, on, alone) {
   const open = v.ui.commits.has(commit.sha);
   const at = placeOf(v, commit.sha);
-  const place = at >= 0 && (v.item.order?.length ?? 0) > 1 ? `<span class="pos">no. ${at + 1} of ${v.item.order.length} in the push order</span>` : "";
+  const kept = at >= 0 && v.item.order[at].accepted === true && v.boardSubtask?.state !== "accepted" ? `<span class="ok">✓ accepted</span>` : "";
+  const place = at >= 0 && (v.item.order?.length ?? 0) > 1 ? `<span class="pos">no. ${at + 1} of ${v.item.order.length} in the push order${kept ? ` · ${kept}` : ""}</span>` : kept;
   if (alone) return `<div class="cm one${open ? "" : " shut"}">${commitHead(commit, index, open)}${commitText(commit, open)}${place ? `<div class="cm-foot">${place}</div>` : ""}</div>`;
   const count = commit.files.length;
   const done = readCount(v, commit.files);

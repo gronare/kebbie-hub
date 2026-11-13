@@ -253,6 +253,41 @@ const mindin = {
   order: [row(1, "Give the tests their own vault", "env"), row(2, "Clean the vault between tests", "env"), row(3, "Keep frontmatter in the index", "fm"), row(4, "Read lint's fields from the index", "lint"), row(5, "Run CI on Python 3.14", "ci"), row(6, "Drop lint's fetch of every note", "lint"), row(7, "Move the backend factory", "split")],
   pushable: { count: 3, through: sha(3), subtasks: ["env", "fm"] },
 };
+mindin.order = mindin.order.map((one) => ({ ...one, accepted: mindin.subtasks.find((part) => part.id === one.subtask).state === "accepted" }));
+
+test("a push order row says whether its tests passed, failed, run or were not run, and a commit moved up says why", () => {
+  const order = mindin.order.map((one, index) => (index === 2 ? { ...one, tests: { state: "passed", at: 1_761_069_000 }, moved: { from: 4, reason: "Lint reads these fields" } } : index === 3 ? { ...one, tests: { state: "failed" } } : index === 4 ? { ...one, tests: { state: "running" } } : index === 5 ? { ...one, tests: { state: "not-run" } } : one));
+  const html = pushOrder({ ...mindin, order });
+  assert.match(text(html), /3 Keep frontmatter in the index Frontmatter in the index · tests ✓ moved up · Lint reads these fields 3333333/);
+  assert.match(text(html), /4 Read lint's fields from the index Lint from the index · to review · tests ✕ 4444444/);
+  assert.match(text(html), /5 Run CI on Python 3.14 CI on Python 3.14 · waits for no. 4 · tests running 5555555/);
+  assert.match(text(html), /6 Drop lint's fetch of every note Lint from the index · to review · tests – 6666666/);
+  assert.match(html, /<span class="tests t-failed" title="tests failed">tests ✕<\/span>/);
+  assert.match(html, /<span class="moved">moved up · Lint reads these fields<\/span>/);
+  assert.doesNotMatch(pushOrder(mindin), /class="tests|class="moved/, "a row without either says nothing of them");
+});
+
+test("commits that go out together sit in one bracket, and the run stops before a group it would split", () => {
+  const order = mindin.order.map((one, index) => (index === 2 || index === 3 ? { ...one, group: "index" } : one));
+  const html = pushOrder({ ...mindin, order, pushable: { count: 2, through: sha(2), subtasks: ["env"] } });
+  assert.match(html, /<\/div><\/div><div class="together" role="group" aria-label="goes out together"><span class="together-h">goes out together<\/span><div class="step s-accepted">.*?3333333.*?<div class="step s-ready">.*?4444444<\/span><\/div><\/div><div class="step s-accepted">/);
+  assert.match(text(html), /^Ready to push: 2 commits subtask Clean test environment /);
+  assert.match(text(html), /3 Keep frontmatter in the index Frontmatter in the index · waits for no. 4 3333333/, "an accepted commit held by its group waits for the one not yet accepted");
+  const inside = pushOrder({ ...mindin, order: mindin.order.map((one, index) => (index < 2 ? { ...one, group: "env" } : one)) });
+  assert.match(inside, /^<div class="steps go order"><div class="run"><div class="run-h">.*?<\/div><div class="together" role="group"/, "a group inside the run sits inside its box");
+});
+
+test("a subtask with some of its commits accepted says how many, on the card and in the push order", () => {
+  const order = mindin.order.map((one) => (one.sha === sha(4) ? { ...one, accepted: true } : one));
+  const partly = { ...mindin, order, pushable: { count: 5, through: sha(5), subtasks: ["env", "fm", "lint", "ci"] } };
+  assert.match(text(subtaskList(partly)), /● Lint from the index 1 of 2 commits accepted · to review/);
+  assert.match(text(pushOrder(partly)), /✓ 4 Read lint's fields from the index Lint from the index · accepted 4444444/);
+  assert.match(text(pushOrder(partly)), /● 6 Drop lint's fetch of every note Lint from the index · to review 6666666/);
+  assert.match(text(pushOrder(partly)), /^Ready to push: 5 commits subtasks Clean test environment, Frontmatter in the index, Lint from the index, CI on Python 3.14 /);
+  const building = { ...partly, subtasks: partly.subtasks.map((one) => (one.id === "lint" ? { ...one, state: "in-progress" } : one)) };
+  assert.match(text(subtaskList(building)), /◐ Lint from the index in progress · 1 of 2 commits accepted/);
+  assert.match(text(subtaskList(mindin)), /● Lint from the index 2 commits · to review/);
+});
 
 test("a board row says in one line how far the subtasks have come and what is yours to do, never the whole list", () => {
   const html = taskRow(rowOf(required));
