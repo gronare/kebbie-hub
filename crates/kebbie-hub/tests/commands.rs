@@ -47,7 +47,6 @@ fn push(head: &str) -> Payload {
         address: ADDRESS.to_string(),
         head: head.to_string(),
         card_sha: None,
-        through_step: None,
     })
 }
 

@@ -14,14 +14,14 @@ use crate::account::{
 };
 use crate::authorize::{AppliedCommands, Verified, Machine, Refusal, authorize};
 use crate::backlog::{
-    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, BodySection, Home, HomeKind, ItemKey,
+    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, BodySection, Found, Home, HomeKind, ItemKey,
     OpenQuestion, Priority,
 };
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
 use crate::board::{
-    Agent, BlobRef, AgentStatus, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
-    MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Prompt, PromptOption, Question, QuestionOption, Report, RoutineSummary,
-    Rules, RulesState, SecondOpinion, Step, StepCommit, StepState, Steps, Verdict, VerdictOutcome,
+    Added, Agent, BlobRef, AgentStatus, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
+    MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Obstacle, ObstacleState, OrderRow, Prompt, PromptOption, Pushable, Question,
+    QuestionOption, Report, RoutineSummary, Rules, RulesState, SecondOpinion, Subtask, SubtaskState, Verdict, VerdictOutcome,
 };
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 use crate::crypto::{
@@ -35,12 +35,12 @@ use crate::device::{
 use crate::envelope::{Envelope, Header, Kind, Urgency};
 use crate::ids::{Id, Prefix};
 use crate::review::{
-    AcceptStep, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
+    AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
-    ReviewCommit, ReviewOpen, ReviewRead, ReviewStep, Side,
+    ReviewCommit, ReviewOpen, ReviewRead, ReviewSubtask, Side,
 };
 use crate::message::{
-    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundStart, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
 };
 
@@ -264,7 +264,11 @@ fn board() -> Payload {
             recover: None,
             routine: None,
             card: None,
-            steps: None,
+            subtasks: None,
+            order: None,
+            pushable: None,
+            require_accept: None,
+            obstacle: None,
             title: None,
             profile: None,
             recipe: None,
@@ -286,22 +290,24 @@ fn rules(state: RulesState) -> Rules {
     Rules { state, breaks: None, names: Vec::new(), overridden: None }
 }
 
-fn stepped_board() -> Payload {
+fn planned_board() -> Payload {
     let Payload::Board(mut board) = board() else {
         unreachable!()
     };
-    let step = |number: u32, title: &str, state: StepState, commits: &[(&str, &str)]| Step {
-        number,
+    let subtask = |id: &str, title: &str, state: SubtaskState, commits: &[&str]| Subtask {
+        id: id.into(),
         title: title.into(),
         state,
-        commits: commits.iter().map(|(sha, subject)| StepCommit { sha: (*sha).into(), subject: (*subject).into() }).collect(),
-        rules: (state == StepState::Ready).then(|| rules(RulesState::Ok)),
+        commits: commits.iter().map(|sha| (*sha).into()).collect(),
+        added: None,
+        rules: (state == SubtaskState::Ready).then(|| rules(RulesState::Ok)),
     };
+    let row = |sha: &str, subject: &str, subtask: &str| OrderRow { sha: sha.into(), subject: subject.into(), subtask: subtask.into() };
     board.items = vec![Item {
         address: "payments@api".into(),
         group: Group::Working,
         urgency: 0,
-        summary: "2 commits".into(),
+        summary: "4 commits".into(),
         next_for_you: None,
         agent: Some(Agent {
             status: AgentStatus::Working,
@@ -313,7 +319,7 @@ fn stepped_board() -> Payload {
         prompt: None,
         git: Some(Git {
             upstream: "main".into(),
-            ahead: 2,
+            ahead: 4,
             behind: 0,
             uncommitted: 0,
             rules: Some(rules(RulesState::Checking)),
@@ -327,16 +333,23 @@ fn stepped_board() -> Payload {
         recover: None,
         routine: None,
         card: None,
-        steps: Some(Steps {
-            pushed: 1,
-            items: vec![
-                step(1, "Name the currency on every amount", StepState::Pushed, &[(PUSHED_COMMIT, "Name the currency on every amount")]),
-                step(2, "Charge through a PaymentGateway", StepState::Ready, &[(FIRST_COMMIT, FIRST_SUBJECT), (HEAD, HEAD_SUBJECT)]),
-                step(3, "Add the new gateway", StepState::InProgress, &[]),
-                step(4, "Remove the old payment client", StepState::Planned, &[]),
-            ],
-            required: None,
-        }),
+        subtasks: Some(vec![
+            subtask("docs", "Say what a gateway is", SubtaskState::Pushed, &[PUSHED_COMMIT]),
+            Subtask { added: Some(Added { at: AT - 1_200, reason: "Amounts carry no currency the gateway can read".into() }), ..subtask("currency", "Name the currency on every amount", SubtaskState::Accepted, &[CURRENCY_COMMIT]) },
+            subtask("gateway", "Charge through a PaymentGateway", SubtaskState::Ready, &[FIRST_COMMIT, HEAD]),
+            subtask("tests", "Run the payment tests on CI", SubtaskState::Accepted, &[BETWEEN_COMMIT]),
+            subtask("new-gateway", "Add the new gateway", SubtaskState::InProgress, &[]),
+            subtask("remove-old", "Remove the old payment client", SubtaskState::Planned, &[]),
+        ]),
+        order: Some(vec![
+            row(CURRENCY_COMMIT, CURRENCY_SUBJECT, "currency"),
+            row(FIRST_COMMIT, FIRST_SUBJECT, "gateway"),
+            row(BETWEEN_COMMIT, BETWEEN_SUBJECT, "tests"),
+            row(HEAD, HEAD_SUBJECT, "gateway"),
+        ]),
+        pushable: Some(Pushable { count: 1, through: CURRENCY_COMMIT.into(), subtasks: vec!["currency".into()] }),
+        require_accept: None,
+        obstacle: None,
         title: None,
         profile: None,
         recipe: None,
@@ -348,7 +361,7 @@ fn stepped_board() -> Payload {
 }
 
 fn next_board() -> Payload {
-    let Payload::Board(mut board) = stepped_board() else {
+    let Payload::Board(mut board) = planned_board() else {
         unreachable!()
     };
     board.away_since = Some(1_761_060_000);
@@ -375,9 +388,14 @@ fn next_board() -> Payload {
         points: Some(2),
         running: false,
     });
-    if let Some(steps) = stepped.steps.as_mut() {
-        steps.required = Some(false);
-    }
+    stepped.require_accept = Some(false);
+    stepped.obstacle = Some(Obstacle {
+        id: "o1".into(),
+        state: ObstacleState::Investigating,
+        text: "The new gateway refuses amounts without a currency, and the old client never sent one.".into(),
+        at: AT - 1_500,
+        decision: None,
+    });
     let mut prompted = stepped.clone();
     prompted.address = "hub@kebbie".into();
     prompted.group = Group::NeedsYou;
@@ -404,7 +422,11 @@ fn next_board() -> Payload {
             },
         ],
     });
-    prompted.steps = None;
+    prompted.subtasks = None;
+    prompted.order = None;
+    prompted.pushable = None;
+    prompted.require_accept = None;
+    prompted.obstacle = None;
     prompted.verdict = None;
     prompted.second_opinion = None;
     board.items.insert(0, prompted);
@@ -514,8 +536,10 @@ fn backlog_blob() -> (BlobRef, Vec<u8>) {
 }
 
 fn backlog_kinds() -> Vec<Kind> {
-    vec![Kind::Answer, Kind::Push, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem, Kind::ItemEdit]
+    vec![Kind::Answer, Kind::Push, Kind::PromptAnswer, Kind::Idea, Kind::ItemAnswer, Kind::StartItem, Kind::ItemEdit, Kind::FoundStart, Kind::FoundAdd, Kind::FoundDismiss]
 }
+
+const FOUND_ITEM: &str = "found:f3";
 
 fn backlog_board() -> Payload {
     let Payload::Board(mut board) = next_board() else {
@@ -538,6 +562,7 @@ fn backlog_board() -> Payload {
             blocking: 1,
             goal: Some("A refund of a whole invoice returns exactly what the invoice charged.".into()),
             body: Some(backlog_blob().0),
+            found: None,
         },
         BacklogRow {
             item: ItemKey::parse("local:01JB7Q2M3N8K").unwrap(),
@@ -554,6 +579,7 @@ fn backlog_board() -> Payload {
             blocking: 0,
             goal: None,
             body: None,
+            found: None,
         },
         BacklogRow {
             item: ItemKey::parse("kept:idea-4411").unwrap(),
@@ -570,9 +596,39 @@ fn backlog_board() -> Payload {
             blocking: 0,
             goal: None,
             body: None,
+            found: None,
+        },
+        BacklogRow {
+            item: ItemKey::parse(FOUND_ITEM).unwrap(),
+            title: "The refund client can't tell a missing receipt from an outage".into(),
+            priority: Priority::None,
+            repo: Some("api".into()),
+            state: BacklogState::Ready,
+            filed: AT - 7_200,
+            home: Home {
+                kind: HomeKind::Found,
+                label: "found by tasks".into(),
+            },
+            questions: 0,
+            blocking: 0,
+            goal: None,
+            body: None,
+            found: Some(Found { sources: vec!["payments@api".into(), "refunds@shop".into()], count: 3 }),
         },
     ]);
     Payload::Board(board)
+}
+
+fn found_start(name: Option<&str>) -> Payload {
+    Payload::FoundStart(FoundStart { item: ItemKey::parse(FOUND_ITEM).unwrap(), name: name.map(Into::into) })
+}
+
+fn found_add() -> Payload {
+    Payload::FoundAdd(FoundAdd { item: ItemKey::parse(FOUND_ITEM).unwrap(), task: "payments@api".into() })
+}
+
+fn found_dismiss() -> Payload {
+    Payload::FoundDismiss(FoundDismiss { item: ItemKey::parse(FOUND_ITEM).unwrap() })
 }
 
 fn idea(text: String) -> Payload {
@@ -646,6 +702,10 @@ const ORDERS_CONTENT: &str = "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567";
 const PUSHED_COMMIT: &str = "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e";
 const FIRST_COMMIT: &str = "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90";
 const FIRST_SUBJECT: &str = "Add the PaymentGateway trait";
+const CURRENCY_COMMIT: &str = "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2";
+const CURRENCY_SUBJECT: &str = "Name the currency on every amount";
+const BETWEEN_COMMIT: &str = "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f";
+const BETWEEN_SUBJECT: &str = "Run the payment tests on CI";
 const HEAD_SUBJECT: &str = "Charge orders through the gateway in cents";
 
 fn review() -> Review {
@@ -692,8 +752,8 @@ fn review() -> Review {
         address: REVIEWED.into(),
         since: "main".into(),
         head: HEAD.into(),
-        step: Some(ReviewStep {
-            number: 2,
+        subtask: Some(ReviewSubtask {
+            id: "gateway".into(),
             title: "Charge through a PaymentGateway".into(),
             commits: vec![
                 ReviewCommit {
@@ -731,9 +791,16 @@ fn review() -> Review {
 
 fn review_from_a_machine_not_yet_updated() -> Value {
     let mut body = serde_json::to_value(review()).unwrap();
-    let step = body["step"].take();
-    body["files"] = step["files"].clone();
-    body["step"] = json!({ "number": 2, "title": step["title"], "sha": HEAD, "subject": HEAD_SUBJECT, "body": step["commits"][1]["body"] });
+    let subtask = body.as_object_mut().unwrap().remove("subtask").unwrap();
+    body["files"] = subtask["files"].clone();
+    body["step"] = json!({ "number": 2, "title": subtask["title"], "sha": HEAD, "subject": HEAD_SUBJECT, "body": subtask["commits"][1]["body"] });
+    body
+}
+
+fn review_of_a_step_of_commits() -> Value {
+    let mut body = serde_json::to_value(review()).unwrap();
+    let subtask = body.as_object_mut().unwrap().remove("subtask").unwrap();
+    body["step"] = json!({ "number": 2, "title": subtask["title"], "commits": subtask["commits"], "files": subtask["files"] });
     body
 }
 
@@ -747,22 +814,22 @@ fn review_blob() -> (BlobRef, Vec<u8>) {
 }
 
 fn review_board() -> Payload {
-    let Payload::Board(mut board) = stepped_board() else {
+    let Payload::Board(mut board) = planned_board() else {
         unreachable!()
     };
-    board.accepts = Some(vec![Kind::Answer, Kind::Push, Kind::ReviewOpen, Kind::ReviewComments, Kind::ReviewRead, Kind::AcceptStep]);
-    board.items[0].review = Some(ReviewOffer { step: Some(2), files: 3 });
+    board.accepts = Some(vec![Kind::Answer, Kind::Push, Kind::ReviewOpen, Kind::ReviewComments, Kind::ReviewRead, Kind::AcceptSubtask]);
+    board.items[0].review = Some(ReviewOffer { subtask: Some("gateway".into()), files: 3 });
     Payload::Board(board)
 }
 
 fn review_open() -> Payload {
-    Payload::ReviewOpen(ReviewOpen { address: REVIEWED.into(), step: Some(2) })
+    Payload::ReviewOpen(ReviewOpen { address: REVIEWED.into(), subtask: Some("gateway".into()) })
 }
 
 fn review_comments() -> Payload {
     Payload::ReviewComments(ReviewComments {
         address: REVIEWED.into(),
-        step: Some(2),
+        subtask: Some("gateway".into()),
         comments: vec![
             ReviewComment { path: "src/orders.rs".into(), line: 41, side: Side::Old, sha: Some(HEAD.into()), text: "Did anything else call client::charge with a float?".into() },
             ReviewComment { path: "src/gateway.rs".into(), line: 2, side: Side::New, sha: Some(HEAD.into()), text: "Name the currency next to cents.".into() },
@@ -778,12 +845,16 @@ fn accept_step() -> Payload {
     Payload::AcceptStep(AcceptStep { address: REVIEWED.into(), step: 2, head: HEAD.into() })
 }
 
+fn accept_subtask() -> Payload {
+    Payload::AcceptSubtask(AcceptSubtask { address: REVIEWED.into(), subtask: "gateway".into(), head: HEAD.into() })
+}
+
 fn review_ready() -> Payload {
     Payload::Result(CommandResult {
         command: command_id("review-open"),
         device: Party::new("phone", Prefix::Device).id,
         outcome: Outcome::Done,
-        text: "The review of step 2 is ready.".into(),
+        text: "The review of Charge through a PaymentGateway is ready.".into(),
         blob: Some(review_blob().0),
     })
 }
@@ -814,16 +885,14 @@ fn push(head: &str) -> Payload {
         address: "refunds@shop".into(),
         head: head.into(),
         card_sha: None,
-        through_step: None,
     })
 }
 
-fn push_through(step: u32) -> Payload {
+fn push_pushable() -> Payload {
     Payload::Push(PushApproval {
         address: REVIEWED.into(),
-        head: HEAD.into(),
+        head: CURRENCY_COMMIT.into(),
         card_sha: None,
-        through_step: Some(step),
     })
 }
 
@@ -1036,19 +1105,19 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         board(),
     ));
-    let stepped = seal_case(
-        "stepped-board",
-        machine_header("stepped-board", Kind::Board, machine),
-        &stepped_board(),
+    let planned = seal_case(
+        "planned-board",
+        machine_header("planned-board", Kind::Board, machine),
+        &planned_board(),
         machine,
         &[machine, account],
     );
     cases.push(opens(
-        "board-with-steps-opened-by-the-account",
-        &stepped,
+        "board-with-subtasks-opened-by-the-account",
+        &planned,
         account,
         machine,
-        stepped_board(),
+        planned_board(),
     ));
     let next = seal_case(
         "next-board",
@@ -1177,6 +1246,10 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         ("review-comments-opened-by-the-machine", "review-comments", Kind::ReviewComments, review_comments()),
         ("review-read-opened-by-the-machine", "review-read", Kind::ReviewRead, review_read()),
         ("accept-step-opened-by-the-machine", "accept-step", Kind::AcceptStep, accept_step()),
+        ("accept-subtask-opened-by-the-machine", "accept-subtask", Kind::AcceptSubtask, accept_subtask()),
+        ("found-start-opened-by-the-machine", "found-start", Kind::FoundStart, found_start(Some("refund-receipts"))),
+        ("found-add-opened-by-the-machine", "found-add", Kind::FoundAdd, found_add()),
+        ("found-dismiss-opened-by-the-machine", "found-dismiss", Kind::FoundDismiss, found_dismiss()),
     ] {
         let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
         cases.push(opens(name, &sealed, machine, phone, payload));
@@ -1738,6 +1811,10 @@ fn envelopes_json(parties: &Parties) -> Value {
         Kind::ReviewComments,
         Kind::ReviewRead,
         Kind::AcceptStep,
+        Kind::AcceptSubtask,
+        Kind::FoundStart,
+        Kind::FoundAdd,
+        Kind::FoundDismiss,
     ]
     .into_iter()
     .map(|kind| (kind.name(), kind.max_ttl()))
@@ -2172,9 +2249,9 @@ fn authorize_json(parties: &Parties) -> Value {
             applies(push(HEAD)),
         ),
         case(
-            "device-pushes-a-task-through-a-step",
-            from_phone("authorize/push-through-step", Kind::Push, &push_through(2)),
-            applies(push_through(2)),
+            "device-pushes-a-tasks-pushable-run",
+            from_phone("authorize/push-pushable", Kind::Push, &push_pushable()),
+            applies(push_pushable()),
         ),
         case(
             "device-runs-a-routine",
@@ -2670,6 +2747,11 @@ fn backlog_json() -> Value {
         ("vault:Projects/Två ord.md", true),
         ("local:01JB7Q2M3N8K", true),
         ("kept:idea-4411", true),
+        ("found:f3", true),
+        ("found:f0", false),
+        ("found:f03", false),
+        ("found:3", false),
+        ("found:idea-1", false),
         ("Projects/refund-rounding.md", false),
         ("vault:/Users/someone/vault/Projects/x.md", false),
         ("vault:~/vault/x.md", false),
@@ -2720,6 +2802,51 @@ fn backlog_json() -> Value {
             json!({ "name": name, "payload": payload, "valid": valid })
         })
         .collect();
+    let found = [
+        ("a task started from a found item", serde_json::to_value(found_start(None)).unwrap(), true),
+        ("a task started from a found item under a name", serde_json::to_value(found_start(Some("refund-receipts"))).unwrap(), true),
+        ("a task started under a name that is not plain", json!({ "type": "found-start", "item": FOUND_ITEM, "name": "Refund receipts" }), false),
+        ("a found item added to a task", serde_json::to_value(found_add()).unwrap(), true),
+        ("a found item added to a task without its repo", json!({ "type": "found-add", "item": FOUND_ITEM, "task": "payments" }), false),
+        ("a found item dismissed", serde_json::to_value(found_dismiss()).unwrap(), true),
+        ("a dismissal with a reason, which it does not carry", json!({ "type": "found-dismiss", "item": FOUND_ITEM, "reason": "noise" }), false),
+        ("a kept item dismissed as if a task found it", json!({ "type": "found-dismiss", "item": "kept:idea-4411" }), false),
+        ("a vault item started as if a task found it", json!({ "type": "found-start", "item": format!("vault:{VAULT_ITEM}") }), false),
+    ];
+    let found: Vec<Value> = found
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
+    let row = serde_json::to_value(backlog_board()).unwrap()["backlog"][3].clone();
+    let found_row = |pointer: &str, value: Value| {
+        let mut changed = row.clone();
+        *changed.pointer_mut(pointer).unwrap() = value;
+        changed
+    };
+    let found_rows = [
+        ("a found item with its sources and count", row.clone(), true),
+        ("a found item without its sources", found_row("/found", Value::Null), false),
+        ("a found item naming no task", found_row("/found/sources", json!([])), false),
+        ("a found item naming a task without its repo", found_row("/found/sources/0", json!("payments")), false),
+        ("a found item naming a task twice", found_row("/found/sources/1", json!("payments@api")), false),
+        ("a found item found fewer times than it has sources", found_row("/found/count", json!(1)), false),
+        ("a found item naming too many tasks", found_row("/found/sources", json!((0..=crate::MAX_FOUND_SOURCES).map(|n| format!("t{n}@api")).collect::<Vec<_>>())), false),
+        ("a kept item that says who found it", { let mut changed = found_row("/item", json!("kept:idea-9")); changed["home"]["kind"] = json!("kept"); changed }, false),
+    ];
+    let found_rows: Vec<Value> = found_rows
+        .into_iter()
+        .map(|(name, row, valid)| {
+            let mut board = serde_json::to_value(backlog_board()).unwrap();
+            board["backlog"] = json!([row.clone()]);
+            let parsed = serde_json::from_value::<Payload>(board);
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "row": row, "valid": valid })
+        })
+        .collect();
     let body = serde_json::to_value(backlog_body()).unwrap();
     let change = |pointer: &str, value: Value| {
         let mut changed = body.clone();
@@ -2759,6 +2886,9 @@ fn backlog_json() -> Value {
         "max_heading_chars": crate::MAX_HEADING_CHARS,
         "text_hashes": hashes,
         "edits": edits,
+        "found": found,
+        "found_rows": found_rows,
+        "max_found_sources": crate::MAX_FOUND_SOURCES,
         "bodies": bodies,
         "body": backlog_body(),
         "blob": blob,
@@ -2771,7 +2901,7 @@ fn review_json() -> Value {
     let (blob, ciphertext) = review_blob();
 
     let comment = json!({ "path": "src/orders.rs", "line": 41, "side": "old", "sha": HEAD, "text": "Why the cast?" });
-    let comments = |list: Value| json!({ "type": "review-comments", "address": REVIEWED, "step": 2, "comments": list });
+    let comments = |list: Value| json!({ "type": "review-comments", "address": REVIEWED, "subtask": "gateway", "comments": list });
     let with = |key: &str, value: Value| {
         let mut changed = comment.clone();
         changed[key] = value;
@@ -2779,7 +2909,10 @@ fn review_json() -> Value {
     };
     let payloads = [
         ("comments on old and new lines", review_comments_json(), true),
-        ("a comment with neither step nor sha", json!({ "type": "review-comments", "address": REVIEWED, "comments": [{ "path": "src/gateway.rs", "line": 1, "side": "new", "text": "Fine." }] }), true),
+        ("comments from an app not yet updated, naming the step by its number", json!({ "type": "review-comments", "address": REVIEWED, "step": 2, "comments": [comment.clone()] }), true),
+        ("comments naming both a subtask and a step", json!({ "type": "review-comments", "address": REVIEWED, "step": 2, "subtask": "gateway", "comments": [comment.clone()] }), false),
+        ("comments on a subtask named by a path", json!({ "type": "review-comments", "address": REVIEWED, "subtask": "../gateway", "comments": [comment.clone()] }), false),
+        ("a comment with neither subtask nor sha", json!({ "type": "review-comments", "address": REVIEWED, "comments": [{ "path": "src/gateway.rs", "line": 1, "side": "new", "text": "Fine." }] }), true),
         ("no comments", comments(json!([])), false),
         ("one comment too many", comments(json!(vec![comment.clone(); MAX_REVIEW_COMMENTS + 1])), false),
         ("an empty comment", with("text", json!("  ")), false),
@@ -2795,21 +2928,29 @@ fn review_json() -> Value {
         ("a field kebbie does not know", with("range", json!([40, 42])), false),
         ("a read mark", serde_json::to_value(review_read()).unwrap(), true),
         ("a read mark on a 64-character object id", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": false, "content": "a".repeat(64) }), true),
-        ("a read mark on the whole step, naming no commit", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": GATEWAY_CONTENT }), true),
+        ("a read mark on the whole subtask, naming no commit", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": GATEWAY_CONTENT }), true),
         ("a read mark in a commit named by a short sha", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": GATEWAY_CONTENT, "sha": "9f3c2a1" }), false),
         ("a read mark on a short hash", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true, "content": "5d1c0a9" }), false),
         ("a read mark without its content", json!({ "type": "review-read", "address": REVIEWED, "path": "src/gateway.rs", "read": true }), false),
-        ("an accept", serde_json::to_value(accept_step()).unwrap(), true),
+        ("an accept of a subtask", serde_json::to_value(accept_subtask()).unwrap(), true),
+        ("an accept of a subtask named by a path", json!({ "type": "accept-subtask", "address": REVIEWED, "subtask": "../gateway", "head": HEAD }), false),
+        ("an accept of a subtask without a name", json!({ "type": "accept-subtask", "address": REVIEWED, "subtask": "", "head": HEAD }), false),
+        ("an accept of a subtask at a short head", json!({ "type": "accept-subtask", "address": REVIEWED, "subtask": "gateway", "head": "9f3c2a1" }), false),
+        ("an accept of a subtask naming a sha instead of its head", json!({ "type": "accept-subtask", "address": REVIEWED, "subtask": "gateway", "sha": HEAD }), false),
+        ("an accept of a step from an app not yet updated", serde_json::to_value(accept_step()).unwrap(), true),
         ("an accept of step zero", json!({ "type": "accept-step", "address": REVIEWED, "step": 0, "head": HEAD }), false),
-        ("an accept of a short head", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "head": "9f3c2a1" }), false),
-        ("an accept naming a sha instead of the step's head", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "sha": HEAD }), false),
-        ("a review of a step asked for", serde_json::to_value(review_open()).unwrap(), true),
-        ("a review of the first step waiting asked for", json!({ "type": "review-open", "address": REVIEWED }), true),
+        ("an accept of a step at a short head", json!({ "type": "accept-step", "address": REVIEWED, "step": 2, "head": "9f3c2a1" }), false),
+        ("a review of a subtask asked for", serde_json::to_value(review_open()).unwrap(), true),
+        ("a review of the first subtask waiting asked for", json!({ "type": "review-open", "address": REVIEWED }), true),
+        ("a review of a step asked for by an app not yet updated", json!({ "type": "review-open", "address": REVIEWED, "step": 2 }), true),
         ("a review of step zero asked for", json!({ "type": "review-open", "address": REVIEWED, "step": 0 }), false),
+        ("a review naming both a subtask and a step", json!({ "type": "review-open", "address": REVIEWED, "step": 2, "subtask": "gateway" }), false),
+        ("a review of a subtask named by a path", json!({ "type": "review-open", "address": REVIEWED, "subtask": "a/b" }), false),
         ("a review asked for a task without its repo", json!({ "type": "review-open", "address": "payments" }), false),
-        ("a push through a step", serde_json::to_value(push_through(2)).unwrap(), true),
+        ("a push of the pushable run", serde_json::to_value(push_pushable()).unwrap(), true),
+        ("a push through a step from an app not yet updated", json!({ "type": "push", "address": REVIEWED, "head": HEAD, "card_sha": null, "through_step": 2 }), true),
         ("a push through step zero", json!({ "type": "push", "address": REVIEWED, "head": HEAD, "card_sha": null, "through_step": 0 }), false),
-        ("a push through a step at a short sha", json!({ "type": "push", "address": REVIEWED, "head": "9f3c2a1", "card_sha": null, "through_step": 2 }), false),
+        ("a push at a short sha", json!({ "type": "push", "address": REVIEWED, "head": "9f3c2a1", "card_sha": null }), false),
     ];
     let payloads: Vec<Value> = payloads
         .into_iter()
@@ -2819,7 +2960,7 @@ fn review_json() -> Value {
             json!({ "name": name, "payload": payload, "valid": valid })
         })
         .collect();
-    let stepped = serde_json::to_value(stepped_board()).unwrap();
+    let planned = serde_json::to_value(planned_board()).unwrap();
     let rules = [
         ("a check still running", json!({ "state": "checking" }), true),
         ("a check that passed", json!({ "state": "ok" }), true),
@@ -2840,8 +2981,8 @@ fn review_json() -> Value {
     let rules: Vec<Value> = rules
         .into_iter()
         .map(|(name, rules, valid)| {
-            for pointer in ["/items/0/git/rules", "/items/0/steps/items/1/rules"] {
-                let mut board = stepped.clone();
+            for pointer in ["/items/0/git/rules", "/items/0/subtasks/2/rules"] {
+                let mut board = planned.clone();
                 *board.pointer_mut(pointer).unwrap() = rules.clone();
                 let parsed = serde_json::from_value::<Payload>(board);
                 assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name} at {pointer}");
@@ -2861,28 +3002,32 @@ fn review_json() -> Value {
         changed
     };
     let mut branch = body.clone();
-    branch["files"] = branch["step"]["files"].clone();
-    branch["step"] = Value::Null;
+    branch["files"] = branch["subtask"]["files"].clone();
+    branch["subtask"] = Value::Null;
+    let mut both = body.clone();
+    both["step"] = review_of_a_step_of_commits()["step"].clone();
     let bodies = [
-        ("the review of a step of two commits", body.clone(), true),
-        ("the review of a branch without steps", branch.clone(), true),
-        ("a review of a step from a machine not yet updated", review_from_a_machine_not_yet_updated(), true),
-        ("an absolute path", change("/step/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
-        ("an absolute path in a commit", change("/step/commits/1/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
-        ("counts that differ from the lines", change("/step/files/1/add", json!(2)), false),
-        ("counts in a commit that differ from its lines", change("/step/commits/1/files/0/del", json!(0)), false),
-        ("an added line with an old number", change("/step/files/0/hunks/0/lines/0/old", json!(1)), false),
-        ("an omitted file with hunks", change("/step/files/0/omitted", json!(true)), false),
+        ("the review of a subtask of two commits", body.clone(), true),
+        ("the review of a branch without subtasks", branch.clone(), true),
+        ("a review of a step of one commit from a machine not yet updated", review_from_a_machine_not_yet_updated(), true),
+        ("a review of a step of commits from a machine not yet updated", review_of_a_step_of_commits(), true),
+        ("a review naming both a subtask and a step", both, false),
+        ("an absolute path", change("/subtask/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
+        ("an absolute path in a commit", change("/subtask/commits/1/files/0/path", json!("/Users/someone/api/src/gateway.rs")), false),
+        ("counts that differ from the lines", change("/subtask/files/1/add", json!(2)), false),
+        ("counts in a commit that differ from its lines", change("/subtask/commits/1/files/0/del", json!(0)), false),
+        ("an added line with an old number", change("/subtask/files/0/hunks/0/lines/0/old", json!(1)), false),
+        ("an omitted file with hunks", change("/subtask/files/0/omitted", json!(true)), false),
         ("a short head", change("/head", json!("9f3c2a1")), false),
-        ("a head that is not the step's last commit", change("/head", json!(FIRST_COMMIT)), false),
-        ("a commit named by a short sha", change("/step/commits/0/sha", json!("a41c9e0")), false),
-        ("one commit listed twice", change("/step/commits/0/sha", json!(HEAD)), false),
-        ("a step without commits", change("/step/commits", json!([])), false),
-        ("step zero", change("/step/number", json!(0)), false),
-        ("a step whose files sit on the review", change("/files", body["step"]["files"].clone()), false),
-        ("a commit without its files", { let mut changed = body.clone(); changed["step"]["commits"][0].as_object_mut().unwrap().remove("files"); changed }, false),
-        ("a content hash in capitals", change("/step/files/1/content", json!("0A1B2C3D4E5F60718293A4B5C6D7E8F901234567")), false),
-        ("a renamed file without its old path", change("/step/files/1/status", json!("renamed")), false),
+        ("a head that is not the subtask's last commit", change("/head", json!(FIRST_COMMIT)), false),
+        ("a commit named by a short sha", change("/subtask/commits/0/sha", json!("a41c9e0")), false),
+        ("one commit listed twice", change("/subtask/commits/0/sha", json!(HEAD)), false),
+        ("a subtask without commits", change("/subtask/commits", json!([])), false),
+        ("a subtask named by a path", change("/subtask/id", json!("../gateway")), false),
+        ("a subtask whose files sit on the review", change("/files", body["subtask"]["files"].clone()), false),
+        ("a commit without its files", { let mut changed = body.clone(); changed["subtask"]["commits"][0].as_object_mut().unwrap().remove("files"); changed }, false),
+        ("a content hash in capitals", change("/subtask/files/1/content", json!("0A1B2C3D4E5F60718293A4B5C6D7E8F901234567")), false),
+        ("a renamed file without its old path", change("/subtask/files/1/status", json!("renamed")), false),
         ("a branch file listed twice", { let mut changed = branch.clone(); changed["files"][1] = branch["files"][0].clone(); changed }, false),
     ];
     let bodies: Vec<Value> = bodies
@@ -2893,8 +3038,7 @@ fn review_json() -> Value {
             json!({ "name": name, "body": body, "valid": valid })
         })
         .collect();
-    let old = review_from_a_machine_not_yet_updated();
-    let legacy_review = json!({ "body": old.clone(), "opens_as": serde_json::from_value::<Review>(old).unwrap() });
+    let legacy_review = [review_from_a_machine_not_yet_updated(), review_of_a_step_of_commits()].map(|old| json!({ "body": old.clone(), "opens_as": serde_json::from_value::<Review>(old).unwrap() }));
     json!({
         "media_type": REVIEW_MEDIA_TYPE,
         "max_comments": MAX_REVIEW_COMMENTS,
@@ -2909,22 +3053,117 @@ fn review_json() -> Value {
         "rules": rules,
         "board_from_a_machine_not_yet_updated": legacy,
         "steps_from_a_machine_not_yet_updated": steps_from_a_machine_not_yet_updated(),
-        "review_from_a_machine_not_yet_updated": legacy_review,
+        "reviews_from_a_machine_not_yet_updated": legacy_review,
+        "plans": plans_json(),
         "bodies": bodies,
     })
 }
 
 fn steps_from_a_machine_not_yet_updated() -> Value {
-    let mut old = serde_json::to_value(stepped_board()).unwrap();
-    old["items"][0]["steps"]["items"] = json!([
+    let base = serde_json::to_value(planned_board()).unwrap();
+    let older = |steps: Value| {
+        let mut old = base.clone();
+        let item = old["items"][0].as_object_mut().unwrap();
+        for key in ["subtasks", "order", "pushable", "require_accept"] {
+            item.remove(key);
+        }
+        item.insert("steps".into(), steps);
+        let parsed: Payload = serde_json::from_value(old.clone()).unwrap();
+        assert_eq!(parsed.validate(), Ok(()), "a board from a machine not yet updated still opens");
+        json!({ "board": old, "opens_as": parsed })
+    };
+    let one = older(json!({ "pushed": 0, "items": [
         { "number": 2, "title": "Charge through a PaymentGateway", "state": "committed", "sha": HEAD, "rules": { "state": "ok" } },
         { "number": 3, "title": "Add the new gateway", "state": "in-progress", "sha": null },
         { "number": 4, "title": "Remove the old payment client", "state": "planned", "sha": null },
         { "number": 5, "title": "Docs", "state": "accepted", "sha": PUSHED_COMMIT },
-    ]);
-    let parsed: Payload = serde_json::from_value(old.clone()).unwrap();
-    assert_eq!(parsed.validate(), Ok(()), "a board from a machine not yet updated still opens");
-    json!({ "board": old, "opens_as": parsed })
+    ] }));
+    let many = older(json!({ "pushed": 1, "required": true, "items": [
+        { "number": 1, "title": "Name the currency on every amount", "state": "pushed", "commits": [{ "sha": PUSHED_COMMIT, "subject": CURRENCY_SUBJECT }] },
+        { "number": 2, "title": "Run the payment tests on CI", "state": "accepted", "commits": [{ "sha": BETWEEN_COMMIT, "subject": BETWEEN_SUBJECT }] },
+        { "number": 3, "title": "Charge through a PaymentGateway", "state": "ready", "commits": [{ "sha": FIRST_COMMIT, "subject": FIRST_SUBJECT }, { "sha": HEAD, "subject": HEAD_SUBJECT }], "rules": { "state": "ok" } },
+        { "number": 4, "title": "Remove the old payment client", "state": "planned", "commits": [] },
+    ] }));
+    json!([one, many])
+}
+
+fn plans_json() -> Value {
+    let board = serde_json::to_value(planned_board()).unwrap();
+    let planned = board["items"][0].clone();
+    let change = |pointer: &str, value: Value| {
+        let mut changed = planned.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        let parent = changed.pointer_mut(parent).unwrap();
+        match parent {
+            Value::Array(list) => list[key.parse::<usize>().unwrap()] = value,
+            _ => parent[key] = value,
+        }
+        changed
+    };
+    let without = |key: &str| {
+        let mut changed = planned.clone();
+        changed.as_object_mut().unwrap().remove(key);
+        changed
+    };
+    let mut accepted = change("/subtasks/2/state", json!("accepted"));
+    accepted["pushable"] = json!({ "count": 4, "through": HEAD, "subtasks": ["currency", "gateway", "tests"] });
+    let mut obstacle = planned.clone();
+    obstacle["obstacle"] = json!({ "id": "o1", "state": "asked", "text": "Lint should read the fields from the index, but the index keeps only title and text.", "at": AT - 1_140, "decision": { "kind": "ask", "by": "investigator", "text": "Both ways hold.\nThe tradeoff is yours." } });
+    let mut decided = obstacle.clone();
+    decided["obstacle"]["state"] = json!("decided");
+    decided["obstacle"]["decision"] = json!({ "kind": "subtask", "by": "investigator", "text": "Frontmatter belongs in the index; search and context read the same fields." });
+    let cases = [
+        ("subtasks, a push order and a pushable run", planned.clone(), true),
+        ("nothing pushable yet", without("pushable"), true),
+        ("accepting a subtask frees the one that waited behind it", accepted, true),
+        ("an obstacle the investigator asks you about", obstacle.clone(), true),
+        ("an obstacle being investigated", { let mut changed = obstacle.clone(); changed["obstacle"]["state"] = json!("investigating"); changed["obstacle"].as_object_mut().unwrap().remove("decision"); changed }, true),
+        ("an obstacle with the lead", { let mut changed = obstacle.clone(); changed["obstacle"]["state"] = json!("with-lead"); changed["obstacle"].as_object_mut().unwrap().remove("decision"); changed }, true),
+        ("an obstacle decided with a new subtask", decided.clone(), true),
+        ("an obstacle decided by the lead with a workaround", { let mut changed = decided.clone(); changed["obstacle"]["decision"]["kind"] = json!("workaround"); changed["obstacle"]["decision"]["by"] = json!("lead"); changed }, true),
+        ("an obstacle decided without its decision", { let mut changed = decided.clone(); changed["obstacle"].as_object_mut().unwrap().remove("decision"); changed }, false),
+        ("an obstacle decided by asking you", { let mut changed = decided.clone(); changed["obstacle"]["decision"]["kind"] = json!("ask"); changed }, false),
+        ("an obstacle asked of you with another decision", { let mut changed = obstacle.clone(); changed["obstacle"]["decision"]["kind"] = json!("task"); changed }, false),
+        ("an obstacle under investigation that is already decided", { let mut changed = decided.clone(); changed["obstacle"]["state"] = json!("investigating"); changed }, false),
+        ("a decision by someone the protocol does not know", { let mut changed = decided.clone(); changed["obstacle"]["decision"]["by"] = json!("task"); changed }, false),
+        ("a decision without text", { let mut changed = decided.clone(); changed["obstacle"]["decision"]["text"] = json!(" "); changed }, false),
+        ("an obstacle without the time it was raised", { let mut changed = decided; changed["obstacle"].as_object_mut().unwrap().remove("at"); changed }, false),
+        ("an obstacle without text", { let mut changed = obstacle.clone(); changed["obstacle"]["text"] = json!(" "); changed }, false),
+        ("an obstacle holding a control character", { let mut changed = obstacle; changed["obstacle"]["text"] = json!("a\u{7}b"); changed }, false),
+        ("a subtask named by a path", change("/subtasks/1/id", json!("../currency")), false),
+        ("a subtask listed twice", change("/subtasks/1/id", json!("docs")), false),
+        ("a subtask's commit named by a short sha", change("/subtasks/1/commits/0", json!("5e4d3c2")), false),
+        ("a commit in two subtasks", change("/subtasks/3/commits/0", json!(FIRST_COMMIT)), false),
+        ("a planned subtask holding a commit", change("/subtasks/5/commits", json!([PUSHED_COMMIT.replace('1', "2")])), false),
+        ("a subtask to review without commits", change("/subtasks/2/commits", json!([])), false),
+        ("a subtask in a state kebbie does not know", change("/subtasks/2/state", json!("merged")), false),
+        ("a reason for adding a subtask over two lines", change("/subtasks/1/added/reason", json!("Amounts carry\nno currency")), false),
+        ("a field a subtask does not have", change("/subtasks/1/number", json!(2)), false),
+        ("a push order row naming a subtask the task does not have", change("/order/0/subtask", json!("nope")), false),
+        ("a push order row under another subtask than its commit's", change("/order/0/subtask", json!("gateway")), false),
+        ("a commit twice in the push order", change("/order/1/sha", json!(CURRENCY_COMMIT)), false),
+        ("a pushed subtask left in the push order", change("/subtasks/1/state", json!("pushed")), false),
+        ("a push order row in a group, which is not built yet", change("/order/0/group", json!("g1")), false),
+        ("a push order without subtasks", { let mut changed = planned.clone(); changed.as_object_mut().unwrap().remove("subtasks"); changed.as_object_mut().unwrap().remove("pushable"); changed }, false),
+        ("a pushable run without a push order", without("order"), false),
+        ("a pushable run of nothing", change("/pushable/count", json!(0)), false),
+        ("a pushable run longer than the push order", change("/pushable/count", json!(5)), false),
+        ("a pushable run ending at another commit than its last", change("/pushable/through", json!(FIRST_COMMIT)), false),
+        ("a pushable run naming subtasks it does not hold", change("/pushable/subtasks", json!(["currency", "tests"])), false),
+        ("a pushable run through a subtask not yet accepted", change("/pushable", json!({ "count": 2, "through": FIRST_COMMIT, "subtasks": ["currency", "gateway"] })), false),
+        ("subtasks and steps together", change("/steps", json!({ "pushed": 0, "items": [] })), false),
+    ];
+    let cases: Vec<Value> = cases
+        .into_iter()
+        .map(|(name, item, valid)| {
+            let mut whole = board.clone();
+            whole["items"] = json!([item.clone()]);
+            let parsed = serde_json::from_value::<Payload>(whole);
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "item": item, "valid": valid })
+        })
+        .collect();
+    json!({ "max_subtask_id_chars": crate::MAX_SUBTASK_ID_CHARS, "max_added_reason_chars": crate::MAX_ADDED_REASON_CHARS, "max_obstacle_chars": crate::MAX_OBSTACLE_CHARS, "cases": cases })
 }
 
 fn review_comments_json() -> Value {

@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { backlogList, chip, chooseMachine, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
+import { backlogList, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
 import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
@@ -8,20 +8,20 @@ import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
 import { textHash } from "../js/protocol.js";
-import { answerBlock, answerReady, APPROVAL_STATES, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { answerBlock, answerReady, APPROVAL_STATES, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled } from "./notify.js";
-import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, stepHref, stepPage, wholePage } from "./review.js";
+import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, wholePage } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, OPENABLE_STEPS, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, stepList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, obstacleBlock, OPENABLE_STEPS, pushOrder, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -265,15 +265,18 @@ function cardBlock(found, selected = null) {
   }
   lines.push(taskFacts(item));
   if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
-  const steps = stepList(item, { expandable: true, href: (number) => stepHref(found.machine, item.address, number), selected, more: uiOf(found.machine, item.address).moreSteps });
-  if (steps) lines.push(`<h3 class="sec">Steps</h3>${steps}`);
+  lines.push(obstacleBlock(item, nowSeconds()));
+  const subtasks = subtaskList(item, { expandable: true, href: (id) => subtaskHref(found.machine, item.address, id), selected, more: uiOf(found.machine, item.address).moreSteps });
+  if (subtasks) lines.push(`<h3 class="sec">Subtasks · ${item.subtasks.length}</h3>${subtasks}`);
   lines.push(reviewLines(item));
   const progress = [item.summary, item.report?.summary].filter(Boolean);
   if (progress.length) lines.push(`<h3 class="sec">Progress</h3><div class="plan">${progress.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`);
   if (item.git) {
     const git = item.git;
     const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null].filter(Boolean);
-    lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}${rulesLines(git.rules, { expandable: true })}</div>`);
+    const order = pushOrder(item);
+    if (order) lines.push(`<h3 class="sec">Push order · ${item.order.length}</h3>${order}<div class="order-foot">${esc(facts.join(" · "))}${rulesLines(git.rules, { expandable: true })}</div>`);
+    else lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}${rulesLines(git.rules, { expandable: true })}</div>`);
   }
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
   if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
@@ -327,7 +330,7 @@ function promptArea(found) {
 
 function pushArea(found) {
   const { item } = found;
-  const pushable = item.group === "READY TO PUSH" || item.card;
+  const pushable = item.group === "READY TO PUSH" || item.card || item.pushable;
   if (!pushable || !item.head) return "";
   const access = commandGate();
   if (access === "off" || !pushReady(item)) return `<button type="button" class="btn primary off" disabled>Push ${esc(short(item.head))} · coming in a later version</button>`;
@@ -335,8 +338,8 @@ function pushArea(found) {
   if (access === "view-only") return viewOnlyBlock();
   if (!takes(found.accepts, "push")) return notTakenBlock("push", found.name, found.accepts);
   const { sent, state: shown, standing } = sentFor(found, "push");
-  const current = sent && sent.head !== item.head && settled(shown) ? null : sent;
-  return decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing }));
+  const current = sent && sent.head !== pushHead(item) && settled(shown) ? null : sent;
+  return `<div class="rv-end thumb-end"><div class="row-btns">${decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing }))}</div></div>`;
 }
 
 function taskBody(found, selected = null) {
@@ -445,7 +448,27 @@ function itemCardHtml(entry) {
   const sentFor = (index) => latestFor(entry, "item-answer", (sent) => sent.index === index);
   const idea = entry.idea ? { ...entry.idea, standing: shownOf(entry.idea.sent).standing } : null;
   const edits = entry.key ? { machine: chosenFor(entry, "item-edit"), editing: ui.editing, sentFor: (section) => editFor(entry, section) } : null;
-  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits });
+  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null });
+}
+
+const FOUND_KINDS = ["found-start", "found-add", "found-dismiss"];
+
+function foundOf(entry) {
+  const chosen = chosenFor(entry, "found-start");
+  const board = state.opened.find((machine) => machine.machine === chosen?.machine)?.board;
+  const tasks = takes(chosen?.accepts, "found-add") ? (entry.row.found?.sources ?? []).map((address) => board?.items.find((item) => item.address === address)).filter(Boolean).map((item) => ({ address: item.address, name: taskName(item, item.address.slice(0, item.address.indexOf("@"))) })) : [];
+  const sent = FOUND_KINDS.map((kind) => latestFor(entry, kind)).filter(Boolean).sort((a, b) => b.sent.at - a.sent.at)[0] ?? null;
+  return { chosen, tasks, sent };
+}
+
+async function foundAction(entry, action, target) {
+  const ui = backlogUi(entry.id);
+  const chosen = chosenFor(entry, action === "found-dismiss" ? "found-dismiss" : action === "found-add" ? "found-add" : "found-start");
+  if (!chosen || ui.busy) return;
+  const task = action === "found-add" ? target.dataset.task : null;
+  const payload = { type: action, item: entry.key, ...(task ? { task } : {}) };
+  await sendBacklog({ machine: chosen, payload, meta: { address: entry.key, label: entry.row.title, task }, ui });
+  render();
 }
 
 function editFor(entry, section) {
@@ -509,8 +532,8 @@ function ideaRoute() {
 
 const taskHref = (machine, address) => `#/task/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
 
-function reviewUiOf(machine, address, step) {
-  const key = `${uiKey(machine, address)}|${step ?? ""}`;
+function reviewUiOf(machine, address, subtask) {
+  const key = `${uiKey(machine, address)}|${subtask ?? ""}`;
   if (!state.reviewUi.has(key)) state.reviewUi.set(key, freshReviewUi());
   return state.reviewUi.get(key);
 }
@@ -529,50 +552,52 @@ function reviewFetch(found, opener, access) {
   return { ...fetch, state: named[shown.state] ?? shown.state, standing: shown.standing };
 }
 
-function heldReview(found, opener, step) {
+function heldReview(found, opener, subtask) {
   const blob = opener?.result?.outcome === "done" ? opener.result.blob : null;
   if (!blob) return { review: null, failed: false };
   const held = blobs.peek(blob.id);
   if (!held) blobs.load(blob).then((loaded) => loaded && render());
-  if (held?.review && (held.review.address !== found.item.address || (held.review.step?.number ?? null) !== step)) return { review: null, failed: true };
+  if (held?.review && (held.review.address !== found.item.address || (held.review.subtask?.id ?? null) !== subtask)) return { review: null, failed: true };
   return { review: held?.review ?? null, failed: Boolean(held?.failed) };
 }
 
 function reviewPage(params, diff) {
-  const step = params[2] ? Number(params[2]) : null;
-  if (!diff || step === null) return { step, kind: diff || step === null ? "whole" : "step", commit: null };
+  const subtask = params[2] ?? null;
+  if (!diff || subtask === null) return { subtask, kind: diff || subtask === null ? "whole" : "subtask", commit: null };
   const commit = params[3] && params[3] !== "all" ? Number(params[3]) - 1 : null;
-  return { step, kind: commit === null ? "whole" : "commit", commit };
+  return { subtask, kind: commit === null ? "whole" : "commit", commit };
 }
 
-const boardStepOf = (found, step) => (step === null ? null : (found.item.steps?.items.find((one) => one.number === step) ?? null));
-const reviewHead = (found, step) => (step === null ? (found.item.head ?? null) : (boardStepOf(found, step)?.commits.at(-1)?.sha ?? null));
+const boardSubtaskOf = (found, subtask) => (subtask === null ? null : (found.item.subtasks?.find((one) => one.id === subtask) ?? null));
+const reviewHead = (found, subtask) => (subtask === null ? (found.item.head ?? null) : (boardSubtaskOf(found, subtask)?.commits.at(-1) ?? null));
+const legacyMachine = (found) => !takes(found.accepts, "accept-subtask") && takes(found.accepts, "accept-step");
+const naming = (found, subtask) => (subtask === null ? {} : legacyMachine(found) && /^[1-9][0-9]*$/.test(subtask) ? { step: Number(subtask) } : { subtask });
 
 function reviewView(found, page) {
-  const { step } = page;
-  const boardStep = boardStepOf(found, step);
-  const head = reviewHead(found, step);
-  const ui = reviewUiOf(found.machine, found.item.address, step);
+  const { subtask } = page;
+  const boardSubtask = boardSubtaskOf(found, subtask);
+  const head = reviewHead(found, subtask);
+  const ui = reviewUiOf(found.machine, found.item.address, subtask);
   foldCommitsOn(ui, location.hash);
-  const wanted = `${head ?? ""}|${step ?? ""}`;
+  const wanted = `${head ?? ""}|${subtask ?? ""}`;
   const access = commandGate();
-  const opener = sentOn(found, "review-open", (sent) => (sent.step ?? null) === step && (sent.head ?? null) === head)[0] ?? null;
-  const { review, failed } = heldReview(found, opener, step);
+  const opener = sentOn(found, "review-open", (sent) => (sent.subtask ?? null) === subtask && (sent.head ?? null) === head)[0] ?? null;
+  const { review, failed } = heldReview(found, opener, subtask);
   settleReview(ui, review);
-  const openable = step === null ? Boolean(found.item.review) : OPENABLE_STEPS.includes(boardStep?.state);
+  const openable = subtask === null ? Boolean(found.item.review) : OPENABLE_STEPS.includes(boardSubtask?.state);
   const fetch = failed ? { state: "failed", sent: opener } : !openable && !opener ? { state: "not-ready", sent: null } : reviewFetch(found, opener, access);
   if (openable && !opener && !ui.busy && ui.requested !== wanted && access === "ready" && takes(found.accepts, "review-open")) {
     ui.requested = wanted;
-    queueMicrotask(() => requestReview(found, step, head));
+    queueMicrotask(() => requestReview(found, subtask, head));
   }
-  const sentComments = sentOn(found, "review-comments", (sent) => (sent.step ?? null) === step).flatMap((sent) => {
+  const sentComments = sentOn(found, "review-comments", (sent) => (sent.subtask ?? null) === subtask).flatMap((sent) => {
     const shown = shownOf(sent).state;
     return (sent.comments ?? []).map((comment) => ({ ...comment, at: sent.at, state: shown }));
   });
-  const accepted = step === null || !head ? null : sentOn(found, "accept-step", (sent) => sent.step === step && (sent.head ?? sent.sha) === head)[0];
+  const accepting = (sent) => sent.subtask === subtask && sent.head === head;
+  const accepted = subtask === null || !head ? null : [...sentOn(found, "accept-subtask", accepting), ...sentOn(found, "accept-step", accepting)].sort((a, b) => b.at - a.at)[0];
   const readSent = opener ? sentOn(found, "review-read", (sent) => sent.at >= opener.at && !settled(shownOf(sent).state)) : [];
-  const stepPush = step === null ? null : (sentOn(found, "push", (sent) => sent.step === step && sent.head === head)[0] ?? null);
-  const taskPush = sentOn(found, "push", (sent) => (sent.step ?? null) === null && sent.head === found.item.head)[0] ?? null;
+  const push = sentOn(found, "push", (sent) => sent.head === pushHead(found.item))[0] ?? null;
   const ready = access === "ready";
   return {
     machine: found.machine,
@@ -582,17 +607,16 @@ function reviewView(found, page) {
     title: taskName(found.item, found.task),
     item: found.item,
     accepts: found.accepts,
-    step,
+    subtask,
     page,
-    boardStep,
+    boardSubtask,
     review,
     fetch,
     ui,
     sentComments,
     readSent,
     acceptSent: accepted ? shownOf(accepted) : null,
-    stepPush: stepPush ? shownOf(stepPush) : null,
-    taskPush: taskPush ? shownOf(taskPush) : null,
+    push: push ? shownOf(push) : null,
     pushUi: uiOf(found.machine, found.item.address),
     access,
     canComment: ready && takes(found.accepts, "review-comments"),
@@ -606,14 +630,14 @@ function reviewRoute(params, diff = false) {
   const [machine, address] = params;
   const page = reviewPage(params, diff);
   const found = findTask(state.opened, machine, address);
-  const up = page.kind === "step" || page.step === null ? taskHref(machine, address) : stepHref(machine, address, page.step);
+  const up = page.kind === "subtask" || page.subtask === null ? taskHref(machine, address) : subtaskHref(machine, address, page.subtask);
   const back = backButton(up);
   if (!found) return shell("board", back + top("Review") + `<div class="center">This task is no longer on the board.</div>`);
   const v = reviewView(found, page);
-  const here = page.kind === "step" ? stepPage : page.kind === "commit" ? commitPage : wholePage;
+  const here = page.kind === "subtask" ? subtaskPage : page.kind === "commit" ? commitPage : wholePage;
   if (twoColumns()) {
-    const task = page.kind === "step" || page.step === null;
-    const left = task ? top(taskName(found.item, found.task), esc(found.name)) + taskBody(found, page.step) : stepPage(v, { top, left: true, selected: page.commit });
+    const task = page.kind === "subtask" || page.subtask === null;
+    const left = task ? top(taskName(found.item, found.task), esc(found.name)) + taskBody(found, page.subtask) : subtaskPage(v, { top, left: true, selected: page.commit });
     return shell("board", back + `<div class="narrow">${left}</div>`, here(v, { top, inPanel: true })) + sendControl(v);
   }
   return shell("board", back + `<div class="narrow">${here(v, { top })}</div>`) + sendControl(v);
@@ -936,16 +960,10 @@ function sendPush(target) {
   const found = findTask(state.opened, machine, address);
   if (!found || !pushReady(found.item)) return;
   const { item } = found;
-  send(target, { type: "push", address, head: item.head, card_sha: item.card?.sha ?? null }, { head: item.head, short: short(item.head), machineName: found.name });
-}
-
-function sendStepPush(target) {
-  const { machine, address } = target.dataset;
-  const found = findTask(state.opened, machine, address);
-  const step = Number(target.dataset.step);
-  const head = found ? reviewHead(found, step) : null;
-  if (!head || !["accepted", "ready"].includes(boardStepOf(found, step)?.state)) return;
-  send(target, { type: "push", address, head, card_sha: null, through_step: step }, { head, short: short(head), step, machineName: found.name });
+  const head = pushHead(item);
+  const last = item.pushable?.subtasks.at(-1);
+  const through = head !== item.head && legacyMachine(found) && /^[1-9][0-9]*$/.test(last ?? "") ? { through_step: Number(last) } : {};
+  send(target, { type: "push", address, head, card_sha: head === item.head ? (item.card?.sha ?? null) : null, ...through }, { head, short: short(head), count: pushCount(item), machineName: found.name });
 }
 
 const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
@@ -987,10 +1005,10 @@ async function sendBacklog({ machine, payload, meta, ui }) {
 
 const machineOf = (found) => ({ machine: found.machine, name: found.name });
 
-async function requestReview(found, step, head) {
-  const ui = reviewUiOf(found.machine, found.item.address, step);
-  const payload = step === null ? { type: "review-open", address: found.item.address } : { type: "review-open", address: found.item.address, step };
-  await sendTo({ machine: machineOf(found), payload, meta: { head, step }, ui });
+async function requestReview(found, subtask, head) {
+  const ui = reviewUiOf(found.machine, found.item.address, subtask);
+  const payload = { type: "review-open", address: found.item.address, ...naming(found, subtask) };
+  await sendTo({ machine: machineOf(found), payload, meta: { head, subtask }, ui });
   render();
 }
 
@@ -1005,9 +1023,9 @@ function reveal(selector, offset = null) {
 }
 
 function toDiff(v, sha, selector, offset, focus = null) {
-  const commit = v.review?.step?.commits.findIndex((one) => one.sha === sha) ?? -1;
-  const last = commit === (v.review?.step?.commits.length ?? 0) - 1;
-  const href = v.step === null ? diffHref(v.machine, v.address) : diffHref(v.machine, v.address, v.step, commit < 0 || last ? "all" : commit + 1);
+  const commit = v.review?.subtask?.commits.findIndex((one) => one.sha === sha) ?? -1;
+  const last = commit === (v.review?.subtask?.commits.length ?? 0) - 1;
+  const href = v.subtask === null ? diffHref(v.machine, v.address) : diffHref(v.machine, v.address, v.subtask, commit < 0 || last ? "all" : commit + 1);
   const here = route().name === "diff" && shaOf(v) === sha;
   if (!here) location.hash = href;
   render();
@@ -1022,10 +1040,10 @@ async function sendComments(found, v) {
   const { ui, review } = v;
   if (!review || !ui.drafts.length || ui.busy) return;
   const comments = ui.drafts.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, sha: draft.sha ?? null, text: draft.text }));
-  const payload = { address: v.address, step: review.step?.number ?? null, comments };
+  const payload = { address: v.address, ...naming(found, review.subtask?.id ?? null), comments };
   ui.error = commentsProblem(payload);
   if (ui.error) return render();
-  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-comments", ...payload }, meta: { step: payload.step, comments, count: comments.length }, ui });
+  const sent = await sendTo({ machine: machineOf(found), payload: { type: "review-comments", ...payload }, meta: { subtask: review.subtask?.id ?? null, comments, count: comments.length }, ui });
   if (sent) {
     const receipt = { count: comments.length, at: sent.at, device: sent.deviceName ?? "this device" };
     Object.assign(ui, { drafts: [], tray: false, composing: null, receipt });
@@ -1056,11 +1074,13 @@ async function markRead(found, v, index) {
   render();
 }
 
-async function acceptStep(found, v) {
-  const step = v.review?.step;
-  if (!step || v.ui.busy) return;
-  const head = step.commits.at(-1).sha;
-  await sendTo({ machine: machineOf(found), payload: { type: "accept-step", address: v.address, step: step.number, head }, meta: { head, step: step.number }, ui: v.ui });
+async function acceptSubtask(found, v) {
+  const part = v.review?.subtask;
+  if (!part || v.ui.busy) return;
+  const head = part.commits.at(-1).sha;
+  const named = naming(found, part.id);
+  const payload = named.step ? { type: "accept-step", address: v.address, step: named.step, head } : { type: "accept-subtask", address: v.address, subtask: part.id, head };
+  await sendTo({ machine: machineOf(found), payload, meta: { head, subtask: part.id }, ui: v.ui });
   render();
 }
 
@@ -1080,16 +1100,16 @@ function reviewAction(action, target) {
   const file = filesOf(v)[Number(target.dataset.file)];
   if (action === "rv-retry") {
     Object.assign(ui, { requested: null, error: null });
-    return requestReview(found, v.step, reviewHead(found, v.step));
+    return requestReview(found, v.subtask, reviewHead(found, v.subtask));
   }
   if (action === "rv-commit") {
-    const commit = v.review?.step?.commits[Number(target.dataset.commit)];
+    const commit = v.review?.subtask?.commits[Number(target.dataset.commit)];
     if (commit && !ui.commits.delete(commit.sha)) ui.commits.add(commit.sha);
     return render();
   }
   if (action === "rv-send") return sendComments(found, v);
   if (action === "rv-read" && file) return markRead(found, v, Number(target.dataset.file));
-  if (action === "rv-accept") return acceptStep(found, v);
+  if (action === "rv-accept") return acceptSubtask(found, v);
   if (action === "rv-line" && file) {
     if (ui.composing || !v.canComment) return;
     ui.composing = { path: file.path, side: target.dataset.side, line: Number(target.dataset.line), sha: shaOf(v), text: "" };
@@ -1183,7 +1203,7 @@ function openEditor(entry, section) {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
-const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "start-item", "item-edit", "item-edit-cancel", "item-edit-save"]);
+const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "start-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
 
 function backlogAction(action, target) {
   const id = target.closest("[data-item]")?.dataset.item ?? null;
@@ -1197,6 +1217,7 @@ function backlogAction(action, target) {
   if (action === "add-idea") return addIdea();
   if (action === "send-item-answer" && entry) return sendItemAnswer(entry);
   if (action === "start-item" && entry) return startItem(entry);
+  if (FOUND_KINDS.includes(action) && entry) return foundAction(entry, action, target);
   if (action === "backlog-choose") ui.choosing = !ui.choosing;
   else if (action === "backlog-machine") Object.assign(ui, { machine: target.dataset.machine, choosing: false });
   else if (action === "pick-question") {
@@ -1222,7 +1243,6 @@ function decideAction(action, target, element) {
   else if (action === "answer") return sendAnswer(target);
   else if (action === "choose") return sendPromptAnswer(target);
   else if (action === "push") return sendPush(target);
-  else if (action === "push-step") return sendStepPush(target);
   render();
 }
 

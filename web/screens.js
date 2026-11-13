@@ -173,66 +173,124 @@ export function rulesLines(rules, { expandable = false } = {}) {
   return `<div class="rules">${broken}${said}</div>`;
 }
 
-const commitCount = (step) => plural(step.commits.length, "commit", "commits");
+const commitCount = (part) => plural(part.commits.length, "commit", "commits");
+const titleOf = (item, id) => item.subtasks?.find((one) => one.id === id)?.title ?? id;
+const dim = (html) => `<span class="dim">${html}</span>`;
 
-export function stepLabel(step) {
-  if (step.state === "ready") return `${commitCount(step)} · to review`;
-  if (step.state === "accepted") return "accepted · push";
-  if (step.state === "pushed") return "pushed";
-  if (step.state === "in-progress") return step.commits.length ? `in progress · ${commitCount(step)}` : "in progress";
-  return "";
+export const runCount = (item) => item.pushable?.count ?? 0;
+export const pushedCount = (item) => Math.max(0, (item.subtasks ?? []).reduce((sum, one) => sum + one.commits.length, 0) - (item.order ?? []).length);
+
+export function blockerOf(item) {
+  const row = (item.order ?? [])[runCount(item)];
+  const owner = row ? item.subtasks?.find((one) => one.id === row.subtask) : null;
+  return owner && owner.state !== "accepted" ? owner : null;
 }
 
-function stepRow(step, href, on) {
-  const label = stepLabel(step);
-  const what = `<span class="what"><span class="mark">${STEP_MARKS[step.state] ?? ""}</span><span class="number">${esc(step.number)}</span><span class="tt"><span class="step-title">${esc(step.title)}</span>${label ? `<span class="label">${esc(label)}</span>` : ""}</span></span>`;
-  if (href && OPENABLE_STEPS.includes(step.state)) return `<a class="step s-${esc(step.state)}${on ? " on" : ""}" href="${esc(href(step.number))}"${on ? ' aria-current="true"' : ""}>${what}${CHEV_RIGHT}</a>`;
-  return `<div class="step s-${esc(step.state)}">${what}</div>`;
+export function inRun(item, subtask) {
+  const order = item.order ?? [];
+  const rows = order.map((row, index) => [row, index]).filter(([row]) => row.subtask === subtask.id);
+  return rows.length > 0 && rows.every(([, index]) => index < runCount(item));
 }
 
-export function stepList(item, { href = null, selected = null, more = false, expandable = false } = {}) {
-  const steps = item.steps;
-  if (!steps || (steps.pushed === 0 && steps.items.length === 0)) return "";
-  const listed = steps.items.some((step) => step.state === "pushed");
-  const pushed = steps.pushed && !listed ? `<div class="pushed">↑ ${esc(steps.pushed)} pushed</div>` : "";
+export function subtaskLabel(item, subtask) {
+  if (subtask.state === "ready") return esc(`${commitCount(subtask)} · to review`);
+  if (subtask.state === "pushed") return "pushed";
+  if (subtask.state === "in-progress") return esc(subtask.commits.length ? `in progress · ${commitCount(subtask)}` : "in progress");
+  if (subtask.state !== "accepted") return "";
+  if (inRun(item, subtask)) return "accepted · ready to push";
+  const blocker = blockerOf(item);
+  const waiting = (item.order ?? []).some((row) => row.subtask === subtask.id);
+  return waiting && blocker ? `accepted ${dim(`· waits for ${esc(blocker.title)}`)}` : "accepted";
+}
+
+const addedLine = (subtask) => (subtask.added ? `<span class="added">added ${esc(lastSeenText(subtask.added.at))} · ${esc(subtask.added.reason)}</span>` : "");
+
+function subtaskRow(item, subtask, href, on) {
+  const label = subtaskLabel(item, subtask);
+  const what = `<span class="what"><span class="mark">${STEP_MARKS[subtask.state] ?? ""}</span><span class="tt"><span class="step-title">${esc(subtask.title)}</span>${label ? `<span class="label">${label}</span>` : ""}${addedLine(subtask)}</span></span>`;
+  if (href && OPENABLE_STEPS.includes(subtask.state)) return `<a class="step s-${esc(subtask.state)}${on ? " on" : ""}" href="${esc(href(subtask.id))}"${on ? ' aria-current="true"' : ""}>${what}${CHEV_RIGHT}</a>`;
+  return `<div class="step s-${esc(subtask.state)}">${what}</div>`;
+}
+
+export function subtaskList(item, { href = null, selected = null, more = false, expandable = false } = {}) {
+  const subtasks = item.subtasks ?? [];
+  if (!subtasks.length) return "";
   let planned = 0;
   let folded = 0;
   const rows = [];
-  for (const step of steps.items) {
-    if (step.state === "planned") planned += 1;
-    if (step.state === "planned" && planned > SHOWN_PLANNED && !more) {
+  for (const subtask of subtasks) {
+    if (subtask.state === "planned") planned += 1;
+    if (subtask.state === "planned" && planned > SHOWN_PLANNED && !more) {
       folded += 1;
       continue;
     }
-    rows.push(stepRow(step, href, step.number === selected) + rulesLines(step.rules, { expandable }));
+    rows.push(subtaskRow(item, subtask, href, subtask.id === selected) + rulesLines(subtask.rules, { expandable }));
   }
   const extra = Math.max(0, planned - SHOWN_PLANNED);
   const fold = folded ? `<button type="button" class="more" data-action="steps-more" aria-expanded="false">${esc(folded)} more planned${CHEV_DOWN}</button>` : more && extra ? `<button type="button" class="more" data-action="steps-more" aria-expanded="true">Fewer planned${CHEV_UP}</button>` : "";
-  const optional = acceptRequired(item) || steps.items.length === 0 ? "" : `<div class="meta">accepting each step is optional: push takes what is committed</div>`;
-  return `<div class="steps go">${pushed}${rows.join("")}${fold}${optional}</div>`;
+  const optional = acceptRequired(item) ? "" : `<div class="meta">accepting each subtask is optional: push takes what is committed</div>`;
+  return `<div class="steps go">${rows.join("")}${fold}${optional}</div>`;
+}
+
+function orderLabel(item, row, index) {
+  const owner = item.subtasks.find((one) => one.id === row.subtask);
+  const title = esc(owner?.title ?? row.subtask);
+  if (owner?.state === "ready") return `${title} · to review`;
+  if (owner?.state === "in-progress") return `${title} · in progress`;
+  if (owner?.state === "accepted" && index >= runCount(item) && blockerOf(item)) return `${title} ${dim(`· waits for no. ${runCount(item) + 1}`)}`;
+  return title;
+}
+
+function orderRow(item, row, index) {
+  const state = item.subtasks.find((one) => one.id === row.subtask)?.state ?? "planned";
+  return `<div class="step s-${esc(state)}"><span class="what"><span class="mark">${STEP_MARKS[state] ?? ""}</span><span class="number">${index + 1}</span><span class="tt"><span class="step-title">${esc(row.subject)}</span><span class="label">${orderLabel(item, row, index)}</span></span></span><span class="mono meta">${esc(row.sha.slice(0, 7))}</span></div>`;
+}
+
+export function pushOrder(item) {
+  const order = item.order ?? [];
+  if (!item.subtasks || !order.length) return "";
+  const count = runCount(item);
+  const rows = order.map((row, index) => orderRow(item, row, index));
+  const names = (item.pushable?.subtasks ?? []).map((id) => titleOf(item, id));
+  const run = count ? `<div class="run"><div class="run-h"><b>Ready to push: ${esc(plural(count, "commit", "commits"))}</b><span>${esc(`${names.length === 1 ? "subtask" : "subtasks"} ${names.join(", ")}`)}</span></div>${rows.slice(0, count).join("")}</div>` : "";
+  return `<div class="steps go order">${run}${rows.slice(count).join("")}</div>`;
+}
+
+const OBSTACLE_WORDS = { investigating: "obstacle: being investigated", asked: "obstacle: the investigator asks you", "with-lead": "obstacle: with the lead" };
+const DECIDED_BY = { investigator: "Investigator", lead: "The lead", you: "You" };
+const DECISION = { subtask: "add a preparatory subtask first", workaround: "work around it", task: "a separate task takes it", ask: "asks you" };
+
+export function obstacleBlock(item, now = Date.now() / 1000) {
+  const obstacle = item.obstacle;
+  if (!obstacle) return "";
+  const said = `<div class="said">${esc(obstacle.text)}<div class="meta">raised by the task · ${esc(lastSeenText(obstacle.at, now))}</div></div>`;
+  const decision = obstacle.decision;
+  let verdict = "";
+  if (decision) verdict = `<div class="sent ${obstacle.state === "decided" ? "done" : "wait"}" role="status"><b>${esc(DECIDED_BY[decision.by])}: ${esc(DECISION[decision.kind])}</b><span>${esc(decision.text)}</span></div>`;
+  else if (obstacle.state === "investigating") verdict = `<div class="sent wait" role="status"><b><span class="spinner"></span>&nbsp; The investigator is looking into it</b><span>The task waits for its ruling.</span></div>`;
+  else if (obstacle.state === "with-lead") verdict = `<div class="sent wait" role="status"><b>With the lead</b><span>The lead decides how the task goes on.</span></div>`;
+  const added = obstacle.state === "decided" && decision?.kind === "subtask" ? (item.subtasks ?? []).filter((one) => one.added && one.added.at >= obstacle.at).sort((a, b) => b.added.at - a.added.at)[0] : null;
+  const change = added ? `<div class="change"><span class="mark">+</span><span>Subtask added: <b>${esc(added.title)}</b></span></div>` : "";
+  return `<h3 class="sec">Obstacle</h3><div class="obs">${said}${verdict}${change}</div>`;
 }
 
 export function stepSummary(item) {
-  const steps = item.steps;
-  const items = steps?.items ?? [];
-  if (!items.length) return "";
-  const total = items.length + (items.some((step) => step.state === "pushed") ? 0 : steps.pushed);
-  const of = (state) => items.filter((step) => step.state === state);
-  const [accepted, ready, building] = [of("accepted"), of("ready"), of("in-progress")];
-  const numbers = (list) => list.map((step) => step.number).join(", ");
+  const subtasks = item.subtasks ?? [];
+  const of = (...states) => subtasks.filter((one) => states.includes(one.state)).length;
+  const [accepted, ready, building] = [of("accepted", "pushed"), of("ready"), of("in-progress")];
+  const total = subtasks.length;
   const parts = [];
-  if (accepted.length) parts.push(`<span class="ok">✓ ${accepted.length === 1 ? `step ${esc(accepted[0].number)}` : `${accepted.length} steps`} accepted</span>`);
-  if (ready.length) parts.push(`<span class="accept">◆ ${accepted.length ? esc(ready.length) : `${esc(ready.length)} of ${esc(total)} steps`} ready to review</span>`);
-  if (building.length) parts.push(`<span class="prog">${building.length === 1 ? "step" : "steps"} ${esc(numbers(building))} in progress</span>`);
+  if (accepted) parts.push(`<span class="ok">✓ ${esc(accepted)} of ${esc(total)} subtasks accepted</span>`);
+  if (ready) parts.push(`<span class="accept">◆ ${accepted ? `${esc(ready)} to review` : `${esc(ready)} of ${esc(total)} subtasks to review`}</span>`);
+  if (building) parts.push(`<span class="prog">${esc(building)} in progress</span>`);
+  if (total && !ready && !building && pushedCount(item)) parts.push(`↑ ${esc(plural(pushedCount(item), "commit", "commits"))} pushed`);
+  if (OBSTACLE_WORDS[item.obstacle?.state]) parts.push(`<span class="warn">${OBSTACLE_WORDS[item.obstacle.state]}</span>`);
   return parts.length ? `<div class="step-line">${parts.join(" · ")}</div>` : "";
 }
 
 export function stepsWanted(item, machineName) {
-  if (!acceptRequired(item)) return null;
-  const items = item.steps.items;
-  const accepted = items.find((step) => step.state === "accepted");
-  const ready = items.find((step) => step.state === "ready");
-  const asks = [accepted ? `push step ${accepted.number}` : "", ready ? `review step ${ready.number}` : ""].filter(Boolean);
+  const ready = (item.subtasks ?? []).find((one) => one.state === "ready");
+  const asks = [runCount(item) ? `push ${plural(runCount(item), "commit", "commits")}` : "", ready ? `review ${ready.title}` : ""].filter(Boolean);
   return asks.length ? `${asks.join(" or ")} on ${machineName}` : null;
 }
 
@@ -552,9 +610,9 @@ export function devicesSection(devices, now) {
   return `<h2 class="group g-muted">Devices · ${kept.length}</h2>${kept.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>${gone}`;
 }
 
-const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on" };
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of" };
 const clip = (text, length = 60) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
-const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept):/, "").replace(/\.md$/, "");
+const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept|found):/, "").replace(/\.md$/, "");
 
 function said(entry) {
   const { payload } = entry;
@@ -568,7 +626,7 @@ function subject(entry) {
   if (payload.type === "routine") return payload.id;
   if (payload.type === "start") return `${payload.name}@${payload.repo}`;
   if (payload.type === "idea") return `${entry.machineName}: ${clip(payload.text)}`;
-  if (payload.type === "item-answer" || payload.type === "start-item" || payload.type === "item-edit") return itemName(entry);
+  if (["item-answer", "start-item", "item-edit", "found-start", "found-add", "found-dismiss"].includes(payload.type)) return itemName(entry);
   if (payload.type === "device-decision") return entry.targetName ?? payload.device.slice(-6);
   return payload.address;
 }
@@ -593,6 +651,10 @@ export function historyEntry(entry, now) {
     if (kind === "review-comments") return { icon: "✓", what: `Sent ${plural(entry.payload.comments.length, "review comment", "review comments")} on ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-read") return { icon: "✓", what: `Marked ${entry.payload.path} ${entry.payload.read ? "read" : "unread"} on ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "accept-step") return { icon: "✓", what: `Accepted step ${entry.payload.step} of ${what}`, said: [(entry.payload.head ?? entry.payload.sha).slice(0, 7), `on ${machine}`].join(" · "), at: entry.at };
+    if (kind === "accept-subtask") return { icon: "✓", what: `Accepted a subtask of ${what}`, said: [entry.payload.head.slice(0, 7), `on ${machine}`].join(" · "), at: entry.at };
+    if (kind === "found-start") return { icon: "✓", what: `Started a task from ${what}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "found-add") return { icon: "✓", what: `Added ${what} to ${entry.payload.task}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "found-dismiss") return { icon: "✓", what: `Dismissed ${what}`, said: `on ${machine}`, at: entry.at };
     return { icon: "✓", what: `Started ${what}`, said: `on ${machine}`, at: entry.at };
   }
   const noun = `${NOUNS[kind] ?? kind} ${what}`;

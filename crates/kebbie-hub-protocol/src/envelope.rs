@@ -31,6 +31,10 @@ pub enum Kind {
     ReviewComments,
     ReviewRead,
     AcceptStep,
+    AcceptSubtask,
+    FoundStart,
+    FoundAdd,
+    FoundDismiss,
 }
 
 impl Kind {
@@ -53,6 +57,10 @@ impl Kind {
             Kind::ReviewComments => "review-comments",
             Kind::ReviewRead => "review-read",
             Kind::AcceptStep => "accept-step",
+            Kind::AcceptSubtask => "accept-subtask",
+            Kind::FoundStart => "found-start",
+            Kind::FoundAdd => "found-add",
+            Kind::FoundDismiss => "found-dismiss",
         }
     }
 
@@ -73,6 +81,10 @@ impl Kind {
                 | Kind::ReviewComments
                 | Kind::ReviewRead
                 | Kind::AcceptStep
+                | Kind::AcceptSubtask
+                | Kind::FoundStart
+                | Kind::FoundAdd
+                | Kind::FoundDismiss
         )
     }
 
@@ -90,9 +102,10 @@ impl Kind {
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
-            Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep => 3_600,
+            Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
+            Kind::FoundAdd | Kind::FoundDismiss => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
-            Kind::StartItem => 86_400,
+            Kind::StartItem | Kind::FoundStart => 86_400,
         }
     }
 
@@ -101,9 +114,10 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem => 86_400,
+            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
-            Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep => 3_600,
+            Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
+            Kind::FoundAdd | Kind::FoundDismiss => 3_600,
             Kind::PromptAnswer => 600,
         }
     }

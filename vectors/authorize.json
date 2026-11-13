@@ -650,19 +650,19 @@
           "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "Ck-dr8iszw1mPc248z562mAIfR04QXjtAXHMjHUschfnsrnqP7Yi0hfq55lo4sdoUkqbrntu7pHQbzmlla3x4OtSOLvsmrW0FxTdvoNe9NyVJbv2eou4xKFZkmeB2QbHKQW3qNG0dlB2CZrkYLD6Sbj-pO02z5hZADp8rubdBYkwqAwj7tvfrJS-r1wDD_kG8iF5Y263Lg",
+        "ct": "ZeXP4ZDo2Sb0ebGaRLtrfrT24hDsDUKk6YXDI1ooV9h-k1e_u9kNvnXO6kR0qn_Y_kga_CdOyOBSFxDxAp5E5Mt2thomwfI8EB7r7NwL0ce1mtOXTuIO8c06XwYVRTdMYM_5ry35dodezRlLPbSFu468LV6tar6aCL9gv0EjoM24upGT9e0",
         "exp": 1761073200,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
-        "id": "cmd_019a07ed-8d00-771d-a0dd-f200cfc5d89c",
-        "kc": "OIrZXQQH6k69yTabufiIadvrPbrrbRUZfGsA5hphviY",
+        "id": "cmd_019a07ed-8d00-7997-9b69-e40e886cd2fe",
+        "kc": "-JeaZ8wmngKi-Qj_jgQMmk_UqAbPCMdAu5_VbtppSmc",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "8jPVP1tclSenGgGlwP50Ep1q5HM8Ye76BjQ2L9a09DciK1k3n99-XEMUhQXeKuJJzV42vOpp9kxqDQSj1Yv7S561m6qSFU2aiV6h5qRWsU0",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "7MTabwmqnfUCe9_bhag3mLc8v1eXrkRu6-q6kA7TD0Zaxow85IHwcVWJhXaIMvX7MyAj43tV2n04UJupPrUbAUU7Obix3yhKeDYPcpbVLbI"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "wYE_UjZizdZdpO6JoQydAXeCn22jKaEXiOiSLc7rCnRLny60J2E4bBhT1a2i_X7e0iBIZGEhytenTOcciVcrCLMZH74jD7iL97b8d2ceidE",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "Mfpq3FoP7OD4DlaIuJSGD_W1KNmrup7Hhy3ASy0ZrVMPtd_D6S2NoFJT2HarVw8nWpk5efYGd0n7w-T3bpvRKFBo021WsGV2oOHZrTp5SSo"
         },
         "kind": "push",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "sycsYKu0PWhsud08bVZFI9PLngCzN4zxe56y5DbK2FPBFvZsTT27WKOpYIc3mKJs_URx7WEcTTfZlGeh_D0zAw",
+        "sig": "5hDvvHQ35TcSzuSYaeuj6Eu7FdX8cbIQKK97ItztHE8IBfItIeg6qcoldqHd7iR5b_isgNv_8z-RzyriLQsHCQ",
         "v": 1
       },
       "expect": {
@@ -670,12 +670,11 @@
         "payload": {
           "address": "payments@api",
           "card_sha": null,
-          "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
-          "through_step": 2,
+          "head": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
           "type": "push"
         }
       },
-      "name": "device-pushes-a-task-through-a-step",
+      "name": "device-pushes-a-tasks-pushable-run",
       "trust": "account"
     },
     {
@@ -1714,7 +1713,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -1765,7 +1767,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -1818,7 +1823,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -1871,7 +1879,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -1917,7 +1928,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -1968,7 +1982,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -2063,7 +2080,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -2109,7 +2129,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -2155,7 +2178,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}
@@ -2201,7 +2227,10 @@
         "idea",
         "item-answer",
         "start-item",
-        "item-edit"
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
       ],
       "applied": {
         "applied": {}

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, stepList, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -219,81 +219,121 @@ test("every way GitHub sign-in comes back refused reads as one line", () => {
   for (const code of ["expired", "denied", "signup-closed", "unauthorized", "signed-out", "deactivated"]) assert.ok(githubErrorText(code) && githubErrorText(code) !== githubErrorText("failed"), code);
 });
 
+const sha = (digit) => String(digit).repeat(40);
 const payments = {
   address: "payments@api",
   group: "WORKING",
   summary: "2 commits",
   next_for_you: null,
   git: { upstream: "main", ahead: 2, behind: 0, uncommitted: 0, rules: { state: "ok" } },
-  steps: {
-    pushed: 1,
-    items: [
-      { number: 2, title: "Charge through a PaymentGateway", state: "ready", commits: [{ sha: "2222222bbbb", subject: "Charge through a PaymentGateway" }] },
-      { number: 3, title: "Add the new gateway", state: "in-progress", commits: [] },
-      { number: 4, title: "Remove the old <payment> client", state: "planned", commits: [] },
-    ],
-  },
+  subtasks: [
+    { id: "2", title: "Charge through a PaymentGateway", state: "ready", commits: [sha(2)] },
+    { id: "3", title: "Add the new gateway", state: "in-progress", commits: [] },
+    { id: "4", title: "Remove the old <payment> client", state: "planned", commits: [] },
+  ],
+  order: [{ sha: sha(2), subject: "Charge through a PaymentGateway", subtask: "2" }],
 };
 const rowOf = (item) => ({ machine: "mch_a", name: "devbox", item, task: "payments", repo: "api" });
 
-const required = { ...payments, steps: { ...payments.steps, required: true } };
+const required = { ...payments, require_accept: true };
 
-test("a board row says in one line how far the steps have come and what is yours to do, never the whole list", () => {
+const subtask = (id, title, state, commits, extra = {}) => ({ id, title, state, commits: commits.map(sha), ...extra });
+const row = (digit, subject, id) => ({ sha: sha(digit), subject, subtask: id });
+const mindin = {
+  ...required,
+  address: "mindin@mindin",
+  subtasks: [
+    subtask("env", "Clean test environment", "accepted", [1, 2]),
+    subtask("fm", "Frontmatter in the index", "accepted", [3], { added: { at: 1_761_069_120, reason: "The index has no frontmatter" } }),
+    subtask("lint", "Lint from the index", "ready", [4, 6]),
+    subtask("ci", "CI on Python 3.14", "accepted", [5]),
+    subtask("split", "Split notes.py", "in-progress", [7]),
+    subtask("wal", "SQLite in WAL mode", "planned", []),
+  ],
+  order: [row(1, "Give the tests their own vault", "env"), row(2, "Clean the vault between tests", "env"), row(3, "Keep frontmatter in the index", "fm"), row(4, "Read lint's fields from the index", "lint"), row(5, "Run CI on Python 3.14", "ci"), row(6, "Drop lint's fetch of every note", "lint"), row(7, "Move the backend factory", "split")],
+  pushable: { count: 3, through: sha(3), subtasks: ["env", "fm"] },
+};
+
+test("a board row says in one line how far the subtasks have come and what is yours to do, never the whole list", () => {
   const html = taskRow(rowOf(required));
-  assert.equal(text(html), "payments devbox api · 2 commits ◆ 1 of 4 steps ready to review · step 3 in progress you: review step 2 on devbox");
-  assert.match(html, /<div class="step-line"><span class="accept">◆ 1 of 4 steps ready to review<\/span> · <span class="prog">step 3 in progress<\/span><\/div>/);
-  assert.doesNotMatch(html, /class="step |<payment>|to accept/, "the board row lists no steps");
-  const accepted = { ...required, steps: { ...required.steps, items: [{ number: 1, title: "Docs", state: "accepted", commits: [{ sha: "a", subject: "Docs" }] }, ...required.steps.items] } };
-  assert.equal(text(stepSummary(accepted)), "✓ step 1 accepted · ◆ 1 ready to review · step 3 in progress");
-  assert.match(text(taskRow(rowOf(accepted))), /you: push step 1 or review step 2 on devbox$/);
-  const two = { ...required, steps: { ...required.steps, items: required.steps.items.map((step) => ({ ...step, state: "in-progress" })) } };
-  assert.equal(text(stepSummary(two)), "steps 2, 3, 4 in progress");
+  assert.equal(text(html), "payments devbox api · 2 commits ◆ 1 of 3 subtasks to review · 1 in progress you: review Charge through a PaymentGateway on devbox");
+  assert.match(html, /<div class="step-line"><span class="accept">◆ 1 of 3 subtasks to review<\/span> · <span class="prog">1 in progress<\/span><\/div>/);
+  assert.doesNotMatch(html, /class="step |<payment>|to accept/, "the board row lists no subtasks");
+  assert.equal(text(stepSummary(mindin)), "✓ 3 of 6 subtasks accepted · ◆ 1 to review · 1 in progress");
+  assert.match(text(taskRow(rowOf(mindin))), /you: push 3 commits or review Lint from the index on devbox$/);
+  const done = { ...mindin, subtasks: mindin.subtasks.map((one) => ({ ...one, state: one.id === "env" ? "pushed" : "accepted", commits: one.commits.length ? one.commits : [sha(9)] })), order: mindin.order.slice(2).map((one) => (one.subtask === "split" ? { ...one, subtask: "split" } : one)), pushable: undefined };
+  done.order = [row(3, "Keep frontmatter in the index", "fm")];
+  assert.equal(text(stepSummary(done)), "✓ 6 of 6 subtasks accepted · ↑ 7 commits pushed");
+  const asks = { ...required, obstacle: { id: "o1", state: "asked", text: "x", at: 1, decision: { kind: "ask", by: "investigator", text: "Yours." } } };
+  assert.equal(text(stepSummary(asks)), "◆ 1 of 3 subtasks to review · 1 in progress · obstacle: the investigator asks you");
+  assert.equal(text(stepSummary({ ...asks, obstacle: { ...asks.obstacle, state: "decided", decision: { kind: "subtask", by: "investigator", text: "x" } } })), "◆ 1 of 3 subtasks to review · 1 in progress", "a decided obstacle asks nothing on the board");
 });
 
-test("what kebbie asks of you comes before a step to review, and steps that need no accepting ask nothing of you", () => {
+test("what kebbie asks of you comes before a subtask to review", () => {
   assert.equal(text(taskRow(rowOf({ ...required, next_for_you: "answer: Keep it?" }))).endsWith("you: answer: Keep it?"), true);
-  for (const steps of [payments.steps, { ...payments.steps, required: false }]) assert.doesNotMatch(text(taskRow(rowOf({ ...payments, steps }))), /you:/);
+  assert.doesNotMatch(text(taskRow(rowOf({ ...payments, subtasks: payments.subtasks.map((one) => ({ ...one, state: one.state === "ready" ? "in-progress" : one.state })) }))), /you:/);
 });
 
-test("the task card lists the steps as the way in: a step to review or accepted opens, one being built or planned does not", () => {
-  const items = [
-    { number: 1, title: "Docs", state: "pushed", commits: [{ sha: "a", subject: "Docs" }] },
-    { number: 2, title: "Charge through a PaymentGateway", state: "ready", commits: [{ sha: "b", subject: "x" }, { sha: "c", subject: "y" }] },
-    { number: 3, title: "Add <the> gateway", state: "accepted", commits: [{ sha: "d", subject: "z" }] },
-    { number: 4, title: "Remove the client", state: "in-progress", commits: [{ sha: "e", subject: "w" }] },
-    { number: 5, title: "Five", state: "in-progress", commits: [] },
-  ];
-  const html = stepList({ ...required, steps: { pushed: 1, required: true, items } }, { href: (n) => `#/review/m/a/${n}`, selected: 2 });
-  assert.equal(text(html), "↑ 1 Docs pushed ● 2 Charge through a PaymentGateway 2 commits · to review ✓ 3 Add <the> gateway accepted · push ◐ 4 Remove the client in progress · 1 commit ◐ 5 Five in progress");
-  assert.match(html, /<a class="step s-ready on" href="#\/review\/m\/a\/2" aria-current="true">.*<svg class="chev"/);
-  assert.match(html, /<a class="step s-accepted" href="#\/review\/m\/a\/3">/);
-  assert.match(html, /<div class="step s-pushed">/);
+test("the task card lists the subtasks without numbers as the way in, each saying where it stands, a late one with why it was added", () => {
+  const html = subtaskList(mindin, { href: (id) => `#/review/m/a/${id}`, selected: "lint" });
+  assert.equal(text(html), "✓ Clean test environment accepted · ready to push ✓ Frontmatter in the index accepted · ready to push added " + text(lastSeenText(1_761_069_120)) + " · The index has no frontmatter ● Lint from the index 2 commits · to review ✓ CI on Python 3.14 accepted · waits for Lint from the index ◐ Split notes.py in progress · 1 commit ○ SQLite in WAL mode");
+  assert.match(html, /<a class="step s-ready on" href="#\/review\/m\/a\/lint" aria-current="true">.*<svg class="chev"/);
+  assert.match(html, /<a class="step s-accepted" href="#\/review\/m\/a\/ci">/);
   assert.match(html, /<div class="step s-in-progress">/);
-  assert.doesNotMatch(html, /<div class="pushed">/, "a step listed as pushed is not counted again");
-  assert.doesNotMatch(html, /<payment>|<the>/);
-  assert.doesNotMatch(stepList(required), /<a /, "without a link the rows are text");
+  assert.match(html, /<span class="label">accepted <span class="dim">· waits for Lint from the index<\/span><\/span>/);
+  assert.match(html, /<span class="added">added .* · The index has no frontmatter<\/span>/);
+  assert.doesNotMatch(html, /class="number"/, "subtasks carry no numbers: the order lives in the commits");
+  assert.doesNotMatch(subtaskList(required), /<a /, "without a link the rows are text");
+  assert.doesNotMatch(subtaskList(payments), /<payment>/);
 });
 
-test("after the two nearest planned steps the rest fold into one line that opens them", () => {
-  const items = [{ number: 1, title: "One", state: "ready", commits: [{ sha: "a", subject: "One" }] }, ...[2, 3, 4, 5, 6].map((number) => ({ number, title: `Step ${number}`, state: "planned", commits: [] }))];
-  const steps = { ...required, steps: { pushed: 0, required: true, items } };
-  const folded = stepList(steps);
-  assert.equal(text(folded), "● 1 One 1 commit · to review ○ 2 Step 2 ○ 3 Step 3 3 more planned");
-  assert.match(folded, /<button type="button" class="more" data-action="steps-more" aria-expanded="false">3 more planned<svg/);
-  const open = stepList(steps, { more: true });
-  assert.match(text(open), /○ 6 Step 6 Fewer planned$/);
-  assert.match(open, /aria-expanded="true"/);
+test("the push order lists the commits top first, each under its subtask, with the run that can go out now in its own box", () => {
+  const html = pushOrder(mindin);
+  assert.match(html, /^<div class="steps go order"><div class="run"><div class="run-h"><b>Ready to push: 3 commits<\/b><span>subtasks Clean test environment, Frontmatter in the index<\/span><\/div>(<div class="step s-accepted">.*?<\/div>){0,1}/);
+  const run = html.slice(0, html.indexOf("</div><div class=\"step s-ready\""));
+  assert.equal((run.match(/class="step /g) ?? []).length, 3);
+  assert.match(text(html), /4 Read lint's fields from the index Lint from the index · to review 4444444 ✓ 5 Run CI on Python 3.14 CI on Python 3.14 · waits for no. 4 5555555/);
+  assert.match(text(html), /7 Move the backend factory Split notes.py · in progress 7777777$/);
+  assert.equal(pushOrder({ ...mindin, pushable: undefined }).includes('class="run"'), false, "nothing pushable, no box");
+  assert.equal(pushOrder(payments.subtasks ? { ...payments, order: [] } : payments), "");
+  assert.equal(pushOrder({ ...payments, subtasks: undefined }), "");
 });
 
-test("a task without steps shows its row as before, and the board's count only when something waits", () => {
-  const plain = { ...payments, steps: undefined };
+test("an obstacle shows what stands in the way and who raised it, then the ruling and the subtask it added", () => {
+  const at = 1_761_068_460;
+  const base = { ...mindin, subtasks: mindin.subtasks.map((one) => (one.id === "fm" ? { ...one, added: { at: at + 600, reason: "The index has no frontmatter" } } : one)) };
+  const raised = obstacleBlock({ ...base, obstacle: { id: "o1", state: "investigating", text: "Lint should read <the> fields.", at } }, at + 60);
+  assert.ok(text(raised).startsWith(`Obstacle Lint should read <the> fields. raised by the task · ${lastSeenText(at, at + 60)}`));
+  assert.match(text(raised), /The investigator is looking into it The task waits for its ruling\.$/);
+  assert.doesNotMatch(raised, /<the>/);
+  const decided = obstacleBlock({ ...base, obstacle: { id: "o1", state: "decided", text: "x", at, decision: { kind: "subtask", by: "investigator", text: "Frontmatter belongs in the index." } } }, at);
+  assert.match(decided, /<div class="sent done" role="status"><b>Investigator: add a preparatory subtask first<\/b><span>Frontmatter belongs in the index.<\/span><\/div><div class="change"><span class="mark">\+<\/span><span>Subtask added: <b>Frontmatter in the index<\/b><\/span><\/div>/);
+  const asked = obstacleBlock({ ...base, obstacle: { id: "o1", state: "asked", text: "x", at, decision: { kind: "ask", by: "investigator", text: "Both hold." } } }, at);
+  assert.match(asked, /<div class="sent wait" role="status"><b>Investigator: asks you<\/b>/);
+  assert.doesNotMatch(asked, /Subtask added/);
+  assert.match(obstacleBlock({ ...base, obstacle: { id: "o1", state: "with-lead", text: "x", at } }, at), /<b>With the lead<\/b>/);
+  assert.equal(obstacleBlock(base), "");
+});
+
+test("a task without subtasks shows its row as before, and the board's count only when something waits", () => {
+  const plain = { ...payments, subtasks: undefined, order: undefined };
   assert.equal(text(taskRow(rowOf(plain))), "payments devbox api · 2 commits");
-  assert.equal(stepList(plain), "");
+  assert.equal(subtaskList(plain), "");
   assert.equal(stepSummary(plain), "");
-  assert.equal(stepList({ ...payments, steps: { pushed: 0, items: [] } }), "");
+  assert.equal(subtaskList({ ...payments, subtasks: [] }), "");
   assert.equal(text(acceptCount(3)), "◆ 3 to accept");
   assert.equal(acceptCount(0), "");
-  assert.match(text(stepList(payments)), /accepting each step is optional: push takes what is committed$/);
+  assert.match(text(subtaskList(payments)), /accepting each subtask is optional: push takes what is committed$/);
+  assert.doesNotMatch(text(subtaskList(required)), /optional/);
+});
+
+test("after the two nearest planned subtasks the rest fold into one line that opens them", () => {
+  const items = [subtask("one", "One", "ready", [1]), ...[2, 3, 4, 5, 6].map((number) => subtask(`s${number}`, `Subtask ${number}`, "planned", []))];
+  const folded = subtaskList({ ...required, subtasks: items });
+  assert.equal(text(folded), "● One 1 commit · to review ○ Subtask 2 ○ Subtask 3 3 more planned");
+  assert.match(folded, /<button type="button" class="more" data-action="steps-more" aria-expanded="false">3 more planned<svg/);
+  const open = subtaskList({ ...required, subtasks: items }, { more: true });
+  assert.match(text(open), /○ Subtask 6 Fewer planned$/);
 });
 
 test("a question's options show as cards with only the recommended one marked, and answering points to the machine", () => {
@@ -329,7 +369,7 @@ test("a machine reads awake or asleep beside its dot, and the board's header lis
 
 const NOW = 1_761_070_000;
 const nextRow = (rank, part, address, line, since, item = null, waits = 0) => ({ rank, part, address, line, since, waits_behind: waits, machine: "mch_a", name: "mac", item, task: address.split("@")[0], repo: address.split("@")[1] });
-const codexTask = { ...payments, address: "hub@kebbie", group: "NEEDS YOU", title: "Clarify machine removal", agent: { status: "blocked", kind: "codex", model: "gpt-6.1-sol" }, prompt: { id: "3f2a9c1d", question: "Would you like to run the following command?", options: [] }, steps: undefined };
+const codexTask = { ...payments, address: "hub@kebbie", group: "NEEDS YOU", title: "Clarify machine removal", agent: { status: "blocked", kind: "codex", model: "gpt-6.1-sol" }, prompt: { id: "3f2a9c1d", question: "Would you like to run the following command?", options: [] }, subtasks: undefined };
 
 test("Next lists what needs you in kebbie's order under its parts, with each task's title, agent, line and wait, and the counts below", () => {
   const rows = [nextRow(1, "stopped", "hub@kebbie", "answer Codex's prompt", NOW - 12 * 60, codexTask), nextRow(2, "push", "card@web", "2 commits · 2 tasks wait on it", NOW - 3600, { ...payments, title: "Card component" }, 2), nextRow(3, "read", "research@kebbie", "result ready · stay on the TUI", null)];
@@ -348,9 +388,9 @@ test("an empty Next says nothing needs you, several machines get a list each und
 });
 
 test("a row shows the task's title, its agent and model, its recipe and the review assessment", () => {
-  const item = { ...payments, steps: undefined, title: "Round VAT per invoice", agent: { status: "working", kind: "claude", model: "opus" }, recipe: "small fix", assessment: "review suggested: touches money" };
+  const item = { ...payments, subtasks: undefined, title: "Round VAT per invoice", agent: { status: "working", kind: "claude", model: "opus" }, recipe: "small fix", assessment: "review suggested: touches money" };
   assert.equal(text(taskRow(rowOf(item))), "Round VAT per invoice devbox api · claude · opus · recipe: small fix · review suggested: touches money · 2 commits");
-  assert.equal(text(taskRow(rowOf({ ...payments, steps: undefined }))), "payments devbox api · 2 commits", "a board from an older kebbie names the task as before");
+  assert.equal(text(taskRow(rowOf({ ...payments, subtasks: undefined }))), "payments devbox api · 2 commits", "a board from an older kebbie names the task as before");
   assert.equal(agentChip({ status: "idle" }), "", "an agent without its kind shows no chip");
 });
 
@@ -548,19 +588,19 @@ test("Account shows one Notifications row under This device, and its own page ho
   assert.doesNotMatch(accountScreen({ me: { account: "acc_x" }, github: false, allowed: null, notify: { phase: "off", text: "Off" } }), /notifications/, "no row where the hub takes no commands");
 });
 
-test("a step shows a rules check that is running, broken or pushed past on its own line, and a passed one not at all", () => {
-  const row = (rules) => text(stepList({ ...payments, steps: { pushed: 0, required: true, items: [{ number: 1, title: "Docs", state: "ready", commits: [{ sha: "aaa", subject: "Docs" }], rules }] } }));
-  const docs = "● 1 Docs 1 commit · to review";
+test("a subtask shows a rules check that is running, broken or pushed past on its own line, and a passed one not at all", () => {
+  const row = (rules) => text(subtaskList({ ...required, subtasks: [subtask("docs", "Docs", "ready", [1], { rules })] }));
+  const docs = "● Docs 1 commit · to review";
   assert.equal(row({ state: "ok" }), docs);
   assert.equal(row({ state: "checking" }), `${docs} checking project rules`);
   assert.equal(row({ state: "breaks", breaks: 1 }), `${docs} breaks 1 project rule`);
   assert.equal(row({ state: "breaks", breaks: 3, names: ["Every commit says why"] }), `${docs} breaks 3 project rules`, "without expanding, a row only counts");
   assert.equal(row({ state: "breaks", breaks: 2, override: { by: "user" } }), `${docs} breaks 2 project rules pushed past the rules check by you`);
   assert.equal(row({ state: "checking", override: { by: "lead" } }), `${docs} pushed past the rules check by the lead`);
-  const card = stepList({ ...payments, steps: { pushed: 0, items: [{ number: 1, title: "Docs", state: "ready", commits: [{ sha: "aaa", subject: "Docs" }], rules: { state: "breaks", breaks: 2, names: ["Every commit says why", "<No> TODO"] } }] } }, { expandable: true });
+  const card = subtaskList({ ...required, subtasks: [subtask("docs", "Docs", "ready", [1], { rules: { state: "breaks", breaks: 2, names: ["Every commit says why", "<No> TODO"] } })] }, { expandable: true });
   assert.match(card, /<details class="rules-names"><summary class="warn">breaks 2 project rules<\/summary><ul><li>Every commit says why<\/li><li>&#60;No&#62; TODO<\/li><\/ul><\/details>/);
   assert.equal(rulesLines(null), "");
-  assert.doesNotMatch(stepList(payments), /approved|rules ✓/);
+  assert.doesNotMatch(subtaskList(payments), /approved|rules ✓/);
 });
 
 test("a device waiting on a machine gets Approve and Deny there, only from a device that machine approved and that takes decisions", async () => {
@@ -601,6 +641,7 @@ test("the device's history names review comments by count and an accept by its s
   const comment = { path: "src/a.rs", line: 1, side: "new", text: "x" };
   assert.equal(entry({ type: "review-comments", address: "retry-push@kebbie", step: 1, comments: [comment, comment, comment] }), "Sent 3 review comments on retry-push@kebbie");
   assert.equal(entry({ type: "accept-step", address: "retry-push@kebbie", step: 1, head: "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e" }), "Accepted step 1 of retry-push@kebbie");
+  assert.equal(entry({ type: "accept-subtask", address: "retry-push@kebbie", subtask: "retry", head: "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e" }), "Accepted a subtask of retry-push@kebbie");
   assert.equal(entry({ type: "review-read", address: "retry-push@kebbie", path: "src/ci.rs", read: true, content: "a".repeat(40) }), "Marked src/ci.rs read on retry-push@kebbie");
   assert.equal(entry({ type: "review-open", address: "retry-push@kebbie" }), "Opened the review of retry-push@kebbie");
 });

@@ -89,12 +89,12 @@ test("a review opens as a checked review, and a review that fails the check does
   assert.deepEqual(await wrong.load({ ...backlog.blob, media_type: review.media_type }), { failed: true });
 });
 
-test("a review from a machine not yet updated opens as a step of one commit", async () => {
+test("a review of a step from a machine not yet updated opens as a subtask of one commit", async () => {
   const review = JSON.parse(readFileSync(new URL("../vectors/review.json", import.meta.url), "utf8"));
-  const { body, opens_as } = review.review_from_a_machine_not_yet_updated;
+  const { body, opens_as } = review.reviews_from_a_machine_not_yet_updated[0];
   const plain = new TextEncoder().encode(JSON.stringify(body));
   const reader = blobReader(hub({ [review.blob.id]: review.ciphertext }).fetchBytes, async () => plain);
   const opened = await reader.load(review.blob);
   assert.deepEqual(opened, { review: opens_as });
-  assert.equal(opened.review.step.commits.length, 1);
+  assert.equal(opened.review.subtask.commits.length, 1);
 });

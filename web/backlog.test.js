@@ -219,3 +219,28 @@ test("an edit loses control characters the machine refuses, says what is too lon
   assert.match(card("goal"), /Goal Saving…/);
   assert.match(card(null), /Saving…/);
 });
+
+test("what tasks found sits in its own group after the filed items, each row saying which tasks found it and how often", () => {
+  const found = row("found:f3", { title: "The client can't tell a missing log from an outage", priority: "none", repo: "mindin", home: { kind: "found", label: "found by tasks" }, found: { sources: ["lint-index@mindin", "split-notes@mindin"], count: 3 } });
+  const entries = mergeBacklog([machine("mch_mac", "MacBook", [found, row("local:faster", { title: "Faster board", priority: "none" })])], NOW);
+  const said = text(backlogList({ entries, now: NOW, top }));
+  assert.match(said, /New · 1 Faster board MacBook kebbie · 1 d Found by tasks · 1 The client can't tell a missing log from an outage MacBook mindin · found 3× · by lint-index, split-notes · 1 d$/);
+  const once = mergeBacklog([machine("mch_mac", "MacBook", [{ ...found, found: { sources: ["lint-index@mindin"], count: 1 } }])], NOW);
+  assert.match(text(backlogList({ entries: once, now: NOW, top })), /mindin · by lint-index · 1 d$/);
+});
+
+test("a found item's card names who found it and offers Start a task, Add to each task that found it, and Dismiss", () => {
+  const found = row("found:f3", { title: "Logs repeat the token", priority: "none", repo: "mindin", home: { kind: "found", label: "found by tasks" }, found: { sources: ["lint-index@mindin"], count: 2 } });
+  const [entry] = mergeBacklog([machine("mch_mac", "MacBook", [found], { accepts: [...ALL, "found-start", "found-add", "found-dismiss"] })], NOW);
+  const chosen = { ...entry.machines[0], why: "awake now" };
+  const options = { access: "ready", ui: ui(), now: NOW, found: { chosen, tasks: [{ address: "lint-index@mindin", name: "Lint from the index" }], sent: null } };
+  const html = itemBody(entry, options);
+  assert.match(text(html), /found found by tasks · on MacBook Found by lint-index@mindin found 2 times outside their own work Start a task Add to Lint from the index Dismiss$/);
+  assert.match(html, /<button type="button" class="btn" data-action="found-add" data-task="lint-index@mindin">Add to Lint from the index<\/button>/);
+  assert.doesNotMatch(html, /Edit title|data-action="start-item"/);
+  assert.match(text(itemBody(entry, { ...options, found: { ...options.found, chosen: null } })), /MacBook takes no actions on found items from the hub\. Settle it in kebbie there\.$/);
+  const sent = { kind: "found-dismiss", machineName: "MacBook", deviceName: "iPhone", at: NOW - 30, exp: NOW + 3570, result: null };
+  assert.match(text(itemBody(entry, { ...options, found: { ...options.found, sent: { sent, state: "waiting" } } })), /Waiting for MacBook It leaves the backlog when MacBook wakes up\./);
+  assert.doesNotMatch(itemBody(entry, { ...options, found: { ...options.found, sent: { sent, state: "waiting" } } }), /data-action="found-start"/, "nothing to press while a choice is on its way");
+  assert.match(text(itemBody(entry, { ...options, access: "view-only" })), /View only/);
+});

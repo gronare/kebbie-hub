@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, stepHead, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -125,41 +125,65 @@ test("decrypted payloads with unknown fields or wrong types are refused", () => 
   }
 });
 
-test("a board item's steps carry only their own fields and known states, and a board without them still passes", () => {
-  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account").expect.payload;
-  checkPayload(stepped);
+test("a board item's subtasks, push order and pushable run carry only their own fields and hold together as Rust's validation says", () => {
+  const planned = envelopes.cases.find((vector) => vector.name === "board-with-subtasks-opened-by-the-account").expect.payload;
+  checkPayload(planned);
   const plain = envelopes.cases.find((vector) => vector.name === "board-opened-by-a-device").expect.payload;
-  assert.equal(Object.hasOwn(plain.items[0], "steps"), false);
+  assert.equal(Object.hasOwn(plain.items[0], "subtasks"), false);
   checkPayload(plain);
-  assert.deepEqual(stepped.items[0].steps.items.map((step) => [step.number, step.state, step.commits.length]), [[1, "pushed", 1], [2, "ready", 2], [3, "in-progress", 0], [4, "planned", 0]]);
-  assert.equal(stepHead(stepped.items[0].steps.items[1]), stepped.items[0].head, "a step's head is its last commit");
-  const broken = [
-    (board) => (board.items[0].steps.items[1].subject = "Charge through a PaymentGateway"),
-    (board) => (board.items[0].steps.items[1].state = "merged"),
-    (board) => (board.items[0].steps.pushed = -1),
-    (board) => (board.items[0].steps.items[1].sha = board.items[0].head),
-    (board) => (board.items[0].steps.items[1].commits[0].body = "Why."),
-    (board) => (board.items[0].steps.items[3].commits = [{ sha: "a41c9e0", subject: "Early" }]),
-    (board) => (board.items[0].steps.items[1].commits = []),
-    (board) => (board.items[0].steps.items[0].commits = []),
-    (board) => (board.items[0].steps.items[0].number = 0),
-  ];
-  for (const [index, change] of broken.entries()) {
-    const board = structuredClone(stepped);
-    change(board);
-    assert.throws(() => checkPayload(board), (error) => error.code === "malformed", `change ${index}`);
+  const item = planned.items[0];
+  assert.deepEqual(item.subtasks.map((one) => [one.id, one.state, one.commits.length]), [["docs", "pushed", 1], ["currency", "accepted", 1], ["gateway", "ready", 2], ["tests", "accepted", 1], ["new-gateway", "in-progress", 0], ["remove-old", "planned", 0]]);
+  assert.deepEqual(item.order.map((row) => row.subtask), ["currency", "gateway", "tests", "gateway"], "a subtask's commits may sit apart in the push order");
+  assert.equal(subtaskHead(subtaskOf(item, "gateway")), item.head, "a subtask's head is its last commit");
+  assert.deepEqual(item.pushable, { count: 1, through: item.order[0].sha, subtasks: ["currency"] });
+  assert.equal(subtaskOf(item, "currency").added.reason, "Amounts carry no currency the gateway can read");
+  const plans = load("review.json").plans;
+  assert.deepEqual([plans.max_subtask_id_chars, plans.max_added_reason_chars, plans.max_obstacle_chars], [MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS]);
+  assert.ok(plans.cases.length > 20);
+  for (const { name, item: candidate, valid } of plans.cases) {
+    const passes = (() => {
+      try {
+        checkPayload({ ...planned, items: [candidate] });
+        return true;
+      } catch (error) {
+        if (error.code !== "malformed") throw error;
+        return false;
+      }
+    })();
+    assert.equal(passes, valid, name);
   }
 });
 
-test("steps from a machine not yet updated open as Rust opens them: one commit each, committed as ready", async () => {
-  const { board, opens_as } = load("review.json").steps_from_a_machine_not_yet_updated;
-  checkPayload(board);
-  assert.deepEqual(payloadOf(board), opens_as);
-  assert.deepEqual(opens_as.items[0].steps.items[0], { number: 2, title: "Charge through a PaymentGateway", state: "ready", commits: [{ sha: board.items[0].head, subject: "Charge through a PaymentGateway" }], rules: { state: "ok" } });
-  assert.deepEqual(payloadOf(opens_as), opens_as, "a board already in the new shape opens as it is");
-  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account");
-  const opened = await openEnvelope(stepped.envelope, await identity("account"), await sender("machine"), envelopes.now);
-  assert.deepEqual(opened, stepped.expect.payload);
+test("steps from a machine not yet updated open as Rust opens them: subtasks named by their numbers, in order, with the run of accepted steps pushable", async () => {
+  const [one, many] = load("review.json").steps_from_a_machine_not_yet_updated;
+  for (const { board, opens_as } of [one, many]) {
+    checkPayload(board);
+    assert.deepEqual(payloadOf(board), opens_as);
+    assert.deepEqual(payloadOf(opens_as), opens_as, "a board already in the new shape opens as it is");
+  }
+  assert.deepEqual(one.opens_as.items[0].subtasks[0], { id: "2", title: "Charge through a PaymentGateway", state: "ready", commits: [one.board.items[0].head], rules: { state: "ok" } });
+  const item = many.opens_as.items[0];
+  assert.deepEqual(item.order.map((row) => row.subtask), ["2", "3", "3"]);
+  assert.deepEqual([item.pushable.count, item.pushable.subtasks, item.require_accept], [1, ["2"], true]);
+  const both = structuredClone(many.board);
+  both.items[0].subtasks = [];
+  assert.throws(() => checkPayload(both), (error) => error.code === "malformed", "subtasks or steps, never both");
+  const planned = envelopes.cases.find((vector) => vector.name === "board-with-subtasks-opened-by-the-account");
+  const opened = await openEnvelope(planned.envelope, await identity("account"), await sender("machine"), envelopes.now);
+  assert.deepEqual(opened, planned.expect.payload);
+});
+
+test("a task says where its obstacle stands, when it was raised and, once decided or asked, the ruling", () => {
+  const next = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
+  const held = next.items.find((one) => one.obstacle);
+  assert.deepEqual([held.obstacle.id, held.obstacle.state], ["o1", "investigating"]);
+  checkPayload(next);
+  assert.equal(held.obstacle.at, envelopes.now - 400 - 1500);
+  for (const [key, value] of [["state", "decided"], ["state", "raised"], ["text", ""], ["id", "a b"], ["text", "x".repeat(MAX_OBSTACLE_CHARS + 1)], ["by", "task"], ["at", "14:41"], ["decision", { kind: "ask", by: "investigator", text: "x" }]]) {
+    const board = structuredClone(next);
+    board.items.find((one) => one.obstacle).obstacle[key] = value;
+    assert.throws(() => checkPayload(board), (error) => error.code === "malformed", `${key}: ${value}`);
+  }
 });
 
 test("a question's plan and a task's card are blob refs, the plan's time sits on the question, and neither carries its text", () => {
@@ -200,7 +224,7 @@ test("a board with Next, counts, the tasks set aside and each item's agent and r
     (board) => (board.counts.idle = 1),
     (board) => (board.items[1].second_opinion.points = "two"),
     (board) => (board.items[1].agent.pane = "w1:p9"),
-    (board) => (board.items[1].steps.required = "no"),
+    (board) => (board.items[1].require_accept = "no"),
   ];
   for (const change of wrong) {
     const payload = structuredClone(full);
@@ -585,8 +609,9 @@ test("a question option may say it needs a note, and nothing else", () => {
 test("a board lists its backlog by item key, each row naming its home and a safe label, and a board without it still passes", () => {
   const full = envelopes.cases.find((vector) => vector.name === "board-with-backlog-opened-by-the-account").expect.payload;
   checkPayload(full);
-  assert.deepEqual(full.backlog.map((row) => [row.item, row.home.kind, row.state]), [["vault:Projects/refund-rounding.md", "vault", "ready"], ["local:01JB7Q2M3N8K", "local", "drafting"], ["kept:idea-4411", "kept", "to-write"]]);
-  assert.deepEqual(full.accepts.slice(-4), ["idea", "item-answer", "start-item", "item-edit"]);
+  assert.deepEqual(full.backlog.map((row) => [row.item, row.home.kind, row.state]), [["vault:Projects/refund-rounding.md", "vault", "ready"], ["local:01JB7Q2M3N8K", "local", "drafting"], ["kept:idea-4411", "kept", "to-write"], ["found:f3", "found", "ready"]]);
+  assert.deepEqual(full.backlog[3].found, { sources: ["payments@api", "refunds@shop"], count: 3 });
+  assert.deepEqual(full.accepts.slice(-7), ["idea", "item-answer", "start-item", "item-edit", "found-start", "found-add", "found-dismiss"]);
   const plain = envelopes.cases.find((vector) => vector.name === "board-with-next-opened-by-the-account").expect.payload;
   assert.equal(Object.hasOwn(plain, "backlog"), false);
   const wrong = [
@@ -624,6 +649,32 @@ test("a backlog item's body opens from its blob as sections and questions, and i
     else assert.throws(() => checkBacklogBody(candidate), (error) => error.code === "malformed", name);
   }
   for (const { key, valid } of backlog.item_keys) assert.equal(isItemKey(key), valid, key);
+});
+
+test("what tasks found is started, added to a task or dismissed by its key, and its row says who found it, as Rust's validation says", async () => {
+  const backlog = load("backlog.json");
+  assert.equal(backlog.max_found_sources, MAX_FOUND_SOURCES);
+  const passes = (payload) => {
+    try {
+      checkPayload(payload);
+      return true;
+    } catch (error) {
+      if (error.code !== "malformed") throw error;
+      return false;
+    }
+  };
+  for (const { name, payload, valid } of backlog.found) assert.equal(passes(payload), valid, name);
+  const board = envelopes.cases.find((vector) => vector.name === "board-with-backlog-opened-by-the-account").expect.payload;
+  for (const { name, row, valid } of backlog.found_rows) assert.equal(passes({ ...board, backlog: [row] }), valid, name);
+  assert.deepEqual([KINDS["found-start"].ttl, KINDS["found-start"].maxTtl, KINDS["found-add"].maxTtl, KINDS["found-dismiss"].maxTtl], [START_ITEM_TTL, envelopes.max_ttl["found-start"], envelopes.max_ttl["found-add"], envelopes.max_ttl["found-dismiss"]]);
+  const device = await certifiedPhone();
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  for (const name of ["found-start-opened-by-the-machine", "found-add-opened-by-the-machine", "found-dismiss-opened-by-the-machine"]) {
+    const vector = envelopes.cases.find((candidate) => candidate.name === name);
+    const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
+    assert.equal(envelope.exp - envelope.at, KINDS[vector.expect.payload.type].ttl, name);
+    assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
+  }
 });
 
 test("ideas and answers on an item live an hour and a start from an item a day, as Rust's limits say", async () => {
@@ -690,26 +741,26 @@ test("a start refused for open questions says how many wait, and no other result
 test("review commands hold Rust's limits and lifetimes, and each payload passes or fails as Rust's validation says", async () => {
   const review = load("review.json");
   assert.deepEqual([review.media_type, review.max_comments, review.max_comment_chars, review.max_comments_bytes], [REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES]);
-  for (const kind of ["review-open", "review-comments", "review-read", "accept-step"]) assert.deepEqual([KINDS[kind].command, KINDS[kind].ttl, KINDS[kind].maxTtl, envelopes.max_ttl[kind]], [true, 3600, 3600, 3600], kind);
+  for (const kind of ["review-open", "review-comments", "review-read", "accept-step", "accept-subtask"]) assert.deepEqual([KINDS[kind].command, KINDS[kind].ttl, KINDS[kind].maxTtl, envelopes.max_ttl[kind]], [true, 3600, 3600, 3600], kind);
   for (const { name, payload, valid } of review.payloads) assert.equal((await failure(Promise.resolve().then(() => checkPayload(payload)))) === null, valid, name);
   const device = await certifiedPhone();
   const machine = { id: parties.machine.id, keys: parties.machine.public };
-  for (const name of ["review-open-opened-by-the-machine", "review-comments-opened-by-the-machine", "review-read-opened-by-the-machine", "accept-step-opened-by-the-machine"]) {
+  for (const name of ["review-open-opened-by-the-machine", "review-comments-opened-by-the-machine", "review-read-opened-by-the-machine", "accept-step-opened-by-the-machine", "accept-subtask-opened-by-the-machine"]) {
     const vector = envelopes.cases.find((candidate) => candidate.name === name);
     const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
     assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
   }
 });
 
-test("a task and each step carry a rules check that passes or fails as Rust's validation says, and an approved flag from an older machine is ignored", () => {
+test("a task and each subtask carry a rules check that passes or fails as Rust's validation says, and an approved flag from an older machine is ignored", () => {
   const review = load("review.json");
   assert.deepEqual([review.max_rule_names, review.max_rule_name_chars], [MAX_RULE_NAMES, MAX_RULE_NAME_CHARS]);
-  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-steps-opened-by-the-account").expect.payload;
+  const stepped = envelopes.cases.find((vector) => vector.name === "board-with-subtasks-opened-by-the-account").expect.payload;
   checkPayload(stepped);
-  assert.deepEqual([stepped.items[0].git.rules, stepped.items[0].steps.items[1].rules], [{ state: "checking" }, { state: "ok" }]);
+  assert.deepEqual([stepped.items[0].git.rules, stepped.items[0].subtasks[2].rules], [{ state: "checking" }, { state: "ok" }]);
   const withRules = (rules, onStep) => {
     const board = structuredClone(stepped);
-    if (onStep) board.items[0].steps.items[1].rules = rules;
+    if (onStep) board.items[0].subtasks[2].rules = rules;
     else board.items[0].git.rules = rules;
     return board;
   };
@@ -723,7 +774,7 @@ test("a task and each step carry a rules check that passes or fails as Rust's va
     }
   };
   assert.ok(review.rules.length > 0);
-  for (const { name, rules, valid } of review.rules) for (const onStep of [false, true]) assert.equal(passes(withRules(rules, onStep)), valid, `${name}${onStep ? " on a step" : " on the task"}`);
+  for (const { name, rules, valid } of review.rules) for (const onStep of [false, true]) assert.equal(passes(withRules(rules, onStep)), valid, `${name}${onStep ? " on a subtask" : " on the task"}`);
   const legacy = review.board_from_a_machine_not_yet_updated;
   assert.equal(legacy.items[0].git.approved, true);
   assert.equal(legacy.items[0].git.rules, undefined);
@@ -731,16 +782,18 @@ test("a task and each step carry a rules check that passes or fails as Rust's va
   assert.equal(passes({ ...legacy, items: [{ ...legacy.items[0], git: { ...legacy.items[0].git, approved: "yes" } }] }), false);
 });
 
-test("a push through a step names the step, counted from one", () => {
+test("a push names the last commit of the run it pushes, and a push through a step from an app not yet updated still passes", () => {
   const review = load("review.json");
-  const through = review.payloads.find((vector) => vector.name === "a push through a step").payload;
-  assert.equal(through.through_step, 2);
-  checkPayload(through);
-  assert.throws(() => checkPayload({ ...through, through_step: 0 }), (error) => error.code === "malformed");
-  assert.throws(() => checkPayload({ ...through, through_step: "2" }), (error) => error.code === "malformed");
-  const applied = load("authorize.json").cases.find((vector) => vector.name === "device-pushes-a-task-through-a-step");
+  const run = review.payloads.find((vector) => vector.name === "a push of the pushable run").payload;
+  assert.equal(Object.hasOwn(run, "through_step"), false);
+  checkPayload(run);
+  const older = review.payloads.find((vector) => vector.name === "a push through a step from an app not yet updated").payload;
+  checkPayload(older);
+  assert.throws(() => checkPayload({ ...older, through_step: 0 }), (error) => error.code === "malformed");
+  assert.throws(() => checkPayload({ ...older, through_step: "2" }), (error) => error.code === "malformed");
+  const applied = load("authorize.json").cases.find((vector) => vector.name === "device-pushes-a-tasks-pushable-run");
   assert.ok(applied.accepts.includes("push"));
-  assert.equal(applied.expect.payload.through_step, 2);
+  assert.deepEqual(applied.expect.payload, run);
 });
 
 test("a review opens from the blob its result names, checked as Rust checks it, and only a result that is done names a blob", async () => {
@@ -749,16 +802,21 @@ test("a review opens from the blob its result names, checked as Rust checks it, 
   assert.deepEqual(body, review.review);
   for (const { name, body: candidate, valid } of review.bodies) assert.equal((await failure(Promise.resolve().then(() => checkReview(candidate)))) === null, valid, name);
   assert.deepEqual(readReview(review.review), review.review, "a review in the new shape opens as it is");
-  assert.deepEqual(readReview(review.review_from_a_machine_not_yet_updated.body), review.review_from_a_machine_not_yet_updated.opens_as, "an older machine's review opens as one commit, as Rust opens it");
-  const [first, last] = review.review.step.commits;
+  for (const older of review.reviews_from_a_machine_not_yet_updated) assert.deepEqual(readReview(older.body), older.opens_as, "an older machine's review of a step opens as a subtask, as Rust opens it");
+  assert.deepEqual(review.reviews_from_a_machine_not_yet_updated.map((older) => [older.opens_as.subtask.id, older.opens_as.subtask.commits.length]), [["2", 1], ["2", 2]]);
+  const [first, last] = review.review.subtask.commits;
   assert.deepEqual([first.files.map((file) => [file.path, file.read]), last.files.map((file) => [file.path, file.read])], [[["src/gateway.rs", true]], [["src/gateway.rs", false], ["src/orders.rs", true], ["assets/logo.png", false]]]);
-  assert.notEqual(first.files[0].content, review.review.step.files[0].content, "a file read in one commit and changed again in the next names new content on the step");
+  assert.notEqual(first.files[0].content, review.review.subtask.files[0].content, "a file read in one commit and changed again in the next names new content on the subtask");
   const ready = envelopes.cases.find((vector) => vector.name === "review-result-naming-its-blob-opened-by-the-account");
   const opened = await openEnvelope(ready.envelope, await identity("account"), await sender("machine"), envelopes.now);
   assert.deepEqual(opened.blob, review.blob);
   assert.throws(() => checkPayload({ ...opened, outcome: "refused", reason: "not-allowed" }), (error) => error.code === "malformed");
   const offering = envelopes.cases.find((vector) => vector.name === "board-offering-a-review-opened-by-the-account").expect.payload;
   checkPayload(offering);
-  assert.deepEqual(offering.items[0].review, { step: 2, files: 3 });
-  assert.throws(() => checkPayload({ ...offering, items: [{ ...offering.items[0], review: { step: 2, files: 3, diff: "+x" } }] }), (error) => error.code === "malformed");
+  assert.deepEqual(offering.items[0].review, { subtask: "gateway", files: 3 });
+  assert.throws(() => checkPayload({ ...offering, items: [{ ...offering.items[0], review: { subtask: "gateway", files: 3, diff: "+x" } }] }), (error) => error.code === "malformed");
+  assert.throws(() => checkPayload({ ...offering, items: [{ ...offering.items[0], review: { subtask: "gateway", step: 2, files: 3 } }] }), (error) => error.code === "malformed");
+  const older = { ...offering, items: [{ ...offering.items[0], review: { step: 2, files: 3 } }] };
+  checkPayload(older);
+  assert.deepEqual(payloadOf(older).items[0].review, { subtask: "2", files: 3 }, "an older machine's offer names the step's number as its subtask");
 });

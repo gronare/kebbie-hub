@@ -180,36 +180,29 @@ export function answerBlock({ key, question, ui, sent, state, standing = null })
 }
 
 export function pushReady(item) {
-  return /^[0-9a-f]{40}$/.test(item.head ?? "") && (item.group === "READY TO PUSH" || Boolean(item.card));
+  return /^[0-9a-f]{40}$/.test(item.head ?? "") && (item.group === "READY TO PUSH" || Boolean(item.card) || Boolean(item.pushable));
 }
+
+export const pushHead = (item) => item.pushable?.through ?? item.head;
+export const pushCount = (item) => item.pushable?.count ?? item.git?.ahead ?? 0;
 
 export function pushBlock({ item, machineName, ui, sent, state, standing = null }) {
-  const short = item.head.slice(0, 7);
-  const commits = item.git?.ahead ?? 0;
+  const head = pushHead(item);
+  const short = head.slice(0, 7);
+  const commits = pushCount(item);
   const count = `${commits} ${commits === 1 ? "commit" : "commits"}`;
+  const part = head !== item.head;
   const live = sent && !settled(state);
   const status = sent ? pushStatus(sent, state, { standing }) : "";
-  if (live) return status;
+  if (live || (part && state === "done")) return status;
   const error = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
   if (ui.confirming) {
-    const reviewed = item.verdict?.verdict === "ok" && !item.verdict.stale ? ", reviewer passed" : "";
+    const reviewed = !part && item.verdict?.verdict === "ok" && !item.verdict.stale ? ", reviewer passed" : "";
+    const rest = part ? " from the top of the push order; the rest stay here" : "";
     const busy = ui.busy ? " disabled" : "";
-    return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push ${esc(short)} to main?</b></p><p>${esc(count)}${reviewed}. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push"${busy}>Push</button></div></div>` + error;
+    return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push ${esc(count)} · ${esc(short)} to main?</b></p><p>${esc(count)}${rest}${reviewed}. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push"${busy}>Push</button></div></div>` + error;
   }
   return status + `<button type="button" class="btn primary" data-action="push-ask">Push ${esc(count)} · ${esc(short)}</button>` + error;
-}
-
-export function stepPushBlock({ step, machineName, ui, sent, state, standing = null }) {
-  const short = step.sha.slice(0, 7);
-  const live = sent && !settled(state);
-  const status = sent ? pushStatus(sent, state, { standing }) : "";
-  if (live || state === "done") return status;
-  const error = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
-  if (ui.confirming) {
-    const busy = ui.busy ? " disabled" : "";
-    return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push step ${esc(step.number)} · ${esc(short)} to main?</b></p><p>The task's commits up to and including step ${esc(step.number)} go out; later steps stay here. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push-step"${busy}>Push</button></div></div>` + error;
-  }
-  return status + `<button type="button" class="btn primary" data-action="push-ask">Push step ${esc(step.number)}</button>` + error;
 }
 
 export function refusedBlock(url) {

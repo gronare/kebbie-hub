@@ -96,6 +96,16 @@ test("the latest command for the task and question is the one shown", () => {
   assert.equal(latestSent([older], { machine: "mch_2", address: "refunds@shop", kind: "answer", question: "q1" }), null);
 });
 
+test("a task with a pushable run offers to push just that run from the top of its push order, and the task is ready to push because of it", () => {
+  const run = { address: "payments@api", group: "WORKING", head: "9".repeat(40), git: { ahead: 7 }, pushable: { count: 3, through: "3".repeat(40), subtasks: ["env", "fm"] } };
+  assert.equal(pushReady(run), true);
+  const idle = { confirming: false, busy: false, error: null };
+  assert.match(pushBlock({ item: run, machineName: "mac", ui: idle, sent: null, state: null }), /data-action="push-ask">Push 3 commits · 3333333</);
+  const confirm = pushBlock({ item: run, machineName: "mac", ui: { ...idle, confirming: true }, sent: null, state: null });
+  assert.match(confirm, /<b>Push 3 commits · 3333333 to main\?<\/b><\/p><p>3 commits from the top of the push order; the rest stay here\. mac rebases/);
+  assert.equal(pushReady({ ...run, pushable: undefined }), false, "a working task without a run offers no push");
+});
+
 test("a ready task offers a push, asks once, then reports the machine's result", () => {
   const item = { address: "mail-dns@shop", group: "READY TO PUSH", head: HEAD, git: { ahead: 3 }, verdict: { verdict: "ok", stale: false } };
   assert.equal(pushReady(item), true);
@@ -103,7 +113,7 @@ test("a ready task offers a push, asks once, then reports the machine's result",
   assert.equal(pushReady({ ...item, group: "WORKING" }), false);
   assert.match(pushBlock({ item, machineName: "mac", ui: idle(), sent: null, state: null }), /data-action="push-ask">Push 3 commits · 9f3c2a1</);
   const confirm = pushBlock({ item, machineName: "mac", ui: { ...idle(), confirming: true }, sent: null, state: null });
-  assert.match(confirm, /Push 9f3c2a1 to main\?/);
+  assert.match(confirm, /Push 3 commits · 9f3c2a1 to main\?/);
   assert.match(confirm, /3 commits, reviewer passed\. mac rebases onto the latest main first; on a conflict its Claude resolves it before pushing\./);
   assert.match(confirm, /data-action="push-cancel"/);
   const pushed = { id: "cmd_p", kind: "push", machine: "mch_1", machineName: "mac", address: item.address, head: HEAD, short: "9f3c2a1", at: AT, exp: AT + 3600 };

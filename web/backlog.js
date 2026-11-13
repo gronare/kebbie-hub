@@ -68,8 +68,14 @@ function rowLines(entry, now) {
   if (row.state === "to-write") return `<div class="meta">${repo}to write · ${age}</div><div class="meta">the lead writes it out</div>`;
   if (row.state === "drafting" && row.blocking > 0) return `<div class="meta">${repo}drafting · <span class="g-yellow">${plural(row.blocking, "question", "questions")}</span> · ${age}</div><div class="you"><b>you:</b> answer ${row.blocking === 1 ? "it" : "them"} on its card</div>`;
   if (row.state === "drafting") return `<div class="meta">${repo}drafting · ${age}</div><div class="meta">the lead is writing it out from the code, the notes and your chat</div>`;
+  if (row.found) return `<div class="meta">${repo}${esc(foundBy(row.found))} · ${age}</div>`;
   return `<div class="meta">${repo}${age}</div>${row.goal ? `<div>${esc(row.goal)}</div>` : ""}`;
 }
+
+const taskOf = (address) => address.slice(0, address.indexOf("@"));
+export const foundBy = (found) => `${found.count > 1 ? `found ${found.count}× · ` : ""}by ${found.sources.map(taskOf).join(", ")}`;
+export const isFound = (entry) => entry.row.home?.kind === "found";
+export const FOUND = { key: "found", title: "Found by tasks", tone: "muted" };
 
 export function backlogRow(entry, selected, now) {
   const on = selected === entry.id;
@@ -81,7 +87,9 @@ export const proLine = (what, url) => `<div class="pro"><b>Hub Pro</b>${what}${u
 const newest = (a, b) => Number(Boolean(b.idea)) - Number(Boolean(a.idea)) || b.row.filed - a.row.filed || a.row.title.localeCompare(b.row.title);
 
 export function backlogGroups(entries) {
-  return PRIORITIES.map((priority) => ({ ...priority, rows: entries.filter((entry) => (entry.row.priority ?? "none") === priority.key).sort(newest) })).filter((group) => group.rows.length > 0);
+  const filed = entries.filter((entry) => !isFound(entry));
+  const groups = PRIORITIES.map((priority) => ({ ...priority, rows: filed.filter((entry) => (entry.row.priority ?? "none") === priority.key).sort(newest) }));
+  return [...groups, { ...FOUND, rows: entries.filter(isFound).sort(newest) }].filter((group) => group.rows.length > 0);
 }
 
 export function listAction({ access, refusedUrl, ideaMachines, composing }) {
@@ -127,7 +135,7 @@ export function ideaForm({ text = "", candidates, chosen, choosing = false, busy
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
-const HOME_TERMS = { vault: "note", local: "file", kept: "kept" };
+const HOME_TERMS = { vault: "note", local: "file", kept: "kept", found: "found" };
 
 export function questionsLeft(body, sentFor) {
   const questions = body?.questions ?? [];
@@ -304,12 +312,46 @@ function ideaCard(entry, now) {
   return `<section class="task"><dl class="facts"><dt>state</dt><dd>${esc(shown)}</dd><dt>filed</dt><dd>${esc(dayOf(sent.at, now))}, from ${esc(sent.deviceName ?? "this device")}</dd></dl></section><div class="md"><p>${esc(said)}</p></div>${status}`;
 }
 
-export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null }) {
+const FOUND_DONE = { "found-start": "✓ Started a task from it", "found-add": "✓ Sent to the task as a subtask to add", "found-dismiss": "✓ Dismissed" };
+const FOUND_GOES = { "found-start": "The lead starts a task from it", "found-add": "The task adds it as a subtask", "found-dismiss": "It leaves the backlog" };
+
+export function foundStatus(sent, state, { standing = null, now }) {
+  const machine = esc(sent.machineName);
+  const kind = sent.kind;
+  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing, now, what: { goes: FOUND_GOES[kind], again: "press it again" } });
+  if (state === "done") return block("done", FOUND_DONE[kind], esc(sent.result.text), `${from(sent)} · on ${machine}`);
+  if (state === "refused") return block("refused", ...refusal("Not done", sent.result.text), from(sent));
+  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep`, `Press it again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `${FOUND_GOES[kind]} when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+  return block("wait", `Sent to ${machine}`, `${FOUND_GOES[kind]}.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+}
+
+function foundArea(entry, { access, refusedUrl, found, ui, now }) {
+  if (access === "off") return "";
+  if (access === "refused") return proLine("Acting on what tasks found from this device comes with Hub Pro.", refusedUrl);
+  if (access === "view-only") return viewOnlyBlock();
+  if (!found.chosen) return `<div class="pro">${esc(entry.machines[0].name)} takes no actions on found items from the hub. Settle it in kebbie there.</div>`;
+  const status = found.sent ? foundStatus(found.sent.sent, found.sent.state, { standing: found.sent.standing, now }) : "";
+  if (found.sent && !settled(found.sent.state)) return status;
+  const busy = ui.busy ? " disabled" : "";
+  const adds = found.tasks.map((task) => `<button type="button" class="btn" data-action="found-add" data-task="${esc(task.address)}"${busy}>Add to ${esc(task.name)}</button>`).join("");
+  const failed = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
+  return `${status}<div class="row-btns found-acts"><button type="button" class="btn primary" data-action="found-start"${busy}>Start a task</button>${adds}<button type="button" class="btn" data-action="found-dismiss"${busy}>Dismiss</button></div>${failed}`;
+}
+
+function foundBody(entry, facts, options) {
+  const { found } = entry.row;
+  const sources = `<h3 class="sec">Found by</h3><div class="plan">${found.sources.map((source) => `<div>${esc(source)}</div>`).join("")}<div class="meta">${found.count === 1 ? "found once" : `found ${esc(found.count)} times`} outside their own work</div></div>`;
+  return facts + sources + `<div class="decide found-area thumb-end" data-item="${esc(entry.id)}">${foundArea(entry, options)}</div>`;
+}
+
+export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null }) {
   if (entry.idea) return ideaCard(entry, now);
   if (entry.gone) return `<div class="decide start-area">${start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : ""}</div><div class="meta pad">It left the backlog when it started.</div>`;
   const counts = body ? questionsLeft(body, sentFor) : { left: entry.row.blocking, withLead: 0 };
   const edit = { can: access === "ready" && Boolean(edits?.machine), ui: edits?.editing ?? null, sentFor: edits?.sentFor ?? (() => null), now };
-  const facts = itemFacts(entry, counts, now, entry.key ? titleArea(entry, edit) : "");
+  const facts = itemFacts(entry, counts, now, entry.key && !isFound(entry) ? titleArea(entry, edit) : "");
+  if (isFound(entry) && found) return foundBody(entry, facts, { access, refusedUrl, found, ui, now });
   const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref })}</div>`;
   if (!entry.row.body && entry.row.state === "ready") return facts + (entry.row.goal ? section("Goal", entry.row.goal) : "") + area;
   if (!entry.row.body) {

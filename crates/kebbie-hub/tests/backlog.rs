@@ -7,7 +7,7 @@ use common::*;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Backlog, MachineState};
 use kebbie_hub_protocol::{
-    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Home, HomeKind, Idea, ItemAnswer, ItemEdit, ItemKey, OpenQuestion,
+    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Found, FoundAdd, FoundDismiss, FoundStart, Home, HomeKind, Idea, ItemAnswer, ItemEdit, ItemKey, OpenQuestion,
     Outcome, Payload, Priority, Reason, StartItem, open_blob, text_hash,
 };
 
@@ -34,6 +34,7 @@ fn backlog() -> Backlog {
             blocking: 0,
             goal: None,
             body: None,
+            found: None,
         }],
         bodies: [(item, BacklogBody {
             sections: vec![
@@ -102,6 +103,50 @@ async fn an_idea_an_answer_and_a_start_travel_through_the_hub_and_the_board_show
     assert!(shown.backlog.unwrap().iter().all(|row| row.item.as_str() != ITEM), "a started item leaves the backlog");
     assert_eq!(shown.items[0].title.as_deref(), Some("Retry a flaky CI push"));
     assert_eq!(sent(&mut person, &mut machine, start(true)).await, Outcome::Refused { reason: Reason::AlreadyStarted });
+}
+
+fn found(number: u32, title: &str) -> BacklogRow {
+    BacklogRow {
+        item: ItemKey::parse(&format!("found:f{number}")).unwrap(),
+        title: title.to_string(),
+        priority: Priority::None,
+        repo: Some("shop".to_string()),
+        state: BacklogState::Ready,
+        filed: 1,
+        home: Home { kind: HomeKind::Found, label: "found by tasks".to_string() },
+        questions: 0,
+        blocking: 0,
+        goal: None,
+        body: None,
+        found: Some(Found { sources: vec!["refunds@shop".to_string()], count: 2 }),
+    }
+}
+
+#[tokio::test]
+async fn what_tasks_found_is_started_added_to_a_task_or_dismissed_from_the_phone() {
+    let test = start_hub(|_| {}).await;
+    let mut person = member(&test).await;
+    let mut machine = connected_with_board(&test, &mut person).await;
+    person.knows(&machine.machine, machine.public());
+    machine.post_board(board(MARKER)).await.unwrap();
+    machine.backlog = Backlog { rows: vec![found(1, "Receipts drop the currency"), found(2, "The client can't tell an outage"), found(3, "Logs repeat the token")], bodies: Default::default() };
+    machine.publish_backlog().await.unwrap();
+
+    let shown = board_of(&mut person, &machine).await.backlog.unwrap();
+    assert_eq!(shown[0].found.as_ref().map(|found| (found.sources.clone(), found.count)), Some((vec!["refunds@shop".to_string()], 2)));
+    let key = |number: u32| ItemKey::parse(&format!("found:f{number}")).unwrap();
+    let address = shown_task(&mut person, &machine).await;
+    assert_eq!(sent(&mut person, &mut machine, Payload::FoundAdd(FoundAdd { item: key(2), task: address })).await, Outcome::Done);
+    assert_eq!(sent(&mut person, &mut machine, Payload::FoundDismiss(FoundDismiss { item: key(3) })).await, Outcome::Done);
+    assert_eq!(sent(&mut person, &mut machine, Payload::FoundStart(FoundStart { item: key(1), name: Some("receipt-currency".to_string()) })).await, Outcome::Done);
+    let shown = board_of(&mut person, &machine).await;
+    assert!(shown.backlog.unwrap().is_empty(), "each settled found item leaves the backlog");
+    assert_eq!(shown.items[0].address, "receipt-currency@shop");
+    assert_eq!(sent(&mut person, &mut machine, Payload::FoundDismiss(FoundDismiss { item: key(3) })).await, Outcome::Refused { reason: Reason::UnknownItem });
+}
+
+async fn shown_task(person: &mut Browser, machine: &MachineState) -> String {
+    board_of(person, machine).await.items[0].address.clone()
 }
 
 async fn body_of(person: &mut Browser, machine: &MachineState) -> BacklogBody {

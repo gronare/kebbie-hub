@@ -732,6 +732,309 @@
       "valid": false
     }
   ],
+  "found": [
+    {
+      "name": "a task started from a found item",
+      "payload": {
+        "item": "found:f3",
+        "type": "found-start"
+      },
+      "valid": true
+    },
+    {
+      "name": "a task started from a found item under a name",
+      "payload": {
+        "item": "found:f3",
+        "name": "refund-receipts",
+        "type": "found-start"
+      },
+      "valid": true
+    },
+    {
+      "name": "a task started under a name that is not plain",
+      "payload": {
+        "item": "found:f3",
+        "name": "Refund receipts",
+        "type": "found-start"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item added to a task",
+      "payload": {
+        "item": "found:f3",
+        "task": "payments@api",
+        "type": "found-add"
+      },
+      "valid": true
+    },
+    {
+      "name": "a found item added to a task without its repo",
+      "payload": {
+        "item": "found:f3",
+        "task": "payments",
+        "type": "found-add"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item dismissed",
+      "payload": {
+        "item": "found:f3",
+        "type": "found-dismiss"
+      },
+      "valid": true
+    },
+    {
+      "name": "a dismissal with a reason, which it does not carry",
+      "payload": {
+        "item": "found:f3",
+        "reason": "noise",
+        "type": "found-dismiss"
+      },
+      "valid": false
+    },
+    {
+      "name": "a kept item dismissed as if a task found it",
+      "payload": {
+        "item": "kept:idea-4411",
+        "type": "found-dismiss"
+      },
+      "valid": false
+    },
+    {
+      "name": "a vault item started as if a task found it",
+      "payload": {
+        "item": "vault:Projects/refund-rounding.md",
+        "type": "found-start"
+      },
+      "valid": false
+    }
+  ],
+  "found_rows": [
+    {
+      "name": "a found item with its sources and count",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": [
+            "payments@api",
+            "refunds@shop"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": true
+    },
+    {
+      "name": "a found item without its sources",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": null,
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item naming no task",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": []
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item naming a task without its repo",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": [
+            "payments",
+            "refunds@shop"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item naming a task twice",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": [
+            "payments@api",
+            "payments@api"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item found fewer times than it has sources",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 1,
+          "sources": [
+            "payments@api",
+            "refunds@shop"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item naming too many tasks",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": [
+            "t0@api",
+            "t1@api",
+            "t2@api",
+            "t3@api",
+            "t4@api",
+            "t5@api",
+            "t6@api",
+            "t7@api",
+            "t8@api",
+            "t9@api",
+            "t10@api",
+            "t11@api",
+            "t12@api",
+            "t13@api",
+            "t14@api",
+            "t15@api",
+            "t16@api"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    },
+    {
+      "name": "a kept item that says who found it",
+      "row": {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": [
+            "payments@api",
+            "refunds@shop"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "kept",
+          "label": "found by tasks"
+        },
+        "item": "kept:idea-9",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      },
+      "valid": false
+    }
+  ],
   "item_keys": [
     {
       "key": "vault:Projects/refund-rounding.md",
@@ -748,6 +1051,26 @@
     {
       "key": "kept:idea-4411",
       "valid": true
+    },
+    {
+      "key": "found:f3",
+      "valid": true
+    },
+    {
+      "key": "found:f0",
+      "valid": false
+    },
+    {
+      "key": "found:f03",
+      "valid": false
+    },
+    {
+      "key": "found:3",
+      "valid": false
+    },
+    {
+      "key": "found:idea-1",
+      "valid": false
     },
     {
       "key": "Projects/refund-rounding.md",
@@ -798,6 +1121,7 @@
       "valid": false
     }
   ],
+  "max_found_sources": 16,
   "max_heading_chars": 120,
   "max_idea_chars": 2000,
   "max_item_answer_chars": 2000,

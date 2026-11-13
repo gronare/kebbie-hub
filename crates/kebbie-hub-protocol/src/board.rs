@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::backlog::BacklogRow;
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
-use crate::message::{check, is_line};
+use crate::message::{check, is_full_sha, is_line, is_text};
 use crate::review::ReviewOffer;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,7 +119,7 @@ pub struct RoutineSummary {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "ItemWire")]
 pub struct Item {
     pub address: String,
     pub group: Group,
@@ -141,7 +141,15 @@ pub struct Item {
     pub routine: Option<String>,
     pub card: Option<CardRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub steps: Option<Steps>,
+    pub subtasks: Option<Vec<Subtask>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<Vec<OrderRow>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushable: Option<Pushable>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub require_accept: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obstacle: Option<Obstacle>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -156,6 +164,101 @@ pub struct Item {
     pub review: Option<ReviewOffer>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ItemWire {
+    address: String,
+    group: Group,
+    urgency: u8,
+    summary: String,
+    next_for_you: Option<String>,
+    agent: Option<Agent>,
+    report: Option<Report>,
+    question: Option<Question>,
+    prompt: Option<Prompt>,
+    git: Option<Git>,
+    head: Option<String>,
+    verdict: Option<Verdict>,
+    push_permission: Option<PushPermission>,
+    push_waits: Option<String>,
+    follows_main: bool,
+    ci: Option<Ci>,
+    recover: Option<Recover>,
+    routine: Option<String>,
+    card: Option<CardRef>,
+    #[serde(default)]
+    subtasks: Option<Vec<Subtask>>,
+    #[serde(default)]
+    order: Option<Vec<OrderRow>>,
+    #[serde(default)]
+    pushable: Option<Pushable>,
+    #[serde(default)]
+    require_accept: Option<bool>,
+    #[serde(default)]
+    obstacle: Option<Obstacle>,
+    #[serde(default)]
+    steps: Option<Steps>,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    profile: Option<String>,
+    #[serde(default)]
+    recipe: Option<String>,
+    #[serde(default)]
+    assessment: Option<String>,
+    #[serde(default)]
+    second_opinion: Option<SecondOpinion>,
+    #[serde(default)]
+    review: Option<ReviewOffer>,
+}
+
+impl TryFrom<ItemWire> for Item {
+    type Error = &'static str;
+
+    fn try_from(wire: ItemWire) -> Result<Self, Self::Error> {
+        let (subtasks, order, pushable, require_accept) = match wire.steps {
+            None => (wire.subtasks, wire.order, wire.pushable, wire.require_accept),
+            Some(_) if wire.subtasks.is_some() || wire.order.is_some() || wire.pushable.is_some() || wire.require_accept.is_some() => return Err("an item carries subtasks or, from an older machine, steps"),
+            Some(steps) => {
+                let (subtasks, order, pushable) = steps.as_subtasks();
+                (Some(subtasks), Some(order), pushable, steps.required)
+            }
+        };
+        Ok(Item {
+            address: wire.address,
+            group: wire.group,
+            urgency: wire.urgency,
+            summary: wire.summary,
+            next_for_you: wire.next_for_you,
+            agent: wire.agent,
+            report: wire.report,
+            question: wire.question,
+            prompt: wire.prompt,
+            git: wire.git,
+            head: wire.head,
+            verdict: wire.verdict,
+            push_permission: wire.push_permission,
+            push_waits: wire.push_waits,
+            follows_main: wire.follows_main,
+            ci: wire.ci,
+            recover: wire.recover,
+            routine: wire.routine,
+            card: wire.card,
+            subtasks,
+            order,
+            pushable,
+            require_accept,
+            obstacle: wire.obstacle,
+            title: wire.title,
+            profile: wire.profile,
+            recipe: wire.recipe,
+            assessment: wire.assessment,
+            second_opinion: wire.second_opinion,
+            review: wire.review,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SecondOpinion {
@@ -164,36 +267,196 @@ pub struct SecondOpinion {
     pub running: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Steps {
-    pub pushed: u32,
-    pub items: Vec<Step>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub required: Option<bool>,
-}
+pub const MAX_SUBTASK_ID_CHARS: usize = 32;
+pub const MAX_ADDED_REASON_CHARS: usize = 500;
+pub const MAX_OBSTACLE_CHARS: usize = 2_000;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, try_from = "StepWire")]
-pub struct Step {
-    pub number: u32,
+#[serde(deny_unknown_fields)]
+pub struct Subtask {
+    pub id: String,
     pub title: String,
-    pub state: StepState,
-    pub commits: Vec<StepCommit>,
+    pub state: SubtaskState,
+    pub commits: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added: Option<Added>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rules: Option<Rules>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct StepCommit {
+pub struct Added {
+    pub at: u64,
+    pub reason: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SubtaskState {
+    Planned,
+    InProgress,
+    Ready,
+    Accepted,
+    Pushed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OrderRow {
     pub sha: String,
     pub subject: String,
+    pub subtask: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Pushable {
+    pub count: u32,
+    pub through: String,
+    pub subtasks: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Obstacle {
+    pub id: String,
+    pub state: ObstacleState,
+    pub text: String,
+    pub at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision: Option<ObstacleDecision>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ObstacleState {
+    Investigating,
+    Asked,
+    WithLead,
+    Decided,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObstacleDecision {
+    pub kind: DecisionKind,
+    pub by: DecidedBy,
+    pub text: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionKind {
+    Workaround,
+    Subtask,
+    Task,
+    Ask,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecidedBy {
+    Investigator,
+    Lead,
+    You,
+}
+
+pub fn is_subtask_id(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    (1..=MAX_SUBTASK_ID_CHARS).contains(&bytes.len()) && bytes[0].is_ascii_alphanumeric() && bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+impl Subtask {
+    pub fn head(&self) -> Option<&str> {
+        self.commits.last().map(String::as_str)
+    }
+
+    fn check(&self) -> Result<(), &'static str> {
+        check(is_subtask_id(&self.id), "a subtask's id is not a short plain name")?;
+        check(self.commits.iter().all(|sha| is_full_sha(sha)), "a subtask's commit is not a full sha")?;
+        match self.state {
+            SubtaskState::Planned => check(self.commits.is_empty(), "a planned subtask holds no commits")?,
+            SubtaskState::Ready | SubtaskState::Accepted | SubtaskState::Pushed => check(!self.commits.is_empty(), "a subtask to review, accepted or pushed holds a commit")?,
+            SubtaskState::InProgress => {}
+        }
+        check(self.added.as_ref().is_none_or(|added| is_line(&added.reason, MAX_ADDED_REASON_CHARS)), "a subtask's reason for being added is empty, too long or not one line")?;
+        self.rules.as_ref().map_or(Ok(()), Rules::check)
+    }
+}
+
+impl Obstacle {
+    fn check(&self) -> Result<(), &'static str> {
+        check(is_subtask_id(&self.id), "an obstacle's id is not a short plain name")?;
+        check(is_obstacle_text(&self.text), "an obstacle's text is empty, too long or holds control characters")?;
+        let Some(decision) = &self.decision else {
+            return check(self.state != ObstacleState::Decided, "a decided obstacle carries its decision");
+        };
+        check(self.state != ObstacleState::Investigating, "an obstacle still being investigated has no decision")?;
+        check((decision.kind == DecisionKind::Ask) == (self.state == ObstacleState::Asked), "an obstacle is asked of you exactly when its decision is to ask")?;
+        check(is_obstacle_text(&decision.text), "a decision's text is empty, too long or holds control characters")
+    }
+}
+
+fn is_obstacle_text(text: &str) -> bool {
+    is_text(text, MAX_OBSTACLE_CHARS) && !text.chars().any(|char| char.is_control() && char != '\n')
+}
+
+impl Item {
+    pub fn subtask(&self, id: &str) -> Option<&Subtask> {
+        self.subtasks.iter().flatten().find(|subtask| subtask.id == id)
+    }
+
+    fn check_plan(&self) -> Result<(), &'static str> {
+        let subtasks = self.subtasks.as_deref().unwrap_or_default();
+        check(self.subtasks.is_some() || (self.order.is_none() && self.pushable.is_none()), "a push order belongs to a task's subtasks")?;
+        check(self.order.is_some() || self.pushable.is_none(), "a pushable run is a part of the push order")?;
+        let mut ids = BTreeSet::new();
+        let mut shas = BTreeSet::new();
+        for subtask in subtasks {
+            subtask.check()?;
+            check(ids.insert(subtask.id.as_str()), "a subtask is listed once")?;
+            check(subtask.commits.iter().all(|sha| shas.insert(sha.as_str())), "a commit belongs to one subtask")?;
+        }
+        let order = self.order.as_deref().unwrap_or_default();
+        let mut placed = BTreeSet::new();
+        for row in order {
+            check(is_full_sha(&row.sha), "a commit in the push order is not a full sha")?;
+            check(placed.insert(row.sha.as_str()), "a commit sits once in the push order")?;
+            let owner = self.subtask(&row.subtask).ok_or("a commit in the push order names a subtask the task does not have")?;
+            check(owner.commits.contains(&row.sha), "a commit in the push order is not one of its subtask's")?;
+            check(owner.state != SubtaskState::Pushed, "a pushed subtask has nothing left in the push order")?;
+        }
+        let Some(pushable) = &self.pushable else {
+            return Ok(());
+        };
+        let count = pushable.count as usize;
+        check((1..=order.len()).contains(&count), "a pushable run holds one to all of the push order")?;
+        check(order[count - 1].sha == pushable.through, "a pushable run ends at its last commit")?;
+        let mut run: Vec<&str> = Vec::new();
+        for row in &order[..count] {
+            if !run.contains(&row.subtask.as_str()) {
+                run.push(&row.subtask);
+            }
+        }
+        check(run == pushable.subtasks.iter().map(String::as_str).collect::<Vec<_>>(), "a pushable run names the subtasks of its commits in order")?;
+        check(run.iter().all(|id| self.subtask(id).is_some_and(|subtask| subtask.state == SubtaskState::Accepted)), "every commit in a pushable run belongs to an accepted subtask")
+    }
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct StepWire {
+struct Steps {
+    #[serde(rename = "pushed")]
+    _pushed: u32,
+    items: Vec<Step>,
+    #[serde(default)]
+    required: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Step {
     number: u32,
     title: String,
     state: StepState,
@@ -205,44 +468,70 @@ struct StepWire {
     rules: Option<Rules>,
 }
 
-impl TryFrom<StepWire> for Step {
-    type Error = &'static str;
-
-    fn try_from(wire: StepWire) -> Result<Self, Self::Error> {
-        let commits = match (wire.commits, wire.sha) {
-            (Some(_), Some(_)) => return Err("a step names its commits, not a sha"),
-            (Some(commits), None) => commits,
-            (None, sha) => sha.into_iter().map(|sha| StepCommit { sha, subject: wire.title.clone() }).collect(),
-        };
-        Ok(Step { number: wire.number, title: wire.title, state: wire.state, commits, rules: wire.rules })
-    }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StepCommit {
+    sha: String,
+    subject: String,
 }
 
-impl Step {
-    pub fn head(&self) -> Option<&str> {
-        self.commits.last().map(|commit| commit.sha.as_str())
-    }
-
-    fn check(&self) -> Result<(), &'static str> {
-        check(self.number >= 1, "steps count from one")?;
-        match self.state {
-            StepState::Planned => check(self.commits.is_empty(), "a planned step holds no commits")?,
-            StepState::Ready | StepState::Accepted | StepState::Pushed => check(!self.commits.is_empty(), "a step to review, accepted or pushed holds a commit")?,
-            StepState::InProgress => {}
-        }
-        self.rules.as_ref().map_or(Ok(()), Rules::check)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum StepState {
+enum StepState {
     Planned,
     InProgress,
     #[serde(alias = "committed")]
     Ready,
     Accepted,
     Pushed,
+}
+
+impl From<StepState> for SubtaskState {
+    fn from(state: StepState) -> SubtaskState {
+        match state {
+            StepState::Planned => SubtaskState::Planned,
+            StepState::InProgress => SubtaskState::InProgress,
+            StepState::Ready => SubtaskState::Ready,
+            StepState::Accepted => SubtaskState::Accepted,
+            StepState::Pushed => SubtaskState::Pushed,
+        }
+    }
+}
+
+impl Steps {
+    fn as_subtasks(&self) -> (Vec<Subtask>, Vec<OrderRow>, Option<Pushable>) {
+        let commits = |step: &Step| -> Vec<(String, String)> {
+            match (&step.commits, &step.sha) {
+                (Some(commits), _) => commits.iter().map(|commit| (commit.sha.clone(), commit.subject.clone())).collect(),
+                (None, sha) => sha.iter().map(|sha| (sha.clone(), step.title.clone())).collect(),
+            }
+        };
+        let subtasks: Vec<Subtask> = self.items.iter().map(|step| Subtask {
+            id: step.number.to_string(),
+            title: step.title.clone(),
+            state: step.state.into(),
+            commits: commits(step).into_iter().map(|(sha, _)| sha).collect(),
+            added: None,
+            rules: step.rules.clone(),
+        }).collect();
+        let order: Vec<OrderRow> = self.items.iter().filter(|step| !matches!(step.state, StepState::Pushed)).flat_map(|step| {
+            commits(step).into_iter().map(|(sha, subject)| OrderRow { sha, subject, subtask: step.number.to_string() })
+        }).collect();
+        (subtasks.clone(), order.clone(), pushable_of(&subtasks, &order))
+    }
+}
+
+fn pushable_of(subtasks: &[Subtask], order: &[OrderRow]) -> Option<Pushable> {
+    let accepted = |row: &OrderRow| subtasks.iter().any(|subtask| subtask.id == row.subtask && subtask.state == SubtaskState::Accepted);
+    let count = order.iter().take_while(|row| accepted(row)).count();
+    let last = order[..count].last()?;
+    let mut run: Vec<String> = Vec::new();
+    for row in &order[..count] {
+        if !run.contains(&row.subtask) {
+            run.push(row.subtask.clone());
+        }
+    }
+    Some(Pushable { count: count as u32, through: last.sha.clone(), subtasks: run })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -415,7 +704,9 @@ impl Board {
     pub fn check(&self) -> Result<(), &'static str> {
         self.items.iter().try_for_each(|item| {
             item.git.iter().filter_map(|git| git.rules.as_ref()).try_for_each(Rules::check)?;
-            item.steps.iter().flat_map(|steps| &steps.items).try_for_each(Step::check)
+            item.obstacle.as_ref().map_or(Ok(()), Obstacle::check)?;
+            item.review.as_ref().map_or(Ok(()), |offer| check(offer.subtask.as_deref().is_none_or(is_subtask_id), "a review offer names a subtask by its id"))?;
+            item.check_plan()
         })
     }
 }
@@ -509,78 +800,193 @@ mod tests {
     }
 
     #[test]
-    fn an_item_from_a_kebbie_without_steps_parses_and_is_written_back_without_the_field() {
+    fn an_item_from_a_kebbie_without_subtasks_parses_and_is_written_back_without_the_fields() {
         let item: Item = serde_json::from_value(plain()).unwrap();
-        assert_eq!(item.steps, None);
+        assert_eq!((item.subtasks.as_ref(), item.order.as_ref(), item.pushable.as_ref(), item.obstacle.as_ref()), (None, None, None, None));
         assert_eq!(serde_json::to_value(&item).unwrap(), plain());
     }
 
-    #[test]
-    fn an_item_carries_its_steps_in_order_each_with_its_commits() {
-        let mut stepped = plain();
-        stepped["steps"] = serde_json::json!({ "pushed": 1, "items": [
-            { "number": 1, "title": "Docs", "state": "pushed", "commits": [{ "sha": "1111111aaaa", "subject": "Say what a step is" }] },
-            { "number": 2, "title": "Charge through a PaymentGateway", "state": "ready", "commits": [{ "sha": "2222222bbbb", "subject": "Add PaymentGateway" }, { "sha": "2222222cccc", "subject": "Charge orders through it" }] },
-            { "number": 3, "title": "Add the new gateway", "state": "in-progress", "commits": [{ "sha": "3333333dddd", "subject": "Add the gateway's client" }] },
-            { "number": 4, "title": "Remove the old payment client", "state": "planned", "commits": [] },
-            { "number": 5, "title": "Docs", "state": "accepted", "commits": [{ "sha": "5555555eeee", "subject": "Docs" }] },
-        ] });
-        let item: Item = serde_json::from_value(stepped.clone()).unwrap();
-        let steps = item.steps.as_ref().unwrap();
-        assert_eq!(steps.pushed, 1);
-        assert_eq!(steps.items.iter().map(|step| (step.number, step.state, step.commits.len())).collect::<Vec<_>>(), [(1, StepState::Pushed, 1), (2, StepState::Ready, 2), (3, StepState::InProgress, 1), (4, StepState::Planned, 0), (5, StepState::Accepted, 1)]);
-        assert_eq!(steps.items[1].head(), Some("2222222cccc"), "a step's head is its last commit");
-        assert_eq!(serde_json::to_value(&item).unwrap(), stepped);
-        let mut subject = stepped.clone();
-        subject["steps"]["items"][1]["subject"] = serde_json::json!("Charge through a PaymentGateway");
-        assert!(serde_json::from_value::<Item>(subject).is_err(), "a step carries only its allow-listed fields");
-        let mut both = stepped.clone();
-        both["steps"]["items"][1]["sha"] = serde_json::json!("2222222cccc");
-        assert!(serde_json::from_value::<Item>(both).is_err(), "a step names its commits or, from an older machine, one sha");
-        let mut unknown = stepped;
-        unknown["steps"]["items"][0]["state"] = serde_json::json!("merged");
-        assert!(serde_json::from_value::<Item>(unknown).is_err());
+    fn sha(digit: char) -> String {
+        digit.to_string().repeat(40)
+    }
+
+    fn planned() -> serde_json::Value {
+        let mut item = plain();
+        item["subtasks"] = serde_json::json!([
+            { "id": "env", "title": "Clean test environment", "state": "accepted", "commits": [sha('1'), sha('2')] },
+            { "id": "fm", "title": "Frontmatter in the index", "state": "accepted", "commits": [sha('3')], "added": { "at": 1_761_069_120u64, "reason": "The index has no frontmatter" } },
+            { "id": "lint", "title": "Lint from the index", "state": "ready", "commits": [sha('4'), sha('6')], "rules": { "state": "ok" } },
+            { "id": "ci", "title": "CI on Python 3.14", "state": "accepted", "commits": [sha('5')] },
+            { "id": "split", "title": "Split notes.py", "state": "in-progress", "commits": [sha('7')] },
+            { "id": "wal", "title": "SQLite in WAL mode", "state": "planned", "commits": [] },
+            { "id": "docs", "title": "Docs", "state": "pushed", "commits": [sha('0')] },
+        ]);
+        item["order"] = serde_json::json!([
+            { "sha": sha('1'), "subject": "Give the tests their own vault", "subtask": "env" },
+            { "sha": sha('2'), "subject": "Clean the vault between tests", "subtask": "env" },
+            { "sha": sha('3'), "subject": "Keep frontmatter in the index", "subtask": "fm" },
+            { "sha": sha('4'), "subject": "Read lint's fields from the index", "subtask": "lint" },
+            { "sha": sha('5'), "subject": "Run CI on Python 3.14", "subtask": "ci" },
+            { "sha": sha('6'), "subject": "Drop lint's fetch of every note", "subtask": "lint" },
+            { "sha": sha('7'), "subject": "Move the backend factory", "subtask": "split" },
+        ]);
+        item["pushable"] = serde_json::json!({ "count": 3, "through": sha('3'), "subtasks": ["env", "fm"] });
+        item["require_accept"] = serde_json::json!(true);
+        item
+    }
+
+    fn checked(item: serde_json::Value) -> Result<(), String> {
+        let item: Item = serde_json::from_value(item).map_err(|error| error.to_string())?;
+        let board = Board { items: vec![item], ..serde_json::from_value(plain_board()).unwrap() };
+        board.check().map_err(str::to_string)
     }
 
     #[test]
-    fn a_step_from_a_machine_not_yet_updated_reads_as_one_commit_and_committed_as_ready() {
-        let mut old = plain();
-        old["steps"] = serde_json::json!({ "pushed": 0, "items": [
-            { "number": 1, "title": "Charge through a PaymentGateway", "state": "committed", "sha": "2222222bbbb" },
-            { "number": 2, "title": "Add the new gateway", "state": "in-progress", "sha": null },
-            { "number": 3, "title": "Remove the old payment client", "state": "planned", "sha": null },
-        ] });
-        let item: Item = serde_json::from_value(old).unwrap();
-        let steps = &item.steps.as_ref().unwrap().items;
-        assert_eq!((steps[0].state, steps[0].commits.clone()), (StepState::Ready, vec![StepCommit { sha: "2222222bbbb".into(), subject: "Charge through a PaymentGateway".into() }]));
-        assert_eq!((steps[1].commits.len(), steps[2].commits.len()), (0, 0));
-        assert_eq!(serde_json::to_value(&item).unwrap()["steps"]["items"][0]["state"], "ready");
+    fn a_task_carries_its_subtasks_its_push_order_and_the_run_that_can_go_out_now() {
+        let item: Item = serde_json::from_value(planned()).unwrap();
+        assert_eq!(checked(planned()), Ok(()));
+        assert_eq!(serde_json::to_value(&item).unwrap(), planned());
+        let lint = item.subtask("lint").unwrap();
+        assert_eq!((lint.state, lint.head()), (SubtaskState::Ready, Some(sha('6').as_str())), "a subtask's commits need not sit together, and its head is its last");
+        assert_eq!(item.subtask("fm").unwrap().added.as_ref().map(|added| added.reason.as_str()), Some("The index has no frontmatter"));
+        assert_eq!(item.pushable.as_ref().map(|run| (run.count, run.through.as_str())), Some((3, sha('3').as_str())));
+        let mut none = planned();
+        none.as_object_mut().unwrap().remove("pushable");
+        assert_eq!(checked(none), Ok(()), "nothing may be pushable yet");
+        let mut later = planned();
+        later["subtasks"][2]["state"] = serde_json::json!("accepted");
+        later["pushable"] = serde_json::json!({ "count": 6, "through": sha('6'), "subtasks": ["env", "fm", "lint", "ci"] });
+        assert_eq!(checked(later), Ok(()), "accepting lint frees ci, which waited behind it");
     }
 
     #[test]
-    fn a_planned_step_holds_no_commits_and_one_to_review_accepted_or_pushed_holds_one() {
-        let board = |state: StepState, commits: usize| Board {
-            items: vec![Item {
-                steps: Some(Steps { pushed: 0, items: vec![Step { number: 1, title: "Docs".into(), state, commits: (0..commits).map(|n| StepCommit { sha: format!("{n}"), subject: "Docs".into() }).collect(), rules: None }], required: None }),
-                ..serde_json::from_value(plain()).unwrap()
-            }],
-            ..serde_json::from_value(serde_json::json!({ "rev": 1, "kebbie": "0.1.0", "away_since": null, "checkouts": [], "routines": [], "items": [], "sessions_outside_tasks": 0 })).unwrap()
+    fn a_push_order_and_its_run_hold_together_with_the_subtasks() {
+        let wrong: [(&str, serde_json::Value); 20] = [
+            ("/subtasks/0/id", serde_json::json!("a b")),
+            ("/subtasks/0/id", serde_json::json!("x".repeat(MAX_SUBTASK_ID_CHARS + 1))),
+            ("/subtasks/1/id", serde_json::json!("env")),
+            ("/subtasks/0/commits/0", serde_json::json!("1111111")),
+            ("/subtasks/1/commits/0", serde_json::json!(sha('1'))),
+            ("/subtasks/5/commits", serde_json::json!([sha('8')])),
+            ("/subtasks/2/commits", serde_json::json!([])),
+            ("/subtasks/0/state", serde_json::json!("merged")),
+            ("/subtasks/1/added/reason", serde_json::json!("Two\nlines")),
+            ("/subtasks/1/added/reason", serde_json::json!(" ")),
+            ("/order/0/subtask", serde_json::json!("nope")),
+            ("/order/0/subtask", serde_json::json!("fm")),
+            ("/order/1/sha", serde_json::json!(sha('1'))),
+            ("/order/6/subtask", serde_json::json!("docs")),
+            ("/pushable/count", serde_json::json!(0)),
+            ("/pushable/count", serde_json::json!(8)),
+            ("/pushable/through", serde_json::json!(sha('2'))),
+            ("/pushable/subtasks", serde_json::json!(["fm", "env"])),
+            ("/pushable", serde_json::json!({ "count": 4, "through": sha('4'), "subtasks": ["env", "fm", "lint"] })),
+            ("/subtasks/0/rules", serde_json::json!({ "state": "breaks" })),
+        ];
+        for (pointer, value) in wrong {
+            let mut item = planned();
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            let parent = item.pointer_mut(parent).unwrap();
+            match parent {
+                serde_json::Value::Array(list) => list[key.parse::<usize>().unwrap()] = value.clone(),
+                _ => parent[key] = value.clone(),
+            }
+            assert!(checked(item).is_err(), "{pointer} = {value}");
+        }
+        let mut alone = plain();
+        alone["order"] = serde_json::json!([]);
+        assert!(checked(alone).is_err(), "a push order belongs to subtasks");
+        let mut unordered = planned();
+        unordered.as_object_mut().unwrap().remove("order");
+        assert!(checked(unordered).is_err(), "a pushable run is a part of the push order");
+        let mut extra = planned();
+        extra["order"][0]["group"] = serde_json::json!("g1");
+        assert!(checked(extra).is_err(), "a row carries only its allow-listed fields");
+    }
+
+    #[test]
+    fn a_task_says_where_its_obstacle_stands() {
+        let mut held = plain();
+        held["obstacle"] = serde_json::json!({ "id": "o2", "state": "investigating", "text": "Lint should read the fields from the index,\nbut the index keeps only title and text.", "at": 1_761_068_460u64 });
+        assert_eq!(checked(held.clone()), Ok(()));
+        let item: Item = serde_json::from_value(held.clone()).unwrap();
+        assert_eq!(item.obstacle.as_ref().map(|obstacle| obstacle.state), Some(ObstacleState::Investigating));
+        assert_eq!(serde_json::to_value(&item).unwrap(), held);
+        let decided = |state: &str, kind: &str, by: &str| {
+            let mut one = held.clone();
+            one["obstacle"]["state"] = serde_json::json!(state);
+            one["obstacle"]["decision"] = serde_json::json!({ "kind": kind, "by": by, "text": "Frontmatter belongs in the index." });
+            one
         };
-        assert_eq!([(StepState::Planned, 0), (StepState::InProgress, 0), (StepState::InProgress, 2), (StepState::Ready, 1), (StepState::Accepted, 2), (StepState::Pushed, 1)].map(|(state, commits)| board(state, commits).check()), [Ok(()); 6]);
-        for (state, commits) in [(StepState::Planned, 1), (StepState::Ready, 0), (StepState::Accepted, 0), (StepState::Pushed, 0)] {
-            assert!(board(state, commits).check().is_err(), "{state:?} with {commits} commits");
+        for (state, kind, by) in [("decided", "subtask", "investigator"), ("decided", "workaround", "lead"), ("decided", "task", "you"), ("asked", "ask", "investigator"), ("with-lead", "workaround", "investigator")] {
+            let one = decided(state, kind, by);
+            assert_eq!(checked(one.clone()), Ok(()), "{state} {kind} {by}");
+            assert_eq!(serde_json::to_value(serde_json::from_value::<Item>(one.clone()).unwrap()).unwrap(), one);
+        }
+        let mut asked = held.clone();
+        asked["obstacle"]["state"] = serde_json::json!("with-lead");
+        assert_eq!(checked(asked), Ok(()), "an obstacle with the lead need not carry a decision yet");
+        for wrong in [decided("decided", "ask", "investigator"), decided("asked", "subtask", "investigator"), decided("investigating", "subtask", "investigator"), decided("decided", "merge", "investigator"), decided("decided", "subtask", "task")] {
+            assert!(checked(wrong.clone()).is_err(), "{wrong}");
+        }
+        let mut bare = decided("decided", "subtask", "investigator");
+        bare["obstacle"].as_object_mut().unwrap().remove("decision");
+        assert!(checked(bare).is_err(), "a decided obstacle carries its decision");
+        let mut long = decided("decided", "subtask", "investigator");
+        long["obstacle"]["decision"]["text"] = serde_json::json!("x".repeat(MAX_OBSTACLE_CHARS + 1));
+        assert!(checked(long).is_err());
+        let mut timeless = held.clone();
+        timeless["obstacle"].as_object_mut().unwrap().remove("at");
+        assert!(checked(timeless).is_err(), "an obstacle says when it was raised");
+        for (key, value) in [("state", serde_json::json!("raised")), ("text", serde_json::json!(" ")), ("text", serde_json::json!("a\u{7}b")), ("id", serde_json::json!("")), ("text", serde_json::json!("x".repeat(MAX_OBSTACLE_CHARS + 1)))] {
+            let mut wrong = held.clone();
+            wrong["obstacle"][key] = value.clone();
+            assert!(checked(wrong).is_err(), "{key}: {value}");
         }
     }
 
     #[test]
-    fn a_task_and_each_step_carry_where_the_rules_check_stands_and_an_approved_flag_is_ignored() {
+    fn steps_from_a_machine_not_yet_updated_open_as_subtasks_in_order_named_by_their_numbers() {
+        let mut stepped = plain();
+        stepped["steps"] = serde_json::json!({ "pushed": 1, "required": true, "items": [
+            { "number": 1, "title": "Docs", "state": "pushed", "commits": [{ "sha": sha('1'), "subject": "Say what a step is" }] },
+            { "number": 2, "title": "Charge through a PaymentGateway", "state": "accepted", "commits": [{ "sha": sha('2'), "subject": "Add PaymentGateway" }, { "sha": sha('3'), "subject": "Charge orders through it" }] },
+            { "number": 3, "title": "Add the new gateway", "state": "ready", "commits": [{ "sha": sha('4'), "subject": "Add the gateway's client" }], "rules": { "state": "ok" } },
+            { "number": 4, "title": "Remove the old payment client", "state": "planned", "commits": [] },
+        ] });
+        let item: Item = serde_json::from_value(stepped.clone()).unwrap();
+        let subtasks = item.subtasks.as_ref().unwrap();
+        assert_eq!(subtasks.iter().map(|subtask| (subtask.id.as_str(), subtask.state, subtask.commits.len())).collect::<Vec<_>>(), [("1", SubtaskState::Pushed, 1), ("2", SubtaskState::Accepted, 2), ("3", SubtaskState::Ready, 1), ("4", SubtaskState::Planned, 0)]);
+        assert_eq!(item.order.as_ref().unwrap().iter().map(|row| (row.subtask.as_str(), row.subject.as_str())).collect::<Vec<_>>(), [("2", "Add PaymentGateway"), ("2", "Charge orders through it"), ("3", "Add the gateway's client")]);
+        assert_eq!(item.pushable, Some(Pushable { count: 2, through: sha('3'), subtasks: vec!["2".into()] }));
+        assert_eq!((item.require_accept, subtasks[2].rules.as_ref().map(|rules| rules.state)), (Some(true), Some(RulesState::Ok)));
+        assert_eq!(checked(stepped.clone()), Ok(()));
+        let written = serde_json::to_value(&item).unwrap();
+        assert!(written.get("steps").is_none() && written.get("subtasks").is_some(), "a board is written back in the new shape");
+        let mut oldest = plain();
+        oldest["steps"] = serde_json::json!({ "pushed": 0, "items": [
+            { "number": 1, "title": "Charge through a PaymentGateway", "state": "committed", "sha": sha('2') },
+            { "number": 2, "title": "Add the new gateway", "state": "in-progress", "sha": null },
+        ] });
+        let item: Item = serde_json::from_value(oldest).unwrap();
+        assert_eq!(item.subtasks.as_ref().unwrap()[0].state, SubtaskState::Ready, "committed reads as ready");
+        assert_eq!(item.order.unwrap(), vec![OrderRow { sha: sha('2'), subject: "Charge through a PaymentGateway".into(), subtask: "1".into() }]);
+        assert_eq!(item.pushable, None);
+        let mut both = stepped;
+        both["subtasks"] = serde_json::json!([]);
+        assert!(serde_json::from_value::<Item>(both).is_err(), "subtasks or steps, never both");
+    }
+
+    #[test]
+    fn a_task_and_each_subtask_carry_where_the_rules_check_stands_and_an_approved_flag_is_ignored() {
         let mut ruled = plain();
         ruled["git"] = serde_json::json!({ "upstream": "main", "ahead": 1, "behind": 0, "uncommitted": 0, "rules": { "state": "breaks", "breaks": 2, "names": ["Every commit says why"], "override": { "by": "lead" } } });
-        ruled["steps"] = serde_json::json!({ "pushed": 0, "items": [{ "number": 1, "title": "Docs", "state": "ready", "commits": [{ "sha": "1111111aaaa", "subject": "Docs" }], "rules": { "state": "checking" } }] });
+        ruled["subtasks"] = serde_json::json!([{ "id": "docs", "title": "Docs", "state": "ready", "commits": [sha('1')], "rules": { "state": "checking" } }]);
+        ruled["order"] = serde_json::json!([{ "sha": sha('1'), "subject": "Docs", "subtask": "docs" }]);
         let item: Item = serde_json::from_value(ruled.clone()).unwrap();
         let rules = item.git.as_ref().unwrap().rules.as_ref().unwrap();
         assert_eq!((rules.state, rules.breaks, rules.overridden.as_ref().map(|by| by.by)), (RulesState::Breaks, Some(2), Some(OverrideBy::Lead)));
-        assert_eq!(item.steps.as_ref().unwrap().items[0].rules.as_ref().unwrap().state, RulesState::Checking);
+        assert_eq!(item.subtasks.as_ref().unwrap()[0].rules.as_ref().unwrap().state, RulesState::Checking);
         assert_eq!(serde_json::to_value(&item).unwrap(), ruled);
         let mut unchecked = ruled.clone();
         unchecked["git"]["rules"] = serde_json::Value::Null;
@@ -670,7 +1076,9 @@ mod tests {
         item["agent"] = serde_json::json!({ "status": "blocked", "kind": "codex", "model": "gpt-6.1" });
         item["verdict"] = serde_json::json!({ "verdict": "ok", "findings": 0, "sha": "abc", "stale": false, "running": false, "held": true });
         item["second_opinion"] = serde_json::json!({ "by": "codex-review", "points": 2, "running": false });
-        item["steps"] = serde_json::json!({ "pushed": 0, "items": [], "required": false });
+        item["subtasks"] = serde_json::json!([]);
+        item["order"] = serde_json::json!([]);
+        item["require_accept"] = serde_json::json!(false);
         item["prompt"] = serde_json::json!({ "id": "3f2a9c1d", "question": "Run it?", "options": [{ "label": "Yes, proceed (y)", "takes_text": false, "key": "y" }, { "label": "Type something", "takes_text": true }] });
         let board: Board = serde_json::from_value(full.clone()).unwrap();
         assert_eq!(board.next.as_ref().unwrap().iter().map(|row| (row.part, row.rank)).collect::<Vec<_>>(), [(NextPart::Stopped, 1), (NextPart::Push, 2)]);

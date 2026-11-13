@@ -3,7 +3,7 @@
     "address": "retry-push@kebbie",
     "group": "NEEDS YOU",
     "urgency": 1,
-    "summary": "2 commits · step 1 of 2",
+    "summary": "2 commits · 1 of 2 subtasks to review",
     "next_for_you": null,
     "agent": {
       "status": "idle",
@@ -31,40 +31,43 @@
     "recover": null,
     "routine": null,
     "card": null,
-    "steps": {
-      "pushed": 0,
-      "required": true,
-      "items": [
-        {
-          "number": 1,
-          "title": "Retry the push when the runner drops",
-          "state": "ready",
-          "commits": [
-            {
-              "sha": "8c2e5b0d9a7f6e4c3b2a1908f7e6d5c4b3a29180",
-              "subject": "Test that a push survives a dropped runner"
-            },
-            {
-              "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
-              "subject": "Retry a CI push when the runner drops"
-            }
-          ],
-          "rules": {
-            "state": "breaks",
-            "breaks": 1,
-            "names": [
-              "A commit says why in its body"
-            ]
-          }
-        },
-        {
-          "number": 2,
-          "title": "Show the retries on the board",
-          "state": "in-progress",
-          "commits": []
+    "subtasks": [
+      {
+        "id": "retry",
+        "title": "Retry the push when the runner drops",
+        "state": "ready",
+        "commits": [
+          "8c2e5b0d9a7f6e4c3b2a1908f7e6d5c4b3a29180",
+          "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e"
+        ],
+        "rules": {
+          "state": "breaks",
+          "breaks": 1,
+          "names": [
+            "A commit says why in its body"
+          ]
         }
-      ]
-    },
+      },
+      {
+        "id": "board-retries",
+        "title": "Show the retries on the board",
+        "state": "in-progress",
+        "commits": []
+      }
+    ],
+    "order": [
+      {
+        "sha": "8c2e5b0d9a7f6e4c3b2a1908f7e6d5c4b3a29180",
+        "subject": "Test that a push survives a dropped runner",
+        "subtask": "retry"
+      },
+      {
+        "sha": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
+        "subject": "Retry a CI push when the runner drops",
+        "subtask": "retry"
+      }
+    ],
+    "require_accept": true,
     "title": "Retry a flaky CI push",
     "recipe": "small-fix"
   },
@@ -72,8 +75,8 @@
     "address": "retry-push@kebbie",
     "since": "main",
     "head": "3f9a2d1c8e7b6a5f4d3c2b1a0f9e8d7c6b5a4f3e",
-    "step": {
-      "number": 1,
+    "subtask": {
+      "id": "retry",
       "title": "Retry the push when the runner drops",
       "commits": [
         {

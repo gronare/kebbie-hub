@@ -13,8 +13,8 @@ use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
     Idea, ItemAnswer, ItemEdit, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
-    DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
-    PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, StepState,
+    DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, AcceptSubtask, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
+    FoundAdd, FoundDismiss, FoundStart, PushApproval, Pushable, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,10 @@ pub fn every_command() -> Vec<Kind> {
         Kind::ReviewComments,
         Kind::ReviewRead,
         Kind::AcceptStep,
+        Kind::AcceptSubtask,
+        Kind::FoundStart,
+        Kind::FoundAdd,
+        Kind::FoundDismiss,
     ]
 }
 
@@ -683,7 +687,7 @@ impl MachineState {
     pub async fn post_review(&mut self, mut item: Item, review: Review) -> Result<u64, Error> {
         review.check().map_err(|problem| Error::Protocol(problem.to_string()))?;
         item.address = review.address.clone();
-        self.reviews.insert(review_key(&review.address, review.step.as_ref().map(|step| step.number)), review);
+        self.reviews.insert(review_key(&review.address, review.subtask.as_ref().map(|subtask| subtask.id.as_str())), review);
         item.review = self.offer(&item);
         let mut board = self.board.clone().unwrap_or_else(empty_board);
         board.items.retain(|held| held.address != item.address);
@@ -692,37 +696,36 @@ impl MachineState {
     }
 
     fn offer(&self, item: &Item) -> Option<ReviewOffer> {
-        let step = self.first_waiting(item);
-        let review = self.reviews.get(&review_key(&item.address, step))?;
-        Some(ReviewOffer { step, files: review.step.as_ref().map_or(&review.files, |step| &step.files).len() as u32 })
+        let subtask = self.first_waiting(item);
+        let review = self.reviews.get(&review_key(&item.address, subtask.as_deref()))?;
+        Some(ReviewOffer { subtask, files: review.subtask.as_ref().map_or(&review.files, |subtask| &subtask.files).len() as u32 })
     }
 
-    fn first_waiting(&self, item: &Item) -> Option<u32> {
-        let steps = item.steps.as_ref()?;
-        steps.items.iter().filter(|step| step.state == StepState::Ready).map(|step| step.number).find(|&number| self.reviews.contains_key(&review_key(&item.address, Some(number))))
+    fn first_waiting(&self, item: &Item) -> Option<String> {
+        item.subtasks.iter().flatten().filter(|subtask| subtask.state == SubtaskState::Ready).map(|subtask| subtask.id.clone()).find(|id| self.reviews.contains_key(&review_key(&item.address, Some(id))))
     }
 
-    fn opened_step(&self, open: &ReviewOpen) -> Option<u32> {
-        open.step.or_else(|| self.board.as_ref()?.items.iter().find(|item| item.address == open.address).and_then(|item| self.first_waiting(item)))
+    fn opened_subtask(&self, open: &ReviewOpen) -> Option<String> {
+        open.subtask.clone().or_else(|| self.board.as_ref()?.items.iter().find(|item| item.address == open.address).and_then(|item| self.first_waiting(item)))
     }
 
-    fn seal_review(&mut self, open: &ReviewOpen) -> Result<(BlobRef, Option<u32>), Reason> {
-        let step = self.opened_step(open);
-        let key = review_key(&open.address, step);
+    fn seal_review(&mut self, open: &ReviewOpen) -> Result<(BlobRef, Option<String>), Reason> {
+        let subtask = self.opened_subtask(open);
+        let key = review_key(&open.address, subtask.as_deref());
         let review = self.reviews.get(&key).ok_or(Reason::AlreadySettled)?;
         let plaintext = serde_json::to_vec(review).expect("a review always serializes");
         if let Some((held, blob, ciphertext)) = self.sealed_reviews.get(&key)
             && *held == plaintext
         {
             self.review_blobs.push((blob.id.clone(), ciphertext.clone()));
-            return Ok((blob.clone(), step));
+            return Ok((blob.clone(), subtask));
         }
         let (blob, ciphertext) = seal_blob(&plaintext, REVIEW_MEDIA_TYPE);
         self.review_blobs.push((blob.id.clone(), ciphertext.clone()));
         if let Some((_, old, _)) = self.sealed_reviews.insert(key, (plaintext, blob.clone(), ciphertext)) {
             self.superseded_blobs.push(old.id);
         }
-        Ok((blob, step))
+        Ok((blob, subtask))
     }
 
     fn mark_read(&mut self, read: &ReviewRead) -> Result<String, Reason> {
@@ -734,7 +737,7 @@ impl MachineState {
         let names = |file: &&mut ReviewFile| file.path == read.path && file.content == read.content;
         let (mut in_commits, mut whole) = (Vec::new(), Vec::new());
         for review in self.reviews.iter_mut().filter(|(key, _)| held(key)).map(|(_, review)| review) {
-            match review.step.as_mut() {
+            match review.subtask.as_mut() {
                 Some(step) => {
                     in_commits.extend(step.commits.iter_mut().filter(|commit| read.sha.as_ref().is_none_or(|sha| *sha == commit.sha)).flat_map(|commit| commit.files.iter_mut()).filter(names));
                     whole.extend(step.files.iter_mut().filter(names));
@@ -752,17 +755,60 @@ impl MachineState {
     }
 
     fn accept_step(&mut self, accept: &AcceptStep) -> Result<String, Reason> {
+        self.accept_subtask(&AcceptSubtask { address: accept.address.clone(), subtask: accept.step.to_string(), head: accept.head.clone() })
+    }
+
+    fn accept_subtask(&mut self, accept: &AcceptSubtask) -> Result<String, Reason> {
         let item = self.board.as_mut().and_then(|board| board.items.iter_mut().find(|item| item.address == accept.address)).ok_or(Reason::UnknownRepo)?;
-        let step = item.steps.as_mut().and_then(|steps| steps.items.iter_mut().find(|step| step.number == accept.step)).ok_or(Reason::HeadMoved)?;
-        if step.head() != Some(accept.head.as_str()) {
+        let subtask = item.subtasks.iter_mut().flatten().find(|subtask| subtask.id == accept.subtask).ok_or(Reason::HeadMoved)?;
+        if subtask.head() != Some(accept.head.as_str()) {
             return Err(Reason::HeadMoved);
         }
-        if step.state == StepState::Accepted {
+        if subtask.state == SubtaskState::Accepted {
             return Err(Reason::AlreadySettled);
         }
-        step.state = StepState::Accepted;
+        subtask.state = SubtaskState::Accepted;
+        let title = subtask.title.clone();
+        item.pushable = pushable(item);
         self.board_changed = true;
-        Ok(format!("Accepted step {} of {}.", accept.step, accept.address))
+        Ok(format!("Accepted {title} of {}.", accept.address))
+    }
+
+    fn push_text(&self, push: &PushApproval) -> (String, String) {
+        let item = self.board.as_ref().and_then(|board| board.items.iter().find(|item| item.address == push.address));
+        if let Some(run) = item.and_then(|item| item.pushable.as_ref()).filter(|run| run.through == push.head && item.and_then(|item| item.head.as_deref()) != Some(push.head.as_str())) {
+            return (format!("push {} through {} at {}", push.address, plural(run.count as usize, "commit"), push.head), format!("Pushed {} of {} at {}.", plural(run.count as usize, "commit"), push.address, push.head));
+        }
+        let head = item.and_then(|item| item.head.clone()).unwrap_or_else(|| push.head.clone());
+        (format!("push {} at {head} (seen {})", push.address, push.head), format!("Pushed {} at {head}.", push.address))
+    }
+
+    fn found_row(&mut self, item: &ItemKey) -> Result<BacklogRow, Reason> {
+        let index = self.backlog.rows.iter().position(|row| &row.item == item && row.found.is_some()).ok_or(Reason::UnknownItem)?;
+        self.backlog_changed = true;
+        Ok(self.backlog.rows.remove(index))
+    }
+
+    fn start_found(&mut self, start: &FoundStart) -> Result<String, Reason> {
+        let row = self.found_row(&start.item)?;
+        let address = format!("{}@{}", start.name.as_deref().unwrap_or("found-task"), row.repo.as_deref().unwrap_or("repo"));
+        let board = self.board.get_or_insert_with(empty_board);
+        board.items.retain(|item| item.address != address);
+        board.items.insert(0, started_task(&address, &row.title));
+        Ok(format!("Started {address} from what tasks found."))
+    }
+
+    fn add_found(&mut self, add: &FoundAdd) -> Result<String, Reason> {
+        if !self.board.as_ref().is_some_and(|board| board.items.iter().any(|item| item.address == add.task)) {
+            return Err(Reason::UnknownRepo);
+        }
+        let row = self.found_row(&add.item)?;
+        Ok(format!("Sent {:?} to {} as a subtask to add.", row.title, add.task))
+    }
+
+    fn dismiss_found(&mut self, dismiss: &FoundDismiss) -> Result<String, Reason> {
+        let row = self.found_row(&dismiss.item)?;
+        Ok(format!("Dismissed {:?}.", row.title))
     }
 
     fn file_idea(&mut self, idea: &Idea) -> String {
@@ -780,6 +826,7 @@ impl MachineState {
             blocking: 0,
             goal: None,
             body: None,
+            found: None,
         });
         self.backlog_changed = true;
         "Filed the idea; the lead writes it out.".to_string()
@@ -964,26 +1011,9 @@ impl MachineState {
                     done(format!("Answered {}'s question.", answer.address)),
                 )
             }
-            Payload::Push(PushApproval { address, head, through_step: Some(step), .. }) => (
-                format!("push {address} through step {step} at {head}"),
-                done(format!("Pushed {address} through step {step} at {head}.")),
-            ),
             Payload::Push(push) => {
-                let head = self
-                    .board
-                    .as_ref()
-                    .and_then(|board| {
-                        board
-                            .items
-                            .iter()
-                            .find(|item| item.address == push.address)
-                            .and_then(|item| item.head.clone())
-                    })
-                    .unwrap_or_else(|| push.head.clone());
-                (
-                    format!("push {} at {head} (seen {})", push.address, push.head),
-                    done(format!("Pushed {} at {head}.", push.address)),
-                )
+                let (did, text) = self.push_text(push);
+                (did, done(text))
             }
             Payload::Start(start) => (
                 format!("start {}@{}: {}", start.name, start.repo, start.prompt),
@@ -1021,9 +1051,9 @@ impl MachineState {
                 self.decide(decision).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::ReviewOpen(open) => (
-                format!("open the review of {}{}", open.address, open.step.map_or(String::new(), |step| format!(" step {step}"))),
+                format!("open the review of {}{}", open.address, open.subtask.as_deref().map_or(String::new(), |subtask| format!(" subtask {subtask}"))),
                 match self.seal_review(open) {
-                    Ok((blob, step)) => CommandResult { blob: Some(blob), ..done(format!("The review of {}{} is ready.", step.map_or(String::new(), |step| format!("step {step} of ")), open.address)) },
+                    Ok((blob, subtask)) => CommandResult { blob: Some(blob), ..done(format!("The review of {}{} is ready.", subtask.map_or(String::new(), |subtask| format!("subtask {subtask} of ")), open.address)) },
                     Err(reason) => refusal(command, device, reason),
                 },
             ),
@@ -1038,6 +1068,22 @@ impl MachineState {
             Payload::AcceptStep(accept) => (
                 format!("accept step {} at {} on {}", accept.step, accept.head, accept.address),
                 self.accept_step(accept).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::AcceptSubtask(accept) => (
+                format!("accept subtask {} at {} on {}", accept.subtask, accept.head, accept.address),
+                self.accept_subtask(accept).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::FoundStart(start) => (
+                format!("start a task from {}{}", start.item, start.name.as_deref().map_or(String::new(), |name| format!(" as {name}"))),
+                self.start_found(start).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::FoundAdd(add) => (
+                format!("add {} to {}", add.item, add.task),
+                self.add_found(add).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::FoundDismiss(dismiss) => (
+                format!("dismiss {}", dismiss.item),
+                self.dismiss_found(dismiss).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),
@@ -1164,8 +1210,22 @@ fn plural(count: usize, one: &str) -> String {
     if count == 1 { format!("1 {one}") } else { format!("{count} {one}s") }
 }
 
-fn review_key(address: &str, step: Option<u32>) -> String {
-    step.map_or_else(|| address.to_string(), |step| format!("{address}#{step}"))
+fn review_key(address: &str, subtask: Option<&str>) -> String {
+    subtask.map_or_else(|| address.to_string(), |subtask| format!("{address}#{subtask}"))
+}
+
+fn pushable(item: &Item) -> Option<Pushable> {
+    let order = item.order.as_deref()?;
+    let accepted = |id: &str| item.subtask(id).is_some_and(|subtask| subtask.state == SubtaskState::Accepted);
+    let count = order.iter().take_while(|row| accepted(&row.subtask)).count();
+    let through = order[..count].last()?.sha.clone();
+    let mut subtasks: Vec<String> = Vec::new();
+    for row in &order[..count] {
+        if !subtasks.contains(&row.subtask) {
+            subtasks.push(row.subtask.clone());
+        }
+    }
+    Some(Pushable { count: count as u32, through, subtasks })
 }
 
 fn comment_lines(comments: &ReviewComments) -> String {
@@ -1220,7 +1280,11 @@ fn started_task(address: &str, title: &str) -> Item {
         recover: None,
         routine: None,
         card: None,
-        steps: None,
+        subtasks: None,
+        order: None,
+        pushable: None,
+        require_accept: None,
+        obstacle: None,
         title: Some(title.to_string()),
         profile: None,
         recipe: Some("small-fix".to_string()),

@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::backlog::{ItemKey, is_section_key, is_text_hash};
+use crate::backlog::{HomeKind, ItemKey, is_section_key, is_text_hash};
 use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
-use crate::review::{AcceptStep, ReviewComments, ReviewOpen, ReviewRead};
+use crate::review::{AcceptStep, AcceptSubtask, ReviewComments, ReviewOpen, ReviewRead};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
@@ -40,6 +40,10 @@ pub enum Payload {
     ReviewComments(ReviewComments),
     ReviewRead(ReviewRead),
     AcceptStep(AcceptStep),
+    AcceptSubtask(AcceptSubtask),
+    FoundStart(FoundStart),
+    FoundAdd(FoundAdd),
+    FoundDismiss(FoundDismiss),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -346,15 +350,53 @@ pub struct Answer {
     pub comment: String,
 }
 
+/// Pushes the task's push order from the top through `head`: the task's HEAD, or the last commit of its pushable run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "PushWire")]
 pub struct PushApproval {
     pub address: String,
     pub head: String,
     pub card_sha: Option<String>,
-    /// Pushes the task's commits up to and including this step, and `head` is then that step's commit.
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PushWire {
+    address: String,
+    head: String,
+    card_sha: Option<String>,
+    #[serde(default)]
+    through_step: Option<u32>,
+}
+
+impl TryFrom<PushWire> for PushApproval {
+    type Error = &'static str;
+
+    fn try_from(wire: PushWire) -> Result<Self, Self::Error> {
+        check(wire.through_step != Some(0), "steps count from one")?;
+        Ok(PushApproval { address: wire.address, head: wire.head, card_sha: wire.card_sha })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FoundStart {
+    pub item: ItemKey,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub through_step: Option<u32>,
+    pub name: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FoundAdd {
+    pub item: ItemKey,
+    pub task: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FoundDismiss {
+    pub item: ItemKey,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -450,6 +492,10 @@ impl Payload {
             Payload::ReviewComments(_) => Kind::ReviewComments,
             Payload::ReviewRead(_) => Kind::ReviewRead,
             Payload::AcceptStep(_) => Kind::AcceptStep,
+            Payload::AcceptSubtask(_) => Kind::AcceptSubtask,
+            Payload::FoundStart(_) => Kind::FoundStart,
+            Payload::FoundAdd(_) => Kind::FoundAdd,
+            Payload::FoundDismiss(_) => Kind::FoundDismiss,
         }
     }
 
@@ -472,8 +518,7 @@ impl Payload {
                 check(
                     push.card_sha.as_deref().is_none_or(is_full_sha),
                     "card_sha is not a full sha",
-                )?;
-                check(push.through_step.is_none_or(|step| step >= 1), "steps count from one")
+                )
             }
             Payload::Start(start) => {
                 check(is_token(&start.repo), "repo is not a plain name")?;
@@ -524,6 +569,16 @@ impl Payload {
             Payload::ReviewComments(comments) => comments.check(),
             Payload::ReviewRead(read) => read.check(),
             Payload::AcceptStep(accept) => accept.check(),
+            Payload::AcceptSubtask(accept) => accept.check(),
+            Payload::FoundStart(start) => {
+                check(start.item.home() == HomeKind::Found, "the item is not one tasks found")?;
+                check(start.name.as_deref().is_none_or(is_token), "name is not a plain name")
+            }
+            Payload::FoundAdd(add) => {
+                check(add.item.home() == HomeKind::Found, "the item is not one tasks found")?;
+                check(is_address(&add.task), "task is not task@repo")
+            }
+            Payload::FoundDismiss(dismiss) => check(dismiss.item.home() == HomeKind::Found, "the item is not one tasks found"),
             Payload::Board(board) => board.check(),
             Payload::StartItem(_) | Payload::Result(_) => Ok(()),
         }
@@ -638,12 +693,14 @@ mod tests {
         };
         assert_eq!(start("x".repeat(MAX_PROMPT_CHARS)).validate(), Ok(()));
         assert!(start("x".repeat(MAX_PROMPT_CHARS + 1)).validate().is_err());
-        let push = |head: &str, through_step| {
-            Payload::Push(PushApproval { address: "refunds@shop".into(), head: head.into(), card_sha: None, through_step })
-        };
-        assert!(push("9f3c2a1", None).validate().is_err());
-        assert_eq!(push(&"a".repeat(40), Some(1)).validate(), Ok(()));
-        assert!(push(&"a".repeat(40), Some(0)).validate().is_err(), "steps count from one");
+        let push = |head: &str| Payload::Push(PushApproval { address: "refunds@shop".into(), head: head.into(), card_sha: None });
+        assert!(push("9f3c2a1").validate().is_err());
+        assert_eq!(push(&"a".repeat(40)).validate(), Ok(()));
+        let older = serde_json::json!({ "type": "push", "address": "refunds@shop", "head": "a".repeat(40), "card_sha": null, "through_step": 2 });
+        assert_eq!(serde_json::from_value::<Payload>(older.clone()).unwrap(), push(&"a".repeat(40)), "an app not yet updated names the step its head ends, and the head alone says how far");
+        let mut zero = older;
+        zero["through_step"] = serde_json::json!(0);
+        assert!(serde_json::from_value::<Payload>(zero).is_err(), "steps count from one");
         let prompt = |prompt: &str, key: &str| {
             Payload::PromptAnswer(PromptAnswer {
                 address: "refunds@shop".into(),
@@ -778,12 +835,13 @@ mod tests {
 
     #[test]
     fn review_commands_live_an_hour_and_only_a_result_that_is_done_names_a_blob() {
-        let kinds = [Kind::ReviewOpen, Kind::ReviewComments, Kind::ReviewRead, Kind::AcceptStep];
+        let kinds = [Kind::ReviewOpen, Kind::ReviewComments, Kind::ReviewRead, Kind::AcceptStep, Kind::AcceptSubtask];
         assert_eq!(kinds.map(|kind| (kind.name(), kind.is_command(), kind.default_ttl(), kind.max_ttl())), [
             ("review-open", true, 3_600, 3_600),
             ("review-comments", true, 3_600, 3_600),
             ("review-read", true, 3_600, 3_600),
             ("accept-step", true, 3_600, 3_600),
+            ("accept-subtask", true, 3_600, 3_600),
         ]);
         let open = serde_json::json!({ "type": "review-open", "address": "retry-push@kebbie" });
         assert_eq!(serde_json::from_value::<Payload>(open).unwrap().kind(), Kind::ReviewOpen);
@@ -797,6 +855,26 @@ mod tests {
         refused["outcome"] = serde_json::json!("refused");
         refused["reason"] = serde_json::json!("not-allowed");
         assert!(serde_json::from_value::<Payload>(refused).is_err());
+    }
+
+    #[test]
+    fn found_items_are_started_added_to_a_task_or_dismissed_by_their_key() {
+        let found = || ItemKey::parse("found:f3").unwrap();
+        let start = |name: Option<&str>| Payload::FoundStart(FoundStart { item: found(), name: name.map(Into::into) });
+        assert_eq!((start(None).validate(), start(Some("remote-log-outage")).validate()), (Ok(()), Ok(())));
+        assert!(start(Some("Remote log")).validate().is_err());
+        assert!(Payload::FoundStart(FoundStart { item: ItemKey::parse("kept:idea-1").unwrap(), name: None }).validate().is_err(), "only an item tasks found");
+        let add = |task: &str| Payload::FoundAdd(FoundAdd { item: found(), task: task.into() });
+        assert_eq!(add("lint-index@mindin").validate(), Ok(()));
+        assert!(add("lint-index").validate().is_err());
+        assert_eq!(Payload::FoundDismiss(FoundDismiss { item: found() }).validate(), Ok(()));
+        assert!(Payload::FoundDismiss(FoundDismiss { item: ItemKey::vault("Projects/x.md").unwrap() }).validate().is_err());
+        assert_eq!(serde_json::to_value(start(None)).unwrap(), serde_json::json!({ "type": "found-start", "item": "found:f3" }));
+        assert!(serde_json::from_value::<Payload>(serde_json::json!({ "type": "found-dismiss", "item": "found:f3", "reason": "noise" })).is_err());
+        assert_eq!(
+            [Kind::FoundStart, Kind::FoundAdd, Kind::FoundDismiss].map(|kind| (kind.name(), kind.is_command(), kind.default_ttl(), kind.max_ttl())),
+            [("found-start", true, 86_400, 86_400), ("found-add", true, 3_600, 3_600), ("found-dismiss", true, 3_600, 3_600)]
+        );
     }
 
     #[test]

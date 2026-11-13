@@ -25,15 +25,16 @@ pub use account::{
 pub use alert::{Alert, AlertKind, AlertState};
 pub use authorize::{Applied, AppliedCommands, Verified, Dropped, Machine, Refusal, authorize};
 pub use backlog::{
-    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, BodySection, Home, HomeKind, ItemKey, MAX_HEADING_CHARS,
+    BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, BodySection, Found, Home, HomeKind, ItemKey, MAX_FOUND_SOURCES, MAX_HEADING_CHARS,
     MAX_LABEL_BYTES, MAX_SECTION_KEY_CHARS, OpenQuestion, Priority, is_relative_label, is_section_key, is_text_hash, text_hash,
 };
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
-    Agent, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
-    Later, LaterState, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextPart, NextRow, OverrideBy, Prompt, PromptOption, PushPermission,
-    Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Step, StepCommit, StepState, Steps,
-    Verdict, VerdictOutcome,
+    Added, Agent, DecidedBy, DecisionKind, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
+    Later, LaterState, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, MAX_SUBTASK_ID_CHARS, NextPart, NextRow,
+    Obstacle, ObstacleDecision, ObstacleState, OrderRow, OverrideBy, Prompt, PromptOption, PushPermission, Pushable,
+    Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Subtask, SubtaskState,
+    Verdict, VerdictOutcome, is_subtask_id,
 };
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 pub use crypto::{
@@ -47,16 +48,16 @@ pub use device::{
 pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
-    Answer, CommandResult, DeviceDecision, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundStart, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
     MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,
     MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
     MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
     StartTask, Target,
 };
 pub use review::{
-    AcceptStep, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
+    AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
-    ReviewCommit, ReviewOpen, ReviewRead, ReviewStep, Side, is_content_hash,
+    ReviewCommit, ReviewOpen, ReviewRead, ReviewSubtask, Side, is_content_hash,
 };
 
 pub const PROTOCOL_VERSION: u16 = 1;

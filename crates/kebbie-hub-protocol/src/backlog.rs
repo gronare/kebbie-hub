@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::board::BlobRef;
-use crate::message::{check, is_line};
+use crate::message::{check, is_address, is_line};
 
 pub const BACKLOG_BODY_MEDIA_TYPE: &str = "application/vnd.kebbie.backlog-item+json";
 pub const MAX_LABEL_BYTES: usize = 256;
@@ -23,7 +23,8 @@ impl ItemKey {
         let fits = match home {
             "vault" => is_relative_label(rest),
             "local" | "kept" => is_local_id(rest),
-            _ => return Err("an item key's home is vault, local or kept"),
+            "found" => is_found_id(rest),
+            _ => return Err("an item key's home is vault, local, kept or found"),
         };
         if fits { Ok(ItemKey(text.to_string())) } else { Err("an item key's id does not fit its home") }
     }
@@ -36,6 +37,7 @@ impl ItemKey {
         match self.0.split_once(':').map(|(home, _)| home) {
             Some("vault") => HomeKind::Vault,
             Some("local") => HomeKind::Local,
+            Some("found") => HomeKind::Found,
             _ => HomeKind::Kept,
         }
     }
@@ -81,6 +83,13 @@ fn is_local_id(text: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
+fn is_found_id(text: &str) -> bool {
+    text.strip_prefix('f').is_some_and(|number| (1..=MAX_FOUND_NUMBER_DIGITS).contains(&number.len()) && number.bytes().all(|byte| byte.is_ascii_digit()) && !number.starts_with('0'))
+}
+
+pub const MAX_FOUND_NUMBER_DIGITS: usize = 9;
+pub const MAX_FOUND_SOURCES: usize = 16;
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BacklogRow {
@@ -96,6 +105,24 @@ pub struct BacklogRow {
     pub blocking: u32,
     pub goal: Option<String>,
     pub body: Option<BlobRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub found: Option<Found>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Found {
+    pub sources: Vec<String>,
+    pub count: u32,
+}
+
+impl Found {
+    fn check(&self) -> Result<(), &'static str> {
+        check((1..=MAX_FOUND_SOURCES).contains(&self.sources.len()), "a found item names one to sixteen tasks that found it")?;
+        check(self.sources.iter().all(|source| is_address(source)), "a found item's source is not task@repo")?;
+        check(self.sources.iter().collect::<BTreeSet<_>>().len() == self.sources.len(), "a found item names each task once")?;
+        check(self.count as usize >= self.sources.len(), "a found item was found at least once by each task it names")
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -129,6 +156,7 @@ pub enum HomeKind {
     Vault,
     Local,
     Kept,
+    Found,
 }
 
 fn relative_label<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
@@ -150,6 +178,12 @@ pub(crate) fn backlog_rows<'de, D: Deserializer<'de>>(
         }
         if row.blocking > row.questions {
             return Err(serde::de::Error::custom("more questions block than are open"));
+        }
+        if (row.home.kind == HomeKind::Found) != row.found.is_some() {
+            return Err(serde::de::Error::custom("a found item, and only a found item, says who found it"));
+        }
+        if let Some(problem) = row.found.as_ref().and_then(|found| found.check().err()) {
+            return Err(serde::de::Error::custom(problem));
         }
         if !seen.insert(&row.item) {
             return Err(serde::de::Error::custom("an item is listed once"));
@@ -246,7 +280,7 @@ mod tests {
 
     #[test]
     fn an_item_key_is_a_vault_path_or_a_local_id_never_a_path_on_the_machine() {
-        for good in ["vault:Projects/refund-rounding.md", "vault:Projects/Två ord.md", "local:01JB7Q2M3N", "kept:idea-4411"] {
+        for good in ["vault:Projects/refund-rounding.md", "vault:Projects/Två ord.md", "local:01JB7Q2M3N", "kept:idea-4411", "found:f1", "found:f204"] {
             assert!(ItemKey::parse(good).is_ok(), "{good}");
         }
         for bad in [
@@ -262,6 +296,12 @@ mod tests {
             "local:",
             "kept:a b",
             "task:refunds",
+            "found:f",
+            "found:f0",
+            "found:f01",
+            "found:7",
+            "found:fx",
+            "found:f1234567890",
         ] {
             assert!(ItemKey::parse(bad).is_err(), "{bad}");
         }
@@ -269,6 +309,7 @@ mod tests {
         assert!(ItemKey::parse(&format!("vault:{}", "a".repeat(MAX_LABEL_BYTES + 1))).is_err());
         assert_eq!(ItemKey::vault("Projects/x.md").unwrap().as_str(), "vault:Projects/x.md");
         assert_eq!(ItemKey::parse("kept:a").unwrap().home(), HomeKind::Kept);
+        assert_eq!(ItemKey::parse("found:f3").unwrap().home(), HomeKind::Found);
     }
 
     #[test]
@@ -289,6 +330,40 @@ mod tests {
         for wrong in [serde_json::json!([local]), serde_json::json!([blocking]), serde_json::json!([absolute]), serde_json::json!([row.clone(), row])] {
             assert!(rows(wrong.clone()).is_err(), "{wrong}");
         }
+    }
+
+    #[test]
+    fn a_found_row_says_which_tasks_found_it_and_how_often_and_no_other_row_does() {
+        let row = serde_json::json!({
+            "item": "found:f3", "title": "The remote client can't tell a missing log from an outage", "priority": "none", "repo": "mindin", "state": "ready",
+            "filed": 1_761_000_000u64, "home": { "kind": "found", "label": "found by tasks" }, "questions": 0, "blocking": 0, "goal": null, "body": null,
+            "found": { "sources": ["lint-index@mindin", "split-notes@mindin"], "count": 3 },
+        });
+        let rows = |rows: serde_json::Value| backlog_rows(rows);
+        let read = rows(serde_json::json!([row.clone()])).unwrap().unwrap();
+        assert_eq!(read[0].found, Some(Found { sources: vec!["lint-index@mindin".into(), "split-notes@mindin".into()], count: 3 }));
+        let change = |pointer: &str, value: serde_json::Value| {
+            let mut changed = row.clone();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            serde_json::json!([changed])
+        };
+        for wrong in [
+            change("/found", serde_json::Value::Null),
+            change("/found/sources", serde_json::json!([])),
+            change("/found/sources", serde_json::json!(["lint-index"])),
+            change("/found/sources", serde_json::json!(["lint-index@mindin", "lint-index@mindin"])),
+            change("/found/count", serde_json::json!(1)),
+            change("/found/sources", serde_json::json!((0..=MAX_FOUND_SOURCES).map(|n| format!("t{n}@mindin")).collect::<Vec<_>>())),
+            change("/home/kind", serde_json::json!("kept")),
+        ] {
+            assert!(rows(wrong.clone()).is_err(), "{wrong}");
+        }
+        let mut kept = row;
+        kept["item"] = serde_json::json!("kept:idea-1");
+        kept["home"]["kind"] = serde_json::json!("kept");
+        assert!(rows(serde_json::json!([kept.clone()])).is_err(), "only a found item says who found it");
+        kept.as_object_mut().unwrap().remove("found");
+        assert!(rows(serde_json::json!([kept])).is_ok());
     }
 
     #[test]

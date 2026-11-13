@@ -1,8 +1,8 @@
-import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENTS_BYTES, stepHead } from "../js/protocol.js";
+import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENTS_BYTES, subtaskHead } from "../js/protocol.js";
 import { failedLine } from "./blobs.js";
 import { commitBody } from "./commit.js";
-import { APPROVAL_STATES, approvalStatus, block, clock, from, pushBlock, pushReady, refusal, settled, stepPushBlock, takes, until, viewOnlyBlock } from "./decide.js";
-import { esc, lastSeenText } from "./screens.js";
+import { APPROVAL_STATES, approvalStatus, block, clock, from, pushBlock, pushReady, refusal, settled, takes, until, viewOnlyBlock } from "./decide.js";
+import { blockerOf, esc, inRun, lastSeenText } from "./screens.js";
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 const short = (sha) => (sha ?? "").slice(0, 7);
@@ -13,16 +13,16 @@ const ICON_CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5
 const BAND = `<div class="rv-band" aria-hidden="true"></div>`;
 
 export const taskHref = (machine, address) => `#/task/${encoded(machine, address)}`;
-export const stepHref = (machine, address, step) => `#/review/${encoded(machine, address)}/${step}`;
-export const diffHref = (machine, address, step = null, commit = "all") => `#/diff/${encoded(machine, address)}${step === null ? "" : `/${step}/${commit}`}`;
+export const subtaskHref = (machine, address, subtask) => `#/review/${encoded(machine, address)}/${encodeURIComponent(subtask)}`;
+export const diffHref = (machine, address, subtask = null, commit = "all") => `#/diff/${encoded(machine, address)}${subtask === null ? "" : `/${encodeURIComponent(subtask)}/${commit}`}`;
 export const freshReviewUi = () => ({ read: new Map(), open: new Map(), commits: new Set(), commitsOn: null, drafts: [], composing: null, tray: false, receipt: null, busy: false, error: null, requested: null, nextId: 1, on: null, onLabel: null, stale: null });
 export function foldCommitsOn(ui, page) {
   if (ui.commitsOn === page) return;
   ui.commits.clear();
   ui.commitsOn = page;
 }
-const reviewIdentity = (review) => (review.step ? stepHead(review.step) : `${review.since}..${review.head}`);
-const reviewLabel = (review) => (review.step ? `step ${review.step.number} · ${short(stepHead(review.step))}` : `the changes up to ${short(review.head)}`);
+const reviewIdentity = (review) => (review.subtask ? subtaskHead(review.subtask) : `${review.since}..${review.head}`);
+const reviewLabel = (review) => (review.subtask ? `${review.subtask.title} · ${short(subtaskHead(review.subtask))}` : `the changes up to ${short(review.head)}`);
 
 export function settleReview(ui, review) {
   if (!review || ui.on === reviewIdentity(review)) return;
@@ -50,20 +50,20 @@ export function commentsProblem(payload) {
 }
 
 export function reviewEntry(found) {
-  if (!found?.item.review || found.item.steps?.items.length || !takes(found.accepts, "review-open")) return "";
+  if (!found?.item.review || found.item.subtasks?.length || !takes(found.accepts, "review-open")) return "";
   return `<div class="lead-act"><a class="btn primary fit" href="${diffHref(found.machine, found.item.address)}">Review · ${plural(found.item.review.files, "file", "files")}</a></div>`;
 }
 
 export function filesOf(v) {
-  const step = v.review?.step;
-  if (!step) return v.review?.files ?? [];
-  return v.page.kind === "commit" ? (step.commits[v.page.commit]?.files ?? []) : step.files;
+  const part = v.review?.subtask;
+  if (!part) return v.review?.files ?? [];
+  return v.page.kind === "commit" ? (part.commits[v.page.commit]?.files ?? []) : part.files;
 }
 
 export function shaOf(v) {
-  const step = v.review?.step;
-  if (!step) return null;
-  return v.page.kind === "commit" ? (step.commits[v.page.commit]?.sha ?? null) : stepHead(step);
+  const part = v.review?.subtask;
+  if (!part) return null;
+  return v.page.kind === "commit" ? (part.commits[v.page.commit]?.sha ?? null) : subtaskHead(part);
 }
 
 export const lineTarget = (line) => (line.kind === "del" ? { side: "old", line: line.old } : { side: "new", line: line.new });
@@ -85,7 +85,7 @@ const sentHere = (v, path) => v.sentComments.filter((comment) => comment.path ==
 const draftsHere = (v, path) => v.ui.drafts.filter((comment) => comment.path === path && onPage(v)(comment));
 
 export function againOf(v, file) {
-  const commits = v.review?.step?.commits ?? [];
+  const commits = v.review?.subtask?.commits ?? [];
   let readAt = -1;
   commits.forEach((commit, index) => {
     const there = commit.files.find((one) => one.path === file.path);
@@ -107,77 +107,92 @@ const fold = (open) => `<span class="rv-icon rv-fold${open ? " is-open" : ""}">$
 const commitHead = (commit, index, open) => `<div class="cm-h" role="button" tabindex="0" data-action="rv-commit" data-commit="${index}" aria-expanded="${open}">${fold(open)}<span class="t">${esc(commit.subject)}</span><span class="mono meta">${esc(short(commit.sha))}</span></div>`;
 const commitText = (commit, open) => (open && commit.body.trim() ? `<div class="rv-body">${commitBody(commit.body)}</div>` : "");
 
+const placeOf = (v, sha) => (v.item.order ?? []).findIndex((row) => row.sha === sha);
+
 function commitRow(v, commit, index, on, alone) {
   const open = v.ui.commits.has(commit.sha);
-  if (alone) return `<div class="cm one${open ? "" : " shut"}">${commitHead(commit, index, open)}${commitText(commit, open)}</div>`;
+  const at = placeOf(v, commit.sha);
+  const place = at >= 0 && (v.item.order?.length ?? 0) > 1 ? `<span class="pos">no. ${at + 1} of ${v.item.order.length} in the push order</span>` : "";
+  if (alone) return `<div class="cm one${open ? "" : " shut"}">${commitHead(commit, index, open)}${commitText(commit, open)}${place ? `<div class="cm-foot">${place}</div>` : ""}</div>`;
   const count = commit.files.length;
   const done = readCount(v, commit.files);
   const said = done === count ? `<span class="ok">✓ ${done} of ${count} read</span>` : `${done} of ${count} read`;
-  const foot = done === count ? `<span class="meta">${plural(count, "file", "files")} · ${said}</span>` : `<a class="btn fit" href="${diffHref(v.machine, v.address, v.step, index + 1)}">Read the diff · ${plural(count, "file", "files")}</a><span class="meta">${said}</span>`;
-  return `<div class="cm${open ? "" : " shut"}${on ? " on" : ""}">${commitHead(commit, index, open)}${commitText(commit, open)}<div class="cm-foot">${foot}</div></div>`;
+  const foot = done === count ? `<span class="meta">${plural(count, "file", "files")} · ${said}</span>` : `<a class="btn fit" href="${diffHref(v.machine, v.address, v.subtask, index + 1)}">Read the diff · ${plural(count, "file", "files")}</a><span class="meta">${said}</span>`;
+  return `<div class="cm${open ? "" : " shut"}${on ? " on" : ""}">${commitHead(commit, index, open)}${commitText(commit, open)}<div class="cm-foot">${foot}${place}</div></div>`;
 }
 
-function stepFileRow(v, file, index) {
+function betweenRows(v, commit, next) {
+  const [from, to] = [placeOf(v, commit.sha), placeOf(v, next.sha)];
+  if (from < 0 || to <= from + 1) return "";
+  const rows = v.item.order.slice(from + 1, to);
+  const owner = (row) => v.item.subtasks?.find((one) => one.id === row.subtask)?.title ?? row.subtask;
+  if (rows.length === 1) return `<div class="cm between">no. ${from + 2} between them belongs to ${esc(owner(rows[0]))}: ${esc(rows[0].subject)}</div>`;
+  const owners = [...new Set(rows.map(owner))];
+  return `<div class="cm between">no. ${from + 2}–${to} between them belong to ${esc(owners.join(", "))}</div>`;
+}
+
+function subtaskFileRow(v, file, index) {
   const read = readOf(v, file);
   const again = read ? null : againOf(v, file);
   const notes = v.ui.drafts.filter((comment) => comment.path === file.path).length + v.sentComments.filter((comment) => comment.path === file.path).length;
   const status = file.status === "added" ? "new file" : file.status === "deleted" ? "deleted" : file.status === "renamed" ? `renamed from ${esc(file.old_path)}` : "";
   const meta = [stat(file), read ? `<span class="ok">read</span>` : again ? `<span class="again">read in ${esc(short(again.read))} · changed again in ${esc(short(again.again))}</span>` : "", status, notes ? plural(notes, "comment", "comments") : ""].filter(Boolean).join(" · ");
-  const whole = diffHref(v.machine, v.address, v.step);
-  const opener = `<a class="rv-icon rv-fold" href="${whole}" data-open-file="${index}" aria-label="Read ${esc(file.path)} in the whole step">${ICON_CHEVRON}</a>`;
+  const whole = diffHref(v.machine, v.address, v.subtask);
+  const opener = `<a class="rv-icon rv-fold" href="${whole}" data-open-file="${index}" aria-label="Read ${esc(file.path)} in the whole subtask">${ICON_CHEVRON}</a>`;
   const name = `<a class="rv-fh-name" href="${whole}" data-open-file="${index}"><span class="mono">${esc(file.path)}</span><span class="meta">${meta}</span></a>`;
   const check = `<button type="button" class="rv-icon rv-check" data-action="rv-read" data-file="${index}" aria-pressed="${read}" aria-label="${read ? "Mark unread" : "Mark read"}"><span class="box">${ICON_CHECK}</span></button>`;
   return `<section class="rv-fsec" id="rv-f-${index}"><header class="rv-fh${read ? " is-read" : ""}">${opener}${name}${check}</header></section>`;
 }
 
-const stepTitle = (v) => v.boardStep?.title ?? v.review?.step?.title ?? "";
+export const subtaskTitle = (v) => v.boardSubtask?.title ?? v.review?.subtask?.title ?? "";
 const pageHead = (v, title, top, inPanel) => (inPanel ? `${chip(v)}<h2>${esc(title)}</h2>` : top(title, chip(v)));
 
-export function stepPage(v, { top, inPanel = false, left = false, selected = null }) {
-  const heading = pageHead(v, `Step ${v.step}`, top, inPanel);
-  const name = stepTitle(v) ? `<p class="step-name">${esc(stepTitle(v))}</p>` : "";
-  const step = v.review?.step;
-  if (!step) return `${heading}${name}${left ? "" : fetchBlock(v)}`;
-  const { commits, files } = step;
-  const standing = v.boardStep?.state === "accepted" ? ` · <span class="ok">✓ accepted</span>` : v.boardStep?.state === "pushed" ? " · ↑ pushed" : "";
+export function subtaskPage(v, { top, inPanel = false, left = false, selected = null }) {
+  const heading = pageHead(v, "Subtask", top, inPanel);
+  const name = subtaskTitle(v) ? `<p class="step-name">${esc(subtaskTitle(v))}</p>` : "";
+  const part = v.review?.subtask;
+  if (!part) return `${heading}${name}${left ? "" : fetchBlock(v)}`;
+  const { commits, files } = part;
+  const standing = v.boardSubtask?.state === "accepted" || v.acceptSent?.state === "done" ? ` · <span class="ok">✓ accepted</span>` : v.boardSubtask?.state === "pushed" ? " · ↑ pushed" : "";
   const facts = `<div class="meta pad">${plural(commits.length, "commit", "commits")} · ${plural(files.length, "file", "files")} · ${sums(files)}${standing}</div>`;
-  const list = `<h3 class="sec">Commits · ${commits.length}</h3><section class="task cm-list">${commits.map((commit, index) => commitRow(v, commit, index, index === selected, commits.length === 1)).join("")}</section>`;
-  const rows = `<h3 class="sec">Files of the step · ${readCount(v, files)} of ${files.length} read</h3>${files.map((file, index) => stepFileRow(v, file, index)).join("")}`;
-  if (left) return heading + name + facts + list + rows;
-  const whole = `<div class="whole"><a class="btn fit" href="${diffHref(v.machine, v.address, v.step)}">${commits.length === 1 ? "Read the diff" : "Read the whole step"} · ${plural(files.length, "file", "files")}</a></div>`;
-  const end = stepEnd(v);
-  return heading + name + facts + (inPanel ? "" : staleBlock(v)) + guideCard(v.review) + list + rows + whole + (end ? `<div class="rv-end">${end}</div>` : "");
+  const rows = commits.map((commit, index) => commitRow(v, commit, index, index === selected, commits.length === 1) + (commits[index + 1] ? betweenRows(v, commit, commits[index + 1]) : ""));
+  const list = `<h3 class="sec">Commits · ${commits.length}</h3><section class="task cm-list">${rows.join("")}</section>`;
+  const fileRows = `<h3 class="sec">Files of the subtask · ${readCount(v, files)} of ${files.length} read</h3>${files.map((file, index) => subtaskFileRow(v, file, index)).join("")}`;
+  if (left) return heading + name + facts + list + fileRows;
+  const whole = `<div class="whole"><a class="btn fit" href="${diffHref(v.machine, v.address, v.subtask)}">${commits.length === 1 ? "Read the diff" : "Read the whole subtask"} · ${plural(files.length, "file", "files")}</a></div>`;
+  const end = subtaskEnd(v);
+  return heading + name + facts + (inPanel ? "" : staleBlock(v)) + guideCard(v.review) + list + fileRows + whole + (end ? `<div class="rv-end">${end}</div>` : "");
 }
 
 export function commitPage(v, { top, inPanel = false }) {
-  const step = v.review?.step;
+  const part = v.review?.subtask;
   const index = v.page.commit;
-  const total = step?.commits.length ?? v.boardStep?.commits.length ?? 0;
+  const total = part?.commits.length ?? v.boardSubtask?.commits.length ?? 0;
   const heading = pageHead(v, total ? `Commit ${index + 1} of ${total}` : `Commit ${index + 1}`, top, inPanel);
-  if (!step) return heading + fetchBlock(v);
-  const commit = step.commits[index];
-  if (!commit) return heading + `<div class="center left">Step ${esc(v.step)} has no commit ${esc(index + 1)}.</div>`;
+  if (!part) return heading + fetchBlock(v);
+  const commit = part.commits[index];
+  if (!commit) return heading + `<div class="center left">${esc(subtaskTitle(v))} has no commit ${esc(index + 1)}.</div>`;
   const open = v.ui.commits.has(commit.sha);
   const card = `<section class="task cm-list solo"><div class="cm one${open ? "" : " shut"}">${commitHead(commit, index, open)}${commitText(commit, open)}</div></section>`;
   const { files } = commit;
-  const facts = `<div class="meta pad">Step ${esc(v.step)} · <span class="mono">${esc(short(commit.sha))}</span> · ${plural(files.length, "file", "files")} · ${sums(files)} · ${readCount(v, files)} of ${files.length} read</div>`;
-  const next = step.commits[index + 1];
-  const back = `<a class="${next ? "link" : "btn primary"}" href="${stepHref(v.machine, v.address, v.step)}">Back to the step</a>`;
-  const onward = next ? `<div class="row-btns"><a class="btn primary" href="${diffHref(v.machine, v.address, v.step, index + 2)}">Next: commit ${index + 2} · ${plural(next.files.length, "file", "files")}</a></div>${back}` : `<div class="row-btns">${back}</div>`;
+  const facts = `<div class="meta pad">${esc(subtaskTitle(v))} · <span class="mono">${esc(short(commit.sha))}</span> · ${plural(files.length, "file", "files")} · ${sums(files)} · ${readCount(v, files)} of ${files.length} read</div>`;
+  const next = part.commits[index + 1];
+  const back = `<a class="${next ? "link" : "btn primary"}" href="${subtaskHref(v.machine, v.address, v.subtask)}">Back to the subtask</a>`;
+  const onward = next ? `<div class="row-btns"><a class="btn primary" href="${diffHref(v.machine, v.address, v.subtask, index + 2)}">Next: commit ${index + 2} · ${plural(next.files.length, "file", "files")}</a></div>${back}` : `<div class="row-btns">${back}</div>`;
   const end = `<div class="meta pad rv-endnote">End of commit ${esc(index + 1)}.</div><div class="rv-end">${onward}</div>`;
   return heading + card + facts + (inPanel ? "" : staleBlock(v)) + files.map((file, at) => fileSection(v, file, at)).join("") + end;
 }
 
 export function wholePage(v, { top, inPanel = false }) {
-  const step = v.review?.step;
-  const heading = pageHead(v, v.step === null ? "Diff" : `Step ${v.step}`, top, inPanel);
+  const part = v.review?.subtask;
+  const heading = pageHead(v, v.subtask === null ? "Diff" : "Subtask", top, inPanel);
   if (!v.review) return heading + fetchBlock(v);
   const files = filesOf(v);
-  const which = step ? `The whole step · ${plural(step.commits.length, "commit", "commits")}` : `Since ${esc(v.review.since)}`;
+  const which = part ? `${esc(part.title)} · ${plural(part.commits.length, "commit", "commits")}` : `Since ${esc(v.review.since)}`;
   const facts = `<div class="meta pad">${which} · ${plural(files.length, "file", "files")} · ${sums(files)} · ${readCount(v, files)} of ${files.length} read</div>`;
-  const guide = step ? "" : guideCard(v.review);
-  const end = step ? stepEnd(v) : readCount(v, files) === files.length ? branchEnd(v) : "";
-  const tail = `<div class="meta pad rv-endnote">End of ${step ? `step ${esc(step.number)}` : "the changes"}.</div>${end ? `<div class="rv-end">${end}</div>` : ""}`;
+  const guide = part ? "" : guideCard(v.review);
+  const end = part ? subtaskEnd(v) : readCount(v, files) === files.length ? branchEnd(v) : "";
+  const tail = `<div class="meta pad rv-endnote">End of ${part ? "the subtask" : "the changes"}.</div>${end ? `<div class="rv-end">${end}</div>` : ""}`;
   return heading + facts + (inPanel ? "" : staleBlock(v)) + guide + files.map((file, index) => fileSection(v, file, index)).join("") + tail;
 }
 
@@ -185,7 +200,7 @@ export function fetchBlock(v) {
   const name = esc(v.name);
   const { state, sent } = v.fetch;
   const again = `<button type="button" class="btn" data-action="rv-retry">Ask ${name} again</button>`;
-  if (state === "not-ready") return `<div class="center left">${v.step === null ? "Nothing waits for review here." : `Step ${esc(v.step)} isn't ready to review yet.`}</div>`;
+  if (state === "not-ready") return `<div class="center left">${v.subtask === null ? "Nothing waits for review here." : `${esc(subtaskTitle(v) || "This subtask")} isn't ready to review yet.`}</div>`;
   if (state === "off") return `<div class="pro">This hub doesn't relay reviews. Review in kebbie on ${name}.</div>`;
   if (state === "refused") return `<div class="pro">Reviewing here is not enabled for your account on this hub.${v.refusedUrl ? ` <a class="link inline" href="${esc(v.refusedUrl)}">Details</a>` : ""}</div>`;
   if (state === "view-only") return viewOnlyBlock();
@@ -199,74 +214,80 @@ export function fetchBlock(v) {
   return `<div class="sent wait" role="status"><b><span class="spinner"></span>&nbsp; Fetching the diff from ${name}…</b><span>It comes sealed to your account and opens here.</span></div>`;
 }
 
-function acceptStatus(v, sent, state) {
-  const machine = esc(v.name);
-  const number = esc(v.step);
-  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing: v.acceptSent.standing, now: v.now, what: { goes: `Step ${number} is accepted`, again: "accept again" } });
-  if (state === "done") return block("done", `✓ Accepted step ${number}`, later(v) ? `Push it now, or read step ${esc(later(v).number)} first and push both later.` : "Push it now.", from(sent));
-  if (state === "refused") return block("refused", ...refusal("Not accepted", sent.result.text), from(sent));
-  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep past the hour`, `Accept again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
-  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `Step ${number} is accepted when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(until(sent.exp, v.now))}`);
-  return block("wait", `Sent to ${machine}`, `${machine} accepts step ${number}.`, `Sent ${from(sent)} · expires ${esc(until(sent.exp, v.now))}`);
+function runText(v) {
+  const run = v.item.pushable;
+  if (!run) return "It goes out once the subtasks above it in the push order are accepted.";
+  const first = (id) => (v.item.order ?? []).findIndex((row) => row.subtask === id);
+  const mine = first(v.subtask);
+  const freed = run.subtasks.filter((id) => id !== v.subtask && mine >= 0 && first(id) > mine).map((id) => v.item.subtasks?.find((one) => one.id === id)?.title ?? id);
+  const waited = freed.length ? ` ${freed.join(", ")} waited for this subtask and ${freed.length === 1 ? "goes" : "go"} out with it.` : "";
+  return `Ready to push: ${plural(run.count, "commit", "commits")}.${waited}`;
 }
 
-const later = (v) => (v.item.steps?.items ?? []).find((one) => one.number > v.step && !["accepted", "pushed"].includes(one.state)) ?? null;
+function acceptStatus(v, sent, state) {
+  const machine = esc(v.name);
+  const title = esc(subtaskTitle(v));
+  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing: v.acceptSent.standing, now: v.now, what: { goes: `${title} is accepted`, again: "accept again" } });
+  if (state === "done") return block("done", `✓ Accepted ${title}`, esc(runText(v)), from(sent));
+  if (state === "refused") return block("refused", ...refusal("Not accepted", sent.result.text), from(sent));
+  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep past the hour`, `Accept again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `${title} is accepted when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(until(sent.exp, v.now))}`);
+  return block("wait", `Sent to ${machine}`, `${machine} accepts ${title}.`, `Sent ${from(sent)} · expires ${esc(until(sent.exp, v.now))}`);
+}
+
+const nextToReview = (v) => (v.item.subtasks ?? []).find((one) => one.id !== v.subtask && one.state === "ready") ?? (v.item.subtasks ?? []).find((one) => one.id !== v.subtask && one.state === "in-progress") ?? null;
+export const takesAccepts = (accepts) => takes(accepts, "accept-subtask") || takes(accepts, "accept-step");
 
 function acceptButton(v) {
   const sent = v.acceptSent?.sent ?? null;
   const status = sent ? acceptStatus(v, sent, v.acceptSent.state) : "";
   if (v.access !== "ready") return status;
-  if (!takes(v.accepts, "accept-step")) return status + `<div class="pro">${esc(v.name)} takes accepts only at the machine. Accept step ${esc(v.step)} in kebbie there.</div>`;
+  if (!takesAccepts(v.accepts)) return status + `<div class="pro">${esc(v.name)} takes accepts only at the machine. Accept ${esc(subtaskTitle(v))} in kebbie there.</div>`;
   const error = v.ui.error ? `<div class="center warn" role="alert">${esc(v.ui.error)}</div>` : "";
-  return status + `<button type="button" class="btn primary" data-action="rv-accept"${v.ui.busy ? " disabled" : ""}>Accept step ${esc(v.step)}</button>` + error;
+  return status + `<button type="button" class="btn primary" data-action="rv-accept"${v.ui.busy ? " disabled" : ""}>Accept subtask</button>` + error;
 }
 
-const decideOn = (v, html, step = null) => `<div class="decide" data-machine="${esc(v.machine)}" data-address="${esc(v.address)}"${step === null ? "" : ` data-step="${esc(step)}"`}>${html}</div>`;
+const decideOn = (v, html) => `<div class="decide" data-machine="${esc(v.machine)}" data-address="${esc(v.address)}">${html}</div>`;
 const GONE = ["refused", "expired", "not-approved", "denied"];
 const WAITING = `<div class="meta">Waiting for Claude's changes</div>`;
 
-function pushArea(v, what, html) {
-  if (v.access !== "ready") return "";
-  if (!takes(v.accepts, "push")) return `<div class="pro">${esc(v.name)} takes pushes only at the machine. Push ${what} in kebbie there.</div>`;
-  return html();
-}
-
-function wholePush(v) {
-  if (!pushReady(v.item)) return "";
-  const shown = v.taskPush;
-  return pushArea(v, "the task", () => decideOn(v, pushBlock({ item: v.item, machineName: v.name, ui: v.pushUi, sent: shown?.sent ?? null, state: shown?.state ?? null, standing: shown?.standing ?? null })));
+function runPush(v) {
+  if (!pushReady(v.item) || v.access !== "ready") return "";
+  if (!takes(v.accepts, "push")) return `<div class="pro">${esc(v.name)} takes pushes only at the machine. Push in kebbie there.</div>`;
+  const shown = v.push;
+  return decideOn(v, pushBlock({ item: v.item, machineName: v.name, ui: v.pushUi, sent: shown?.sent ?? null, state: shown?.state ?? null, standing: shown?.standing ?? null }));
 }
 
 function onward(v) {
-  const next = later(v);
-  if (next?.state === "ready") return { link: `<a class="btn" href="${stepHref(v.machine, v.address, next.number)}">Next: step ${esc(next.number)} · ${plural(next.commits.length, "commit", "commits")}</a>`, note: "" };
-  return { link: "", note: next?.state === "in-progress" ? `<div class="meta">Step ${esc(next.number)} is being built</div>` : "" };
+  const next = nextToReview(v);
+  if (next?.state === "ready") return { link: `<a class="btn" href="${subtaskHref(v.machine, v.address, next.id)}">Next: ${esc(next.title)} · ${plural(next.commits.length, "commit", "commits")}</a>`, note: "" };
+  return { link: "", note: next?.state === "in-progress" ? `<div class="meta">${esc(next.title)} is being built</div>` : "" };
 }
 
 const backToTask = (v) => `<a class="link" href="${taskHref(v.machine, v.address)}">Back to the task</a>`;
 const waitsForClaude = (v) => v.sentComments.some((comment) => !GONE.includes(comment.state));
 
 function branchEnd(v) {
-  return waitsForClaude(v) ? WAITING : wholePush(v);
+  return waitsForClaude(v) ? WAITING : runPush(v);
 }
 
-export function stepEnd(v) {
-  const step = v.review?.step;
-  if (!step) return "";
+export function subtaskEnd(v) {
+  const part = v.review?.subtask;
+  if (!part) return "";
   if (waitsForClaude(v)) return WAITING;
   const next = onward(v);
-  const pushed = v.boardStep ? v.boardStep.state === "pushed" : (v.item.steps?.pushed ?? 0) >= v.step;
-  if (pushed && !v.stepPush) return `<div class="meta">↑ Step ${esc(v.step)} is pushed.</div>${next.link ? `<div class="row-btns">${next.link}</div>` : ""}${next.note}${backToTask(v)}`;
-  const accepted = v.boardStep?.state === "accepted" || v.acceptSent?.state === "done" || Boolean(v.stepPush);
+  if (v.boardSubtask?.state === "pushed" && !v.push) return `<div class="meta">↑ ${esc(subtaskTitle(v))} is pushed.</div>${next.link ? `<div class="row-btns">${next.link}</div>` : ""}${next.note}${backToTask(v)}`;
+  const accepted = v.boardSubtask?.state === "accepted" || v.acceptSent?.state === "done";
   if (!accepted) {
     if (v.acceptSent && !settled(v.acceptSent.state)) return acceptStatus(v, v.acceptSent.sent, v.acceptSent.state);
-    return readCount(v, step.files) === step.files.length ? acceptButton(v) : "";
+    return readCount(v, part.files) === part.files.length ? acceptButton(v) : "";
   }
   const receipt = v.acceptSent?.state === "done" ? acceptStatus(v, v.acceptSent.sent, "done") : "";
-  const shown = v.stepPush;
-  const head = { number: v.step, sha: stepHead(step) };
-  const push = !later(v) && pushReady(v.item) && !shown ? wholePush(v) : pushArea(v, `step ${esc(v.step)}`, () => decideOn(v, stepPushBlock({ step: head, machineName: v.name, ui: v.pushUi, sent: shown?.sent ?? null, state: shown?.state ?? null, standing: shown?.standing ?? null }), v.step));
-  return `${receipt}<div class="row-btns">${push}${next.link}</div>${next.note}${backToTask(v)}`;
+  const goes = v.boardSubtask && (inRun(v.item, v.boardSubtask) || v.push);
+  const blocker = blockerOf(v.item);
+  const waits = !goes && !receipt && blocker && blocker.id !== v.subtask ? `<div class="meta">Waits for ${esc(blocker.title)} before it goes out.</div>` : "";
+  const push = goes ? runPush(v) : "";
+  return `${receipt}${waits}<div class="row-btns">${push}${next.link}</div>${next.note}${backToTask(v)}`;
 }
 
 export function staleBlock(v) {

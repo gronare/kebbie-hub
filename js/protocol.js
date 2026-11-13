@@ -77,6 +77,10 @@ export const KINDS = {
   "review-comments": { ...command, maxTtl: COMMAND_TTL },
   "review-read": { ...command, maxTtl: COMMAND_TTL },
   "accept-step": { ...command, maxTtl: COMMAND_TTL },
+  "accept-subtask": { ...command, maxTtl: COMMAND_TTL },
+  "found-start": { ...command, ttl: START_ITEM_TTL },
+  "found-add": { ...command, maxTtl: COMMAND_TTL },
+  "found-dismiss": { ...command, maxTtl: COMMAND_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -210,27 +214,87 @@ const rulesCheck = (rules) =>
   (rules.state === "breaks" ? !absent(rules.breaks) && rules.breaks >= 1 : absent(rules.breaks) && absent(rules.names)) &&
   (absent(rules.names) || (rules.names.length <= MAX_RULE_NAMES && rules.names.length <= rules.breaks && rules.names.every((name) => isLine(MAX_RULE_NAME_CHARS)(name)))) &&
   (absent(rules.override) || rules.state !== "ok");
-const STEP_STATES = ["planned", "in-progress", "ready", "accepted", "pushed"];
+export const MAX_SUBTASK_ID_CHARS = 32;
+export const MAX_ADDED_REASON_CHARS = 500;
+export const MAX_OBSTACLE_CHARS = 2000;
+export const MAX_FOUND_SOURCES = 16;
+const SUBTASK_STATES = ["planned", "in-progress", "ready", "accepted", "pushed"];
 const COMMITS_HELD = { planned: (n) => n === 0, "in-progress": () => true, ready: (n) => n >= 1, accepted: (n) => n >= 1, pushed: (n) => n >= 1 };
+export const isSubtaskId = (value) => typeof value === "string" && new RegExp(`^[A-Za-z0-9][A-Za-z0-9_-]{0,${MAX_SUBTASK_ID_CHARS - 1}}$`).test(value);
+const subtask = shape({ id: isSubtaskId, title: string, state: oneOf(...SUBTASK_STATES), commits: list(string), added: optionalField(shape({ at: u64v, reason: string })), rules: optionalField(rulesCheck) });
+const orderRow = shape({ sha: string, subject: string, subtask: string });
+const pushable = shape({ count: u32v, through: string, subtasks: list(string) });
+const obstacleText = (value) => isText(MAX_OBSTACLE_CHARS)(value) && !/[^\P{Cc}\n]/u.test(value);
+const obstacleDecision = shape({ kind: oneOf("workaround", "subtask", "task", "ask"), by: oneOf("investigator", "lead", "you"), text: obstacleText });
+const obstacle = (value) =>
+  shape({ id: isSubtaskId, state: oneOf("investigating", "asked", "with-lead", "decided"), text: obstacleText, at: u64v, decision: optionalField(obstacleDecision) })(value) &&
+  (absent(value.decision) ? value.state !== "decided" : value.state !== "investigating" && (value.decision.kind === "ask") === (value.state === "asked"));
 const stepCommit = shape({ sha: string, subject: string });
-const boardStep = (value) =>
-  shape({ number: u32v, title: string, state: oneOf(...STEP_STATES, "committed"), commits: optionalField(list(stepCommit)), sha: optionalField(string), rules: optionalField(rulesCheck) })(value) &&
-  (absent(value.commits) || absent(value.sha)) &&
-  value.number >= 1 &&
-  COMMITS_HELD[stepOf(value).state](stepOf(value).commits.length);
-export function stepOf(step) {
-  const { sha, ...rest } = step;
-  return { ...rest, state: step.state === "committed" ? "ready" : step.state, commits: step.commits ?? (absent(sha) ? [] : [{ sha, subject: step.title }]) };
+const boardStep = shape({ number: (value) => u32v(value) && value >= 1, title: string, state: oneOf(...SUBTASK_STATES, "committed"), commits: optionalField(list(stepCommit)), sha: optionalField(string), rules: optionalField(rulesCheck) });
+const boardSteps = (value) => shape({ pushed: u32v, items: list(boardStep), required: optionalField(bool) })(value) && value.items.every((step) => absent(step.commits) || absent(step.sha));
+const reviewOffer = (value) => shape({ subtask: optionalField(isSubtaskId), step: optionalField((step) => u32v(step) && step >= 1), files: u32v })(value) && (absent(value.subtask) || absent(value.step));
+const runOf = (order, count) => [...new Set(order.slice(0, count).map((row) => row.subtask))];
+const PLAN_KEYS = ["subtasks", "order", "pushable", "require_accept"];
+function subtasksOf(steps) {
+  const commitsOf = (step) => step.commits ?? (absent(step.sha) ? [] : [{ sha: step.sha, subject: step.title }]);
+  const subtasks = steps.items.map((step) => {
+    const one = { id: String(step.number), title: step.title, state: step.state === "committed" ? "ready" : step.state, commits: commitsOf(step).map((commit) => commit.sha) };
+    return absent(step.rules) ? one : { ...one, rules: step.rules };
+  });
+  const order = steps.items.filter((step) => step.state !== "pushed").flatMap((step) => commitsOf(step).map((commit) => ({ sha: commit.sha, subject: commit.subject, subtask: String(step.number) })));
+  const accepted = new Set(subtasks.filter((one) => one.state === "accepted").map((one) => one.id));
+  const count = order.findIndex((row) => !accepted.has(row.subtask));
+  const run = count === -1 ? order.length : count;
+  const plan = { subtasks, order };
+  if (run > 0) plan.pushable = { count: run, through: order[run - 1].sha, subtasks: runOf(order, run) };
+  if (!absent(steps.required)) plan.require_accept = steps.required;
+  return plan;
 }
-export const stepHead = (step) => step.commits.at(-1)?.sha ?? null;
-const ordered = (step) => {
-  const { number, title, state, commits, rules } = stepOf(step);
-  return absent(rules) ? { number, title, state, commits } : { number, title, state, commits, rules };
+function itemOf(item) {
+  let out = item;
+  if (!absent(item.steps)) {
+    const { steps, ...rest } = item;
+    out = { ...rest, ...subtasksOf(steps) };
+  }
+  if (!absent(out.review)) out = { ...out, review: { subtask: out.review.subtask ?? (absent(out.review.step) ? null : String(out.review.step)), files: out.review.files } };
+  return out;
+}
+export const subtaskHead = (part) => {
+  const last = part.commits.at(-1);
+  return typeof last === "string" ? last : (last?.sha ?? null);
 };
+export const subtaskOf = (item, id) => (item.subtasks ?? []).find((one) => one.id === id) ?? null;
 export function payloadOf(payload) {
   if (payload.type !== "board") return payload;
-  return { ...payload, items: payload.items.map((one) => (absent(one.steps) ? one : { ...one, steps: { ...one.steps, items: one.steps.items.map(ordered) } })) };
+  return { ...payload, items: payload.items.map(itemOf) };
 }
+function planHolds(item) {
+  if (absent(item.subtasks)) return absent(item.order) && absent(item.pushable);
+  if (absent(item.order) && !absent(item.pushable)) return false;
+  const ids = new Set();
+  const shas = new Set();
+  for (const one of item.subtasks) {
+    if (ids.has(one.id) || !one.commits.every(isFullSha) || !COMMITS_HELD[one.state](one.commits.length)) return false;
+    if (!absent(one.added) && !isLine(MAX_ADDED_REASON_CHARS)(one.added.reason)) return false;
+    ids.add(one.id);
+    for (const sha of one.commits) {
+      if (shas.has(sha)) return false;
+      shas.add(sha);
+    }
+  }
+  const order = item.order ?? [];
+  const placed = new Set();
+  for (const row of order) {
+    const owner = subtaskOf(item, row.subtask);
+    if (!isFullSha(row.sha) || placed.has(row.sha) || !owner || !owner.commits.includes(row.sha) || owner.state === "pushed") return false;
+    placed.add(row.sha);
+  }
+  if (absent(item.pushable)) return true;
+  const { count, through, subtasks } = item.pushable;
+  const run = runOf(order, count);
+  return count >= 1 && count <= order.length && order[count - 1].sha === through && run.length === subtasks.length && run.every((id, index) => subtasks[index] === id) && run.every((id) => subtaskOf(item, id).state === "accepted");
+}
+const itemHolds = (raw) => (absent(raw.steps) || PLAN_KEYS.every((key) => absent(raw[key]))) && planHolds(itemOf(raw));
 const item = shape({
   address: string,
   group: oneOf("NEEDS YOU", "WORKING", "TO REVIEW", "READY TO PUSH", "CI RUNNING", "WAITING FOR WORK"),
@@ -262,14 +326,20 @@ const item = shape({
   recover: optionalField(shape({ note: string })),
   routine: optionalField(string),
   card: optionalField(shape({ sha: string, current: bool, blob: blobRef })),
-  steps: optionalField(shape({ pushed: u32v, items: list((value) => boardStep(value)), required: optionalField(bool) })),
+  subtasks: optionalField(list(subtask)),
+  order: optionalField(list(orderRow)),
+  pushable: optionalField(pushable),
+  require_accept: optionalField(bool),
+  obstacle: optionalField(obstacle),
+  steps: optionalField(boardSteps),
   title: optionalField(string),
   profile: optionalField(string),
   recipe: optionalField(string),
   assessment: optionalField(string),
   second_opinion: optionalField(shape({ by: string, points: optionalField(u32v), running: bool })),
-  review: optionalField(shape({ step: optionalField(u32v), files: u32v })),
+  review: optionalField(reviewOffer),
 });
+const boardItem = (value) => item(value) && itemHolds(value);
 export const isHomeLabel = (label) =>
   typeof label === "string" &&
   text.encode(label).length >= 1 &&
@@ -283,6 +353,7 @@ export function isItemKey(key) {
   if (typeof key !== "string" || !key.includes(":")) return false;
   const id = key.slice(key.indexOf(":") + 1);
   const home = homeOf(key);
+  if (home === "found") return /^f[1-9][0-9]{0,8}$/.test(id);
   return home === "vault" ? isHomeLabel(id) : (home === "local" || home === "kept") && LOCAL_ID.test(id);
 }
 const isText = (max) => (value) => typeof value === "string" && value.trim() !== "" && [...value].length <= max;
@@ -294,14 +365,17 @@ const backlogRow = (row) =>
     repo: optionalField(string),
     state: oneOf("to-write", "drafting", "ready"),
     filed: u64v,
-    home: shape({ kind: oneOf("vault", "local", "kept"), label: isHomeLabel }),
+    home: shape({ kind: oneOf("vault", "local", "kept", "found"), label: isHomeLabel }),
     questions: u32v,
     blocking: u32v,
     goal: optionalField(string),
     body: optionalField(blobRef),
+    found: optionalField(shape({ sources: list(isAddress), count: u32v })),
   })(row) &&
   homeOf(row.item) === row.home.kind &&
-  row.blocking <= row.questions;
+  row.blocking <= row.questions &&
+  (row.home.kind === "found") === !absent(row.found) &&
+  (absent(row.found) || (row.found.sources.length >= 1 && row.found.sources.length <= MAX_FOUND_SOURCES && new Set(row.found.sources).size === row.found.sources.length && row.found.count >= row.found.sources.length));
 const backlog = (rows) => list(backlogRow)(rows) && new Set(rows.map((row) => row.item)).size === rows.length;
 export const isSectionKey = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(value);
 const bodySection = shape({ key: isSectionKey, heading: (value) => isLine(MAX_HEADING_CHARS)(value), text: string, required: bool });
@@ -343,33 +417,39 @@ const reviewFiles = (files) => list(reviewFile)(files) && new Set(files.map((fil
 const reviewCommit = shape({ sha: isFullSha, subject: string, body: string, files: reviewFiles });
 const oneCommitStep = shape({ number: count, title: string, sha: string, subject: string, body: string });
 const commitsStep = shape({ number: count, title: string, commits: list(reviewCommit), files: reviewFiles });
+const reviewSubtask = shape({ id: string, title: string, commits: list(reviewCommit), files: reviewFiles });
 const reviewShape = (body) =>
   shape({
     address: isAddress,
     since: (value) => isText(MAX_SINCE_CHARS)(value) && !/\p{Cc}/u.test(value),
     head: isFullSha,
+    subtask: optionalField(reviewSubtask),
     step: optionalField((step) => commitsStep(step) || oneCommitStep(step)),
     guide: list(shape({ path: isHomeLabel, text: string })),
     left_out: optionalField(string),
     files: reviewFiles,
-  })(body);
+  })(body) &&
+  (absent(body.subtask) || absent(body.step)) &&
+  (absent(body.step) || body.step.number >= 1);
 const reviewOf = (body) => {
-  const { address, since, head, step, guide, left_out, files } = body;
-  if (absent(step)) return { address, since, head, step: null, guide, left_out: left_out ?? null, files };
-  if (Object.hasOwn(step, "commits")) return { address, since, head, step: { number: step.number, title: step.title, commits: step.commits, files: step.files }, guide, left_out: left_out ?? null, files };
+  const { address, since, head, subtask, step, guide, left_out, files } = body;
+  const opened = (part, rest) => ({ address, since, head, subtask: part, guide, left_out: left_out ?? null, files: rest });
+  if (!absent(subtask)) return opened({ id: subtask.id, title: subtask.title, commits: subtask.commits, files: subtask.files }, files);
+  if (absent(step)) return opened(null, files);
+  if (Object.hasOwn(step, "commits")) return opened({ id: String(step.number), title: step.title, commits: step.commits, files: step.files }, files);
   const commit = { sha: step.sha, subject: step.subject, body: step.body, files };
-  return { address, since, head, step: { number: step.number, title: step.title, commits: [commit], files }, guide, left_out: left_out ?? null, files: [] };
+  return opened({ id: String(step.number), title: step.title, commits: [commit], files }, []);
 };
-const steppedReview = (body) => {
-  if (absent(body.step)) return true;
-  const { step } = body;
-  return body.files.length === 0 && step.number >= 1 && step.commits.length >= 1 && step.commits.every((commit) => isFullSha(commit.sha)) && step.commits.at(-1).sha === body.head && new Set(step.commits.map((commit) => commit.sha)).size === step.commits.length;
+const subtaskReview = (body) => {
+  if (absent(body.subtask)) return true;
+  const { subtask } = body;
+  return body.files.length === 0 && isSubtaskId(subtask.id) && subtask.commits.length >= 1 && subtask.commits.every((commit) => isFullSha(commit.sha)) && subtask.commits.at(-1).sha === body.head && new Set(subtask.commits.map((commit) => commit.sha)).size === subtask.commits.length;
 };
 
 export function readReview(body) {
   if (!reviewShape(body)) throw new ProtocolError("malformed");
   const opened = reviewOf(body);
-  if (!steppedReview(opened)) throw new ProtocolError("malformed");
+  if (!subtaskReview(opened)) throw new ProtocolError("malformed");
   return opened;
 }
 
@@ -378,8 +458,10 @@ export function checkReview(body) {
 }
 
 const reviewComment = shape({ path: isHomeLabel, line: stepNumber, side: oneOf("old", "new"), sha: optionalField(isFullSha), text: (value) => isText(MAX_REVIEW_COMMENT_CHARS)(value) && !/[^\P{Cc}\n\t]/u.test(value) });
+const namesOne = (value) => absent(value.subtask) || absent(value.step);
 const reviewComments = (value) =>
-  typed({ address: isAddress, step: optionalField(stepNumber), comments: (comments) => Array.isArray(comments) && comments.length >= 1 && comments.length <= MAX_REVIEW_COMMENTS && comments.every(reviewComment) })(value) &&
+  namesOne(value) &&
+  typed({ address: isAddress, subtask: optionalField(isSubtaskId), step: optionalField(stepNumber), comments: (comments) => Array.isArray(comments) && comments.length >= 1 && comments.length <= MAX_REVIEW_COMMENTS && comments.every(reviewComment) })(value) &&
   text.encode(JSON.stringify({ ...value, type: undefined })).length <= MAX_REVIEW_COMMENTS_BYTES;
 
 const isTextHash = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
@@ -418,6 +500,8 @@ const notice = (value) =>
     retract: optionalField((tags) => Array.isArray(tags) && tags.length <= MAX_RETRACTS && tags.every((tag) => typeof tag === "string" && COLLAPSE.test(tag))),
   })(value) && text.encode(JSON.stringify(value)).length <= MAX_NOTICE_BYTES;
 const typed = (fields) => shape({ type: string, ...fields });
+const isToken = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
+const isFoundKey = (value) => isItemKey(value) && homeOf(value) === "found";
 const PAYLOADS = {
   board: typed({
     rev: u64v,
@@ -425,7 +509,7 @@ const PAYLOADS = {
     away_since: optionalField(u64v),
     checkouts: list(shape({ repo: string, free_worktrees: u32v, busy_worktrees: u32v })),
     routines: list(shape({ id: string, title: string, repo: string, mode: string, next_run: optionalField(u64v), last_outcome: optionalField(string) })),
-    items: list(item),
+    items: list(boardItem),
     sessions_outside_tasks: u32v,
     next: optionalField(list(nextRow)),
     counts: optionalField(shape({ working: u32v, queued: u32v, parked: u32v })),
@@ -450,10 +534,14 @@ const PAYLOADS = {
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
   "item-edit": itemEdit,
   "device-decision": typed({ device: (value) => prefixOf(value) === "dev", fingerprint: (value) => typeof value === "string" && FINGERPRINT.test(value), approve: bool }),
-  "review-open": typed({ address: isAddress, step: optionalField(stepNumber) }),
+  "review-open": (value) => namesOne(value) && typed({ address: isAddress, subtask: optionalField(isSubtaskId), step: optionalField(stepNumber) })(value),
   "review-comments": reviewComments,
   "review-read": typed({ address: isAddress, path: isHomeLabel, read: bool, content: isContentHash, sha: optionalField(isFullSha) }),
   "accept-step": typed({ address: isAddress, step: stepNumber, head: isFullSha }),
+  "accept-subtask": typed({ address: isAddress, subtask: isSubtaskId, head: isFullSha }),
+  "found-start": typed({ item: isFoundKey, name: optionalField(isToken) }),
+  "found-add": typed({ item: isFoundKey, task: isAddress }),
+  "found-dismiss": typed({ item: isFoundKey }),
 };
 
 export function checkPayload(payload) {
