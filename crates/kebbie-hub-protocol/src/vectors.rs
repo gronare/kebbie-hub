@@ -18,8 +18,9 @@ use crate::backlog::{
     OpenQuestion, Priority,
 };
 use crate::blob::{BLOB_DOMAIN, seal_blob_with};
+use crate::card::{CARD_MEDIA_TYPE, Card, CardDecision, DecisionSource, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, Noticed, NoticedChoice};
 use crate::board::{
-    Added, Agent, BlobRef, AgentStatus, CommitTests, Moved, TestsState, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
+    Added, Agent, Assessment, AssessmentWord, CardRef, DecidedBy, Judgement, MAX_ASSESSMENT_REASON_CHARS, BlobRef, AgentStatus, CommitTests, Moved, TestsState, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
     MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Obstacle, ObstacleState, OrderRow, Prompt, PromptOption, Pushable, Question,
     QuestionOption, Report, RoutineSummary, Rules, RulesState, SecondOpinion, Subtask, SubtaskState, Verdict, VerdictOutcome,
     CLOSE_OPTIONS, KebbieQuestion, KebbieQuestionKind, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS,
@@ -39,10 +40,10 @@ use crate::ids::{Id, Prefix};
 use crate::review::{
     AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
-    ReviewCommit, ReviewOpen, ReviewRead, ReviewSubtask, Side,
+    ReviewCommit, ReviewOpen, ReviewRead, ReviewSend, ReviewSubtask, Side,
 };
 use crate::message::{
-    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundStart, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
 };
 
@@ -438,7 +439,7 @@ fn next_board() -> Payload {
     stepped.title = Some("Charge through the gateway".into());
     stepped.profile = Some("task".into());
     stepped.recipe = Some("small fix".into());
-    stepped.assessment = Some("review suggested: touches money and its tests".into());
+    stepped.assessment = Some(Assessment::Said("review suggested: touches money and its tests".into()));
     stepped.agent = Some(Agent {
         status: AgentStatus::Working,
         kind: Some("claude".into()),
@@ -698,6 +699,60 @@ fn found_add() -> Payload {
 
 fn found_dismiss() -> Payload {
     Payload::FoundDismiss(FoundDismiss { item: ItemKey::parse(FOUND_ITEM).unwrap() })
+}
+
+fn found_keep() -> Payload {
+    Payload::FoundKeep(FoundKeep { item: ItemKey::parse(FOUND_ITEM).unwrap() })
+}
+
+fn review_send() -> Payload {
+    Payload::ReviewSend(ReviewSend { address: "payments@api".into(), subtask: None })
+}
+
+fn card() -> Card {
+    let decision = |text: &str, by: DecidedBy, source: Option<DecisionSource>, at: u64, subtask: Option<&str>| CardDecision { text: text.into(), by, source, at: Some(at), subtask: subtask.map(Into::into), replaced_by: None };
+    let noticed = |text: &str, found: Option<&str>, chosen: Option<NoticedChoice>| Noticed { text: text.into(), found: found.map(|key| ItemKey::parse(key).unwrap()), chosen };
+    let previous = Card {
+        version: 1,
+        changed_at: None,
+        built: vec!["Payments go through the gateway; a refund rounds per invoice.".into()],
+        decisions: vec![decision("Round VAT per line", DecidedBy::Lead, Some(DecisionSource::Method), AT - 7_200, Some("currency"))],
+        noticed: vec![noticed("The refund mail names the old gateway", Some(FOUND_ITEM), None)],
+        previous: None,
+    };
+    Card {
+        version: 2,
+        changed_at: Some(AT - 600),
+        built: vec!["Payments go through the gateway; a refund rounds VAT per invoice.".into(), "See it: `pay refund --dry-run 1042` prints the rounded amount.".into()],
+        decisions: vec![
+            CardDecision { replaced_by: Some(3), ..decision("Round VAT per line", DecidedBy::Lead, Some(DecisionSource::Method), AT - 7_200, Some("currency")) },
+            decision("Keep the old endpoint for a week", DecidedBy::You, Some(DecisionSource::Plan), AT - 9_000, None),
+            decision("The gateway's sandbox key comes from the vault", DecidedBy::Investigator, Some(DecisionSource::Obstacle), AT - 5_400, Some("gateway")),
+            decision("Round VAT per invoice, as the accountant books it", DecidedBy::You, Some(DecisionSource::Question), AT - 3_600, Some("currency")),
+            CardDecision { at: None, ..decision("A narrower retry around the webhook", DecidedBy::Task, None, AT, None) },
+        ],
+        noticed: vec![
+            noticed("The refund mail names the old gateway", Some(FOUND_ITEM), None),
+            noticed("`settle_batch` reads and writes outside a transaction", Some("found:f4"), Some(NoticedChoice::Kept)),
+        ],
+        previous: Some(Box::new(previous)),
+    }
+}
+
+fn card_blob() -> (BlobRef, Vec<u8>) {
+    seal_blob_with(&serde_json::to_vec(&card()).unwrap(), CARD_MEDIA_TYPE, seed("card/blob/key"), seed("card/blob/nonce")[..12].try_into().unwrap())
+}
+
+fn carded_board() -> Payload {
+    let Payload::Board(mut board) = planned_board() else {
+        unreachable!()
+    };
+    board.accepts = Some(vec![Kind::Answer, Kind::Push, Kind::FoundStart, Kind::FoundAdd, Kind::FoundKeep, Kind::ReviewSend]);
+    let item = &mut board.items[0];
+    item.group = Group::ReadyToPush;
+    item.card = Some(CardRef { sha: HEAD.into(), current: true, blob: card_blob().0 });
+    item.assessment = Some(Assessment::Judged(Judgement { word: AssessmentWord::Recommended, reason: Some("Changes how refunds are rounded and booked, in 4 commits".into()), at: Some(AT - 300) }));
+    Payload::Board(board)
 }
 
 fn idea(text: String) -> Payload {
@@ -1333,10 +1388,14 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         ("found-start-opened-by-the-machine", "found-start", Kind::FoundStart, found_start(Some("refund-receipts"))),
         ("found-add-opened-by-the-machine", "found-add", Kind::FoundAdd, found_add()),
         ("found-dismiss-opened-by-the-machine", "found-dismiss", Kind::FoundDismiss, found_dismiss()),
+        ("found-keep-opened-by-the-machine", "found-keep", Kind::FoundKeep, found_keep()),
+        ("review-send-opened-by-the-machine", "review-send", Kind::ReviewSend, review_send()),
     ] {
         let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
         cases.push(opens(name, &sealed, machine, phone, payload));
     }
+    let carded = seal_case("carded-board", machine_header("carded-board", Kind::Board, machine), &carded_board(), machine, &[machine, account]);
+    cases.push(opens("board-with-a-sign-off-card-and-an-assessment-opened-by-the-account", &carded, account, machine, carded_board()));
     let ready = seal_case(
         "review-ready",
         machine_header("review-open", Kind::Result, machine),
@@ -3380,6 +3439,144 @@ fn stages_json() -> Value {
     })
 }
 
+fn cards_json() -> Value {
+    let (blob, ciphertext) = card_blob();
+    let body = serde_json::to_value(card()).unwrap();
+    let change = |value: &Value, changes: &[(&str, Value)]| {
+        let mut changed = value.clone();
+        for (pointer, value) in changes {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            match changed.pointer_mut(parent).unwrap() {
+                Value::Array(list) => list[key.parse::<usize>().unwrap()] = value.clone(),
+                parent => parent[key] = value.clone(),
+            }
+        }
+        changed
+    };
+    let drop = |value: &Value, pointer: &str| {
+        let mut changed = value.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        changed.pointer_mut(parent).unwrap().as_object_mut().unwrap().remove(key);
+        changed
+    };
+    let first = drop(&change(&body, &[("/version", json!(1))]), "/previous");
+    let cards = [
+        ("a card that changed, with the version before it", body.clone(), true),
+        ("a first card, with nothing before it", first.clone(), true),
+        ("a card with nothing but what was built", json!({ "version": 1, "built": ["The README names every flag."], "decisions": [], "noticed": [] }), true),
+        ("a card with six Built lines", change(&first, &[("/built", json!(["1", "2", "3", "4", "5", "6"]))]), true),
+        ("a noticed line not yet filed, without buttons", change(&first, &[("/noticed/1", json!({ "text": "The CLI's help names an old flag" }))]), true),
+        ("a decision said in the lead's chat", change(&first, &[("/decisions/1/source", json!("through-lead"))]), true),
+        ("a change without the version before it", drop(&change(&body, &[("/version", json!(3))]), "/previous"), true),
+        ("a Built line at its length", change(&first, &[("/built/0", json!("x".repeat(MAX_CARD_LINE_CHARS)))]), true),
+        ("seven Built lines", change(&first, &[("/built", json!(["1", "2", "3", "4", "5", "6", "7"]))]), false),
+        ("a Built line past its length", change(&first, &[("/built/0", json!("x".repeat(MAX_CARD_LINE_CHARS + 1)))]), false),
+        ("a Built line over two lines", change(&first, &[("/built/0", json!("Payments go through the gateway\nand refunds round"))]), false),
+        ("a decision past its length", change(&first, &[("/decisions/1/text", json!("x".repeat(MAX_DECISION_CHARS + 1)))]), false),
+        ("a decision with a terminal escape", change(&first, &[("/decisions/1/text", json!("Keep it\u{1b}[2J"))]), false),
+        ("a decision by someone kebbie does not know", change(&first, &[("/decisions/1/by", json!("reviewer"))]), false),
+        ("a decision from a source kebbie does not know", change(&first, &[("/decisions/1/source", json!("hunch"))]), false),
+        ("a decision replaced by itself", change(&first, &[("/decisions/0/replaced_by", json!(0))]), false),
+        ("a decision replaced by an earlier one", change(&first, &[("/decisions/2/replaced_by", json!(1))]), false),
+        ("a decision replaced by one not on the card", change(&first, &[("/decisions/0/replaced_by", json!(5))]), false),
+        ("a decision's subtask named by a path", change(&first, &[("/decisions/0/subtask", json!("../currency"))]), false),
+        ("a noticed line naming a kept item", change(&first, &[("/noticed/0/found", json!("kept:idea-4411"))]), false),
+        ("a choice on a line not filed", change(&first, &[("/noticed/1", json!({ "text": "x", "chosen": "kept" }))]), false),
+        ("a choice kebbie does not know", change(&first, &[("/noticed/1/chosen", json!("dismissed"))]), false),
+        ("one found item on two lines", change(&first, &[("/noticed/1/found", json!(FOUND_ITEM))]), false),
+        ("version zero", change(&first, &[("/version", json!(0))]), false),
+        ("a version before it that is not earlier", change(&body, &[("/previous/version", json!(2))]), false),
+        ("a change without when", drop(&body, "/changed_at"), false),
+        ("a version before it carrying its own", change(&body, &[("/previous/previous", first.clone())]), false),
+        ("a version before it that breaks the rules", change(&body, &[("/previous/built", json!(["1", "2", "3", "4", "5", "6", "7"]))]), false),
+        ("a confirm part, which a card does not have", change(&first, &[("/confirm", json!(["Check the refund mail by hand"]))]), false),
+        ("too many decisions", change(&first, &[("/decisions", json!(vec![body["decisions"][1].clone(); MAX_DECISIONS + 1]))]), false),
+        ("too many noticed lines", change(&first, &[("/noticed", json!(vec![json!({ "text": "x" }); MAX_NOTICED + 1]))]), false),
+    ];
+    let cards: Vec<Value> = cards
+        .into_iter()
+        .map(|(name, card, valid)| {
+            assert_eq!(Card::read(card.to_string().as_bytes()).is_ok(), valid, "{name}");
+            json!({ "name": name, "card": card, "valid": valid })
+        })
+        .collect();
+    let board = serde_json::to_value(carded_board()).unwrap();
+    let item = board["items"][0].clone();
+    let assessed = |assessment: Value| change(&item, &[("/assessment", assessment)]);
+    let assessments = [
+        ("a full review recommended, with why and when", item.clone(), true),
+        ("a full review not needed", assessed(json!({ "word": "not-needed", "reason": "One file, covered by its tests", "at": AT - 300 })), true),
+        ("a full review not needed, without why", assessed(json!({ "word": "not-needed" })), true),
+        ("the assessor still at it", assessed(json!({ "word": "assessing" })), true),
+        ("one line from a machine not yet updated", assessed(json!("review suggested: touches money")), true),
+        ("a recommendation without why", assessed(json!({ "word": "recommended", "at": AT })), false),
+        ("the assessor at it with a reason already", assessed(json!({ "word": "assessing", "reason": "x" })), false),
+        ("the assessor at it since a time", assessed(json!({ "word": "assessing", "at": AT })), false),
+        ("a reason over two lines", assessed(json!({ "word": "recommended", "reason": "Money\nand tests" })), false),
+        ("a reason past its length", assessed(json!({ "word": "recommended", "reason": "x".repeat(MAX_ASSESSMENT_REASON_CHARS + 1) })), false),
+        ("a word kebbie does not know", assessed(json!({ "word": "running" })), false),
+        ("an assessment with a field it does not have", assessed(json!({ "word": "recommended", "reason": "x", "by": "codex" })), false),
+        ("an obstacle decided by the lead", change(&item, &[("/obstacle", json!({ "id": "sandbox", "state": "decided", "text": "No sandbox key", "at": AT, "decision": { "kind": "workaround", "by": "lead", "text": "Use the test key" } }))]), true),
+        ("an obstacle decided by the task", change(&item, &[("/obstacle", json!({ "id": "sandbox", "state": "decided", "text": "No sandbox key", "at": AT, "decision": { "kind": "workaround", "by": "task", "text": "Use the test key" } }))]), false),
+    ];
+    let assessments: Vec<Value> = assessments
+        .into_iter()
+        .map(|(name, item, valid)| {
+            let mut whole = board.clone();
+            whole["items"] = json!([item.clone()]);
+            let parsed = serde_json::from_value::<Payload>(whole);
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "item": item, "valid": valid })
+        })
+        .collect();
+    let payloads = [
+        ("a full review asked for", serde_json::to_value(review_send()).unwrap(), true),
+        ("a full review of one subtask asked for", json!({ "type": "review-send", "address": "payments@api", "subtask": "gateway" }), true),
+        ("a full review of a task without its repo", json!({ "type": "review-send", "address": "payments" }), false),
+        ("a full review of a subtask named by a path", json!({ "type": "review-send", "address": "payments@api", "subtask": "../gateway" }), false),
+        ("a full review with a reason, which it does not carry", json!({ "type": "review-send", "address": "payments@api", "reason": "money" }), false),
+        ("a found item kept in the backlog", serde_json::to_value(found_keep()).unwrap(), true),
+        ("a kept item kept as if a task found it", json!({ "type": "found-keep", "item": "kept:idea-4411" }), false),
+        ("a found item kept for a task, which it does not name", json!({ "type": "found-keep", "item": FOUND_ITEM, "task": "payments@api" }), false),
+        ("a found item added to the card's task as a subtask", serde_json::to_value(found_add()).unwrap(), true),
+        ("a task started from a noticed line", serde_json::to_value(found_start(None)).unwrap(), true),
+    ];
+    let payloads: Vec<Value> = payloads
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
+    let markdown = {
+        let mut old = board.clone();
+        let item = &mut old["items"][0];
+        item["card"]["blob"]["media_type"] = json!("text/markdown");
+        item["assessment"] = json!("review suggested: touches money");
+        let parsed: Payload = serde_json::from_value(old.clone()).unwrap();
+        assert_eq!(parsed.validate(), Ok(()), "a board from a machine not yet updated still opens");
+        old
+    };
+    json!({
+        "media_type": CARD_MEDIA_TYPE,
+        "max_built_lines": MAX_BUILT_LINES,
+        "max_card_line_chars": MAX_CARD_LINE_CHARS,
+        "max_decisions": MAX_DECISIONS,
+        "max_decision_chars": MAX_DECISION_CHARS,
+        "max_noticed": MAX_NOTICED,
+        "max_assessment_reason_chars": MAX_ASSESSMENT_REASON_CHARS,
+        "card": body,
+        "blob": blob,
+        "ciphertext": b64(&ciphertext),
+        "board": board,
+        "board_from_a_machine_not_yet_updated": markdown,
+        "cards": cards,
+        "assessments": assessments,
+        "payloads": payloads,
+    })
+}
+
 fn review_comments_json() -> Value {
     serde_json::to_value(review_comments()).unwrap()
 }
@@ -3448,6 +3645,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("review.json", review_json()),
         ("notices.json", notices_json()),
         ("stages.json", stages_json()),
+        ("cards.json", cards_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

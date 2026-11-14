@@ -1,13 +1,14 @@
 import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { backlogList, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
+import { backlogList, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
-import { KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
+import { CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
+import { assessmentBlock, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea } from "./card.js";
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
@@ -260,14 +261,63 @@ function questionBlock(found) {
   return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${card ? `<section class="task">${card}</section>` : ""}${answerArea(found)}`;
 }
 
+const seenKey = (machine, address) => `kebbie-card-seen:${machine}|${address}`;
+
+function seenVersion(machine, address) {
+  try {
+    return Number(localStorage.getItem(seenKey(machine, address))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markSeen(machine, address, version) {
+  try {
+    localStorage.setItem(seenKey(machine, address), String(version));
+  } catch {}
+}
+
+function noticedSent(found, key) {
+  const shown = NOTICED_KINDS.map((kind) => sentFor(found, kind, null, null, key)).filter((one) => one.sent).sort((a, b) => b.sent.at - a.sent.at)[0];
+  return shown ? { sent: shown.sent, state: shown.state, standing: shown.standing } : null;
+}
+
+function structuredCard(found) {
+  const { item } = found;
+  const held = blobs.peek(item.card.blob.id);
+  if (!held) {
+    blobs.load(item.card.blob).then((loaded) => loaded && render());
+    return `<div class="plan"><div>${esc(loadingLine("card", item.card.blob))}</div></div>`;
+  }
+  if (!held.card) return `<div class="plan"><div>${esc(failedLine("card"))}</div></div>`;
+  const ui = uiOf(found.machine, item.address);
+  const backlog = state.opened.find((machine) => machine.machine === found.machine)?.board?.backlog ?? [];
+  const noticed = (line) => noticedArea(line, { access: commandGate(), accepts: found.accepts, sent: line.found ? noticedSent(found, line.found) : null, busy: ui.busy, error: ui.error, now: nowSeconds(), recurring: backlog.find((row) => row.item === line.found)?.found?.sources.length ?? 0 });
+  return changedNotice(held.card, seenVersion(found.machine, item.address)) + cardParts(held.card, { noticed });
+}
+
+function assessArea(found) {
+  const { item } = found;
+  const ui = uiOf(found.machine, item.address);
+  const shown = sentFor(found, "review-send");
+  const sent = shown.sent ? shown : null;
+  return assessmentBlock(item, { access: commandGate(), accepts: found.accepts, sent, busy: ui.busy, error: ui.error, status: (one) => foundStatus(one.sent, one.state, { standing: one.standing, now: nowSeconds() }) });
+}
+
 function cardBlock(found, selected = null) {
   const { item } = found;
   const lines = [];
-  if (item.card) {
+  if (item.card?.blob.media_type === CARD_MEDIA_TYPE) {
+    lines.push(taskFacts(item));
     lines.push(cardAge(item.card));
-    lines.push(`<h3 class="sec">Card</h3>${slot(item.card.blob, { kind: "card", look: "md" })}`);
+    lines.push(structuredCard(found));
+  } else {
+    if (item.card) {
+      lines.push(cardAge(item.card));
+      lines.push(`<h3 class="sec">Card</h3>${slot(item.card.blob, { kind: "card", look: "md" })}`);
+    }
+    lines.push(taskFacts(item));
   }
-  lines.push(taskFacts(item));
   if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
   lines.push(obstacleBlock(item, nowSeconds()));
   lines.push(stageList(item, nowSeconds()));
@@ -286,7 +336,9 @@ function cardBlock(found, selected = null) {
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
   if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
   const card = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
-  return reviewEntry(found) + card + pushArea(found);
+  const structured = item.card?.blob.media_type === CARD_MEDIA_TYPE;
+  const assess = assessArea(found);
+  return reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + pushArea(found);
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
@@ -301,8 +353,8 @@ function uiOf(machine, address) {
 const commandGate = () => gate({ info: state.info, refused: state.refused, allowed: state.allowed });
 const decide = (found, html) => `<div class="decide" data-machine="${esc(found.machine)}" data-address="${esc(found.item.address)}">${html}</div>`;
 
-function sentFor(found, kind, question = null, prompt = null) {
-  const sent = latestSent(state.kept.sent, { machine: found.machine, address: found.item.address, kind, question, prompt });
+function sentFor(found, kind, question = null, prompt = null, address = found.item.address) {
+  const sent = latestSent(state.kept.sent, { machine: found.machine, address, kind, question, prompt });
   if (!sent) return { sent: null, state: null, standing: null };
   const opened = state.opened.find((machine) => machine.machine === found.machine);
   const standing = standingOn(opened?.board, state.device?.id === sent.device ? state.device : null);
@@ -976,6 +1028,23 @@ function sendPush(target) {
   send(target, { type: "push", address, head, card_sha: head === item.head ? (item.card?.sha ?? null) : null, ...through }, { head, short: short(head), count: pushCount(item), machineName: found.name });
 }
 
+function sendReview(target) {
+  const { machine, address } = target.dataset;
+  const found = findTask(state.opened, machine, address);
+  if (!found || !takes(found.accepts, "review-send")) return;
+  send(target, { type: "review-send", address }, { machineName: found.name });
+}
+
+function sendNoticed(target, action, key) {
+  const { machine, address } = target.dataset;
+  const found = findTask(state.opened, machine, address);
+  const kind = NOTICED_ACTIONS.find((one) => one.action === action).kind;
+  if (!found || !key || !takes(found.accepts, kind)) return;
+  const line = blobs.peek(found.item.card?.blob.id ?? "")?.card?.noticed.find((one) => one.found === key);
+  const payload = kind === "found-add" ? { type: kind, item: key, task: address } : { type: kind, item: key };
+  send(target, payload, { address: key, label: line?.text ?? null, ...(kind === "found-add" ? { task: address } : {}), machineName: found.name });
+}
+
 const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
 
 async function sendTo({ machine, payload, meta, ui }) {
@@ -1253,6 +1322,9 @@ function decideAction(action, target, element) {
   else if (action === "answer") return sendAnswer(target);
   else if (action === "choose") return sendPromptAnswer(target);
   else if (action === "push") return sendPush(target);
+  else if (action === "review-send") return sendReview(target);
+  else if (action === "card-seen") markSeen(machine, address, Number(element.dataset.version));
+  else if (NOTICED_ACTIONS.some((one) => one.action === action)) return sendNoticed(target, action, element.dataset.item);
   render();
 }
 

@@ -7,7 +7,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kebbie_hub_fakes::machine::{ApproveFrom, Backlog, Handled, Handling, MachineState, Posted, connect, every_command, join};
 use kebbie_hub_fakes::{load, save};
-use kebbie_hub_protocol::{Board, Id, Item, ItemKey, Kind, Notice, NoticeCategory, Outcome, Review, Target, Urgency};
+use kebbie_hub_protocol::{Board, Card, Id, Item, ItemKey, Kind, Notice, NoticeCategory, Outcome, Review, Target, Urgency};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -15,6 +15,13 @@ use serde::Deserialize;
 struct ReviewFile {
     item: Item,
     review: Review,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CardFile {
+    item: Item,
+    card: Card,
 }
 
 #[derive(Parser)]
@@ -62,6 +69,8 @@ enum Command {
     PostBacklog { file: PathBuf },
     #[command(about = "Put a task up for review from a JSON file of its board item and its review, and post the board")]
     PostReview { file: PathBuf },
+    #[command(about = "Put up a task's sign-off card from a JSON file of its board item and its card, seal the card as a blob and post the board")]
+    PostCard { file: PathBuf },
     #[command(about = "Long-poll the machine's queue once")]
     Poll {
         #[arg(long, default_value_t = 25)]
@@ -284,6 +293,14 @@ async fn run(cli: Cli) -> Result<(), String> {
             let posted = state.post_review(item, review).await.map_err(|e| text(&e))?;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("posted board rev {posted} with {address} up for review");
+        }
+        Command::PostCard { file } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let CardFile { item, card } = load(&file).map_err(|e| text(&e))?;
+            let address = item.address.clone();
+            let posted = state.post_card(item, card).await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("posted board rev {posted} with {address}'s card");
         }
         Command::Poll { wait } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

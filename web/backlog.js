@@ -312,8 +312,8 @@ function ideaCard(entry, now) {
   return `<section class="task"><dl class="facts"><dt>state</dt><dd>${esc(shown)}</dd><dt>filed</dt><dd>${esc(dayOf(sent.at, now))}, from ${esc(sent.deviceName ?? "this device")}</dd></dl></section><div class="md"><p>${esc(said)}</p></div>${status}`;
 }
 
-const FOUND_DONE = { "found-start": "✓ Started a task from it", "found-add": "✓ Sent to the task as a subtask to add", "found-dismiss": "✓ Dismissed" };
-const FOUND_GOES = { "found-start": "The lead starts a task from it", "found-add": "The task adds it as a subtask", "found-dismiss": "It leaves the backlog" };
+const FOUND_DONE = { "found-start": "✓ Started a task from it", "found-add": "✓ Sent to the task as a subtask to add", "found-dismiss": "✓ Dismissed", "found-keep": "✓ Kept in the backlog", "review-send": "✓ Sent to a full review" };
+const FOUND_GOES = { "found-start": "The lead starts a task from it", "found-add": "The task adds it as a subtask", "found-dismiss": "It leaves the backlog", "found-keep": "It stays in the backlog", "review-send": "The reviewer starts a full review" };
 
 export function foundStatus(sent, state, { standing = null, now }) {
   const machine = esc(sent.machineName);

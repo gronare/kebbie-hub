@@ -161,7 +161,7 @@ pub struct Item {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recipe: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub assessment: Option<String>,
+    pub assessment: Option<Assessment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub second_opinion: Option<SecondOpinion>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -213,7 +213,7 @@ struct ItemWire {
     #[serde(default)]
     recipe: Option<String>,
     #[serde(default)]
-    assessment: Option<String>,
+    assessment: Option<Assessment>,
     #[serde(default)]
     second_opinion: Option<SecondOpinion>,
     #[serde(default)]
@@ -278,6 +278,47 @@ pub struct SecondOpinion {
     pub by: String,
     pub points: Option<u32>,
     pub running: bool,
+}
+
+pub const MAX_ASSESSMENT_REASON_CHARS: usize = 500;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Assessment {
+    Said(String),
+    Judged(Judgement),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Judgement {
+    pub word: AssessmentWord,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AssessmentWord {
+    Recommended,
+    NotNeeded,
+    Assessing,
+}
+
+impl Assessment {
+    fn check(&self) -> Result<(), &'static str> {
+        let Assessment::Judged(judged) = self else {
+            return Ok(());
+        };
+        check(judged.reason.as_ref().is_none_or(|reason| is_line(reason, MAX_ASSESSMENT_REASON_CHARS)), "an assessment's reason is empty, too long or not one line")?;
+        match judged.word {
+            AssessmentWord::Recommended => check(judged.reason.is_some(), "a recommended review says why"),
+            AssessmentWord::Assessing => check(judged.reason.is_none() && judged.at.is_none(), "an assessment still running has no reason and no time yet"),
+            AssessmentWord::NotNeeded => Ok(()),
+        }
+    }
 }
 
 pub const MAX_SUBTASK_ID_CHARS: usize = 32;
@@ -432,6 +473,7 @@ pub enum DecidedBy {
     Investigator,
     Lead,
     You,
+    Task,
 }
 
 pub const MAX_STAGES: usize = 16;
@@ -596,6 +638,7 @@ impl Obstacle {
             return check(self.state != ObstacleState::Decided, "a decided obstacle carries its decision");
         };
         check(self.state != ObstacleState::Investigating, "an obstacle still being investigated has no decision")?;
+        check(decision.by != DecidedBy::Task, "an obstacle is decided by the investigator, the lead or you, never the task")?;
         check((decision.kind == DecisionKind::Ask) == (self.state == ObstacleState::Asked), "an obstacle is asked of you exactly when its decision is to ask")?;
         check(is_obstacle_text(&decision.text), "a decision's text is empty, too long or holds control characters")
     }
@@ -995,6 +1038,7 @@ impl Board {
         self.items.iter().try_for_each(|item| {
             item.git.iter().filter_map(|git| git.rules.as_ref()).try_for_each(Rules::check)?;
             item.obstacle.as_ref().map_or(Ok(()), Obstacle::check)?;
+            item.assessment.as_ref().map_or(Ok(()), Assessment::check)?;
             item.review.as_ref().map_or(Ok(()), |offer| check(offer.subtask.as_deref().is_none_or(is_subtask_id), "a review offer names a subtask by its id"))?;
             item.check_plan()?;
             item.check_stages()?;
@@ -1685,6 +1729,27 @@ mod tests {
             wrong.pointer_mut(parent).unwrap()[key] = value;
             assert!(serde_json::from_value::<Board>(wrong).is_err(), "{path}");
         }
+    }
+
+    #[test]
+    fn an_assessment_is_a_word_with_why_or_one_line_from_a_machine_not_yet_updated() {
+        let assessed = |assessment: serde_json::Value| {
+            let mut board = plain_board();
+            board["items"] = serde_json::json!([plain()]);
+            board["items"][0]["assessment"] = assessment;
+            serde_json::from_value::<Board>(board).map_err(|_| "unreadable").and_then(|board| board.check().map(|()| board.items[0].assessment.clone().unwrap()))
+        };
+        assert_eq!(assessed(serde_json::json!("review suggested: touches money")), Ok(Assessment::Said("review suggested: touches money".into())));
+        assert_eq!(
+            assessed(serde_json::json!({ "word": "recommended", "reason": "Changes how refunds round", "at": 1_761_069_600u64 })),
+            Ok(Assessment::Judged(Judgement { word: AssessmentWord::Recommended, reason: Some("Changes how refunds round".into()), at: Some(1_761_069_600) }))
+        );
+        assert!(assessed(serde_json::json!({ "word": "assessing" })).is_ok());
+        assert!(assessed(serde_json::json!({ "word": "not-needed" })).is_ok());
+        assert!(assessed(serde_json::json!({ "word": "recommended" })).is_err(), "a recommendation says why");
+        assert!(assessed(serde_json::json!({ "word": "assessing", "reason": "x" })).is_err());
+        assert!(assessed(serde_json::json!({ "word": "running" })).is_err(), "a running review is the verdict's to say");
+        assert!(assessed(serde_json::json!({ "word": "recommended", "reason": "a\nb" })).is_err());
     }
 
     #[test]

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { fromB64 } from "../js/protocol.js";
+import { REVIEW_MEDIA_TYPE, fromB64 } from "../js/protocol.js";
 import { blobReader, blobSlot, failedLine, loadingLine, planHref } from "./blobs.js";
 
 const vectors = JSON.parse(readFileSync(new URL("../vectors/blobs.json", import.meta.url), "utf8"));
@@ -84,6 +84,11 @@ test("a review opens as a checked review, and a review that fails the check does
   const review = JSON.parse(readFileSync(new URL("../vectors/review.json", import.meta.url), "utf8"));
   const reader = blobReader(hub({ [review.blob.id]: review.ciphertext }).fetchBytes);
   assert.deepEqual(await reader.load(review.blob), { review: review.review });
+  const cards = JSON.parse(readFileSync(new URL("../vectors/cards.json", import.meta.url), "utf8"));
+  const cardReader = blobReader(hub({ [cards.blob.id]: cards.ciphertext }).fetchBytes);
+  assert.deepEqual(await cardReader.load(cards.blob), { card: cards.card });
+  const markdown = blobReader(hub({ [cards.blob.id]: cards.ciphertext }).fetchBytes);
+  assert.deepEqual(await markdown.load({ ...cards.blob, media_type: REVIEW_MEDIA_TYPE }), { failed: true }, "a card is not opened as a review");
   const backlog = JSON.parse(readFileSync(new URL("../vectors/backlog.json", import.meta.url), "utf8"));
   const wrong = blobReader(hub({ [backlog.blob.id]: backlog.ciphertext }).fetchBytes);
   assert.deepEqual(await wrong.load({ ...backlog.blob, media_type: review.media_type }), { failed: true });

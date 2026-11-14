@@ -37,10 +37,12 @@ pub enum Kind {
     FoundStart,
     FoundAdd,
     FoundDismiss,
+    FoundKeep,
+    ReviewSend,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 21] = [
+    pub const ALL: [Kind; 23] = [
         Kind::Board,
         Kind::Notice,
         Kind::Result,
@@ -62,6 +64,8 @@ impl Kind {
         Kind::FoundStart,
         Kind::FoundAdd,
         Kind::FoundDismiss,
+        Kind::FoundKeep,
+        Kind::ReviewSend,
     ];
 
     pub fn name(self) -> &'static str {
@@ -87,6 +91,8 @@ impl Kind {
             Kind::FoundStart => "found-start",
             Kind::FoundAdd => "found-add",
             Kind::FoundDismiss => "found-dismiss",
+            Kind::FoundKeep => "found-keep",
+            Kind::ReviewSend => "review-send",
         }
     }
 
@@ -111,6 +117,8 @@ impl Kind {
                 | Kind::FoundStart
                 | Kind::FoundAdd
                 | Kind::FoundDismiss
+                | Kind::FoundKeep
+                | Kind::ReviewSend
         )
     }
 
@@ -129,7 +137,7 @@ impl Kind {
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
-            Kind::FoundAdd | Kind::FoundDismiss => 3_600,
+            Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem | Kind::FoundStart => 86_400,
         }
@@ -144,7 +152,7 @@ impl Kind {
             Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
-            Kind::FoundAdd | Kind::FoundDismiss => 3_600,
+            Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
             Kind::PromptAnswer => 600,
         }
     }

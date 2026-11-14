@@ -16,6 +16,7 @@ use kebbie_hub_protocol::{
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, AcceptSubtask, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
     FoundAdd, FoundDismiss, FoundStart, PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState, pushable_of,
     Answer, KebbieQuestionKind, MAX_STAGE_NOTE_CHARS, StageState, unlock_stages,
+    CARD_MEDIA_TYPE, Card, CardRef, FoundKeep, NoticedChoice, ReviewSend, Verdict,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,8 @@ pub fn every_command() -> Vec<Kind> {
         Kind::FoundStart,
         Kind::FoundAdd,
         Kind::FoundDismiss,
+        Kind::FoundKeep,
+        Kind::ReviewSend,
     ]
 }
 
@@ -137,6 +140,10 @@ pub struct MachineState {
     pub retracts: Vec<String>,
     #[serde(default)]
     pub reviews: BTreeMap<String, Review>,
+    #[serde(default)]
+    pub cards: BTreeMap<String, Card>,
+    #[serde(skip)]
+    cards_changed: bool,
     #[serde(skip)]
     review_blobs: Vec<(Id, Vec<u8>)>,
     #[serde(skip)]
@@ -351,6 +358,8 @@ impl MachineState {
             approve_from: ApproveFrom::Devices,
             retracts: Vec::new(),
             reviews: BTreeMap::new(),
+            cards: BTreeMap::new(),
+            cards_changed: false,
             review_blobs: Vec::new(),
             sealed_reviews: BTreeMap::new(),
             superseded_blobs: Vec::new(),
@@ -652,6 +661,9 @@ impl MachineState {
                 self.post_board(board).await?;
             }
         }
+        if std::mem::take(&mut self.cards_changed) {
+            self.seal_cards().await?;
+        }
         if self.backlog_changed {
             self.publish_backlog().await?;
         } else if std::mem::take(&mut self.board_changed)
@@ -683,6 +695,54 @@ impl MachineState {
         board.backlog = Some(self.backlog.rows.clone());
         self.backlog_changed = false;
         self.post_board(board).await
+    }
+
+    pub async fn post_card(&mut self, mut item: Item, card: Card) -> Result<u64, Error> {
+        card.check().map_err(|problem| Error::Protocol(problem.to_string()))?;
+        self.cards.insert(item.address.clone(), card);
+        item.card = Some(self.seal_card(&item).await?);
+        let mut board = self.board.clone().unwrap_or_else(empty_board);
+        board.items.retain(|held| held.address != item.address);
+        board.items.insert(0, item);
+        self.post_board(board).await
+    }
+
+    async fn seal_card(&self, item: &Item) -> Result<CardRef, Error> {
+        let card = &self.cards[&item.address];
+        let plaintext = serde_json::to_vec(card).map_err(|error| Error::Protocol(error.to_string()))?;
+        let (blob, ciphertext) = seal_blob(&plaintext, CARD_MEDIA_TYPE);
+        self.put_blob(&blob.id, ciphertext).await?;
+        let sha = item.head.clone().or_else(|| item.card.as_ref().map(|card| card.sha.clone())).unwrap_or_else(|| "0".repeat(40));
+        Ok(CardRef { sha, current: true, blob })
+    }
+
+    async fn seal_cards(&mut self) -> Result<(), Error> {
+        let Some(mut board) = self.board.clone() else {
+            return Ok(());
+        };
+        for item in board.items.iter_mut().filter(|item| self.cards.contains_key(&item.address)) {
+            item.card = Some(self.seal_card(item).await?);
+        }
+        self.board = Some(board);
+        self.board_changed = true;
+        Ok(())
+    }
+
+    fn choose_on_cards(&mut self, item: &ItemKey, choice: NoticedChoice) {
+        for noticed in self.cards.values_mut().flat_map(|card| card.noticed.iter_mut()).filter(|noticed| noticed.found.as_ref() == Some(item)) {
+            noticed.chosen = Some(choice);
+            self.cards_changed = true;
+        }
+    }
+
+    fn send_to_review(&mut self, send: &ReviewSend) -> Result<String, Reason> {
+        let item = self.board.as_mut().and_then(|board| board.items.iter_mut().find(|item| item.address == send.address)).ok_or(Reason::UnknownRepo)?;
+        if item.verdict.as_ref().is_some_and(|verdict| verdict.running) {
+            return Err(Reason::AlreadySettled);
+        }
+        item.verdict = Some(Verdict { verdict: None, findings: None, sha: item.head.clone(), stale: false, running: true, held: None });
+        self.board_changed = true;
+        Ok(format!("Sent {}{} to a full review.", send.subtask.as_deref().map_or(String::new(), |subtask| format!("subtask {subtask} of ")), send.address))
     }
 
     pub async fn post_review(&mut self, mut item: Item, review: Review) -> Result<u64, Error> {
@@ -846,6 +906,7 @@ impl MachineState {
 
     fn start_found(&mut self, start: &FoundStart) -> Result<String, Reason> {
         let row = self.found_row(&start.item)?;
+        self.choose_on_cards(&start.item, NoticedChoice::Task);
         let address = format!("{}@{}", start.name.as_deref().unwrap_or("found-task"), row.repo.as_deref().unwrap_or("repo"));
         let board = self.board.get_or_insert_with(empty_board);
         board.items.retain(|item| item.address != address);
@@ -858,7 +919,15 @@ impl MachineState {
             return Err(Reason::UnknownRepo);
         }
         let row = self.found_row(&add.item)?;
+        self.choose_on_cards(&add.item, NoticedChoice::Subtask);
         Ok(format!("Sent {:?} to {} as a subtask to add.", row.title, add.task))
+    }
+
+    fn keep_found(&mut self, keep: &FoundKeep) -> Result<String, Reason> {
+        let row = self.backlog.rows.iter().find(|row| row.item == keep.item && row.found.is_some()).ok_or(Reason::UnknownItem)?;
+        let title = row.title.clone();
+        self.choose_on_cards(&keep.item, NoticedChoice::Kept);
+        Ok(format!("Kept {title:?} in the backlog."))
     }
 
     fn dismiss_found(&mut self, dismiss: &FoundDismiss) -> Result<String, Reason> {
@@ -1143,6 +1212,14 @@ impl MachineState {
             Payload::FoundDismiss(dismiss) => (
                 format!("dismiss {}", dismiss.item),
                 self.dismiss_found(dismiss).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::FoundKeep(keep) => (
+                format!("keep {} in the backlog", keep.item),
+                self.keep_found(keep).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::ReviewSend(send) => (
+                format!("send {}{} to a full review", send.address, send.subtask.as_deref().map_or(String::new(), |subtask| format!(" subtask {subtask}"))),
+                self.send_to_review(send).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),

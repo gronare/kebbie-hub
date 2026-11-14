@@ -756,3 +756,25 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 :root.panes #app, :root.panes .app { height: 100%; min-height: 0; }
 :root.panes .app { grid-template-rows: minmax(0, 1fr); }
 :root.panes .app > main.screen.in-app, :root.panes .app > .panel { position: relative; top: auto; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.card-built p { margin: 0 0 6px; }
+.card-built p:last-child { margin: 0; }
+.decs { display: grid; }
+.dec, .noticed { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14.5px; overflow-wrap: anywhere; }
+.decs > :first-child { border-top: 0; padding-top: 4px; }
+.dec-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.who { font: 500 11.5px/1.5 var(--mono); border-radius: 6px; padding: 0 6px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+.who-investigator { color: var(--blue); }
+.who-you { color: var(--yellow); }
+.who-task { color: var(--teal); }
+.dec.replaced .dec-text { color: var(--muted); text-decoration: line-through; }
+.noticed-acts { margin-top: 2px; }
+.assess { display: grid; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14px; box-shadow: inset 3px 0 0 var(--accent); overflow-wrap: anywhere; }
+.decide > .btn.fit { justify-self: start; }
+.card-changed { margin-bottom: 4px; }
+.card-changed .btn { justify-self: start; margin-top: 4px; }
+.change small { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.change.removed .mark { color: var(--yellow); }
+.change.removed > span:last-child { color: var(--muted); text-decoration: line-through; }
+.card-diff { display: grid; gap: 6px; }
+.card-diff > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13.5px; padding: 4px 0; }
+.card-diff[open] > summary { margin-bottom: 4px; }

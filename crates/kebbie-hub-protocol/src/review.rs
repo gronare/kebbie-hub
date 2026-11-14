@@ -293,6 +293,21 @@ pub fn is_content_hash(text: &str) -> bool {
     (text.len() == 40 || text.len() == 64) && text.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewSend {
+    pub address: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtask: Option<String>,
+}
+
+impl ReviewSend {
+    pub fn check(&self) -> Result<(), &'static str> {
+        check(is_address(&self.address), "address is not task@repo")?;
+        check(self.subtask.as_deref().is_none_or(is_subtask_id), "a subtask is named by its id")
+    }
+}
+
 impl ReviewOpen {
     pub fn check(&self) -> Result<(), &'static str> {
         check(is_address(&self.address), "address is not task@repo")?;

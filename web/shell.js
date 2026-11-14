@@ -1,4 +1,4 @@
-export const SHELL = "kebbie-shell-v22";
+export const SHELL = "kebbie-shell-v23";
 
 // A new worker never reloads the page: the page fetched its files past the cache, so it already runs the newest code.
 export function watchShell(workers, { page = globalThis.document } = {}) {

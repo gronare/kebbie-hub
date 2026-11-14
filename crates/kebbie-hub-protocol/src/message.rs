@@ -4,7 +4,7 @@ use crate::backlog::{HomeKind, ItemKey, is_section_key, is_text_hash};
 use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
-use crate::review::{AcceptStep, AcceptSubtask, ReviewComments, ReviewOpen, ReviewRead};
+use crate::review::{AcceptStep, AcceptSubtask, ReviewComments, ReviewOpen, ReviewRead, ReviewSend};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
@@ -44,6 +44,8 @@ pub enum Payload {
     FoundStart(FoundStart),
     FoundAdd(FoundAdd),
     FoundDismiss(FoundDismiss),
+    FoundKeep(FoundKeep),
+    ReviewSend(ReviewSend),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -401,6 +403,12 @@ pub struct FoundDismiss {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct FoundKeep {
+    pub item: ItemKey,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StartTask {
     pub repo: String,
     pub name: String,
@@ -496,6 +504,8 @@ impl Payload {
             Payload::FoundStart(_) => Kind::FoundStart,
             Payload::FoundAdd(_) => Kind::FoundAdd,
             Payload::FoundDismiss(_) => Kind::FoundDismiss,
+            Payload::FoundKeep(_) => Kind::FoundKeep,
+            Payload::ReviewSend(_) => Kind::ReviewSend,
         }
     }
 
@@ -579,6 +589,8 @@ impl Payload {
                 check(is_address(&add.task), "task is not task@repo")
             }
             Payload::FoundDismiss(dismiss) => check(dismiss.item.home() == HomeKind::Found, "the item is not one tasks found"),
+            Payload::FoundKeep(keep) => check(keep.item.home() == HomeKind::Found, "the item is not one tasks found"),
+            Payload::ReviewSend(send) => send.check(),
             Payload::Board(board) => board.check(),
             Payload::StartItem(_) | Payload::Result(_) => Ok(()),
         }
@@ -874,6 +886,23 @@ mod tests {
         assert_eq!(
             [Kind::FoundStart, Kind::FoundAdd, Kind::FoundDismiss].map(|kind| (kind.name(), kind.is_command(), kind.default_ttl(), kind.max_ttl())),
             [("found-start", true, 86_400, 86_400), ("found-add", true, 3_600, 3_600), ("found-dismiss", true, 3_600, 3_600)]
+        );
+    }
+
+    #[test]
+    fn a_noticed_line_is_kept_by_its_key_and_a_task_is_sent_to_a_full_review_by_its_address() {
+        let keep = |item: &str| Payload::FoundKeep(FoundKeep { item: ItemKey::parse(item).unwrap() });
+        assert_eq!(keep("found:f3").validate(), Ok(()));
+        assert!(keep("kept:idea-1").validate().is_err(), "only an item tasks found");
+        assert_eq!(serde_json::to_value(keep("found:f3")).unwrap(), serde_json::json!({ "type": "found-keep", "item": "found:f3" }));
+        let send = |address: &str, subtask: Option<&str>| Payload::ReviewSend(crate::ReviewSend { address: address.into(), subtask: subtask.map(Into::into) });
+        assert_eq!((send("payments@api", None).validate(), send("payments@api", Some("gateway")).validate()), (Ok(()), Ok(())));
+        assert!(send("payments", None).validate().is_err());
+        assert!(send("payments@api", Some("../gateway")).validate().is_err());
+        assert_eq!(serde_json::to_value(send("payments@api", None)).unwrap(), serde_json::json!({ "type": "review-send", "address": "payments@api" }));
+        assert_eq!(
+            [Kind::FoundKeep, Kind::ReviewSend].map(|kind| (kind.name(), kind.is_command(), kind.default_ttl(), kind.max_ttl())),
+            [("found-keep", true, 3_600, 3_600), ("review-send", true, 3_600, 3_600)]
         );
     }
 

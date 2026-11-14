@@ -222,7 +222,8 @@ export function pushBlock({ item, machineName, ui, sent, state, standing = null 
     const busy = ui.busy ? " disabled" : "";
     return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push ${esc(count)} · ${esc(short)} to main?</b></p><p>${esc(count)}${rest}${reviewed}. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push"${busy}>Push</button></div></div>` + error;
   }
-  return status + `<button type="button" class="btn primary" data-action="push-ask">Push ${esc(count)} · ${staged ? `stage ${esc(staged.number)}` : esc(short)}</button>` + error;
+  const reviewFirst = item.assessment?.word === "recommended" && !item.verdict?.running;
+  return status + `<button type="button" class="btn${reviewFirst ? "" : " primary"}" data-action="push-ask">Push ${esc(count)} · ${staged ? `stage ${esc(staged.number)}` : esc(short)}</button>` + error;
 }
 
 export function refusedBlock(url) {

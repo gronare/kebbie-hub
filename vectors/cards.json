@@ -1,0 +1,5099 @@
+{
+  "assessments": [
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069300,
+          "reason": "Changes how refunds are rounded and booked, in 4 commits",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a full review recommended, with why and when",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069300,
+          "reason": "One file, covered by its tests",
+          "word": "not-needed"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a full review not needed",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "word": "not-needed"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a full review not needed, without why",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "word": "assessing"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "the assessor still at it",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": "review suggested: touches money",
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "one line from a machine not yet updated",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069600,
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a recommendation without why",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "reason": "x",
+          "word": "assessing"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "the assessor at it with a reason already",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069600,
+          "word": "assessing"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "the assessor at it since a time",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "reason": "Money\nand tests",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a reason over two lines",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a reason past its length",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "word": "running"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a word kebbie does not know",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "by": "codex",
+          "reason": "x",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "an assessment with a field it does not have",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069300,
+          "reason": "Changes how refunds are rounded and booked, in 4 commits",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "obstacle": {
+          "at": 1761069600,
+          "decision": {
+            "by": "lead",
+            "kind": "workaround",
+            "text": "Use the test key"
+          },
+          "id": "sandbox",
+          "state": "decided",
+          "text": "No sandbox key"
+        },
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "an obstacle decided by the lead",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069300,
+          "reason": "Changes how refunds are rounded and booked, in 4 commits",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "obstacle": {
+          "at": 1761069600,
+          "decision": {
+            "by": "task",
+            "kind": "workaround",
+            "text": "Use the test key"
+          },
+          "id": "sandbox",
+          "state": "decided",
+          "text": "No sandbox key"
+        },
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "an obstacle decided by the task",
+      "valid": false
+    }
+  ],
+  "blob": {
+    "bytes": 1186,
+    "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+    "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+    "media_type": "application/vnd.kebbie.card+json"
+  },
+  "board": {
+    "accepts": [
+      "answer",
+      "push",
+      "found-start",
+      "found-add",
+      "found-keep",
+      "review-send"
+    ],
+    "away_since": null,
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": {
+          "at": 1761069300,
+          "reason": "Changes how refunds are rounded and booked, in 4 commits",
+          "word": "recommended"
+        },
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "application/vnd.kebbie.card+json"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
+  "board_from_a_machine_not_yet_updated": {
+    "accepts": [
+      "answer",
+      "push",
+      "found-start",
+      "found-add",
+      "found-keep",
+      "review-send"
+    ],
+    "away_since": null,
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "assessment": "review suggested: touches money",
+        "card": {
+          "blob": {
+            "bytes": 1186,
+            "id": "blb_544176d7ac489fd467119309c0efac55a477ad80102c7a191d3b4132b1aaf61d",
+            "key": "F8kOF7AIFgrIfWTiBc9NSA6FNHNM8fkcr9bNn6kfhYc",
+            "media_type": "text/markdown"
+          },
+          "current": true,
+          "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+        },
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "READY TO PUSH",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
+  "card": {
+    "built": [
+      "Payments go through the gateway; a refund rounds VAT per invoice.",
+      "See it: `pay refund --dry-run 1042` prints the rounded amount."
+    ],
+    "changed_at": 1761069000,
+    "decisions": [
+      {
+        "at": 1761062400,
+        "by": "lead",
+        "replaced_by": 3,
+        "source": "method",
+        "subtask": "currency",
+        "text": "Round VAT per line"
+      },
+      {
+        "at": 1761060600,
+        "by": "you",
+        "source": "plan",
+        "text": "Keep the old endpoint for a week"
+      },
+      {
+        "at": 1761064200,
+        "by": "investigator",
+        "source": "obstacle",
+        "subtask": "gateway",
+        "text": "The gateway's sandbox key comes from the vault"
+      },
+      {
+        "at": 1761066000,
+        "by": "you",
+        "source": "question",
+        "subtask": "currency",
+        "text": "Round VAT per invoice, as the accountant books it"
+      },
+      {
+        "by": "task",
+        "text": "A narrower retry around the webhook"
+      }
+    ],
+    "noticed": [
+      {
+        "found": "found:f3",
+        "text": "The refund mail names the old gateway"
+      },
+      {
+        "chosen": "kept",
+        "found": "found:f4",
+        "text": "`settle_batch` reads and writes outside a transaction"
+      }
+    ],
+    "previous": {
+      "built": [
+        "Payments go through the gateway; a refund rounds per invoice."
+      ],
+      "decisions": [
+        {
+          "at": 1761062400,
+          "by": "lead",
+          "source": "method",
+          "subtask": "currency",
+          "text": "Round VAT per line"
+        }
+      ],
+      "noticed": [
+        {
+          "found": "found:f3",
+          "text": "The refund mail names the old gateway"
+        }
+      ],
+      "version": 1
+    },
+    "version": 2
+  },
+  "cards": [
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "previous": {
+          "built": [
+            "Payments go through the gateway; a refund rounds per invoice."
+          ],
+          "decisions": [
+            {
+              "at": 1761062400,
+              "by": "lead",
+              "source": "method",
+              "subtask": "currency",
+              "text": "Round VAT per line"
+            }
+          ],
+          "noticed": [
+            {
+              "found": "found:f3",
+              "text": "The refund mail names the old gateway"
+            }
+          ],
+          "version": 1
+        },
+        "version": 2
+      },
+      "name": "a card that changed, with the version before it",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a first card, with nothing before it",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "The README names every flag."
+        ],
+        "decisions": [],
+        "noticed": [],
+        "version": 1
+      },
+      "name": "a card with nothing but what was built",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6"
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a card with six Built lines",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "text": "The CLI's help names an old flag"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a noticed line not yet filed, without buttons",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "through-lead",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision said in the lead's chat",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 3
+      },
+      "name": "a change without the version before it",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a Built line at its length",
+      "valid": true
+    },
+    {
+      "card": {
+        "built": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "seven Built lines",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a Built line past its length",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway\nand refunds round",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a Built line over two lines",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision past its length",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep it\u001b[2J"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision with a terminal escape",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "reviewer",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision by someone kebbie does not know",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "hunch",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision from a source kebbie does not know",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 0,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision replaced by itself",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "replaced_by": 1,
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision replaced by an earlier one",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 5,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision replaced by one not on the card",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "../currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a decision's subtask named by a path",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "kept:idea-4411",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a noticed line naming a kept item",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "text": "x"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a choice on a line not filed",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "dismissed",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a choice kebbie does not know",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f3",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "one found item on two lines",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 0
+      },
+      "name": "version zero",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "previous": {
+          "built": [
+            "Payments go through the gateway; a refund rounds per invoice."
+          ],
+          "decisions": [
+            {
+              "at": 1761062400,
+              "by": "lead",
+              "source": "method",
+              "subtask": "currency",
+              "text": "Round VAT per line"
+            }
+          ],
+          "noticed": [
+            {
+              "found": "found:f3",
+              "text": "The refund mail names the old gateway"
+            }
+          ],
+          "version": 2
+        },
+        "version": 2
+      },
+      "name": "a version before it that is not earlier",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "previous": {
+          "built": [
+            "Payments go through the gateway; a refund rounds per invoice."
+          ],
+          "decisions": [
+            {
+              "at": 1761062400,
+              "by": "lead",
+              "source": "method",
+              "subtask": "currency",
+              "text": "Round VAT per line"
+            }
+          ],
+          "noticed": [
+            {
+              "found": "found:f3",
+              "text": "The refund mail names the old gateway"
+            }
+          ],
+          "version": 1
+        },
+        "version": 2
+      },
+      "name": "a change without when",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "previous": {
+          "built": [
+            "Payments go through the gateway; a refund rounds per invoice."
+          ],
+          "decisions": [
+            {
+              "at": 1761062400,
+              "by": "lead",
+              "source": "method",
+              "subtask": "currency",
+              "text": "Round VAT per line"
+            }
+          ],
+          "noticed": [
+            {
+              "found": "found:f3",
+              "text": "The refund mail names the old gateway"
+            }
+          ],
+          "previous": {
+            "built": [
+              "Payments go through the gateway; a refund rounds VAT per invoice.",
+              "See it: `pay refund --dry-run 1042` prints the rounded amount."
+            ],
+            "changed_at": 1761069000,
+            "decisions": [
+              {
+                "at": 1761062400,
+                "by": "lead",
+                "replaced_by": 3,
+                "source": "method",
+                "subtask": "currency",
+                "text": "Round VAT per line"
+              },
+              {
+                "at": 1761060600,
+                "by": "you",
+                "source": "plan",
+                "text": "Keep the old endpoint for a week"
+              },
+              {
+                "at": 1761064200,
+                "by": "investigator",
+                "source": "obstacle",
+                "subtask": "gateway",
+                "text": "The gateway's sandbox key comes from the vault"
+              },
+              {
+                "at": 1761066000,
+                "by": "you",
+                "source": "question",
+                "subtask": "currency",
+                "text": "Round VAT per invoice, as the accountant books it"
+              },
+              {
+                "by": "task",
+                "text": "A narrower retry around the webhook"
+              }
+            ],
+            "noticed": [
+              {
+                "found": "found:f3",
+                "text": "The refund mail names the old gateway"
+              },
+              {
+                "chosen": "kept",
+                "found": "found:f4",
+                "text": "`settle_batch` reads and writes outside a transaction"
+              }
+            ],
+            "version": 1
+          },
+          "version": 1
+        },
+        "version": 2
+      },
+      "name": "a version before it carrying its own",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "previous": {
+          "built": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "decisions": [
+            {
+              "at": 1761062400,
+              "by": "lead",
+              "source": "method",
+              "subtask": "currency",
+              "text": "Round VAT per line"
+            }
+          ],
+          "noticed": [
+            {
+              "found": "found:f3",
+              "text": "The refund mail names the old gateway"
+            }
+          ],
+          "version": 1
+        },
+        "version": 2
+      },
+      "name": "a version before it that breaks the rules",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "confirm": [
+          "Check the refund mail by hand"
+        ],
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "a confirm part, which a card does not have",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          }
+        ],
+        "noticed": [
+          {
+            "found": "found:f3",
+            "text": "The refund mail names the old gateway"
+          },
+          {
+            "chosen": "kept",
+            "found": "found:f4",
+            "text": "`settle_batch` reads and writes outside a transaction"
+          }
+        ],
+        "version": 1
+      },
+      "name": "too many decisions",
+      "valid": false
+    },
+    {
+      "card": {
+        "built": [
+          "Payments go through the gateway; a refund rounds VAT per invoice.",
+          "See it: `pay refund --dry-run 1042` prints the rounded amount."
+        ],
+        "changed_at": 1761069000,
+        "decisions": [
+          {
+            "at": 1761062400,
+            "by": "lead",
+            "replaced_by": 3,
+            "source": "method",
+            "subtask": "currency",
+            "text": "Round VAT per line"
+          },
+          {
+            "at": 1761060600,
+            "by": "you",
+            "source": "plan",
+            "text": "Keep the old endpoint for a week"
+          },
+          {
+            "at": 1761064200,
+            "by": "investigator",
+            "source": "obstacle",
+            "subtask": "gateway",
+            "text": "The gateway's sandbox key comes from the vault"
+          },
+          {
+            "at": 1761066000,
+            "by": "you",
+            "source": "question",
+            "subtask": "currency",
+            "text": "Round VAT per invoice, as the accountant books it"
+          },
+          {
+            "by": "task",
+            "text": "A narrower retry around the webhook"
+          }
+        ],
+        "noticed": [
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          },
+          {
+            "text": "x"
+          }
+        ],
+        "version": 1
+      },
+      "name": "too many noticed lines",
+      "valid": false
+    }
+  ],
+  "ciphertext": "hl099oFS9Vj1uDNbROH4N0roNxLhv4wszxFED_2CfjS422uruEBXtPeygVU79amWnb1cYQiM7Z3d-POazWp0OiK_dxq0usna7RTiA1JaMwfoY7_h-npWbaBIIEn6dcIc11D-wDhZ5M5TXGz6_o6ZNQQzpXm096UWeJdNwbRp-Ff5PkzJMnnJUwFvOLuLLQpv7XmJslvgDFUnqF_f9s9oh6XwhYZZjBMLbRLE1rbEH4yNErp9fTx4CLBDLVgMLbMxCLYny2Ju9bcQ1jV3Tpw3W-XyCytZqNdlnhB7jmx0Wm9D3rxdQZvtzaZjYZ6rmrOIK7y4i0cMSDoEXQpBv8xpK45V0WZ20IZtpack9ZtaJkiSMccC-81FNOA9VgKV33U_a71iwW49jbGzdN08BBYeLhhx-XgGo0jPwcR99XRT7Hzr2CayaeTHZi3RsqZhY2h-BJjX7whfAjZlkR0i6ELKwnjugCkuVO6bhFFzGi3T51vRSl2tMUoyfLsidcjKvcsnHWDzYhpEGTm-SiSLDDZnjEluthXQOElKqHyaCR5MGG4fnBEQHzw7l2_EGIyo-8jHJ49prmEk1WLoBjGqCbteL2q69ZZEompXRnLyazZAQBlp-CeDeKQbo9CTsiWgoeGETZKaMBcIBbZlzH7IgVb0x2oMH2bnPoFzg8h6pQ_sl_MJQQdzCdg_wAO509rjZQhTh9Z4N5mzG8UdyulzYDr_7uSnVAk1Cp6Vr-Xw7CX6Ape5q1YkScv3cc9ATSQRI9Dt77EhdgM2yoKdL1IICdhJlSxmp12BDyVRVSD8HxXPleNE2a2S4U8pzpdUUC78vxDAHFnd3t0LvSyYy5oH9Uama8Bpn7RCJP6OprA5CqvIv84IxSkDx1NO8A_2--WW09FUmEwxk4n3hdCzQmStmWnfvdimIPJDB_jPEDiWeiIe1FBlvOy5_ksAt-sAMYGoaqorEx7KwexwDSfHdoAbDwvW2KT9dynHZYWPkAejbyMzxsWMwdBStyNFecz1QP660yD5-WgBk1s7abFj7ZV5V1m8ypyXS_PA8NeeHfIujLrwbvJmwCab_vrOd56dyGAlOR6MFX-Rsm6aZ18UZUvrryMn9Hdlh9Y2WRO4PsDlIBZ24faX5T8RYTkRSD2K6lZdzmtJJMK_EXP65GD4JiExHpY6fr6UAIy2cT4kUfEnWpdBKb69QTOrY31Xey0jEG4yfNctxPYiDRIpjqxvyHvEhJ2mbsrnMvqutage12KHDtgBL9kQB871qI8Q2smqBOeB38fUaabFQqL-FWFLNhOaveGxjnFd3H0KzYWuPd0pz8fnhd1MycK8AYFRVkxJm8k3xaVqV1uMBORlVaFWHYUPQEdLcsn4o4nb-fF80nsXKdIvczJ6fi7W-Q3_yY_egoz0vA0DTJbQX4aLFfNmurW-dOP9CYfGcON0puDDhCBYkcweHFmiJl09zqpLTekKmSl8-wjFK2r6kjzMD4vXuW2I8PVFlZ-Mr7vkwCHdeRtCNKf1uIHma7fuRUMNAW-E0thtEZlaQjqVaB-dWPq4WQH_YgdQRv8KHg1XYq_LR9-Dv3kqdyDO1y4vWtBrwkdN26CzFhfPHdezs0iSTZVpo7VeTXI",
+  "max_assessment_reason_chars": 500,
+  "max_built_lines": 6,
+  "max_card_line_chars": 600,
+  "max_decision_chars": 1000,
+  "max_decisions": 64,
+  "max_noticed": 32,
+  "media_type": "application/vnd.kebbie.card+json",
+  "payloads": [
+    {
+      "name": "a full review asked for",
+      "payload": {
+        "address": "payments@api",
+        "type": "review-send"
+      },
+      "valid": true
+    },
+    {
+      "name": "a full review of one subtask asked for",
+      "payload": {
+        "address": "payments@api",
+        "subtask": "gateway",
+        "type": "review-send"
+      },
+      "valid": true
+    },
+    {
+      "name": "a full review of a task without its repo",
+      "payload": {
+        "address": "payments",
+        "type": "review-send"
+      },
+      "valid": false
+    },
+    {
+      "name": "a full review of a subtask named by a path",
+      "payload": {
+        "address": "payments@api",
+        "subtask": "../gateway",
+        "type": "review-send"
+      },
+      "valid": false
+    },
+    {
+      "name": "a full review with a reason, which it does not carry",
+      "payload": {
+        "address": "payments@api",
+        "reason": "money",
+        "type": "review-send"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item kept in the backlog",
+      "payload": {
+        "item": "found:f3",
+        "type": "found-keep"
+      },
+      "valid": true
+    },
+    {
+      "name": "a kept item kept as if a task found it",
+      "payload": {
+        "item": "kept:idea-4411",
+        "type": "found-keep"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item kept for a task, which it does not name",
+      "payload": {
+        "item": "found:f3",
+        "task": "payments@api",
+        "type": "found-keep"
+      },
+      "valid": false
+    },
+    {
+      "name": "a found item added to the card's task as a subtask",
+      "payload": {
+        "item": "found:f3",
+        "task": "payments@api",
+        "type": "found-add"
+      },
+      "valid": true
+    },
+    {
+      "name": "a task started from a noticed line",
+      "payload": {
+        "item": "found:f3",
+        "type": "found-start"
+      },
+      "valid": true
+    }
+  ]
+}

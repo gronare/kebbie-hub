@@ -4,7 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AccountKey, AppliedCommands, BacklogBody, BlobRef, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Notice, NoticeCategory, Payload, PublicKeys, Refusal, SecretKeys, Target, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
+    AccountKey, AppliedCommands, BacklogBody, BlobRef, Card, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Notice, NoticeCategory, Payload, PublicKeys, Refusal, SecretKeys, Target, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
 };
 use serde_json::Value;
 
@@ -336,6 +336,31 @@ fn blobs_open_or_fail_as_the_vectors_say() {
             Some(error) => assert_eq!(opened.unwrap_err().key(), error, "{name}"),
         }
     }
+}
+
+#[test]
+fn a_sign_off_card_opens_from_its_blob_and_its_commands_and_assessments_hold_as_the_vectors_say() {
+    let vectors = load("cards.json");
+    let blob: BlobRef = serde_json::from_value(vectors["blob"].clone()).unwrap();
+    assert_eq!(blob.media_type, vectors["media_type"].as_str().unwrap());
+    let ciphertext = URL_SAFE_NO_PAD.decode(vectors["ciphertext"].as_str().unwrap()).unwrap();
+    let card = Card::read(&open_blob(&blob, &ciphertext).unwrap()).unwrap();
+    assert_eq!(serde_json::to_value(&card).unwrap(), vectors["card"]);
+    for case in vectors["cards"].as_array().unwrap() {
+        assert_eq!(Card::read(case["card"].to_string().as_bytes()).is_ok(), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    for case in vectors["assessments"].as_array().unwrap() {
+        let mut board = vectors["board"].clone();
+        board["items"] = serde_json::json!([case["item"].clone()]);
+        let parsed = serde_json::from_value::<Payload>(board);
+        assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    for case in vectors["payloads"].as_array().unwrap() {
+        let parsed = serde_json::from_value::<Payload>(case["payload"].clone());
+        assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    let old = serde_json::from_value::<Payload>(vectors["board_from_a_machine_not_yet_updated"].clone()).unwrap();
+    assert_eq!(old.validate(), Ok(()), "a markdown card and a one-line assessment still open");
 }
 
 #[test]

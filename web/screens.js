@@ -132,6 +132,14 @@ export function awayLine(away, now) {
   return `<div class="center warn">${esc(said)}</div>`;
 }
 
+export function assessmentText(assessment) {
+  if (!assessment) return "";
+  if (typeof assessment === "string") return assessment;
+  if (assessment.word === "recommended") return "full review recommended";
+  if (assessment.word === "not-needed") return "no full review needed";
+  return "assessing the review";
+}
+
 export function taskFacts(item) {
   const agent = agentChip(item.agent, true);
   const profile = item.profile ? `profile ${esc(item.profile)}` : "";
@@ -141,7 +149,7 @@ export function taskFacts(item) {
 
 export function reviewLines(item) {
   const lines = [];
-  if (item.assessment) lines.push(`<div>${esc(item.assessment)}</div>`);
+  if (item.assessment && item.assessment.word !== "recommended") lines.push(`<div>${esc(assessmentText(item.assessment))}</div>`);
   const verdict = item.verdict;
   const said = [];
   if (verdict) {
@@ -410,7 +418,7 @@ export const taskKey = (machine, address) => `${machine}|${address}`;
 export function taskRow(row, selected = null) {
   const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
   const on = selected === taskKey(row.machine, row.item.address);
-  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(row.item.assessment ?? ""), esc(row.item.summary)].filter(Boolean).join(" · ");
+  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(assessmentText(row.item.assessment)), esc(row.item.summary)].filter(Boolean).join(" · ");
   const wanted = row.item.next_for_you ?? stepsWanted(row.item, row.name);
   const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
   return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepSummary(row.item)}${you}</a>`;
@@ -719,7 +727,7 @@ export function devicesSection(devices, now) {
   return `<h2 class="group g-muted">Devices · ${kept.length}</h2>${kept.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>${gone}`;
 }
 
-const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of" };
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of", "found-keep": "Keeping of", "review-send": "Full review of" };
 const clip = (text, length = 60) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept|found):/, "").replace(/\.md$/, "");
 
@@ -735,7 +743,7 @@ function subject(entry) {
   if (payload.type === "routine") return payload.id;
   if (payload.type === "start") return `${payload.name}@${payload.repo}`;
   if (payload.type === "idea") return `${entry.machineName}: ${clip(payload.text)}`;
-  if (["item-answer", "start-item", "item-edit", "found-start", "found-add", "found-dismiss"].includes(payload.type)) return itemName(entry);
+  if (["item-answer", "start-item", "item-edit", "found-start", "found-add", "found-dismiss", "found-keep"].includes(payload.type)) return itemName(entry);
   if (payload.type === "device-decision") return entry.targetName ?? payload.device.slice(-6);
   return payload.address;
 }
@@ -764,6 +772,8 @@ export function historyEntry(entry, now) {
     if (kind === "found-start") return { icon: "✓", what: `Started a task from ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "found-add") return { icon: "✓", what: `Added ${what} to ${entry.payload.task}`, said: `on ${machine}`, at: entry.at };
     if (kind === "found-dismiss") return { icon: "✓", what: `Dismissed ${what}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "found-keep") return { icon: "✓", what: `Kept ${what} in the backlog`, said: `on ${machine}`, at: entry.at };
+    if (kind === "review-send") return { icon: "✓", what: `Sent ${what} to a full review`, said: `on ${machine}`, at: entry.at };
     return { icon: "✓", what: `Started ${what}`, said: `on ${machine}`, at: entry.at };
   }
   const noun = `${NOUNS[kind] ?? kind} ${what}`;

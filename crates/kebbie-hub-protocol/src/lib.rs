@@ -4,6 +4,7 @@ mod authorize;
 mod backlog;
 mod blob;
 mod board;
+mod card;
 mod connect;
 mod crypto;
 mod device;
@@ -30,7 +31,7 @@ pub use backlog::{
 };
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
-    Added, Agent, CommitTests, DecidedBy, DecisionKind, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
+    Added, Agent, Assessment, AssessmentWord, Judgement, MAX_ASSESSMENT_REASON_CHARS, CommitTests, DecidedBy, DecisionKind, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
     KebbieQuestion, KebbieQuestionKind, Later, LaterState, CLOSE_OPTIONS, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS,
     MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, Requirement, RequirementKind, Stage, StageState,
     VERIFY_OPTIONS, MAX_ADDED_REASON_CHARS, MAX_MOVED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, MAX_SUBTASK_ID_CHARS, NextPart, NextRow,
@@ -38,6 +39,7 @@ pub use board::{
     Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Subtask, SubtaskState,
     TestsState, Verdict, VerdictOutcome, is_subtask_id, pushable_of, unlock_stages,
 };
+pub use card::{CARD_MEDIA_TYPE, Card, CardDecision, DecisionSource, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, Noticed, NoticedChoice};
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 pub use crypto::{
     CLOCK_SKEW, HPKE_INFO, OpenError, PublicKeys, Randomness, SealError, SecretKeys,
@@ -50,7 +52,7 @@ pub use device::{
 pub use envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
-    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundStart, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
     MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,
     MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
     MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
@@ -59,7 +61,7 @@ pub use message::{
 pub use review::{
     AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
-    ReviewCommit, ReviewOpen, ReviewRead, ReviewSubtask, Side, is_content_hash,
+    ReviewCommit, ReviewOpen, ReviewRead, ReviewSend, ReviewSubtask, Side, is_content_hash,
 };
 
 pub const PROTOCOL_VERSION: u16 = 1;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { CARD_MEDIA_TYPE, MAX_ASSESSMENT_REASON_CHARS, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, readCard, CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -747,6 +747,53 @@ test("what tasks found is started, added to a task or dismissed by its key, and 
     const vector = envelopes.cases.find((candidate) => candidate.name === name);
     const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
     assert.equal(envelope.exp - envelope.at, KINDS[vector.expect.payload.type].ttl, name);
+    assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
+  }
+});
+
+test("a sign-off card opens from its blob as data, and its commands and assessments hold as Rust's validation says", async () => {
+  const cards = load("cards.json");
+  assert.equal(cards.media_type, CARD_MEDIA_TYPE);
+  assert.deepEqual(
+    [cards.max_built_lines, cards.max_card_line_chars, cards.max_decisions, cards.max_decision_chars, cards.max_noticed, cards.max_assessment_reason_chars],
+    [MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISIONS, MAX_DECISION_CHARS, MAX_NOTICED, MAX_ASSESSMENT_REASON_CHARS],
+  );
+  const opened = readCard(JSON.parse(new TextDecoder().decode(await openBlob(cards.blob, fromB64(cards.ciphertext)))));
+  assert.deepEqual(opened, cards.card);
+  assert.deepEqual(opened.decisions.map((decision) => decision.by), ["lead", "you", "investigator", "you", "task"]);
+  assert.equal(opened.decisions[0].replaced_by, 3);
+  assert.equal(opened.previous.version, 1);
+  const reads = (candidate) => {
+    try {
+      readCard(candidate);
+      return true;
+    } catch (error) {
+      if (error.code !== "malformed") throw error;
+      return false;
+    }
+  };
+  assert.ok(cards.cards.length > 25);
+  for (const { name, card, valid } of cards.cards) assert.equal(reads(card), valid, name);
+  const passes = (payload) => {
+    try {
+      checkPayload(payload);
+      return true;
+    } catch (error) {
+      if (error.code !== "malformed") throw error;
+      return false;
+    }
+  };
+  const board = envelopes.cases.find((vector) => vector.name === "board-with-a-sign-off-card-and-an-assessment-opened-by-the-account").expect.payload;
+  assert.deepEqual(board, cards.board);
+  for (const { name, item, valid } of cards.assessments) assert.equal(passes({ ...board, items: [item] }), valid, name);
+  for (const { name, payload, valid } of cards.payloads) assert.equal(passes(payload), valid, name);
+  assert.ok(passes(cards.board_from_a_machine_not_yet_updated), "a markdown card and a one-line assessment still open");
+  assert.deepEqual([KINDS["found-keep"].maxTtl, KINDS["review-send"].maxTtl], [envelopes.max_ttl["found-keep"], envelopes.max_ttl["review-send"]]);
+  const device = await certifiedPhone();
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  for (const name of ["found-keep-opened-by-the-machine", "review-send-opened-by-the-machine"]) {
+    const vector = envelopes.cases.find((candidate) => candidate.name === name);
+    const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
     assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload, name);
   }
 });

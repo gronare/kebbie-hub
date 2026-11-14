@@ -1,4 +1,4 @@
-import { BACKLOG_BODY_MEDIA_TYPE, REVIEW_MEDIA_TYPE, checkBacklogBody, openBlob, readReview } from "../js/protocol.js";
+import { BACKLOG_BODY_MEDIA_TYPE, CARD_MEDIA_TYPE, REVIEW_MEDIA_TYPE, checkBacklogBody, openBlob, readCard, readReview } from "../js/protocol.js";
 
 export const kb = (bytes) => `${Math.max(1, Math.round(bytes / 1024))} kB`;
 
@@ -27,13 +27,15 @@ export function blobReader(fetchBytes, open = openBlob) {
           try {
             const body = ref.media_type === BACKLOG_BODY_MEDIA_TYPE;
             const review = ref.media_type === REVIEW_MEDIA_TYPE;
-            if (!body && !review && !/^text\//.test(ref.media_type)) throw new Error("not text");
-            const text = new TextDecoder("utf-8", { fatal: body || review }).decode(await open(ref, await fetchBytes(ref.id)));
-            if (!body && !review) return { text };
+            const card = ref.media_type === CARD_MEDIA_TYPE;
+            if (!body && !review && !card && !/^text\//.test(ref.media_type)) throw new Error("not text");
+            const text = new TextDecoder("utf-8", { fatal: body || review || card }).decode(await open(ref, await fetchBytes(ref.id)));
+            if (!body && !review && !card) return { text };
             const parsed = JSON.parse(text);
             if (review) {
               return { review: readReview(parsed) };
             }
+            if (card) return { card: readCard(parsed) };
             checkBacklogBody(parsed);
             return { body: parsed };
           } catch {

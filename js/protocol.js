@@ -55,6 +55,13 @@ export const fitsCollapse = (notice, tag) => [null, notice.category].includes(no
 export const MAX_LABEL_BYTES = 256;
 export const BACKLOG_BODY_MEDIA_TYPE = "application/vnd.kebbie.backlog-item+json";
 export const REVIEW_MEDIA_TYPE = "application/vnd.kebbie.review+json";
+export const CARD_MEDIA_TYPE = "application/vnd.kebbie.card+json";
+export const MAX_BUILT_LINES = 6;
+export const MAX_CARD_LINE_CHARS = 600;
+export const MAX_DECISIONS = 64;
+export const MAX_DECISION_CHARS = 1000;
+export const MAX_NOTICED = 32;
+export const MAX_ASSESSMENT_REASON_CHARS = 500;
 export const MAX_REVIEW_COMMENTS = 50;
 export const MAX_REVIEW_COMMENT_CHARS = 2000;
 export const MAX_REVIEW_COMMENTS_BYTES = 24 * 1024;
@@ -82,6 +89,8 @@ export const KINDS = {
   "found-start": { ...command, ttl: START_ITEM_TTL },
   "found-add": { ...command, maxTtl: COMMAND_TTL },
   "found-dismiss": { ...command, maxTtl: COMMAND_TTL },
+  "found-keep": { ...command, maxTtl: COMMAND_TTL },
+  "review-send": { ...command, maxTtl: COMMAND_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -427,10 +436,14 @@ const item = shape({
   title: optionalField(string),
   profile: optionalField(string),
   recipe: optionalField(string),
-  assessment: optionalField(string),
+  assessment: optionalField((value) => string(value) || judgement(value)),
   second_opinion: optionalField(shape({ by: string, points: optionalField(u32v), running: bool })),
   review: optionalField(reviewOffer),
 });
+const judgement = (value) =>
+  shape({ word: oneOf("recommended", "not-needed", "assessing"), reason: optionalField(isLine(MAX_ASSESSMENT_REASON_CHARS)), at: optionalField(u64v) })(value) &&
+  (value.word !== "recommended" || !absent(value.reason)) &&
+  (value.word !== "assessing" || (absent(value.reason) && absent(value.at)));
 const boardItem = (value) => item(value) && itemHolds(value);
 export const isHomeLabel = (label) =>
   typeof label === "string" &&
@@ -545,6 +558,37 @@ export function readReview(body) {
   return opened;
 }
 
+const cardDecision = shape({
+  text: (value) => isLine(MAX_DECISION_CHARS)(value),
+  by: oneOf("you", "lead", "investigator", "task"),
+  source: optionalField(oneOf("question", "method", "obstacle", "plan", "message", "through-lead")),
+  at: optionalField(u64v),
+  subtask: optionalField(isSubtaskId),
+  replaced_by: optionalField(u32v),
+});
+const noticedLine = (value) =>
+  shape({ text: (text) => isLine(MAX_CARD_LINE_CHARS)(text), found: optionalField((key) => isItemKey(key) && homeOf(key) === "found"), chosen: optionalField(oneOf("subtask", "task", "kept")) })(value) &&
+  (absent(value.chosen) || !absent(value.found));
+const cardLines = (card) =>
+  card.version >= 1 &&
+  card.built.length <= MAX_BUILT_LINES &&
+  card.built.every((line) => isLine(MAX_CARD_LINE_CHARS)(line)) &&
+  card.decisions.length <= MAX_DECISIONS &&
+  card.decisions.every((decision, index) => absent(decision.replaced_by) || (decision.replaced_by > index && decision.replaced_by < card.decisions.length)) &&
+  card.noticed.length <= MAX_NOTICED &&
+  new Set(card.noticed.filter((line) => !absent(line.found)).map((line) => line.found)).size === card.noticed.filter((line) => !absent(line.found)).length;
+const cardShape = (previous) => shape({ version: u32v, changed_at: optionalField(u64v), built: list(string), decisions: list(cardDecision), noticed: list(noticedLine), previous });
+const earlierCard = (value) => cardShape(optionalField(() => false))(value) && cardLines(value);
+const card = (value) =>
+  cardShape(optionalField(earlierCard))(value) &&
+  cardLines(value) &&
+  (absent(value.previous) || (!absent(value.changed_at) && value.previous.version < value.version));
+
+export function readCard(body) {
+  if (!card(body)) throw new ProtocolError("malformed");
+  return body;
+}
+
 export function checkReview(body) {
   readReview(body);
 }
@@ -634,6 +678,8 @@ const PAYLOADS = {
   "found-start": typed({ item: isFoundKey, name: optionalField(isToken) }),
   "found-add": typed({ item: isFoundKey, task: isAddress }),
   "found-dismiss": typed({ item: isFoundKey }),
+  "found-keep": typed({ item: isFoundKey }),
+  "review-send": typed({ address: isAddress, subtask: optionalField(isSubtaskId) }),
 };
 
 export function checkPayload(payload) {
