@@ -22,7 +22,7 @@ import { outOfRangeScroll } from "./scroll.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, obstacleBlock, OPENABLE_STEPS, pushOrder, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, pushOrder, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -318,7 +318,7 @@ function cardBlock(found, selected = null) {
     }
     lines.push(taskFacts(item));
   }
-  if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
+  lines.push(youLine(item));
   lines.push(obstacleBlock(item, nowSeconds()));
   lines.push(stageList(item, nowSeconds()));
   const subtasks = subtaskList(item, { expandable: true, href: (id) => subtaskHref(found.machine, item.address, id), selected, more: uiOf(found.machine, item.address).moreSteps });
@@ -338,7 +338,8 @@ function cardBlock(found, selected = null) {
   const card = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
   const structured = item.card?.blob.media_type === CARD_MEDIA_TYPE;
   const assess = assessArea(found);
-  return reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + pushArea(found);
+  const waits = asksYou(item) ? questionWaits(item, questionHref(found.machine, item.address)) : "";
+  return waits + reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + pushArea(found);
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
@@ -408,19 +409,30 @@ function taskBody(found, selected = null) {
   return asksYou(found.item) ? questionBlock(found) : cardBlock(found, selected);
 }
 
-function taskScreen([machine, address]) {
-  const back = overview() ? backButton(backHref("task", state.from)) : "";
+function switchButton(found, card) {
+  if (!asksYou(found.item)) return "";
+  const { machine, item } = found;
+  return card ? questionButton(questionHref(machine, item.address), arrange(state.opened, nowSeconds()).questions.length) : cardButton(cardHref(machine, item.address));
+}
+
+function taskScreen([machine, address], card = false) {
+  const back = overview() ? backButton(backHref(card ? "card" : "task", state.from)) : "";
   const found = findTask(state.opened, machine, address);
   if (!found) return shell("board", back + top("Task") + `<div class="center">This task is no longer on the board.</div>`);
   const asks = asksYou(found.item);
-  return shell(asks ? "questions" : "board", back + top(taskName(found.item, found.task), esc(found.name)) + taskBody(found));
+  const button = switchButton(found, card);
+  const body = card ? cardBlock(found) : taskBody(found);
+  return shell(asks ? "questions" : "board", (button ? backRow(back, button) : back) + top(taskName(found.item, found.task), esc(found.name)) + body);
 }
 
-function taskPanel([machine, address]) {
+function taskPanel([machine, address], card = false) {
   const found = findTask(state.opened, machine, address);
   if (!found) return `<h2>Task</h2><div class="center left">This task is no longer on the board.</div>`;
-  return `<span class="machine">${esc(found.name)}</span><h2>${esc(taskName(found.item, found.task))}</h2>${taskBody(found)}`;
+  const button = switchButton(found, card);
+  return `${button ? backRow("", button) : ""}<span class="machine">${esc(found.name)}</span><h2>${esc(taskName(found.item, found.task))}</h2>${card ? cardBlock(found) : taskBody(found)}`;
 }
+
+const cardPanel = (params) => taskPanel(params, true);
 
 function planParts([machine, address]) {
   const found = findTask(state.opened, machine, address);
@@ -781,6 +793,7 @@ function render() {
   else if (name === "questions") html = shell("questions", questionsScreen());
   else if (name === "machines") html = shell("machines", machinesScreen());
   else if (name === "task") html = twoColumns() ? wideTaskScreen(params) : taskScreen(params);
+  else if (name === "card") html = twoColumns() ? wideTaskScreen(params, cardPanel) : taskScreen(params, true);
   else if (name === "plan") html = twoColumns() ? wideTaskScreen(params, planPanel) : planScreen(params);
   else if (name === "section") html = sectionRoute(params[0]);
   else if (name === "backlog") html = backlogRoute();
@@ -809,7 +822,7 @@ function render() {
   }
   fillBlobs();
   for (const element of root.querySelectorAll("[data-markdown]")) element.replaceChildren(...markdown(element.textContent));
-  document.title = ["task", "plan", "review", "diff"].includes(name) && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
+  document.title = ["task", "card", "plan", "review", "diff"].includes(name) && params[1] ? `${params[1].split("@")[0]} · kebbie` : "kebbie";
   if (listTop) listPane()?.scrollTo(0, listTop);
   const moved = anchor === null ? null : rowTop(location.hash);
   if (moved !== null) listPane()?.scrollBy(0, moved - anchor);
@@ -1772,7 +1785,7 @@ addEventListener("hashchange", () => {
   state.sheet = false;
   if (rendered === location.hash && !revealAfter) return;
   render();
-  if (!(twoColumns() && (name === "task" || name === "plan" || name === "item" || name === "idea"))) scrollListToTop();
+  if (!(twoColumns() && (name === "task" || name === "card" || name === "plan" || name === "item" || name === "idea"))) scrollListToTop();
   const pending = revealAfter;
   revealAfter = null;
   if (pending) reveal(pending.selector, pending.offset);
@@ -1806,7 +1819,7 @@ addEventListener("keydown", (event) => {
   if (pageMode || event.key !== "Escape") return;
   if (state.sheet) closeSheet();
   else if (twoColumns() && route().name === "plan") go(`#/task/${route().params.map(encodeURIComponent).join("/")}`);
-  else if (twoColumns() && route().name === "task") go(`#/${state.from}`);
+  else if (twoColumns() && (route().name === "task" || route().name === "card")) go(`#/${state.from}`);
   else if (twoColumns() && (route().name === "item" || route().name === "idea")) go("#/backlog");
 });
 

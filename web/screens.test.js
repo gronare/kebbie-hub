@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -711,4 +711,46 @@ test("a device's page shows older history on request and removes the device only
 test("a card that is current says nothing about its age, and one written before the last commit warns that the code changed", () => {
   assert.equal(cardAge({ sha: "9f3c2a1", current: true }), "");
   assert.equal(cardAge({ sha: "9f3c2a1", current: false }), `<div class="meta warn">Written before the last commit; the code changed since.</div>`);
+});
+
+const asked = { address: "fm@mindin", next_for_you: "answer: Read the index?", question: { id: "q1", text: "Read the index?\n\nIt is 40 times faster.", options: [{ label: "Yes" }, { label: "No" }] } };
+
+test("a task's question and its card are two routes, so the card opens while the question waits", () => {
+  assert.equal(questionHref("mch a", "fm@mindin"), "#/task/mch%20a/fm%40mindin");
+  assert.equal(cardHref("mch a", "fm@mindin"), "#/card/mch%20a/fm%40mindin");
+});
+
+test("the question page offers the card through a round button with the card icon", () => {
+  const html = cardButton(cardHref("m", "fm@mindin"));
+  assert.match(html, /<a class="round switch-btn" href="#\/card\/m\/fm%40mindin" aria-label="Open the task's card"><svg class="tab-icon"/);
+  assert.match(html, /<path d="M3\.5 9h17M7 12\.5h7M7 15\.5h4"\/>/);
+});
+
+test("the card leads back to the question with the Questions icon and the same count as the Questions tab", () => {
+  assert.match(questionButton("#/task/m/a", 2), /aria-label="Back to the question, 2 waiting">.*<em class="badge">2<\/em><\/a>$/);
+  assert.doesNotMatch(questionButton("#/task/m/a", 0), /badge/);
+  assert.match(questionButton("#/task/m/a", 0), /aria-label="Back to the question"/);
+});
+
+test("Back and the switch button share one row, Back first, so the button sits at the row's right end", () => {
+  assert.equal(backRow("<a class=\"back-btn\"></a>", "<a class=\"switch-btn\"></a>"), '<div class="back-row"><a class="back-btn"></a><a class="switch-btn"></a></div>');
+});
+
+test("the card names the waiting question by its first line and leads to it with Answer, without the options", () => {
+  const html = questionWaits(asked, questionHref("m", asked.address));
+  assert.equal(text(html), "A question waits for you Read the index? Answer");
+  assert.match(html, /<a class="btn fit primary" href="#\/task\/m\/fm%40mindin">Answer<\/a>/);
+  assert.doesNotMatch(html, /Yes|No|opt/);
+});
+
+test("the waiting line comes from the task's own question, a prompt or kebbie's question card", () => {
+  assert.equal(questionLine(asked), "Read the index?");
+  assert.equal(questionLine({ prompt: { question: "Bash command\nrm -rf build\nDo you want to proceed?", options: [] } }), "Do you want to proceed?");
+  assert.equal(questionLine({ kebbie_questions: [{ text: "\n  Does the sign-off read right?\nMore." }] }), "Does the sign-off read right?");
+});
+
+test("the card drops its you: line while a question waits, since the box above already says it, and keeps it otherwise", () => {
+  assert.equal(youLine(asked), "");
+  assert.equal(text(youLine({ next_for_you: "push 3 commits" })), "you: push 3 commits");
+  assert.equal(youLine({}), "");
 });

@@ -53,6 +53,7 @@ test("the task shown beside a section is Next's first by rank, else the section'
 test("back from a task card returns to where it was opened, and back from a section to the board", () => {
   assert.equal(backHref("task", "section/working"), "#/section/working");
   assert.equal(backHref("task", "board"), "#/board");
+  assert.equal(backHref("card", "questions"), "#/questions");
   assert.equal(backHref("section", "section/working"), "#/board");
 });
 

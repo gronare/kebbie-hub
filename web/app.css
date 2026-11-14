@@ -407,6 +407,13 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .round { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; cursor: pointer; }
 .round .tab-icon { display: block; }
 .back-btn { display: none; }
+.back-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.switch-btn { position: relative; margin-left: auto; }
+.switch-btn .badge { position: absolute; top: -2px; right: -4px; font-size: 10px; }
+.qwait { gap: 6px; }
+.qwait .eyebrow { color: var(--peach); font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.qwait .first { font-weight: 600; font-size: 15px; line-height: 1.35; }
+.qwait .btn { justify-self: start; margin-top: 4px; }
 .bar { display: flex; align-items: center; gap: 10px; }
 .big-title { font: 700 34px/1.05 var(--display); margin: 4px 2px 0; }
 .big-title + .lead { font-size: 14px; margin-top: -6px; }
@@ -436,12 +443,12 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .pose-stack .screen { max-width: none; padding-bottom: var(--content-bottom); }
 :is(.pose-stack, .pose-split, .pose-land) main.in-app > .brand { display: none; }
 .pose-phone main:not(.page) .back-btn { display: grid; }
-.pose-phone .screen:has(> .back-btn) { padding-top: calc(env(safe-area-inset-top) + 4px); }
+.pose-phone .screen:has(> :is(.back-btn, .back-row)) { padding-top: calc(env(safe-area-inset-top) + 4px); }
 @media (orientation: portrait) { .pose-phone main.in-app > .brand { display: none; } }
 .pose-stack main:not(.page) .back-btn { display: grid; }
 .strip-pending .tabbar:not(.desk-nav) { visibility: hidden; }
-.strip-pending .back-btn { display: none; }
-.pose-stack:not(.strip-left):not(.strip-right):not(.strip-pending) .screen:has(> .back-btn) { padding-top: calc(env(safe-area-inset-top) + 4px); }
+.strip-pending :is(.back-btn, .switch-btn) { display: none; }
+.pose-stack:not(.strip-left):not(.strip-right):not(.strip-pending) .screen:has(> :is(.back-btn, .back-row)) { padding-top: calc(env(safe-area-inset-top) + 4px); }
 
 :is(.pose-split, .pose-land) .app:has(> .screen.in-app) { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100dvh; }
 :is(.pose-split, .pose-land) .app.with-panel:has(> .screen.in-app:not(.page)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -489,11 +496,20 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
   .pose-split .back-btn { top: var(--strip-status, 120px); width: 44px; height: 44px; }
   .strip-left .back-btn { left: calc((env(safe-area-inset-left) - 52px) / 2); }
   .strip-right .back-btn { right: calc((env(safe-area-inset-right) - 52px) / 2); }
+  :is(.strip-left, .strip-right) .back-row { display: contents; }
+  :is(.strip-left, .strip-right) .switch-btn { position: fixed; top: calc(var(--strip-status, 175px) + 64px); z-index: 2; width: 52px; height: 52px; margin: 0; }
+  .pose-split .switch-btn { top: var(--strip-status, 120px); width: 44px; height: 44px; }
+  .strip-left .switch-btn { left: calc((env(safe-area-inset-left) - 52px) / 2); }
+  .strip-right .switch-btn { right: calc((env(safe-area-inset-right) - 52px) / 2); }
+  .pose-split.strip-left .switch-btn { left: calc((env(safe-area-inset-left) - 44px) / 2); }
+  .pose-split.strip-right .switch-btn { right: calc((env(safe-area-inset-right) - 44px) / 2); }
   :is(.strip-left, .strip-right) .back-link { display: none; }
   :is(.strip-left, .strip-right) .screen { max-width: none; padding-bottom: var(--content-bottom); }
   .strip-cam-bottom .tabbar:not(.desk-nav) { top: calc(env(safe-area-inset-top) + 12px); bottom: auto; }
   .strip-cam-bottom .back-btn { top: auto; bottom: var(--strip-status-bottom, 175px); }
   .pose-split.strip-cam-bottom .back-btn { bottom: var(--strip-status-bottom, 120px); }
+  .strip-cam-bottom .switch-btn { top: auto; bottom: calc(var(--strip-status-bottom, 175px) + 64px); }
+  .pose-split.strip-cam-bottom .switch-btn { bottom: var(--strip-status-bottom, 120px); }
   .fold.strip-cam-bottom .screen { padding-bottom: calc(var(--content-bottom) + var(--d-edge, 24px)); }
   @media (orientation: landscape) { .fold:not(.strip-cam-bottom) .screen { padding-top: calc(env(safe-area-inset-top) + 14px + var(--d-edge, 24px)); } }
 }

@@ -431,11 +431,34 @@ export const ICONS = {
   machines: `<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>`,
   back: `<path d="M15 5l-7 7 7 7"/>`,
   sections: `<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15M5.8 8.5h1.6M5.8 11.5h1.6"/>`,
+  card: `<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 9h17M7 12.5h7M7 15.5h4"/>`,
 };
 
 export const icon = (name) => `<svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 
 export const backButton = (href) => `<a class="back-btn round" href="${esc(href)}" aria-label="Back">${icon("back")}</a>`;
+
+const taskPath = (machine, address) => `${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
+export const questionHref = (machine, address) => `#/task/${taskPath(machine, address)}`;
+export const cardHref = (machine, address) => `#/card/${taskPath(machine, address)}`;
+
+export const backRow = (back, button) => `<div class="back-row">${back}${button}</div>`;
+
+export const cardButton = (href) => `<a class="round switch-btn" href="${esc(href)}" aria-label="Open the task's card">${icon("card")}</a>`;
+
+export function questionButton(href, waiting = 0) {
+  const said = waiting ? `Back to the question, ${waiting} waiting` : "Back to the question";
+  return `<a class="round switch-btn" href="${esc(href)}" aria-label="${esc(said)}">${icon("questions")}${waiting ? `<em class="badge">${esc(waiting)}</em>` : ""}</a>`;
+}
+
+export function questionLine(item) {
+  const text = item.question?.text ?? (item.prompt ? promptParts(item.prompt.question).question : (item.kebbie_questions?.[0]?.text ?? ""));
+  return text.split("\n").map((line) => line.trim()).find(Boolean) ?? "";
+}
+
+export const questionWaits = (item, href) => `<div class="sent wait qwait" role="status"><span class="eyebrow">A question waits for you</span><span class="first">${esc(questionLine(item))}</span><a class="btn fit primary" href="${esc(href)}">Answer</a></div>`;
+
+export const youLine = (item) => (item.next_for_you && !asksYou(item) ? `<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>` : "");
 
 export function nav({ active, questions = 0, deskOnly = false }) {
   const tab = (href, label, key, said = label) => `<a href="${href}" aria-label="${esc(said)}" class="${active === key ? "on" : ""}"${active === key ? ' aria-current="page"' : ""}>${label}${icon(key)}</a>`;

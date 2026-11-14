@@ -54,4 +54,4 @@ export function sectionSheet(sections, current) {
   return `<button type="button" class="scrim" data-action="close-sections" aria-label="Hide sections"></button><nav class="sheet" aria-label="Sections"><div class="head"><b>Board</b><button type="button" class="round" data-action="close-sections" aria-label="Hide sections">${icon("sections")}</button></div>${items.join("")}</nav>`;
 }
 
-export const backHref = (name, from) => (name === "task" ? `#/${from}` : "#/board");
+export const backHref = (name, from) => (name === "task" || name === "card" ? `#/${from}` : "#/board");
