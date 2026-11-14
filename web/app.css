@@ -651,6 +651,9 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .run-h { display: grid; padding: 0 8px 4px 11px; font-size: 13px; }
 .run-h b { font-weight: 600; color: var(--green); font-size: 14px; }
 .run-h span { color: var(--muted); }
+.run.line { padding: 6px 0; margin-bottom: 0; }
+.run.line .run-h { display: block; padding-bottom: 0; color: var(--muted); }
+.order-toggle { margin-top: 2px; }
 .order-foot { display: grid; gap: 2px; font-size: 13px; color: var(--muted); padding: 6px 0 0; }
 .cm.between { padding: 8px 0 8px 24px; font-size: 13px; color: var(--muted); border-top: 1px dashed var(--line); }
 .cm.between + .cm { border-top: 1px dashed var(--line); }

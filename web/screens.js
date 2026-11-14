@@ -317,6 +317,30 @@ export function pushOrder(item) {
   return `<div class="steps go order">${run}${orderRows(item, order.slice(count), count)}</div>`;
 }
 
+export function orderOpens(item) {
+  const order = item.order ?? [];
+  const waiting = !runCount(item) && order.some((row) => row.accepted);
+  return waiting || order.some((row) => row.moved || row.group || row.tests?.state === "failed");
+}
+
+function orderWaits(item) {
+  const blocker = blockerOf(item);
+  if (blocker) return `Waits for ${blocker.title} to be accepted`;
+  const held = heldBy(item, item.order?.find((row) => row.accepted));
+  return held ? `Waits for ${stageName(item, held)} · ${held.title}` : "Nothing is ready to push yet";
+}
+
+export function pushSection(item, { open = orderOpens(item), push = "", foot = "" } = {}) {
+  const order = item.order ?? [];
+  if (!item.subtasks || !order.length) return "";
+  const count = runCount(item);
+  const names = (item.pushable?.subtasks ?? []).map((id) => titleOf(item, id));
+  const line = count ? `<div class="run line"><div class="run-h"><b>Ready to push: ${esc(plural(count, "commit", "commits"))}</b> · ${esc(names.join(", "))}</div></div>` : `<div class="meta pad order-wait">${esc(orderWaits(item))}</div>`;
+  const toggle = `<button type="button" class="more" data-action="order-more" aria-expanded="${open}">${open ? `Hide push order${CHEV_UP}` : `Show push order${CHEV_DOWN}`}</button>`;
+  const body = open ? (count ? "" : line) + pushOrder(item) : line;
+  return `<h3 class="sec">Push order · ${esc(order.length)}</h3>${body}${push}<div class="steps go order-toggle">${toggle}</div>${foot}`;
+}
+
 const OBSTACLE_WORDS = { investigating: "obstacle: being investigated", asked: "obstacle: the investigator asks you", "with-lead": "obstacle: with the lead" };
 const DECIDED_BY = { investigator: "Investigator", lead: "The lead", you: "You" };
 const DECISION = { subtask: "add a preparatory subtask first", workaround: "work around it", task: "a separate task takes it", ask: "asks you" };

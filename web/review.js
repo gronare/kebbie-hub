@@ -12,7 +12,9 @@ const ICON_CHEVRON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10
 const ICON_CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg>`;
 const BAND = `<div class="rv-band" aria-hidden="true"></div>`;
 
-export const taskHref = (machine, address) => `#/task/${encoded(machine, address)}`;
+export const taskHref = (machine, address, view = "task") => `#/${view}/${encoded(machine, address)}`;
+export const keptTaskView = (kept, name, params) => (name === "task" || name === "card" ? { machine: params[0], address: params[1], view: name } : kept);
+export const taskViewOf = (kept, machine, address) => (kept?.machine === machine && kept?.address === address ? kept.view : "task");
 export const subtaskHref = (machine, address, subtask) => `#/review/${encoded(machine, address)}/${encodeURIComponent(subtask)}`;
 export const diffHref = (machine, address, subtask = null, commit = "all") => `#/diff/${encoded(machine, address)}${subtask === null ? "" : `/${encodeURIComponent(subtask)}/${commit}`}`;
 export function reviewPage(params, diff) {
@@ -271,7 +273,7 @@ function onward(v) {
   return { link: "", note: next?.state === "in-progress" ? `<div class="meta">${esc(next.title)} is being built</div>` : "" };
 }
 
-const backToTask = (v) => `<a class="link" href="${taskHref(v.machine, v.address)}">Back to the task</a>`;
+const backToTask = (v) => `<a class="link" href="${taskHref(v.machine, v.address, v.taskView)}">Back to the task</a>`;
 const waitsForClaude = (v) => v.sentComments.some((comment) => !GONE.includes(comment.state));
 
 function branchEnd(v) {

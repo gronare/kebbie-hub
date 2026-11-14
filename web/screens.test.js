@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, orderOpens, pushSection, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -287,6 +287,34 @@ test("a subtask with some of its commits accepted says how many, on the card and
   const building = { ...partly, subtasks: partly.subtasks.map((one) => (one.id === "lint" ? { ...one, state: "in-progress" } : one)) };
   assert.match(text(subtaskList(building)), /◐ Lint from the index in progress · 1 of 2 commits accepted/);
   assert.match(text(subtaskList(mindin)), /● Lint from the index 2 commits · to review/);
+});
+
+test("the card's push order folds to one line with the push and opens on a toggle, so no commit is listed twice", () => {
+  const folded = pushSection(mindin, { push: '<button class="btn">Push 3 commits</button>' });
+  assert.equal(orderOpens(mindin), false);
+  assert.equal(text(folded), "Push order · 7 Ready to push: 3 commits · Clean test environment, Frontmatter in the index Push 3 commits Show push order");
+  assert.match(folded, /data-action="order-more" aria-expanded="false"/);
+  const listed = subtaskList(mindin) + folded;
+  for (const one of mindin.order) assert.ok(!listed.includes(one.subject) && !listed.includes(one.sha.slice(0, 7)), `${one.subject} is not listed under the push order while it is folded`);
+  const opened = pushSection(mindin, { open: true });
+  assert.match(opened, /data-action="order-more" aria-expanded="true"/);
+  assert.match(text(opened), /^Push order · 7 Ready to push: 3 commits subtasks Clean test environment, Frontmatter in the index ✓ 1 Give the tests their own vault .* Hide push order$/);
+  assert.equal(pushSection({ ...mindin, order: [] }), "");
+});
+
+test("the push order opens by itself on a moved commit, a group, a failed test, or accepted commits with nothing pushable", () => {
+  const at = (index, fields) => ({ ...mindin, order: mindin.order.map((one, where) => (where === index ? { ...one, ...fields } : one)) });
+  assert.equal(orderOpens(at(2, { moved: { from: 4, reason: "Lint reads these fields" } })), true);
+  assert.equal(orderOpens(at(4, { group: "ci-lint" })), true);
+  assert.equal(orderOpens(at(4, { tests: { state: "failed" } })), true);
+  assert.equal(orderOpens(at(4, { tests: { state: "passed" } })), false);
+  const stuck = { ...mindin, order: [mindin.order[3], ...mindin.order.filter((_, index) => index !== 3)], pushable: null };
+  assert.equal(orderOpens(stuck), true);
+  assert.match(pushSection(stuck), /aria-expanded="true"/);
+  assert.match(text(pushSection(stuck)), /^Push order · 7 Waits for Lint from the index to be accepted ✓ 1|^Push order · 7 Waits for Lint from the index to be accepted ● 1/);
+  assert.equal(text(pushSection(stuck, { open: false })), "Push order · 7 Waits for Lint from the index to be accepted Show push order");
+  const nothing = { ...mindin, order: mindin.order.map((one) => ({ ...one, accepted: false })), pushable: null };
+  assert.equal(orderOpens(nothing), false, "nothing accepted yet keeps it folded");
 });
 
 test("a board row says in one line how far the subtasks have come and what is yours to do, never the whole list", () => {

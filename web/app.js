@@ -16,7 +16,7 @@ import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememb
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
-import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, wholePage } from "./review.js";
+import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, keptTaskView, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -24,13 +24,13 @@ import { awayOn, chosenLead, composerHtml, leadHead, leadHref, leadMachines, pan
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, pushOrder, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, orderOpens, pushSection, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
 let reloading = false;
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
@@ -324,6 +324,7 @@ function assessArea(found) {
 function cardBlock(found, selected = null) {
   const { item } = found;
   const lines = [];
+  let pushed = false;
   if (item.card?.blob.media_type === CARD_MEDIA_TYPE) {
     lines.push(taskFacts(item));
     lines.push(cardAge(item.card));
@@ -346,8 +347,10 @@ function cardBlock(found, selected = null) {
   if (item.git) {
     const git = item.git;
     const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null].filter(Boolean);
-    const order = pushOrder(item);
-    if (order) lines.push(`<h3 class="sec">Push order · ${item.order.length}</h3>${order}<div class="order-foot">${esc(facts.join(" · "))}${rulesLines(git.rules, { expandable: true })}</div>`);
+    const ui = uiOf(found.machine, item.address);
+    const order = pushSection(item, { open: ui.pushOrder ?? orderOpens(item), push: pushArea(found), foot: `<div class="order-foot">${esc(facts.join(" · "))}${rulesLines(git.rules, { expandable: true })}</div>` });
+    pushed = Boolean(order);
+    if (order) lines.push(order);
     else lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}${rulesLines(git.rules, { expandable: true })}</div>`);
   }
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
@@ -356,11 +359,11 @@ function cardBlock(found, selected = null) {
   const structured = item.card?.blob.media_type === CARD_MEDIA_TYPE;
   const assess = assessArea(found);
   const waits = asksYou(item) ? questionWaits(item, questionHref(found.machine, item.address)) : "";
-  return waits + reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + pushArea(found);
+  return waits + reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + (pushed ? "" : pushArea(found));
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
-const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null, moreSteps: false });
+const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null, moreSteps: false, pushOrder: null });
 
 function uiOf(machine, address) {
   const key = uiKey(machine, address);
@@ -662,8 +665,6 @@ function ideaRoute() {
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
 }
 
-const taskHref = (machine, address) => `#/task/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
-
 function reviewUiOf(machine, address, subtask) {
   const key = `${uiKey(machine, address)}|${subtask ?? ""}`;
   if (!state.reviewUi.has(key)) state.reviewUi.set(key, freshReviewUi());
@@ -734,6 +735,7 @@ function reviewView(found, page) {
     accepts: found.accepts,
     subtask,
     page,
+    taskView: taskViewOf(state.taskView, found.machine, found.item.address),
     boardSubtask,
     review,
     fetch,
@@ -755,14 +757,15 @@ function reviewRoute(params, diff = false) {
   const [machine, address] = params;
   const page = reviewPage(params, diff);
   const found = findTask(state.opened, machine, address);
-  const up = page.kind === "subtask" || page.subtask === null ? taskHref(machine, address) : subtaskHref(machine, address, page.subtask);
+  const view = taskViewOf(state.taskView, machine, address);
+  const up = page.kind === "subtask" || page.subtask === null ? taskHref(machine, address, view) : subtaskHref(machine, address, page.subtask);
   const back = backButton(up);
   if (!found) return shell("board", back + top("Review") + `<div class="center">This task is no longer on the board.</div>`);
   const v = reviewView(found, page);
   const here = page.kind === "subtask" ? subtaskPage : page.kind === "commit" ? commitPage : wholePage;
   if (twoColumns()) {
     const task = page.kind === "subtask" || page.subtask === null;
-    const left = task ? top(taskName(found.item, found.task), esc(found.name)) + taskBody(found, page.subtask) : subtaskPage(v, { top, left: true, selected: page.commit });
+    const left = task ? top(taskName(found.item, found.task), esc(found.name)) + (view === "card" ? cardBlock(found, page.subtask) : taskBody(found, page.subtask)) : subtaskPage(v, { top, left: true, selected: page.commit });
     return shell("board", back + `<div class="narrow">${left}</div>`, here(v, { top, inPanel: true })) + sendControl(v);
   }
   return shell("board", back + `<div class="narrow">${here(v, { top })}</div>`) + sendControl(v);
@@ -945,6 +948,7 @@ function render() {
   if (pageMode) return;
   unlockEnds.watch(state.session);
   const { name, params } = route();
+  state.taskView = keptTaskView(state.taskView, name, params);
   let html;
   if (!cryptoReady()) html = unsupportedScreen();
   else if (state.unlocking) html = unlockingScreen();
@@ -1850,6 +1854,11 @@ root.addEventListener("click", (event) => {
   if (action === "steps-more") {
     const ui = uiOf(route().params[0], route().params[1]);
     ui.moreSteps = !ui.moreSteps;
+    return render();
+  }
+  if (action === "order-more") {
+    const ui = uiOf(route().params[0], route().params[1]);
+    ui.pushOrder = target.getAttribute("aria-expanded") !== "true";
     return render();
   }
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);

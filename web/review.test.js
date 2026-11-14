@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS } from "../js/protocol.js";
-import { againOf, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, wholePage } from "./review.js";
+import { againOf, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, keptTaskView, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -31,6 +31,18 @@ const acceptedView = (fields = {}) => {
   const next = fields.item ?? accepted();
   return view({ item: next, boardSubtask: next.subtasks.find((one) => one.id === ID), ...fields });
 };
+
+test("a review leads back to the page it was opened from: the card when the card opened it, the question page otherwise", () => {
+  const walk = (hops) => hops.reduce((kept, [name, ...params]) => keptTaskView(kept, name, params), null);
+  const back = (kept) => taskHref("mch_a", "payments@api", taskViewOf(kept, "mch_a", "payments@api"));
+  const fromCard = walk([["task", "mch_a", "payments@api"], ["card", "mch_a", "payments@api"], ["review", "mch_a", "payments@api", "gateway"], ["diff", "mch_a", "payments@api", "gateway", "1"]]);
+  assert.equal(back(fromCard), "#/card/mch_a/payments%40api");
+  assert.equal(back(walk([["card", "mch_a", "payments@api"], ["task", "mch_a", "payments@api"], ["review", "mch_a", "payments@api", "gateway"]])), "#/task/mch_a/payments%40api");
+  assert.equal(back(walk([["card", "mch_a", "other@api"], ["review", "mch_a", "payments@api", "gateway"]])), "#/task/mch_a/payments%40api", "another task's card does not decide this one's way back");
+  assert.equal(back(null), "#/task/mch_a/payments%40api");
+  assert.match(subtaskEnd(acceptedView({ taskView: "card" })), /<a class="link" href="#\/card\/mch_a\/payments%40api">Back to the task<\/a>/);
+  assert.match(subtaskEnd(acceptedView()), /<a class="link" href="#\/task\/mch_a\/payments%40api">Back to the task<\/a>/);
+});
 
 test("a subtask opens by its id, its commits each read on their own page, and the whole subtask on one", () => {
   assert.deepEqual([subtaskHref("mch_a", "payments@api", "gateway"), diffHref("mch_a", "payments@api", "gateway", 1), diffHref("mch_a", "payments@api", "gateway"), diffHref("mch_a", "payments@api"), subtaskHref("m", "a@b", "a b")], ["#/review/mch_a/payments%40api/gateway", "#/diff/mch_a/payments%40api/gateway/1", "#/diff/mch_a/payments%40api/gateway/all", "#/diff/mch_a/payments%40api", "#/review/m/a%40b/a%20b"]);
