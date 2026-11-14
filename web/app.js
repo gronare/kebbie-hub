@@ -1,6 +1,7 @@
 import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { backlogList, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
+import { answersWithLead, backlogList, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
@@ -87,6 +88,17 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${ch
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 const short = (sha) => (sha ?? "").slice(0, 7);
 const blobs = blobReader(account.blob);
+const deviceStorage = () => {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+};
+let findRefresh = null;
+// The hub allows an account a burst of 60 and 120 requests a minute; the bodies take half the burst and three quarters of the rate and pause on a refusal, so the board and commands keep the rest.
+const bodies = pacer({ load: (ref) => blobs.load(ref).then((loaded) => (loaded && laterFindRefresh(), loaded)), held: (id) => blobs.peek(id) !== null, burst: 30, perSecond: 1.5, failed: (loaded) => Boolean(loaded?.failed) });
+state.find = loadFind(deviceStorage());
 const blobRefs = new Map();
 
 function when(seconds) {
@@ -115,10 +127,11 @@ const go = (hash) => {
 
 function shell(active, main, panel = "", { said = "Selected task", bare = false } = {}) {
   const questions = arrange(state.opened, nowSeconds()).questions.length;
+  const backlog = needsYouCount(backlogEntries());
   const replies = unseenReplies(leadMachines(state.opened), leadSeen);
   const side = panel ? `<aside class="panel" aria-label="${esc(said)}">${panel}</aside>` : "";
   const toast = state.updated ? `<div class="toast" role="status"><span>New version</span><button type="button" class="toast-act" data-action="reload">Reload</button></div>` : "";
-  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions, replies })}<main class="screen in-app">${bare ? "" : brand}${main}</main>${side}${toast}</div>`;
+  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions, replies, backlog })}<main class="screen in-app">${bare ? "" : brand}${main}</main>${side}${toast}</div>`;
 }
 
 function top(title, aside = "") {
@@ -476,8 +489,47 @@ function shownOf(sent) {
 
 function backlogEntries() {
   const now = nowSeconds();
-  const merged = mergeBacklog(state.opened, now);
+  const merged = mergeBacklog(state.opened, now).map((entry) => ({ ...entry, waiting: Math.max(0, entry.row.blocking - answersInFlight(entry)) }));
   return [...ideaEntries(state.kept.sent, state.opened, now, (sent) => shownOf(sent).state), ...merged];
+}
+
+function answersInFlight(entry) {
+  const storedAt = (machine) => state.opened.find((opened) => opened.machine === machine)?.storedAt ?? 0;
+  return answersWithLead(entry, state.kept.sent, { shown: shownOf, storedAt, body: blobs.peek(entry.row.body?.id ?? "")?.body ?? null });
+}
+
+const bodyTextOf = textsOf((entry) => blobs.peek(entry.row.body?.id ?? "")?.body ?? null);
+
+function wantBodies(entries) {
+  bodies.want(entries.map((entry) => entry.row.body).filter(Boolean));
+}
+
+function laterFindRefresh() {
+  if (findRefresh || !state.find.q.trim()) return;
+  findRefresh = setTimeout(() => {
+    findRefresh = null;
+    patchBacklogList();
+  }, 600);
+}
+
+function patchBacklogList() {
+  const results = root.querySelector(".bl-results");
+  if (!results) return;
+  const picked = root.querySelector(".bl-results a.task.sel")?.getAttribute("href") ?? null;
+  const selected = picked ? decodeURIComponent(picked.slice("#/item/".length)) : null;
+  const shaped = document.createElement("template");
+  shaped.innerHTML = backlogListHtml(backlogEntries(), selected);
+  root.querySelector(".bl-filters")?.replaceWith(shaped.content.querySelector(".bl-filters"));
+  results.replaceWith(shaped.content.querySelector(".bl-results"));
+  const clear = root.querySelector(".bl-search .clear");
+  if (clear) clear.hidden = state.find.q === "";
+}
+
+function setFind(find, { patch = false } = {}) {
+  state.find = find;
+  keepFind(deviceStorage(), find);
+  if (patch) patchBacklogList();
+  else render();
 }
 
 function backlogUi(id) {
@@ -570,9 +622,10 @@ function ideaCandidates() {
 
 const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine });
 
-function backlogListHtml(entries, selected, composing = false) {
+function backlogListHtml(entries, selected, composing = false, view = backlogView(entries, state.find, bodyTextOf)) {
   const action = listAction({ access: commandGate(), refusedUrl: state.refused?.url ?? null, ideaMachines: ideaCandidates(), composing });
-  return backlogList({ entries, selected, now: nowSeconds(), top, action });
+  wantBodies(entries);
+  return backlogList({ entries, selected, now: nowSeconds(), top, action, find: state.find, textOf: bodyTextOf, view });
 }
 
 const itemPanel = (entry) => `<span class="machine">${esc(chip(entry))}</span><h2>${esc(entry.row.title)}</h2>${itemCardHtml(entry)}`;
@@ -580,8 +633,9 @@ const missingItem = `<div class="center left">This item is no longer in the back
 
 function backlogRoute() {
   const entries = backlogEntries();
-  if (twoColumns() && entries.length) return shell("backlog", backlogListHtml(entries, entries[0].id), itemPanel(entries[0]));
-  return shell("backlog", backlogListHtml(entries, null));
+  const view = backlogView(entries, state.find, bodyTextOf);
+  if (twoColumns() && view.first) return shell("backlog", backlogListHtml(entries, view.first.id, false, view), itemPanel(view.first));
+  return shell("backlog", backlogListHtml(entries, null, false, view));
 }
 
 function itemRoute(id) {
@@ -1473,6 +1527,7 @@ function stopCommands() {
 
 function lockBoards() {
   blobs.forget();
+  bodies.stop();
   stopCommands();
   following?.abort();
   following = null;
@@ -1483,6 +1538,7 @@ function lockBoards() {
 
 function signedOut(message) {
   blobs.forget();
+  bodies.stop();
   stopCommands();
   forgetUnlock();
   following?.abort();
@@ -1774,6 +1830,12 @@ root.addEventListener("click", (event) => {
 
 root.addEventListener("click", (event) => {
   if (pageMode) return;
+  const search = root.querySelector("#bl-q");
+  if (search && event.target.closest('.tabbar a[href="/#/backlog"].on')) {
+    event.preventDefault();
+    scrollListToTop();
+    return search.focus({ preventScroll: true });
+  }
   const picked = event.target.closest(".sheet a.item");
   if (picked) {
     event.preventDefault();
@@ -1795,6 +1857,15 @@ root.addEventListener("click", (event) => {
     return render();
   }
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
+  if (action === "find-chip") return setFind(toggled(state.find, target.dataset.kind, target.dataset.value));
+  if (action === "find-clear") return setFind(cleared(state.find));
+  if (action === "find-sort") return setFind({ ...state.find, sort: target.dataset.sort });
+  if (action === "find-q-clear") {
+    const input = root.querySelector("#bl-q");
+    if (input) input.value = "";
+    setFind({ ...state.find, q: "" }, { patch: true });
+    return input?.focus({ preventScroll: true });
+  }
   if (action === "lead-pick") {
     state.lead.picking = !state.lead.picking;
     return render();
@@ -1854,6 +1925,10 @@ function openFile(link) {
 }
 
 root.addEventListener("input", (event) => {
+  if (event.target.id === "bl-q") {
+    if (!pageMode) setFind({ ...state.find, q: event.target.value }, { patch: true });
+    return;
+  }
   if (event.target.dataset?.draft === "review-comment") {
     const [machine, address, step] = route().params;
     const ui = reviewUiOf(machine, address, step ? Number(step) : null);
@@ -1905,6 +1980,10 @@ globalThis.visualViewport?.addEventListener("resize", () => root.querySelector("
 
 root.addEventListener("keydown", (event) => {
   if (pageMode) return;
+  if (event.key === "Enter" && event.target.id === "bl-q") {
+    event.preventDefault();
+    return event.target.blur();
+  }
   if (event.key === "Enter" && event.target.matches?.("#email, #code")) {
     event.preventDefault();
     return root.querySelector(SUBMIT)?.click();

@@ -388,6 +388,9 @@ test("the nav names the tabs with the backlog between board and questions, count
   assert.match(html, /class="on" aria-current="page">Questions <em class="badge">2<\/em>/);
   assert.match(nav({ active: "lead", replies: 1 }), /<a href="\/#\/lead" aria-label="Lead, 1 new reply" class="on" aria-current="page">Lead <em class="badge">1<\/em><svg class="tab-icon"/);
   assert.doesNotMatch(nav({ active: "board" }), /badge|Admin/);
+  assert.match(nav({ active: "board", backlog: 2 }), /<a href="\/#\/backlog" aria-label="Backlog, 2 wait on you" class="">Backlog <em class="badge">2<\/em><svg class="tab-icon"/);
+  assert.match(nav({ active: "backlog", backlog: 1 }), /aria-label="Backlog, 1 waits on you" class="on" aria-current="page">Backlog <em class="badge">1<\/em>/);
+  assert.match(nav({ active: "backlog", questions: 3 }), /aria-label="Backlog" class="on" aria-current="page">Backlog<svg/);
   assert.match(nav({ active: "account", deskOnly: true }), /^<nav class="tabbar desk-nav">/);
 });
 

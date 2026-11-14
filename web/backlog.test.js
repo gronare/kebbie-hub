@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { backlogList, chooseMachine, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startsAnyway } from "./backlog.js";
+import { answersWithLead, backlogList, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startsAnyway } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -44,11 +44,10 @@ test("a vault note seen on two machines is one row with the vault chip, and the 
   const shared = entries.find((entry) => entry.key === "vault:Projects/session.md");
   assert.deepEqual(shared.machines.map((one) => one.name), ["MacBook", "work-mac"]);
   const said = text(backlogList({ entries, now: NOW, top }));
-  assert.match(said, /^Backlog 4 items · 2 questions wait High · 2/);
-  assert.match(said, /Session drops on reload vault webapp · drafting · 2 questions · 1 d you: answer them on its card/);
+  assert.match(said, /^Backlog 4 items · 2 questions wait .* All 4 Priority Newest Needs you · 1 Session drops on reload vault webapp · drafting · 2 questions · 1 d you: answer them on its card High · 1 Round invoices/);
   assert.match(said, /Faster board MacBook kebbie · 1 d The board shows the push within a second\./);
   assert.match(said, /Archive logs MacBook kebbie · to write · 2 h the lead writes it out/);
-  assert.ok(said.indexOf("High") < said.indexOf("Medium"));
+  assert.ok(said.indexOf("High ·") < said.indexOf("Medium ·"));
 });
 
 test("a start goes to the machine that has the repo, else the one used last, and can be changed", () => {
@@ -243,4 +242,62 @@ test("a found item's card names who found it and offers Start a task, Add to eac
   assert.match(text(itemBody(entry, { ...options, found: { ...options.found, sent: { sent, state: "waiting" } } })), /Waiting for MacBook It leaves the backlog when MacBook wakes up\./);
   assert.doesNotMatch(itemBody(entry, { ...options, found: { ...options.found, sent: { sent, state: "waiting" } } }), /data-action="found-start"/, "nothing to press while a choice is on its way");
   assert.match(text(itemBody(entry, { ...options, access: "view-only" })), /View only/);
+});
+
+const list = (entries, find, textOf) => text(backlogList({ entries, now: NOW, top, find: { q: "", repos: [], priorities: [], states: [], found: false, sort: "priority", ...find }, textOf }));
+const asked = row("vault:Projects/asked.md", { title: "Lock screen notice", priority: "low", repo: "hub", state: "drafting", questions: 2, blocking: 1, filed: NOW - 2 * DAY });
+const listed = mergeBacklog([machine("mch_mac", "MacBook", [session, asked, row("local:faster", { title: "Faster board", priority: "high", goal: "The board shows the notice within a second." }), row("local:logs", { title: "Archive logs", priority: "low", state: "to-write", filed: NOW - 7200 }), row("found:f1", { title: "Notices double up", priority: "none", home: { kind: "found", label: "found by tasks" }, found: { sources: ["notify@hub"], count: 2 } })], { repos: ["kebbie"] })], NOW);
+
+test("items whose questions wait on you sit once, newest first, in Needs you above every sort and filter", () => {
+  const said = list(listed);
+  assert.match(said, /All 5 Priority Newest Needs you · 2 Session drops on reload vault webapp · drafting · 2 questions · 1 d you: answer them on its card Lock screen notice vault hub · drafting · 1 question · 2 d you: answer it on its card High · 1 Faster board .* Low · 1 Archive logs .* Found by tasks · 1 Notices double up/);
+  assert.equal(said.match(/Session drops on reload/g).length, 1);
+  assert.match(list(listed, { sort: "newest" }), /Needs you · 2 Session drops on reload .* Lock screen notice .* Newest first · 3 Archive logs MacBook low · kebbie · to write · 2 h .* Faster board MacBook high · kebbie · 1 d .* Notices double up MacBook kebbie · found 2× · by notify/);
+  assert.doesNotMatch(list(listed, { sort: "newest" }), /High · |Low · /);
+  assert.match(text(backlogList({ entries: listed, now: NOW, top, find: { q: "", repos: [], priorities: [], states: [], found: false, sort: "newest" } })), /Archive logs MacBook low · kebbie/);
+  assert.match(backlogList({ entries: listed, now: NOW, top, find: { q: "", repos: [], priorities: [], states: [], found: false, sort: "newest" } }), /<span class="g-muted">low<\/span> · kebbie/);
+  const filtered = list(listed, { repos: ["hub"] });
+  assert.match(filtered, /1 of 5 .*Needs you · 1 Lock screen notice/);
+  assert.doesNotMatch(filtered, /Session drops/);
+  const answered = listed.map((one) => (one.key === "vault:Projects/asked.md" ? { ...one, waiting: 0 } : one));
+  assert.match(list(answered), /^Backlog 5 items · 2 questions wait .*Needs you · 1 Session drops on reload .* Low · 2 Archive logs .* Lock screen notice vault hub · drafting · 2 d the lead is writing it out/);
+  assert.equal(needsYouCount(listed), 2);
+  assert.equal(needsYouCount(answered), 1);
+});
+
+test("the toolbar counts what shows, puts active chips first after Clear, and parts the chip kinds", () => {
+  const html = backlogList({ entries: listed, now: NOW, top, find: { q: "", repos: ["hub"], priorities: [], states: ["drafting"], found: false, sort: "priority" } });
+  const chips = [...html.matchAll(/<button type="button" class="pill[^"]*"[^>]*>(.*?)<\/button>|<span class="sep"/g)].map((match) => (match[1] === undefined ? "|" : text(match[1])));
+  assert.deepEqual(chips, ["Clear", "hub 1", "drafting 1", "|", "kebbie 0", "webapp 1", "|", "High 0", "Medium 0", "Low 1", "New 0", "|", "to write 0", "ready 0", "|", "Found by tasks 0"]);
+  assert.match(html, /aria-pressed="true">hub <span class="n">1<\/span>/);
+  assert.match(text(html), /1 of 5 Priority Newest/);
+  assert.match(html, /<input type="search" id="bl-q" placeholder="Search titles and text"[^>]*value=""[^>]*><button type="button" class="clear" data-action="find-q-clear" aria-label="Clear search" hidden>/);
+  assert.match(html, /data-action="find-sort" data-sort="priority" aria-pressed="true">Priority/);
+  assert.match(text(backlogList({ entries: [], now: NOW, top })), /^Backlog No machine has a backlog on its board yet\.$/);
+  assert.match(list(listed, { q: "nothing like this" }), /0 of 5 .* Nothing in the backlog matches\./);
+});
+
+test("a search marks the title, and a match only in the item's text shows a snippet line", () => {
+  const bodies = { blb_1: { sections: [section("goal", "Goal", "Every notice keeps you signed in.")], questions: [], questions_key: null } };
+  const textOf = (entry) => [entry.row.goal, ...(bodies[entry.row.body?.id]?.sections.map((one) => one.text) ?? [])].filter(Boolean);
+  const html = backlogList({ entries: listed, now: NOW, top, find: { q: "notice", repos: [], priorities: [], states: [], found: false, sort: "priority" }, textOf });
+  assert.match(text(html), /4 of 5/);
+  assert.match(html, /<span class="name">Lock screen <mark>notice<\/mark><\/span>/);
+  assert.match(html, /<span class="name">Session drops on reload<\/span>.*?<div class="hit">Every <mark>notice<\/mark> keeps you signed in\.<\/div><\/a>/);
+  assert.match(html, /<div>The board shows the <mark>notice<\/mark> within a second\.<\/div><\/a>/, "a goal the row shows is marked in place, with no snippet");
+  assert.match(html, /<mark>Notice<\/mark>s double up/);
+  assert.match(html, /class="clear" data-action="find-q-clear" aria-label="Clear search">/);
+});
+
+test("an answer sent from this device takes its question out of the count until the board carries it", () => {
+  const entry = listed.find((one) => one.key === "vault:Projects/session.md");
+  const sent = (index, fields = {}) => sentAt({ kind: "item-answer", address: entry.key, machine: "mch_mac", index, ...fields });
+  const storedAt = () => NOW - 60;
+  const live = (sent) => ({ state: sent.result ? "done" : "sending", live: true });
+  assert.equal(answersWithLead(entry, [sent(0), sent(0, { id: "cmd_2" }), sent(1, { machine: "mch_other" })], { shown: live, storedAt }), 1);
+  assert.equal(answersWithLead(entry, [sent(0, { result: { outcome: "done", at: NOW - 30 } })], { shown: live, storedAt }), 1, "done but not yet on the stored board");
+  assert.equal(answersWithLead(entry, [sent(0, { result: { outcome: "done", at: NOW - 90 } })], { shown: live, storedAt }), 0, "the board already counts it");
+  assert.equal(answersWithLead(entry, [sent(0)], { shown: () => ({ state: "refused", live: false }), storedAt }), 0);
+  assert.equal(answersWithLead(entry, [sent(2)], { shown: live, storedAt, body }), 0, "a question that does not block never counted");
+  assert.equal(answersWithLead(entry, [sent(1)], { shown: live, storedAt, body }), 1);
 });

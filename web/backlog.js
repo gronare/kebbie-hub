@@ -3,6 +3,7 @@ import { failedLine, loadingLine } from "./blobs.js";
 import { isAsleep } from "./board.js";
 import { APPROVAL_STATES, approvalStatus, block, clock, from, hours, refusal, settled, takes, viewOnlyBlock } from "./decide.js";
 import { esc, waited } from "./screens.js";
+import { chipsFor, emptyFind, filtering, findIn, marked, snippet, textsOf } from "./find.js";
 
 export const PRIORITIES = [
   { key: "none", title: "New", tone: "teal" },
@@ -60,16 +61,22 @@ function ideaLine(entry) {
   return `not filed: ${esc(sent.result?.text || (state === "expired" ? `${sent.machineName} stayed asleep past the hour` : "not approved"))}`;
 }
 
-function rowLines(entry, now) {
+export const waitingOf = (entry) => entry.waiting ?? entry.row.blocking ?? 0;
+const toneOf = (key) => PRIORITIES.find((one) => one.key === (key ?? "none")) ?? PRIORITIES[0];
+const showsGoal = (entry) => !entry.idea && waitingOf(entry) === 0 && entry.row.state === "ready" && !entry.row.found && Boolean(entry.row.goal);
+
+function rowLines(entry, now, { q = "", sort = "priority" } = {}) {
   const { row } = entry;
   const age = esc(waited(Math.max(0, now - row.filed)));
-  const repo = row.repo ? `${esc(row.repo)} · ` : "";
+  const priority = sort === "newest" && !entry.idea && !isFound(entry) ? `<span class="g-${toneOf(row.priority).tone}">${esc(toneOf(row.priority).title.toLowerCase())}</span> · ` : "";
+  const repo = `${priority}${row.repo ? `${esc(row.repo)} · ` : ""}`;
+  const waiting = waitingOf(entry);
   if (entry.idea) return `<div class="meta">${repo}to write · ${age}</div><div class="meta">${ideaLine(entry)}</div>`;
+  if (waiting > 0) return `<div class="meta">${repo}${esc(row.state === "to-write" ? "to write" : row.state)} · <span class="g-yellow">${plural(waiting, "question", "questions")}</span> · ${age}</div><div class="you"><b>you:</b> answer ${waiting === 1 ? "it" : "them"} on its card</div>`;
   if (row.state === "to-write") return `<div class="meta">${repo}to write · ${age}</div><div class="meta">the lead writes it out</div>`;
-  if (row.state === "drafting" && row.blocking > 0) return `<div class="meta">${repo}drafting · <span class="g-yellow">${plural(row.blocking, "question", "questions")}</span> · ${age}</div><div class="you"><b>you:</b> answer ${row.blocking === 1 ? "it" : "them"} on its card</div>`;
   if (row.state === "drafting") return `<div class="meta">${repo}drafting · ${age}</div><div class="meta">the lead is writing it out from the code, the notes and your chat</div>`;
   if (row.found) return `<div class="meta">${repo}${esc(foundBy(row.found))} · ${age}</div>`;
-  return `<div class="meta">${repo}${age}</div>${row.goal ? `<div>${esc(row.goal)}</div>` : ""}`;
+  return `<div class="meta">${repo}${age}</div>${row.goal ? `<div>${marked(row.goal, q)}</div>` : ""}`;
 }
 
 const taskOf = (address) => address.slice(0, address.indexOf("@"));
@@ -77,20 +84,47 @@ export const foundBy = (found) => `${found.count > 1 ? `found ${found.count}× �
 export const isFound = (entry) => entry.row.home?.kind === "found";
 export const FOUND = { key: "found", title: "Found by tasks", tone: "muted" };
 
-export function backlogRow(entry, selected, now) {
+export function backlogRow(entry, selected, now, look = {}) {
   const on = selected === entry.id;
-  return `<a class="task${on ? " sel" : ""}" href="${entryHref(entry.id)}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(entry.row.title)}</span> <span class="machine">${esc(chip(entry))}</span></div>${rowLines(entry, now)}</a>`;
+  const q = look.q ?? "";
+  const titled = q && marked(entry.row.title, q) !== esc(entry.row.title);
+  const texts = q && !titled && look.textOf ? look.textOf(entry).filter((text) => !(showsGoal(entry) && text === entry.row.goal)) : [];
+  const hit = texts.length ? snippet(texts, q) : null;
+  return `<a class="task${on ? " sel" : ""}" href="${entryHref(entry.id)}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${marked(entry.row.title, q)}</span> <span class="machine">${esc(chip(entry))}</span></div>${rowLines(entry, now, look)}${hit ? `<div class="hit">${hit}</div>` : ""}</a>`;
 }
 
 export const proLine = (what, url) => `<div class="pro"><b>Hub Pro</b>${what}${url ? ` <a class="link inline" href="${esc(url)}">Details</a>` : ""}</div>`;
 
 const newest = (a, b) => Number(Boolean(b.idea)) - Number(Boolean(a.idea)) || b.row.filed - a.row.filed || a.row.title.localeCompare(b.row.title);
 
-export function backlogGroups(entries) {
-  const filed = entries.filter((entry) => !isFound(entry));
-  const groups = PRIORITIES.map((priority) => ({ ...priority, rows: filed.filter((entry) => (entry.row.priority ?? "none") === priority.key).sort(newest) }));
-  return [...groups, { ...FOUND, rows: entries.filter(isFound).sort(newest) }].filter((group) => group.rows.length > 0);
+export const NEEDS_YOU = { key: "needs", title: "Needs you", tone: "yellow" };
+export const NEWEST = { key: "newest", title: "Newest first", tone: "muted" };
+
+export function backlogGroups(entries, sort = "priority") {
+  const needs = entries.filter((entry) => waitingOf(entry) > 0).sort(newest);
+  const others = entries.filter((entry) => waitingOf(entry) === 0);
+  const filed = others.filter((entry) => !isFound(entry));
+  const rest = sort === "newest"
+    ? [{ ...NEWEST, rows: [...others].sort(newest) }]
+    : [...PRIORITIES.map((priority) => ({ ...priority, rows: filed.filter((entry) => (entry.row.priority ?? "none") === priority.key).sort(newest) })), { ...FOUND, rows: others.filter(isFound).sort(newest) }];
+  return [{ ...NEEDS_YOU, rows: needs }, ...rest].filter((group) => group.rows.length > 0);
 }
+
+export function answersWithLead(entry, sentList, { shown, storedAt, body = null }) {
+  if (!entry.key || !entry.row.blocking) return 0;
+  const machines = new Set(entry.machines.map((one) => one.machine));
+  const indexes = new Set();
+  for (const sent of sentList) {
+    if (sent.kind !== "item-answer" || sent.address !== entry.key || !machines.has(sent.machine)) continue;
+    const question = body?.questions[sent.index];
+    if (body && !(question?.blocks && (question.pending_answer ?? null) === null)) continue;
+    const { state, live } = shown(sent);
+    if (live && !(state === "done" && storedAt(sent.machine) >= (sent.result?.at ?? 0))) indexes.add(sent.index);
+  }
+  return indexes.size;
+}
+
+export const needsYouCount = (entries) => entries.filter((entry) => waitingOf(entry) > 0).length;
 
 export function listAction({ access, refusedUrl, ideaMachines, composing }) {
   if (composing || access === "off") return "";
@@ -100,12 +134,45 @@ export function listAction({ access, refusedUrl, ideaMachines, composing }) {
   return `<a class="fab" href="#/idea" aria-label="New idea"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>`;
 }
 
-export function backlogList({ entries, selected = null, now, top, action = "" }) {
-  const waiting = entries.reduce((sum, entry) => sum + (entry.row.blocking ?? 0), 0);
+const SEARCH_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`;
+const CROSS = `<svg class="x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+
+const pill = (one) => `<button type="button" class="pill" data-action="find-chip" data-kind="${esc(one.kind)}" data-value="${esc(one.value)}" aria-pressed="${one.on}">${esc(one.label)} <span class="n">${one.n}</span></button>`;
+const SEPARATOR = `<span class="sep" aria-hidden="true"></span>`;
+
+export function chipRow(groups) {
+  const active = groups.flat().filter((one) => one.on);
+  const rest = groups.map((group) => group.filter((one) => !one.on)).filter((group) => group.length > 0);
+  const lead = active.length ? `<button type="button" class="pill clear" data-action="find-clear" aria-label="Clear filters">${CROSS}Clear</button>${active.map(pill).join("")}${SEPARATOR}` : "";
+  return `<div class="pills" role="group" aria-label="Filter">${lead}${rest.map((group) => group.map(pill).join("")).join(SEPARATOR)}</div>`;
+}
+
+export function findFilters({ chips, shown, total, find }) {
+  const count = filtering(find) ? `<b>${shown}</b> of ${total}` : `All <b>${total}</b>`;
+  const sort = (key, label) => `<button type="button" data-action="find-sort" data-sort="${key}" aria-pressed="${find.sort === key}">${label}</button>`;
+  return `<div class="bl-filters">${chipRow(chips)}<div class="bl-count"><span class="n">${count}</span><span class="bl-sort" role="group" aria-label="Sort">${sort("priority", "Priority")}${sort("newest", "Newest")}</span></div></div>`;
+}
+
+const searchField = (q) => `<label class="bl-search">${SEARCH_ICON}<input type="search" id="bl-q" placeholder="Search titles and text" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(q)}" aria-label="Search the backlog"><button type="button" class="clear" data-action="find-q-clear" aria-label="Clear search"${q ? "" : " hidden"}>${CROSS}</button></label>`;
+
+export function backlogView(entries, find = emptyFind(), textOf = textsOf(() => null)) {
+  const shown = findIn(entries, find, textOf);
+  const groups = backlogGroups(shown, find.sort);
+  return { shown, groups, first: groups[0]?.rows[0] ?? null, chips: chipsFor(entries, find, textOf, PRIORITIES) };
+}
+
+export function backlogResults(view, { entries, selected = null, now, find = emptyFind(), textOf = textsOf(() => null) }) {
+  if (entries.length === 0) return `<div class="bl-results"><div class="center">No machine has a backlog on its board yet.</div></div>`;
+  if (view.shown.length === 0) return `<div class="bl-results"><div class="center">Nothing in the backlog matches.</div></div>`;
+  const look = { q: find.q, sort: find.sort, textOf };
+  return `<div class="bl-results">${view.groups.map((group) => `<h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>${group.rows.map((entry) => backlogRow(entry, selected, now, look)).join("")}`).join("")}</div>`;
+}
+
+export function backlogList({ entries, selected = null, now, top, action = "", find = emptyFind(), textOf = textsOf(() => null), view = backlogView(entries, find, textOf) }) {
+  const waiting = entries.reduce((sum, entry) => sum + waitingOf(entry), 0);
   const aside = [plural(entries.length, "item", "items"), waiting ? waits(waiting) : ""].filter(Boolean).join(" · ");
-  const groups = backlogGroups(entries);
-  const body = groups.length ? groups.map((group) => `<h2 class="group g-${group.tone}">${esc(group.title)} · ${group.rows.length}</h2>${group.rows.map((entry) => backlogRow(entry, selected, now)).join("")}`).join("") : `<div class="center">No machine has a backlog on its board yet.</div>`;
-  return `<div class="narrow">${top("Backlog", esc(entries.length ? aside : ""))}${body}</div>${action}`;
+  const tools = entries.length ? `<div class="bl-tools">${searchField(find.q)}${findFilters({ chips: view.chips, shown: view.shown.length, total: entries.length, find })}</div>` : "";
+  return `<div class="narrow">${top("Backlog", esc(entries.length ? aside : ""))}${tools}${backlogResults(view, { entries, selected, now, find, textOf })}</div>${action}`;
 }
 
 export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen = null } = {}) {

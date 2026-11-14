@@ -461,11 +461,11 @@ export const questionWaits = (item, href) => `<div class="sent wait qwait" role=
 
 export const youLine = (item) => (item.next_for_you && !asksYou(item) ? `<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>` : "");
 
-export function nav({ active, questions = 0, replies = 0, deskOnly = false }) {
+export function nav({ active, questions = 0, replies = 0, backlog = 0, deskOnly = false }) {
   const tab = (href, label, key, said = label) => `<a href="${href}" aria-label="${esc(said)}" class="${active === key ? "on" : ""}"${active === key ? ' aria-current="page"' : ""}>${label}${icon(key)}</a>`;
   const badge = questions ? ` <em class="badge">${esc(questions)}</em>` : "";
   const account = `<a href="/account" class="account${active === "account" ? " on" : ""}"${active === "account" ? ' aria-current="page"' : ""}>Account</a>`;
-  return `<nav class="tabbar${deskOnly ? " desk-nav" : ""}"><div class="side-brand brand">${brand.replace(/^<header class="brand">|<\/header>$/g, "")}</div>${tab("/#/board", "Board", "board")}${tab("/#/backlog", "Backlog", "backlog")}${tab("/#/questions", `Questions${badge}`, "questions", questions ? `Questions, ${questions} waiting` : "Questions")}${tab("/#/lead", `Lead${replies ? ` <em class="badge">${esc(replies)}</em>` : ""}`, "lead", replies ? `Lead, ${replies} new ${replies === 1 ? "reply" : "replies"}` : "Lead")}${tab("/#/machines", "Machines", "machines")}${account}</nav>`;
+  return `<nav class="tabbar${deskOnly ? " desk-nav" : ""}"><div class="side-brand brand">${brand.replace(/^<header class="brand">|<\/header>$/g, "")}</div>${tab("/#/board", "Board", "board")}${tab("/#/backlog", `Backlog${backlog ? ` <em class="badge">${esc(backlog)}</em>` : ""}`, "backlog", backlog ? `Backlog, ${backlog} ${backlog === 1 ? "waits" : "wait"} on you` : "Backlog")}${tab("/#/questions", `Questions${badge}`, "questions", questions ? `Questions, ${questions} waiting` : "Questions")}${tab("/#/lead", `Lead${replies ? ` <em class="badge">${esc(replies)}</em>` : ""}`, "lead", replies ? `Lead, ${replies} new ${replies === 1 ? "reply" : "replies"}` : "Lead")}${tab("/#/machines", "Machines", "machines")}${account}</nav>`;
 }
 
 export function optionCards(options, recommend = null) {
