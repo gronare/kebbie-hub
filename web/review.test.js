@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS } from "../js/protocol.js";
-import { againOf, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, wholePage } from "./review.js";
+import { againOf, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, wholePage } from "./review.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -219,4 +219,11 @@ test("the task card offers a Review button only for a task without subtasks", ()
   const plain = { ...found, item: { ...item, subtasks: undefined, review: { subtask: null, files: 1 } } };
   assert.equal(reviewEntry(plain), `<div class="lead-act"><a class="btn primary fit" href="#/diff/mch_a/payments%40api">Review · 1 file</a></div>`);
   assert.equal(reviewEntry({ ...plain, accepts: ["answer"] }), "");
+});
+
+test("a named subtask's draft is kept under the subtask the page shows, on the review and on its diff", () => {
+  assert.deepEqual(reviewPage(["mch_a", "t@r", "gateway"], false), { subtask: "gateway", kind: "subtask", commit: null });
+  assert.deepEqual(reviewPage(["mch_a", "t@r", "gateway", "2"], true), { subtask: "gateway", kind: "commit", commit: 1 });
+  assert.deepEqual(reviewPage(["mch_a", "t@r", "3"], false).subtask, "3", "a numbered step stays the string the page keys on");
+  assert.deepEqual(reviewPage(["mch_a", "t@r"], false), { subtask: null, kind: "whole", commit: null });
 });

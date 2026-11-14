@@ -69,11 +69,13 @@ export function pendingMessages(sentList, machine, turnIds, now) {
     .sort((a, b) => a.sent.at - b.sent.at);
 }
 
-export function awayOn(sentList, opened) {
+const ahead = (sent, machine, now) => (sent.result ? sent.result.outcome === "done" && (machine.storedAt ?? 0) < (sent.result.at ?? 0) : now < sent.exp);
+
+export function awayOn(sentList, opened, now) {
   const latest = sentList.filter((sent) => sent.kind === "away").sort((a, b) => b.at - a.at)[0];
   const boards = opened.filter((machine) => machine.board);
   const applied = (machine) => (latest.on ? Boolean(machine.board.away_since) : !machine.board.away_since);
-  if (latest && boards.some((machine) => machine.machine === latest.machine && !applied(machine))) return Boolean(latest.on);
+  if (latest && boards.some((machine) => machine.machine === latest.machine && !applied(machine) && ahead(latest, machine, now))) return Boolean(latest.on);
   return boards.some((machine) => Boolean(machine.board.away_since));
 }
 

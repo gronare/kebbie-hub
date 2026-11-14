@@ -611,6 +611,7 @@ async fn a_device_removed_under_account_keeps_what_it_sent_listed_but_sends_and_
     person.command(&machine.machine, &answer()).await.unwrap();
     let device = person.device_id().clone();
     let path = format!("/v1/a/devices/{device}");
+    assert_eq!(rows(&test, "queue"), 1);
 
     let mut stranger = member(&test).await;
     assert_eq!(refusal_of(stranger.delete(&path).await), (404, "unknown-device".to_string()));
@@ -620,6 +621,7 @@ async fn a_device_removed_under_account_keeps_what_it_sent_listed_but_sends_and_
     let view = person.devices().await.unwrap().devices.pop().unwrap();
     assert!(view.removed_at.is_some() && view.push.is_none(), "{view:?}");
     assert_eq!(rows(&test, "push_subscriptions"), 0);
+    assert_eq!(rows(&test, "queue"), 0, "what it queued for a sleeping machine is never delivered");
     assert_eq!(person.device_commands(&device, None).await.unwrap().commands.len(), 1, "what it sent stays listed");
     assert!(machine.notified_devices().await.unwrap().devices.is_empty(), "machines no longer seal notices to it");
     assert_eq!(machine.notify(notice(NoticeCategory::Questions, "x"), "q", Urgency::High).await.unwrap().pushes, 0);

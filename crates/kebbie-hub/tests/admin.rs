@@ -43,13 +43,13 @@ fn user_version(path: &std::path::Path) -> i64 {
 }
 
 #[test]
-fn a_fresh_database_starts_at_schema_17() {
+fn a_fresh_database_starts_at_schema_18() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
 }
 
 fn columns(connection: &rusqlite::Connection, table: &str) -> Vec<String> {
@@ -97,7 +97,7 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
     let store = Store::open(&path).unwrap();
     assert_eq!(store.account("acc_kept").unwrap().unwrap().handle, "alice");
     drop(store);
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
     let connection = rusqlite::Connection::open(&path).unwrap();
     let devices = columns(&connection, "devices");
     assert!(devices.contains(&"cert".to_string()) && !devices.contains(&"token_hash".to_string()), "{devices:?}");
@@ -122,7 +122,7 @@ fn a_schema_14_database_drops_its_device_tables_and_keeps_the_rest() {
 }
 
 #[test]
-fn a_schema_17_database_keeps_its_devices_and_reads_name_and_kind_from_their_certificates() {
+fn a_schema_17_database_opens_as_18_keeps_its_devices_and_reads_name_and_kind_from_their_certificates() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");
     drop(Store::open(&path).unwrap());
@@ -133,11 +133,12 @@ fn a_schema_17_database_keeps_its_devices_and_reads_name_and_kind_from_their_cer
              DROP TABLE devices;
              CREATE TABLE devices (device_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, signing_key BLOB NOT NULL, cert TEXT NOT NULL, created_at INTEGER NOT NULL, last_seen_at INTEGER);
              INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
-             INSERT INTO devices VALUES ('dev_kept', 'acc_kept', 'iPhone', 'web', x'01', '{}', 1, 2);",
+             INSERT INTO devices VALUES ('dev_kept', 'acc_kept', 'iPhone', 'web', x'01', '{}', 1, 2);
+             PRAGMA user_version = 17;",
         )
         .unwrap();
     drop(Store::open(&path).unwrap());
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
     let connection = rusqlite::Connection::open(&path).unwrap();
     let devices = columns(&connection, "devices");
     assert!(devices.contains(&"removed_at".to_string()) && !devices.contains(&"name".to_string()) && !devices.contains(&"kind".to_string()), "{devices:?}");
@@ -188,7 +189,7 @@ fn a_schema_15_database_drops_its_account_signed_commands_and_keeps_the_rest() {
     let store = Store::open(&path).unwrap();
     assert_eq!(store.account("acc_kept").unwrap().unwrap().handle, "alice");
     drop(store);
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
     let connection = rusqlite::Connection::open(&path).unwrap();
     for column in ["device_id", "envelope"] {
         assert!(columns(&connection, "commands").contains(&column.to_string()), "{column}");
@@ -223,7 +224,7 @@ fn a_schema_16_database_drops_its_devices_without_encryption_keys_and_their_comm
     assert_eq!(store.account("acc_kept").unwrap().unwrap().handle, "alice");
     assert!(store.devices("acc_kept").unwrap().is_empty());
     drop(store);
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
     let connection = rusqlite::Connection::open(&path).unwrap();
     for table in ["devices", "commands", "results", "queue", "push_subscriptions", "notices"] {
         let left: i64 = connection.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row.get(0)).unwrap();
@@ -268,7 +269,7 @@ fn a_schema_13_database_opens_as_17_and_keeps_what_an_embedding_binary_added() {
         .unwrap();
     assert!(matches!(outcome, kebbie_hub::store::SignUpOutcome::Created(_)));
     drop(store);
-    assert_eq!(user_version(&path), 17);
+    assert_eq!(user_version(&path), 18);
     let connection = rusqlite::Connection::open(&path).unwrap();
     let tiers: Vec<String> = connection
         .prepare("SELECT tier FROM accounts ORDER BY created_at")
@@ -285,8 +286,8 @@ fn a_schema_13_database_opens_as_17_and_keeps_what_an_embedding_binary_added() {
 }
 
 #[test]
-fn a_database_from_before_schema_13_or_after_17_is_refused() {
-    for version in [4, 12, 18] {
+fn a_database_from_before_schema_13_or_after_18_is_refused() {
+    for version in [4, 12, 19] {
         let data = tempfile::tempdir().unwrap();
         let path = data.path().join("hub.sqlite3");
         rusqlite::Connection::open(&path)

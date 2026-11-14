@@ -1,22 +1,27 @@
-const DB = "kebbie-hub";
 const STORE = "kv";
-let opening = null;
+const BLOBS = "blobs";
+const opening = new Map();
 
-function database() {
-  opening ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  return opening;
+function database(name, store) {
+  if (!opening.has(name)) {
+    opening.set(
+      name,
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open(name, 1);
+        request.onupgradeneeded = () => request.result.createObjectStore(store);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      }),
+    );
+  }
+  return opening.get(name);
 }
 
-async function run(mode, act) {
-  const db = await database();
+async function run(mode, act, name = "kebbie-hub", store = STORE) {
+  const db = await database(name, store);
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE, mode);
-    const request = act(transaction.objectStore(STORE));
+    const transaction = db.transaction(store, mode);
+    const request = act(transaction.objectStore(store));
     transaction.oncomplete = () => resolve(request?.result);
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
@@ -26,6 +31,25 @@ async function run(mode, act) {
 export const get = (key) => run("readonly", (store) => store.get(key));
 export const put = (key, value) => run("readwrite", (store) => store.put(value, key));
 export const del = (key) => run("readwrite", (store) => store.delete(key));
+
+const blobRun = (mode, act) => run(mode, act, "kebbie-hub-blobs", BLOBS);
+
+export const keptBlobs = {
+  get: (id) => blobRun("readonly", (store) => store.get(id)).then((kept) => kept?.bytes ?? null),
+  put: (id, bytes, at) => blobRun("readwrite", (store) => store.put({ bytes, at }, id)),
+  prune: (before) =>
+    blobRun("readwrite", (store) => {
+      const walk = store.openCursor();
+      walk.onsuccess = () => {
+        const cursor = walk.result;
+        if (!cursor) return;
+        if (!(cursor.value?.at >= before)) cursor.delete();
+        cursor.continue();
+      };
+      return null;
+    }),
+  clear: () => blobRun("readwrite", (store) => store.clear()),
+};
 
 export const forgetDeviceKeys = () => run("readwrite", (store) => (store.delete("device"), store.delete("machines"), store.delete("attempts"))).catch(() => undefined);
 

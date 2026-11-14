@@ -1,4 +1,4 @@
-import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
+import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
 import { answersWithLead, backlogList, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
@@ -10,13 +10,13 @@ import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
 import { CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
 import { assessmentBlock, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea } from "./card.js";
-import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled } from "./notify.js";
-import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, wholePage } from "./review.js";
+import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, wholePage } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -87,7 +87,9 @@ const unlockEnds = lockWhenDue(lockBoards);
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 const short = (sha) => (sha ?? "").slice(0, 7);
-const blobs = blobReader(account.blob);
+const blobs = blobReader(keptBytes(account.blob, deviceStore.keptBlobs));
+const KEEP_BLOBS_SECONDS = 30 * 86_400;
+deviceStore.keptBlobs.prune(Math.floor(Date.now() / 1000) - KEEP_BLOBS_SECONDS).catch(() => undefined);
 const deviceStorage = () => {
   try {
     return localStorage;
@@ -96,8 +98,8 @@ const deviceStorage = () => {
   }
 };
 let findRefresh = null;
-// The hub allows an account a burst of 60 and 120 requests a minute; the bodies take half the burst and three quarters of the rate and pause on a refusal, so the board and commands keep the rest.
-const bodies = pacer({ load: (ref) => blobs.load(ref).then((loaded) => (loaded && laterFindRefresh(), loaded)), held: (id) => blobs.peek(id) !== null, burst: 30, perSecond: 1.5, failed: (loaded) => Boolean(loaded?.failed) });
+// The hub allows an account a burst of 60 and 120 requests a minute across all its devices; each page's bodies take a quarter of the burst and three eighths of the rate, so two open devices still leave the board and commands room.
+const bodies = pacer({ load: (ref) => blobs.load(ref).then((loaded) => (loaded && laterFindRefresh(), loaded)), held: (id) => blobs.peek(id) !== null, burst: 15, perSecond: 0.75, failed: (loaded) => Boolean(loaded?.failed) });
 state.find = loadFind(deviceStorage());
 const blobRefs = new Map();
 
@@ -416,7 +418,7 @@ function pushArea(found) {
   if (access === "view-only") return viewOnlyBlock();
   if (!takes(found.accepts, "push")) return notTakenBlock("push", found.name, found.accepts);
   const { sent, state: shown, standing } = sentFor(found, "push");
-  const current = sent && sent.head !== pushHead(item) && settled(shown) ? null : sent;
+  const current = speaksFor(sent, shown, (one) => one.head === pushHead(item));
   return `<div class="rv-end thumb-end"><div class="row-btns">${decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing }))}</div></div>`;
 }
 
@@ -691,13 +693,6 @@ function heldReview(found, opener, subtask) {
   return { review: held?.review ?? null, failed: Boolean(held?.failed) };
 }
 
-function reviewPage(params, diff) {
-  const subtask = params[2] ?? null;
-  if (!diff || subtask === null) return { subtask, kind: diff || subtask === null ? "whole" : "subtask", commit: null };
-  const commit = params[3] && params[3] !== "all" ? Number(params[3]) - 1 : null;
-  return { subtask, kind: commit === null ? "whole" : "commit", commit };
-}
-
 const boardSubtaskOf = (found, subtask) => (subtask === null ? null : (found.item.subtasks?.find((one) => one.id === subtask) ?? null));
 const reviewHead = (found, subtask) => (subtask === null ? (found.item.head ?? null) : (boardSubtaskOf(found, subtask)?.commits.at(-1) ?? null));
 const legacyMachine = (found) => !takes(found.accepts, "accept-subtask") && takes(found.accepts, "accept-step");
@@ -817,7 +812,7 @@ function leadView(machine, now) {
 function leadRoute(wanted) {
   const now = nowSeconds();
   const machines = leadMachines(state.opened);
-  const away = awayOn(state.kept.sent, state.opened);
+  const away = awayOn(state.kept.sent, state.opened, now);
   const machine = chosenLead(machines, wanted ?? state.lead.machine, now);
   if (!machine) return shell("lead", `<div class="narrow">${top("Lead", awaySwitch(away))}${away ? awayNote : ""}<div class="center">No machine's lead talks to the app yet. Update kebbie on a machine to write to its lead from here.</div></div>`);
   if (state.lead.machine !== machine.machine) state.lead.draft = "";
@@ -1216,7 +1211,7 @@ function sendReview(target) {
   const { machine, address } = target.dataset;
   const found = findTask(state.opened, machine, address);
   if (!found || !takes(found.accepts, "review-send")) return;
-  send(target, { type: "review-send", address }, { machineName: found.name });
+  send(target, { type: "review-send", address }, { machineName: found.name, assessed: found.item.assessment?.at ?? null });
 }
 
 function sendNoticed(target, action, key) {
@@ -1538,6 +1533,7 @@ function lockBoards() {
 
 function signedOut(message) {
   blobs.forget();
+  deviceStore.keptBlobs.clear().catch(() => undefined);
   bodies.stop();
   stopCommands();
   forgetUnlock();
@@ -1930,8 +1926,8 @@ root.addEventListener("input", (event) => {
     return;
   }
   if (event.target.dataset?.draft === "review-comment") {
-    const [machine, address, step] = route().params;
-    const ui = reviewUiOf(machine, address, step ? Number(step) : null);
+    const params = route().params;
+    const ui = reviewUiOf(params[0], params[1], reviewPage(params, false).subtask);
     if (ui.composing) ui.composing.text = event.target.value;
     return;
   }

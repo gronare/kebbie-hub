@@ -41,6 +41,8 @@ export function sentState(sent, { now, asleep, standing = null }) {
 }
 
 export const settled = (state) => state === "expired" || state === "refused" || state === "not-approved" || state === "denied";
+export const pending = (state) => state === "sending" || state === "waiting" || state === "approval";
+export const speaksFor = (sent, state, answers) => (sent && (pending(state) || answers(sent)) ? sent : null);
 
 export function standingOn(board, device) {
   const standing = device ? board?.devices?.[device.id] : null;

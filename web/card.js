@@ -1,5 +1,5 @@
 import { foundStatus } from "./backlog.js";
-import { clock, settled, takes } from "./decide.js";
+import { clock, settled, speaksFor, takes } from "./decide.js";
 import { esc } from "./screens.js";
 
 export const DECIDERS = { you: "you", lead: "lead", investigator: "investigator", task: "task" };
@@ -69,12 +69,13 @@ export function cardParts(card, { noticed = () => "" } = {}) {
   return built + decisions + seen;
 }
 
-export function assessmentBlock(item, { access, accepts, sent = null, busy = false, error = null, status = () => "" }) {
+export function assessmentBlock(item, { access, accepts, sent: maybe = null, busy = false, error = null, status = () => "" }) {
   const judged = item.assessment;
   if (!judged || typeof judged === "string" || judged.word !== "recommended") return "";
   const when = judged.at ? `<div class="meta">assessed ${esc(clock(judged.at))}</div>` : "";
   const box = `<div class="assess"><b>A full review is recommended</b><span>${inline(judged.reason)}</span>${when}</div>`;
   if (item.verdict?.running) return `${box}<div class="meta pad">The full review is running.</div>`;
+  const sent = maybe && speaksFor(maybe.sent, maybe.state, (one) => (one.assessed ?? null) === (judged.at ?? null)) ? maybe : null;
   const shown = sent ? status(sent) : "";
   if (sent && !settled(sent.state)) return box + shown;
   if (access !== "ready" || !takes(accepts, "review-send")) return box + shown;

@@ -15,6 +15,12 @@ const BAND = `<div class="rv-band" aria-hidden="true"></div>`;
 export const taskHref = (machine, address) => `#/task/${encoded(machine, address)}`;
 export const subtaskHref = (machine, address, subtask) => `#/review/${encoded(machine, address)}/${encodeURIComponent(subtask)}`;
 export const diffHref = (machine, address, subtask = null, commit = "all") => `#/diff/${encoded(machine, address)}${subtask === null ? "" : `/${encodeURIComponent(subtask)}/${commit}`}`;
+export function reviewPage(params, diff) {
+  const subtask = params[2] ?? null;
+  if (!diff || subtask === null) return { subtask, kind: diff || subtask === null ? "whole" : "subtask", commit: null };
+  const commit = params[3] && params[3] !== "all" ? Number(params[3]) - 1 : null;
+  return { subtask, kind: commit === null ? "whole" : "commit", commit };
+}
 export const freshReviewUi = () => ({ read: new Map(), open: new Map(), commits: new Set(), commitsOn: null, drafts: [], composing: null, tray: false, receipt: null, busy: false, error: null, requested: null, nextId: 1, on: null, onLabel: null, stale: null });
 export function foldCommitsOn(ui, page) {
   if (ui.commitsOn === page) return;

@@ -13,10 +13,32 @@ export const blobSlot = (ref, { kind, tag = "div", look, wait = "plan" }) =>
 
 export const planHref = (machine, address) => `#/plan/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
 
-export function blobReader(fetchBytes, open = openBlob) {
+const hex = async (bytes) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+export function keptBytes(fetchBytes, kept, now = () => Math.floor(Date.now() / 1000)) {
+  return async (id) => {
+    const held = await kept.get(id).catch(() => null);
+    if (held && `blb_${await hex(held)}` === id) return held;
+    const bytes = await fetchBytes(id);
+    await kept.put(id, bytes, now()).catch(() => undefined);
+    return bytes;
+  };
+}
+
+export function blobReader(fetchBytes, open = openBlob, { pause = 30_000, wait = (ms) => new Promise((done) => setTimeout(done, ms)) } = {}) {
   const held = new Map();
   const loading = new Map();
   let generation = 0;
+  async function arrival(id, started) {
+    for (;;) {
+      try {
+        return await fetchBytes(id);
+      } catch (error) {
+        if (error?.status !== 429 || started !== generation) throw error;
+        await wait(pause);
+      }
+    }
+  }
   return {
     peek: (id) => held.get(id) ?? null,
     load(ref) {
@@ -31,7 +53,7 @@ export function blobReader(fetchBytes, open = openBlob) {
             const lead = ref.media_type === LEAD_THREAD_MEDIA_TYPE;
             const data = body || review || card || lead;
             if (!data && !/^text\//.test(ref.media_type)) throw new Error("not text");
-            const text = new TextDecoder("utf-8", { fatal: data }).decode(await open(ref, await fetchBytes(ref.id)));
+            const text = new TextDecoder("utf-8", { fatal: data }).decode(await open(ref, await arrival(ref.id, started)));
             if (!data) return { text };
             const parsed = JSON.parse(text);
             if (review) {

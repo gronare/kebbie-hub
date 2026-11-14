@@ -93,3 +93,16 @@ test("while a full review is recommended the push is the second action, and the 
   assert.equal(pushOf({ ...item, verdict: { running: true, stale: false } }), "btn primary");
   assert.equal(pushOf({ ...item, assessment: { word: "not-needed" } }), "btn primary");
 });
+
+test("a review sent for an earlier recommendation gives way to Send to review for a newer one", () => {
+  const status = () => "<i>status</i>";
+  const at = item.assessment.at;
+  const done = { kind: "review-send", at: NOW, exp: NOW + 3600, assessed: at, result: { outcome: "done" } };
+  assert.doesNotMatch(assessmentBlock(item, options({ sent: { sent: done, state: "done" }, status })), /<button/, "the recommendation it answered");
+  const newer = { ...item, assessment: { ...item.assessment, at: at + 600 } };
+  const html = assessmentBlock(newer, options({ sent: { sent: done, state: "done" }, status }));
+  assert.match(html, /data-action="review-send">Send to review</);
+  assert.doesNotMatch(html, /<i>status<\/i>/);
+  const going = { ...done, result: null };
+  assert.doesNotMatch(assessmentBlock(newer, options({ sent: { sent: going, state: "sending" }, status })), /<button/, "one still on its way holds the button");
+});

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { answerBlock, answerReady, answerStatus, choosable, gate, standingOn, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, promptStatus, pushBlock, pushStatus, pushReady, refusedBlock, sentState, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { answerBlock, answerReady, answerStatus, choosable, gate, standingOn, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, promptStatus, pushBlock, pushStatus, pushReady, refusedBlock, sentState, speaksFor, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { pushableOf } from "../js/protocol.js";
 
 const HEAD = "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a";
@@ -224,3 +224,24 @@ test("a command from a device the machine hasn't approved waits, says when it is
   for (const html of [waiting, expired, denied, done]) assert.doesNotMatch(html, /\u2014/, "no dashes in the copy");
 });
 
+
+test("a push that went out for an earlier stage gives way to the next stage's Push once it has its result", () => {
+  const sha = (c) => c.repeat(40);
+  const stage = (id, state, extra = {}) => ({ id, title: id, state, requirement: { kind: "deploy" }, ...extra });
+  const item = {
+    address: "t@r", head: sha("c"), group: "WORKING", git: { ahead: 3 }, subtasks: [],
+    order: [{ sha: sha("b"), subtask: "2", accepted: true, stage: "s2" }, { sha: sha("c"), subtask: "3", accepted: true, stage: "s3" }],
+    pushable: { count: 1, through: sha("b"), subtasks: ["2"] },
+    stages: [stage("s1", "met", { through: sha("a"), pushed_at: 1, met_at: 2 }), stage("s2", "open"), stage("s3", "locked")],
+  };
+  const ui = { confirming: false, busy: false, error: null };
+  const pushed = { kind: "push", head: sha("a"), short: "aaaaaaa", at: 100, exp: 3700, machineName: "mac", result: { outcome: "done", text: "pushed" } };
+  const forHead = (one) => one.head === item.pushable.through;
+  const done = sentState(pushed, { now: 5000, asleep: false });
+  assert.equal(speaksFor(pushed, done, forHead), null);
+  assert.match(pushBlock({ item, machineName: "mac", ui, sent: null, state: null }), /data-action="push-ask">Push 1 commit · stage 2</);
+  const going = { ...pushed, result: null, exp: 9000 };
+  assert.equal(speaksFor(going, sentState(going, { now: 5000, asleep: false }), forHead), going, "a push still on its way keeps its status");
+  const current = { ...pushed, head: sha("b") };
+  assert.equal(speaksFor(current, done, forHead), current, "the push for the offered run still speaks for it");
+});

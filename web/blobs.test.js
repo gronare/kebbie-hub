@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { REVIEW_MEDIA_TYPE, fromB64 } from "../js/protocol.js";
-import { blobReader, blobSlot, failedLine, loadingLine, planHref } from "./blobs.js";
+import { blobReader, blobSlot, failedLine, keptBytes, loadingLine, planHref } from "./blobs.js";
 
 const vectors = JSON.parse(readFileSync(new URL("../vectors/blobs.json", import.meta.url), "utf8"));
 const [opens, tampered] = vectors.cases;
@@ -102,4 +102,44 @@ test("a review of a step from a machine not yet updated opens as a subtask of on
   const opened = await reader.load(review.blob);
   assert.deepEqual(opened, { review: opens_as });
   assert.equal(opened.review.subtask.commits.length, 1);
+});
+
+test("a body the hub refuses for too many requests is not loaded yet: it waits and is fetched again, never marked failed", async () => {
+  const asked = [];
+  let refusals = 2;
+  const fetchBytes = async (id) => {
+    asked.push(id);
+    if (refusals-- > 0) throw Object.assign(new Error("429 rate-limited"), { status: 429 });
+    return fromB64(opens.ciphertext);
+  };
+  const waits = [];
+  let release;
+  const reader = blobReader(fetchBytes, undefined, { pause: 30_000, wait: (ms) => (waits.push(ms), new Promise((done) => (release = done))) });
+  const loading = reader.load(opens.blob);
+  while (!release) await new Promise((done) => setImmediate(done));
+  assert.equal(reader.peek(opens.blob.id), null, "still loading, not failed");
+  release();
+  release = null;
+  while (!release) await new Promise((done) => setImmediate(done));
+  release();
+  assert.equal((await loading).text, vectors.plaintext);
+  assert.deepEqual(waits, [30_000, 30_000]);
+  assert.equal(asked.length, 3);
+});
+
+test("a fetched body is kept across launches by its id and is not fetched again; a kept copy that does not match its id is fetched anew", async () => {
+  const shelf = new Map();
+  const kept = { get: async (id) => shelf.get(id)?.bytes ?? null, put: async (id, bytes, at) => void shelf.set(id, { bytes, at }) };
+  const first = hub({ [opens.blob.id]: opens.ciphertext });
+  assert.equal((await blobReader(keptBytes(first.fetchBytes, kept, () => 7)).load(opens.blob)).text, vectors.plaintext);
+  assert.equal(shelf.get(opens.blob.id).at, 7);
+  const relaunched = hub({});
+  assert.equal((await blobReader(keptBytes(relaunched.fetchBytes, kept)).load(opens.blob)).text, vectors.plaintext);
+  assert.deepEqual(relaunched.asked, [], "the next launch reads the kept ciphertext");
+  shelf.set(opens.blob.id, { bytes: new Uint8Array([1, 2, 3]), at: 7 });
+  const again = hub({ [opens.blob.id]: opens.ciphertext });
+  assert.equal((await blobReader(keptBytes(again.fetchBytes, kept)).load(opens.blob)).text, vectors.plaintext);
+  assert.deepEqual(again.asked, [opens.blob.id]);
+  const broken = { get: async () => { throw new Error("no IndexedDB"); }, put: async () => { throw new Error("no IndexedDB"); } };
+  assert.equal((await blobReader(keptBytes(hub({ [opens.blob.id]: opens.ciphertext }).fetchBytes, broken)).load(opens.blob)).text, vectors.plaintext, "a device that keeps nothing still loads");
 });

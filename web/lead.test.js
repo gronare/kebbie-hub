@@ -70,11 +70,11 @@ test("a message the machine has not picked up waits in the hub while it sleeps, 
 
 test("away mode is one switch: on when the latest switch has not reached a machine yet, otherwise as the boards say", () => {
   const off = { ...machine(), board: { ...vectors.board, away_since: null } };
-  assert.equal(awayOn([], [off]), false);
-  assert.equal(awayOn([], [machine()]), true);
-  const sentOn = { kind: "away", machine: "mch_a", on: true, at: NOW };
-  assert.equal(awayOn([sentOn], [off]), true, "sent but not yet applied");
-  assert.equal(awayOn([{ ...sentOn, on: false }], [machine()]), false);
+  assert.equal(awayOn([], [off], NOW), false);
+  assert.equal(awayOn([], [machine()], NOW), true);
+  const sentOn = { kind: "away", machine: "mch_a", on: true, at: NOW, exp: NOW + 3600, result: null };
+  assert.equal(awayOn([sentOn], [off], NOW), true, "sent but not yet applied");
+  assert.equal(awayOn([{ ...sentOn, on: false }], [machine()], NOW), false);
   assert.match(leadHead(machine(), { now: NOW, away: true, picking: false, canPick: true }), /<input type="checkbox" class="switch" name="away" data-action="lead-away" checked aria-label="Away mode"><\/label><\/div><div class="away-on">/);
 });
 
@@ -102,4 +102,15 @@ test("the composer is a 16px field and a round Send that stays off until there i
   assert.equal(text(composerHtml(machine(), { draft: "", busy: false, error: null, takes: false })), "MacBook's kebbie can't take messages from the app yet.");
   const css = readFileSync(new URL("./app.css", import.meta.url), "utf8");
   assert.match(css, /\.composer textarea \{[^}]*font: 16px/, "16px keeps iOS from zooming into the field");
+});
+
+test("the away switch follows the board once the phone's switch has its answer and the board has caught up", () => {
+  const off = { ...machine(), storedAt: NOW, board: { ...vectors.board, away_since: null } };
+  const doneOn = { kind: "away", machine: "mch_a", on: true, at: NOW - 2 * 86_400, exp: NOW + 5 * 86_400, result: { outcome: "done", at: NOW - 2 * 86_400 + 5 } };
+  assert.equal(awayOn([doneOn], [off], NOW), false, "turned off at the computer after the phone turned it on");
+  assert.equal(awayOn([doneOn], [{ ...off, storedAt: NOW - 2 * 86_400 }], NOW), true, "the board from before the switch took effect");
+  const refused = { ...doneOn, at: NOW - 3600, exp: NOW, result: { outcome: "refused", reason: "not-allowed" } };
+  assert.equal(awayOn([refused], [off], NOW), false, "a refused switch changed nothing");
+  const lapsed = { ...doneOn, at: NOW - 3600, exp: NOW - 1, result: null };
+  assert.equal(awayOn([lapsed], [off], NOW), false, "a switch never delivered changed nothing");
 });

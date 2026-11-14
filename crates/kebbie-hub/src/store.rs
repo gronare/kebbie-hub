@@ -206,10 +206,12 @@ CREATE TABLE IF NOT EXISTS blobs (
 );
 ";
 
-const SCHEMA_VERSION: i64 = 17;
-// Schemas 13 and 14 open as 17: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
+const SCHEMA_VERSION: i64 = 18;
+// Schema 17 opens as 18 in place: devices lose name and kind and gain removed_at, push subscriptions gain offered.
+const MIGRATED_IN_PLACE: [i64; 1] = [17];
+// Schemas 13 and 14 open as 18: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
 const COMPATIBLE_VERSIONS: [i64; 2] = [13, 14];
-// Schemas 15 and 16 open as 17 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
+// Schemas 15 and 16 open as 18 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
 const DEVICE_KEYS_FROM: [i64; 2] = [15, 16];
 const DROPPED_FOR_DEVICE_KEYS: &str = "
 DROP TABLE IF EXISTS results;
@@ -422,6 +424,7 @@ impl Store {
             connection.query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get(0))?;
         let fresh = version == 0 && tables == 0;
         let opens = version == SCHEMA_VERSION
+            || MIGRATED_IN_PLACE.contains(&version)
             || DEVICE_KEYS_FROM.contains(&version)
             || COMPATIBLE_VERSIONS.contains(&version);
         if !fresh && !opens {
@@ -833,6 +836,11 @@ impl Store {
         )?;
         if removed > 0 {
             tx.execute("DELETE FROM push_subscriptions WHERE device_id = ?1", [device.as_str()])?;
+            tx.execute(
+                "DELETE FROM queue WHERE (machine_id, seq) IN
+                     (SELECT machine_id, seq FROM commands WHERE device_id = ?1 AND delivered_at IS NULL)",
+                [device.as_str()],
+            )?;
         }
         tx.commit()?;
         Ok(removed > 0)
