@@ -311,39 +311,71 @@ export function answerStatus(sent, state, { standing = null, now }) {
 
 const withLead = (text, meta) => block("wait", `With the lead: "${esc(text)}"`, "The lead folds your answer into the item and takes the question out.", meta);
 
-function questionCard(question, index, { pickable, picked, ui, sent, now }) {
-  const pending = question.pending_answer !== null && question.pending_answer !== undefined;
+const pendingOf = (question) => question.pending_answer !== null && question.pending_answer !== undefined;
+const answerable = (question, sent) => !pendingOf(question) && !(sent && !settled(sent.state));
+
+export const answerableQuestions = (body, sentFor) => (body?.questions ?? []).flatMap((question, index) => (answerable(question, sentFor(index)) ? [index] : []));
+export const draftOf = (ui, index) => ui.answers?.get(index) ?? "";
+export const filledAnswers = (ui, indices) => indices.filter((index) => ui.open?.has(index) && draftOf(ui, index).trim() !== "");
+export const sendAllLabel = (count) => `Send ${count} answers`;
+
+export function bodyShown(held, shown) {
+  if (!held) return shown ? { body: shown, bodyState: "ready" } : { body: null, bodyState: "loading" };
+  return held.body ? { body: held.body, bodyState: "ready" } : { body: null, bodyState: "failed" };
+}
+
+export const answersToSend = (body, ui, indices) => indices.map((index) => ({ index, question: body?.questions[index], answer: draftOf(ui, index).trim() })).filter((one) => one.question && one.answer);
+export const answerCommand = (entry, { index, question, answer }) => ({ payload: { type: "item-answer", item: entry.key, index, question: question.text, answer }, meta: { address: entry.key, index, text: answer, label: entry.row.title } });
+
+export async function sendAnswers(entry, answers, { send, sent }) {
+  for (const one of answers) {
+    if (!(await send(answerCommand(entry, one)))) return false;
+    sent(one.index);
+  }
+  return true;
+}
+
+export function nextQuestion(indices, sending) {
+  const left = indices.filter((index) => !sending.includes(index));
+  const last = Math.max(...sending);
+  return left.find((index) => index > last) ?? left[0] ?? null;
+}
+
+function questionCard(question, index, { pickable, ui, sent, now, batch }) {
+  const pending = pendingOf(question);
   const live = sent && !settled(sent.state);
   const answered = pending || (live && sent.state === "done");
+  const picked = Boolean(ui.open?.has(index)) && answerable(question, sent);
   const mark = question.blocks ? `<span class="qmark${answered ? "" : " warn"}" aria-hidden="true">?</span>` : `<span class="qmark" aria-hidden="true">·</span>`;
   const press = pickable && !pending && !live;
   const classes = ["opt", "bq", question.blocks ? "" : "plain", press ? "pick" : "", picked ? "picked" : "", answered ? "answered" : ""].filter(Boolean).join(" ");
   const attributes = press ? ` role="button" tabindex="0" data-action="pick-question" data-index="${index}" aria-pressed="${picked}"` : "";
   const card = `<div class="${classes}"${attributes}><b>${mark}${esc(question.text)}</b>${question.blocks ? "" : "<small>the work can settle it</small>"}</div>`;
-  if (sent && (live || !pending)) {
-    const status = answerStatus(sent.sent, sent.state, { standing: sent.standing, now });
-    if (live || !picked) return card + status;
-    return card + status + answerRow(index, ui);
-  }
+  const row = picked && press ? answerRow(index, ui, batch) : "";
+  if (sent && (live || !pending)) return card + answerStatus(sent.sent, sent.state, { standing: sent.standing, now }) + row;
   if (pending) return card + withLead(question.pending_answer, "with the lead on its machine");
-  if (picked) return card + answerRow(index, ui);
-  return card;
+  return card + row;
 }
 
-function answerRow(index, ui) {
-  const ready = ui.text.trim() !== "" && !ui.busy;
-  const failed = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
-  return `<div class="answer-row"><div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" rows="2" maxlength="2000">${esc(ui.text)}</textarea></div><button type="button" class="btn primary" data-action="send-item-answer"${ready ? "" : " disabled"}>Send to the lead</button></div>${failed}`;
+function answerRow(index, ui, batch) {
+  const text = draftOf(ui, index);
+  const ready = text.trim() !== "" && !ui.answering?.busy;
+  return `<div class="answer-row"><div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" data-index="${index}" rows="2" maxlength="2000">${esc(text)}</textarea></div><button type="button" class="btn primary" data-action="send-item-answer" data-index="${index}"${ready ? "" : " disabled"}${batch ? " hidden" : ""}>Send to the lead</button></div>`;
 }
 
 function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, heading = `<h3 class="sec">Open questions</h3>` }) {
   const questions = body.questions;
   const head = counts.left > 0 ? `${counts.left === 1 ? "1 waits" : `${counts.left} wait`} on you before it starts` : "none blocks the start";
   const pickable = access === "ready" && takesAnswers;
-  const cards = questions.map((question, index) => questionCard(question, index, { pickable, picked: ui.picked === index, ui, sent: sentFor(index), now })).join("");
+  const indices = pickable ? answerableQuestions(body, sentFor) : [];
+  const filled = filledAnswers(ui, indices).length;
+  const cards = questions.map((question, index) => questionCard(question, index, { pickable, ui, sent: sentFor(index), now, batch: filled >= 2 })).join("");
+  const opened = indices.filter((index) => ui.open?.has(index)).length;
+  const all = opened >= 2 ? `<div class="answers-send"${filled >= 2 ? "" : " hidden"}><button type="button" class="btn primary" data-action="send-item-answers"${ui.answering?.busy ? " disabled" : ""}>${sendAllLabel(filled)}</button></div>` : "";
+  const failed = pickable && ui.answering?.error ? `<div class="center warn" role="alert">${esc(ui.answering.error)}</div>` : "";
   const gate = access === "refused" ? proLine("Answering its questions from this device comes with Hub Pro.", refusedUrl) : access === "view-only" && questions.length ? viewOnlyBlock() : "";
   if (questions.length === 0) return `${heading}<div class="meta pad">None open.</div>`;
-  return `${heading}<div class="meta pad">${head}</div><div class="options qlist">${cards}</div>${gate}`;
+  return `${heading}<div class="meta pad">${head}</div><div class="options qlist">${cards}</div>${all}${failed}${gate}`;
 }
 
 export function startStatus(sent, state, { title, standing = null, now, taskHref = "#/board" }) {
