@@ -146,6 +146,27 @@ fn a_schema_17_database_keeps_its_devices_and_reads_name_and_kind_from_their_cer
 }
 
 #[test]
+fn a_push_subscription_from_before_the_lead_answered_category_was_offered_the_six_before_it() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    drop(Store::open(&path).unwrap());
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             DROP TABLE push_subscriptions;
+             CREATE TABLE push_subscriptions (device_id TEXT PRIMARY KEY, endpoint TEXT NOT NULL UNIQUE, p256dh BLOB NOT NULL, auth BLOB NOT NULL, categories TEXT NOT NULL, subscribed_at INTEGER NOT NULL);
+             INSERT INTO push_subscriptions VALUES ('dev_kept', 'https://push.example/1', x'01', x'02', '[\"questions\"]', 1);",
+        )
+        .unwrap();
+    drop(Store::open(&path).unwrap());
+    drop(Store::open(&path).unwrap());
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    let offered: String = connection.query_row("SELECT offered FROM push_subscriptions", [], |row| row.get(0)).unwrap();
+    assert_eq!(offered, r#"["questions","new-device","idea-questions","ready","ci-failed","started"]"#);
+}
+
+#[test]
 fn a_schema_15_database_drops_its_account_signed_commands_and_keeps_the_rest() {
     let data = tempfile::tempdir().unwrap();
     let path = data.path().join("hub.sqlite3");

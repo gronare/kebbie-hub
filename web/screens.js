@@ -428,6 +428,7 @@ export const ICONS = {
   board: `<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>`,
   backlog: `<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/>`,
   questions: `<path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M10 9a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.4"/><path d="M12 14.6v.1"/>`,
+  lead: `<path d="M4 4.5h11a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/><path d="M16 8.5h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1v3l-4-3h-4a1 1 0 0 1-1-1v-.5"/>`,
   machines: `<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>`,
   back: `<path d="M15 5l-7 7 7 7"/>`,
   sections: `<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15M5.8 8.5h1.6M5.8 11.5h1.6"/>`,
@@ -460,11 +461,11 @@ export const questionWaits = (item, href) => `<div class="sent wait qwait" role=
 
 export const youLine = (item) => (item.next_for_you && !asksYou(item) ? `<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>` : "");
 
-export function nav({ active, questions = 0, deskOnly = false }) {
+export function nav({ active, questions = 0, replies = 0, deskOnly = false }) {
   const tab = (href, label, key, said = label) => `<a href="${href}" aria-label="${esc(said)}" class="${active === key ? "on" : ""}"${active === key ? ' aria-current="page"' : ""}>${label}${icon(key)}</a>`;
   const badge = questions ? ` <em class="badge">${esc(questions)}</em>` : "";
   const account = `<a href="/account" class="account${active === "account" ? " on" : ""}"${active === "account" ? ' aria-current="page"' : ""}>Account</a>`;
-  return `<nav class="tabbar${deskOnly ? " desk-nav" : ""}"><div class="side-brand brand">${brand.replace(/^<header class="brand">|<\/header>$/g, "")}</div>${tab("/#/board", "Board", "board")}${tab("/#/backlog", "Backlog", "backlog")}${tab("/#/questions", `Questions${badge}`, "questions", questions ? `Questions, ${questions} waiting` : "Questions")}${tab("/#/machines", "Machines", "machines")}${account}</nav>`;
+  return `<nav class="tabbar${deskOnly ? " desk-nav" : ""}"><div class="side-brand brand">${brand.replace(/^<header class="brand">|<\/header>$/g, "")}</div>${tab("/#/board", "Board", "board")}${tab("/#/backlog", "Backlog", "backlog")}${tab("/#/questions", `Questions${badge}`, "questions", questions ? `Questions, ${questions} waiting` : "Questions")}${tab("/#/lead", `Lead${replies ? ` <em class="badge">${esc(replies)}</em>` : ""}`, "lead", replies ? `Lead, ${replies} new ${replies === 1 ? "reply" : "replies"}` : "Lead")}${tab("/#/machines", "Machines", "machines")}${account}</nav>`;
 }
 
 export function optionCards(options, recommend = null) {

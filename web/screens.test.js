@@ -384,8 +384,9 @@ test("a question's options show as cards with only the recommended one marked, a
 
 test("the nav names the tabs with the backlog between board and questions, counts waiting questions in a badge, marks the open tab and links the account", () => {
   const html = nav({ active: "questions", questions: 2 });
-  assert.deepEqual(hrefs(html), [{ label: "Board", href: "/#/board" }, { label: "Backlog", href: "/#/backlog" }, { label: "Questions", href: "/#/questions" }, { label: "Machines", href: "/#/machines" }, { label: "Account", href: "/account" }]);
+  assert.deepEqual(hrefs(html), [{ label: "Board", href: "/#/board" }, { label: "Backlog", href: "/#/backlog" }, { label: "Questions", href: "/#/questions" }, { label: "Lead", href: "/#/lead" }, { label: "Machines", href: "/#/machines" }, { label: "Account", href: "/account" }]);
   assert.match(html, /class="on" aria-current="page">Questions <em class="badge">2<\/em>/);
+  assert.match(nav({ active: "lead", replies: 1 }), /<a href="\/#\/lead" aria-label="Lead, 1 new reply" class="on" aria-current="page">Lead <em class="badge">1<\/em><svg class="tab-icon"/);
   assert.doesNotMatch(nav({ active: "board" }), /badge|Admin/);
   assert.match(nav({ active: "account", deskOnly: true }), /^<nav class="tabbar desk-nav">/);
 });
@@ -610,8 +611,8 @@ test("Account shows one Notifications row under This device, and its own page ho
   assert.doesNotMatch(off, /notify-card|Notify me when|name="notify"/);
   assert.match(accountScreen({ me: { account: "acc_x" }, github: false, allowed: true, notify: { phase: "on", text: "x", categories: [] } }), /<span class="meta ok">On<\/span>/);
   const on = notifySection({ phase: "on", text: "On for this iPhone.", senders: "MacBook and work-mac send here.", failure: "The last notification, at 14:02 from MacBook, couldn't be opened.", categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed"] });
-  assert.equal(text(on), "Notifications On for this iPhone. MacBook and work-mac send here. The last notification, at 14:02 from MacBook, couldn't be opened. Notify me when it needs you Questions and prompts A task asks you something, or an agent's prompt waits for a choice A new device to approve A device wants to make changes on one of your machines The lead's questions on an idea The lead wrote out an idea and needs answers before it starts Notify me when work moves Ready to push A task is reviewed and waits for your push CI failed A push came back red A start went through A task you started from here began on its machine");
-  assert.equal((on.match(/name="notice-category"/g) ?? []).length, 6);
+  assert.equal(text(on), "Notifications On for this iPhone. MacBook and work-mac send here. The last notification, at 14:02 from MacBook, couldn't be opened. Notify me when it needs you Questions and prompts A task asks you something, or an agent's prompt waits for a choice A new device to approve A device wants to make changes on one of your machines The lead's questions on an idea The lead wrote out an idea and needs answers before it starts The lead answered A machine's lead replied to you in its thread Notify me when work moves Ready to push A task is reviewed and waits for your push CI failed A push came back red A start went through A task you started from here began on its machine");
+  assert.equal((on.match(/name="notice-category"/g) ?? []).length, 7);
   assert.equal((on.match(/ checked/g) ?? []).length, 6, "the main switch and five categories");
   assert.match(on, /name="notice-category" value="started" aria-labelledby="n-start-name" aria-describedby="n-start-state" aria-checked="false">/);
   assert.doesNotMatch(notifySection({ phase: "off", text: "Off", senders: "MacBook sends here." }), /sends here/, "machines that send here show only while it is on");

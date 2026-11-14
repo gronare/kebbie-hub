@@ -97,6 +97,7 @@ export function keyboardLift(view = globalThis.visualViewport, page = globalThis
   const sync = () => {
     const keyboard = innerHeight - view.height - view.offsetTop;
     page.style.setProperty("--vvh", `${view.height}px`);
+    page.style.setProperty("--kb", `${Math.max(0, Math.round(keyboard))}px`);
     page.classList.toggle("kb-open", keyboard > 80);
   };
   return (shown) => {
@@ -110,6 +111,7 @@ export function keyboardLift(view = globalThis.visualViewport, page = globalThis
       view.removeEventListener("resize", sync);
       view.removeEventListener("scroll", sync);
       page.style.removeProperty("--vvh");
+      page.style.removeProperty("--kb");
       page.classList.remove("kb-open");
     }
   };

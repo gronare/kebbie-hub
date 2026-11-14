@@ -29,6 +29,16 @@
       "category": "started",
       "fits": true,
       "tag": "q"
+    },
+    {
+      "category": "lead-answered",
+      "fits": true,
+      "tag": "l-mbp-lead"
+    },
+    {
+      "category": "ready",
+      "fits": false,
+      "tag": "l-mbp-lead"
     }
   ],
   "prefixes": [
@@ -59,6 +69,10 @@
     {
       "category": "started",
       "prefix": "s"
+    },
+    {
+      "category": "lead-answered",
+      "prefix": "l"
     }
   ],
   "tags": [
@@ -89,6 +103,10 @@
     {
       "category": "started",
       "tag": "s-1a2b"
+    },
+    {
+      "category": "lead-answered",
+      "tag": "l-mbp-lead"
     },
     {
       "category": "questions",

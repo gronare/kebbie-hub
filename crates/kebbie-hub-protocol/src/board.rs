@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::backlog::BacklogRow;
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
+use crate::lead::LeadRef;
 use crate::message::{check, is_full_sha, is_line, is_text};
 use crate::review::ReviewOffer;
 
@@ -30,6 +31,8 @@ pub struct Board {
     pub devices: Option<BTreeMap<Id, DeviceStanding>>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::backlog::backlog_rows")]
     pub backlog: Option<Vec<BacklogRow>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lead: Option<Box<LeadRef>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1035,6 +1038,7 @@ impl Rules {
 
 impl Board {
     pub fn check(&self) -> Result<(), &'static str> {
+        self.lead.as_deref().map_or(Ok(()), LeadRef::check)?;
         self.items.iter().try_for_each(|item| {
             item.git.iter().filter_map(|git| git.rules.as_ref()).try_for_each(Rules::check)?;
             item.obstacle.as_ref().map_or(Ok(()), Obstacle::check)?;

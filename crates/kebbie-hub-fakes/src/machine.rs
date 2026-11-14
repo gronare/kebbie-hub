@@ -17,6 +17,7 @@ use kebbie_hub_protocol::{
     FoundAdd, FoundDismiss, FoundStart, PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState, pushable_of,
     Answer, KebbieQuestionKind, MAX_STAGE_NOTE_CHARS, StageState, unlock_stages,
     CARD_MEDIA_TYPE, Card, CardRef, FoundKeep, NoticedChoice, ReviewSend, Verdict,
+    Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_PAGE_TURNS, NoticeCategory, Target, Turn,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -45,6 +46,8 @@ pub fn every_command() -> Vec<Kind> {
         Kind::FoundDismiss,
         Kind::FoundKeep,
         Kind::ReviewSend,
+        Kind::LeadMessage,
+        Kind::Away,
     ]
 }
 
@@ -70,9 +73,48 @@ pub struct Backlog {
     pub bodies: BTreeMap<ItemKey, BacklogBody>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LeadHold {
+    #[default]
+    None,
+    Turn,
+    Draft,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Lead {
+    pub turns: Vec<Turn>,
+    pub working_since: Option<u64>,
+    pub replied_at: Option<u64>,
+    pub hold: LeadHold,
+    pub pending: Vec<CommandResult>,
+    pub said: u64,
+}
+
+impl Lead {
+    fn next_id(&mut self) -> String {
+        self.said += 1;
+        format!("t-{}", self.said)
+    }
+
+    fn holds(&self, command: &Id) -> bool {
+        self.turns.iter().any(|turn| matches!(turn, Turn::You { id, delivery: Some(Delivery::WaitingTurn | Delivery::WaitingDraft), .. } if id == command.as_str()))
+    }
+
+    pub fn pages(&self) -> Vec<LeadThread> {
+        let mut pages: Vec<LeadThread> = self.turns.chunks(MAX_LEAD_PAGE_TURNS).map(|turns| LeadThread { turns: turns.to_vec(), older: None }).collect();
+        if pages.is_empty() {
+            pages.push(LeadThread { turns: Vec::new(), older: None });
+        }
+        pages
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Handling {
     Applied { did: String, result: CommandResult },
+    Held { did: String },
     Refused(CommandResult),
     Replayed(CommandResult),
     Waiting(Id),
@@ -85,7 +127,7 @@ impl Handling {
             Handling::Applied { result, .. }
             | Handling::Refused(result)
             | Handling::Replayed(result) => Some(result),
-            Handling::Waiting(_) | Handling::Dropped(_) => None,
+            Handling::Held { .. } | Handling::Waiting(_) | Handling::Dropped(_) => None,
         }
     }
 }
@@ -142,6 +184,10 @@ pub struct MachineState {
     pub reviews: BTreeMap<String, Review>,
     #[serde(default)]
     pub cards: BTreeMap<String, Card>,
+    #[serde(default)]
+    pub lead: Lead,
+    #[serde(skip)]
+    lead_changed: bool,
     #[serde(skip)]
     cards_changed: bool,
     #[serde(skip)]
@@ -366,6 +412,8 @@ impl MachineState {
             board_changed: false,
             backlog_changed: false,
             decided: false,
+            lead: Lead::default(),
+            lead_changed: false,
         }
     }
 
@@ -664,6 +712,9 @@ impl MachineState {
         if std::mem::take(&mut self.cards_changed) {
             self.seal_cards().await?;
         }
+        if std::mem::take(&mut self.lead_changed) {
+            self.seal_lead().await?;
+        }
         if self.backlog_changed {
             self.publish_backlog().await?;
         } else if std::mem::take(&mut self.board_changed)
@@ -733,6 +784,115 @@ impl MachineState {
             noticed.chosen = Some(choice);
             self.cards_changed = true;
         }
+    }
+
+    fn tell_lead(&mut self, command: &Id, device: &Id, message: &LeadMessage) -> String {
+        if self.lead.turns.iter().any(|turn| turn.id() == command.as_str()) {
+            return "Already with the lead.".into();
+        }
+        let at = now();
+        let (delivery, said) = match self.lead.hold {
+            LeadHold::None => (Delivery::Delivered { at }, "Delivered to the lead."),
+            LeadHold::Turn => (Delivery::WaitingTurn, "Waiting for the lead to finish its turn."),
+            LeadHold::Draft => (Delivery::WaitingDraft, "Waiting: a draft is in the lead's input."),
+        };
+        if self.lead.hold == LeadHold::None {
+            self.lead.working_since = Some(at);
+        }
+        self.lead.turns.push(Turn::You { id: command.to_string(), at, device: Some(device.clone()), text: Some(message.text.clone()), away: None, delivery: Some(delivery) });
+        self.lead_changed = true;
+        said.into()
+    }
+
+    fn switch_away(&mut self, command: &Id, device: &Id, away: Away) -> String {
+        let at = now();
+        let mut board = self.board.clone().unwrap_or_else(empty_board);
+        board.away_since = away.on.then_some(board.away_since.unwrap_or(at));
+        self.board = Some(board);
+        self.lead.turns.push(Turn::You { id: command.to_string(), at, device: Some(device.clone()), text: None, away: Some(away.on), delivery: None });
+        let id = self.lead.next_id();
+        let reply = if away.on { "Understood. While you're away I settle questions about method myself and write down what I chose; questions about what you want wait in Questions." } else { "Welcome back. I ask you again before I choose." };
+        self.lead.turns.push(Turn::Lead { id, at, text: reply.into() });
+        self.lead.replied_at = Some(at);
+        self.lead_changed = true;
+        format!("Away mode {}.", if away.on { "on" } else { "off" })
+    }
+
+    pub fn say_at_the_computer(&mut self, text: &str) {
+        let at = now();
+        let id = self.lead.next_id();
+        self.lead.turns.push(Turn::You { id, at, device: None, text: Some(text.into()), away: None, delivery: None });
+        self.lead.working_since = Some(at);
+        self.lead_changed = true;
+    }
+
+    pub fn lead_replies(&mut self, text: &str, still_working: bool) {
+        let at = now();
+        let id = self.lead.next_id();
+        self.lead.turns.push(Turn::Lead { id, at, text: text.into() });
+        self.lead.replied_at = Some(at);
+        self.lead.working_since = still_working.then_some(self.lead.working_since.unwrap_or(at));
+        self.lead_changed = true;
+    }
+
+    pub async fn release_lead(&mut self) -> Result<Vec<CommandResult>, Error> {
+        let at = now();
+        let mut released = false;
+        for turn in &mut self.lead.turns {
+            if let Turn::You { delivery: Some(delivery @ (Delivery::WaitingTurn | Delivery::WaitingDraft)), .. } = turn {
+                *delivery = Delivery::Delivered { at };
+                released = true;
+            }
+        }
+        if released {
+            self.lead.working_since = Some(at);
+        }
+        self.lead.hold = LeadHold::None;
+        let pending = std::mem::take(&mut self.lead.pending);
+        if let Some(account) = self.account.clone() {
+            for result in &pending {
+                let result = CommandResult { text: "Delivered to the lead.".into(), ..result.clone() };
+                self.applied.record(at, result.clone());
+                self.deliver_result(&account, &result).await?;
+            }
+        }
+        self.publish_lead().await?;
+        Ok(pending)
+    }
+
+    pub async fn publish_lead(&mut self) -> Result<u64, Error> {
+        self.seal_lead().await?;
+        self.lead_changed = false;
+        self.board_changed = false;
+        let board = self.board.clone().unwrap_or_else(empty_board);
+        self.post_board(board).await
+    }
+
+    async fn seal_lead(&mut self) -> Result<(), Error> {
+        let mut older: Option<BlobRef> = None;
+        for mut page in self.lead.pages() {
+            page.older = older.take();
+            page.check().map_err(|problem| Error::Protocol(problem.to_string()))?;
+            let plaintext = serde_json::to_vec(&page).map_err(|error| Error::Protocol(error.to_string()))?;
+            let (blob, ciphertext) = seal_blob(&plaintext, LEAD_THREAD_MEDIA_TYPE);
+            self.put_blob(&blob.id, ciphertext).await?;
+            older = Some(blob);
+        }
+        let mut board = self.board.clone().unwrap_or_else(empty_board);
+        board.lead = older.map(|thread| Box::new(LeadRef { thread, working_since: self.lead.working_since, replied_at: self.lead.replied_at }));
+        self.board = Some(board);
+        self.board_changed = true;
+        Ok(())
+    }
+
+    pub async fn notify_lead_answered(&mut self) -> Result<NoticeSent, Error> {
+        let reply = self.lead.turns.iter().rev().find_map(|turn| match turn {
+            Turn::Lead { text, .. } => Some(text.clone()),
+            Turn::You { .. } => None,
+        });
+        let body: String = reply.unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ").chars().take(240).collect();
+        let notice = Notice { category: NoticeCategory::LeadAnswered, title: format!("Lead · {}", self.name), body, open: Target::Lead {}, retract: Vec::new() };
+        self.notify(notice, "l-lead", Urgency::Normal).await
     }
 
     fn send_to_review(&mut self, send: &ReviewSend) -> Result<String, Reason> {
@@ -1065,7 +1225,13 @@ impl MachineState {
         let handling = match authorize(&machine, &self.applied, envelope, at) {
             Ok(verified) => {
                 let (did, result) = self.execute(&header.id, verified.device.id(), &verified.payload);
-                Handling::Applied { did, result }
+                if self.lead.holds(&header.id) {
+                    self.lead.pending.retain(|pending| pending.command != header.id);
+                    self.lead.pending.push(result);
+                    Handling::Held { did }
+                } else {
+                    Handling::Applied { did, result }
+                }
             }
             Err(Refusal::Answer(reason)) => Handling::Refused(refusal(&header.id, &header.from, reason)),
             Err(Refusal::Replay(result)) => Handling::Replayed(*result),
@@ -1220,6 +1386,14 @@ impl MachineState {
             Payload::ReviewSend(send) => (
                 format!("send {}{} to a full review", send.address, send.subtask.as_deref().map_or(String::new(), |subtask| format!(" subtask {subtask}"))),
                 self.send_to_review(send).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::LeadMessage(message) => (
+                format!("tell the lead {:?}", message.text),
+                done(self.tell_lead(command, device, message)),
+            ),
+            Payload::Away(away) => (
+                format!("turn away mode {}", if away.on { "on" } else { "off" }),
+                done(self.switch_away(command, device, *away)),
             ),
             Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
                 "nothing: not a command".to_string(),
@@ -1378,6 +1552,7 @@ fn empty_board() -> Board {
         accepts: None,
         devices: None,
         backlog: None,
+        lead: None,
     }
 }
 

@@ -129,12 +129,12 @@ test("the switch asks for permission from the tap itself, subscribes with the hu
   const device = added.body.cert.device;
   assert.ok(added.body.cert.encryption, "the device registers its encryption key");
   const subscribed = calls.find((call) => call.method === "PUT" && call.url === `/v1/a/devices/${device}/push`);
-  assert.deepEqual(subscribed.body, { endpoint: "https://web.push.apple.com/QGuQyavXutnMH", keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" }, categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed"] });
+  assert.deepEqual(subscribed.body, { endpoint: "https://web.push.apple.com/QGuQyavXutnMH", keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" }, categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed", "lead-answered"] });
   assert.match(root.innerHTML, /Notify me when it needs you/);
 
   root.change({ name: "notice-category", value: "started", checked: true });
   await until(() => calls.some((call) => call.url === `/v1/a/devices/${device}/categories`));
-  assert.deepEqual(calls.find((call) => call.url === `/v1/a/devices/${device}/categories`).body, { categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"] });
+  assert.deepEqual(calls.find((call) => call.url === `/v1/a/devices/${device}/categories`).body, { categories: ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started", "lead-answered"] });
 
   root.change({ name: "notify", checked: false });
   await until(() => calls.some((call) => call.method === "DELETE"));

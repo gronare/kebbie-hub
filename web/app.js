@@ -19,6 +19,7 @@ import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fi
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
+import { awayOn, chosenLead, composerHtml, leadHead, leadHref, leadMachines, panelHead, pendingMessages, pickRow, popHtml, previewOf, shortWhen, threadHtml, threadOf, unseenReplies, awaySwitch, awayNote } from "./lead.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
@@ -28,7 +29,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
 let reloading = false;
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
@@ -112,11 +113,12 @@ const go = (hash) => {
   else location.hash = hash;
 };
 
-function shell(active, main, panel = "") {
+function shell(active, main, panel = "", { said = "Selected task", bare = false } = {}) {
   const questions = arrange(state.opened, nowSeconds()).questions.length;
-  const side = panel ? `<aside class="panel" aria-label="Selected task">${panel}</aside>` : "";
+  const replies = unseenReplies(leadMachines(state.opened), leadSeen);
+  const side = panel ? `<aside class="panel" aria-label="${esc(said)}">${panel}</aside>` : "";
   const toast = state.updated ? `<div class="toast" role="status"><span>New version</span><button type="button" class="toast-act" data-action="reload">Reload</button></div>` : "";
-  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions })}<main class="screen in-app">${brand}${main}</main>${side}${toast}</div>`;
+  return `<div class="app${panel ? " with-panel" : ""}">${nav({ active, questions, replies })}<main class="screen in-app">${bare ? "" : brand}${main}</main>${side}${toast}</div>`;
 }
 
 function top(title, aside = "") {
@@ -717,6 +719,116 @@ function reviewRoute(params, diff = false) {
   return shell("board", back + `<div class="narrow">${here(v, { top })}</div>`) + sendControl(v);
 }
 
+const leadSeenKey = (machine) => `kebbie-lead-seen:${machine}`;
+
+function leadSeen(machine) {
+  try {
+    return Number(localStorage.getItem(leadSeenKey(machine))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markLeadSeen(machine, at) {
+  if (!at || leadSeen(machine) >= at) return;
+  try {
+    localStorage.setItem(leadSeenKey(machine), String(at));
+  } catch {}
+}
+
+function deviceName(id) {
+  if (id === state.device?.id) return state.device.cert.name;
+  return state.lead.names?.get(id) ?? "another device";
+}
+
+function loadDeviceNames() {
+  if (state.lead.names) return;
+  state.lead.names = new Map();
+  account
+    .devices()
+    .then((listed) => {
+      for (const device of listed.devices ?? []) state.lead.names.set(device.cert.device, device.cert.name);
+      if (route().name === "lead") render();
+    })
+    .catch(() => undefined);
+}
+
+function leadView(machine, now) {
+  const thread = threadOf(machine.board.lead, blobs.peek, state.lead.depth.get(machine.machine) ?? 0);
+  if (thread.missing) blobs.load(thread.missing).then((loaded) => loaded && route().name === "lead" && render());
+  const pending = pendingMessages(state.kept.sent, machine, new Set(thread.turns.map((turn) => turn.id)), now);
+  return { thread, pending };
+}
+
+function leadRoute(wanted) {
+  const now = nowSeconds();
+  const machines = leadMachines(state.opened);
+  const away = awayOn(state.kept.sent, state.opened);
+  const machine = chosenLead(machines, wanted ?? state.lead.machine, now);
+  if (!machine) return shell("lead", `<div class="narrow">${top("Lead", awaySwitch(away))}${away ? awayNote : ""}<div class="center">No machine's lead talks to the app yet. Update kebbie on a machine to write to its lead from here.</div></div>`);
+  if (state.lead.machine !== machine.machine) state.lead.draft = "";
+  state.lead.machine = machine.machine;
+  loadDeviceNames();
+  markLeadSeen(machine.machine, machine.board.lead?.replied_at);
+  const { thread, pending } = leadView(machine, now);
+  const body = threadHtml({ machine, thread, pending, now, nameOf: deviceName });
+  const composer = composerHtml(machine, { draft: state.lead.draft, busy: state.lead.busy, error: state.lead.error, takes: (machine.board.accepts ?? []).includes("lead-message") });
+  const when = (one) => {
+    const view = one === machine ? { thread, pending } : leadView(one, now);
+    const last = Math.max(view.thread.turns.at(-1)?.at ?? 0, view.pending.at(-1)?.sent.at ?? 0);
+    return { when: shortWhen(last, now), preview: previewOf(view.thread.turns, view.pending) };
+  };
+  if (splitLike()) {
+    const rows = machines.map((one) => pickRow(one, { now, selected: one === machine, unseen: one !== machine && (one.board.lead?.replied_at ?? 0) > leadSeen(one.machine), ...when(one) }));
+    return shell("lead", `<div class="narrow">${top("Lead", awaySwitch(away))}${away ? awayNote : ""}<div class="mlist">${rows.join("")}</div></div>`, panelHead(machine, now) + body + composer, { said: `Thread with ${machine.name}'s lead` });
+  }
+  const pop = state.lead.picking ? popHtml(machines.map((one) => pickRow(one, { now, selected: one === machine, pop: true, unseen: one !== machine && (one.board.lead?.replied_at ?? 0) > leadSeen(one.machine), when: when(one).when }))) : "";
+  return shell("lead", leadHead(machine, { now, away, picking: state.lead.picking, canPick: machines.length > 1 }) + body + composer + pop, "", { bare: true });
+}
+
+async function sendLead() {
+  const machine = leadMachines(state.opened).find((one) => one.machine === state.lead.machine);
+  const text = state.lead.draft.trim();
+  if (!machine || !text || state.lead.busy) return;
+  const sent = await sendTo({ machine: { machine: machine.machine, name: machine.name }, payload: { type: "lead-message", text }, meta: { text }, ui: state.lead });
+  if (sent) {
+    state.lead.draft = "";
+    state.lead.error = null;
+  }
+  render();
+  if (sent) scrollThreadToEnd();
+}
+
+async function switchAway(on) {
+  const machines = state.opened.filter((one) => one.board && !one.problem && (one.board.accepts ?? []).includes("away"));
+  const ui = { busy: false, error: null };
+  for (const machine of machines) await sendTo({ machine: { machine: machine.machine, name: machine.name }, payload: { type: "away", on }, meta: { on }, ui });
+  state.lead.error = ui.error;
+  render();
+}
+
+function atThreadEnd() {
+  const pane = root.querySelector(".app > .panel");
+  if (pane && root.querySelector(".panel .thread")) return pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80;
+  return innerHeight + scrollY >= document.documentElement.scrollHeight - 80 || !root.querySelector(".thread");
+}
+
+function scrollThreadToEnd() {
+  const pane = root.querySelector(".app > .panel");
+  if (pane && root.querySelector(".panel .thread")) pane.scrollTop = pane.scrollHeight;
+  else if (root.querySelector("main.screen .thread")) scrollTo(0, document.documentElement.scrollHeight);
+}
+
+function fitComposer(field = root.querySelector("#lead-say")) {
+  if (field) {
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight + 2, 136)}px`;
+  }
+  const composer = root.querySelector(".composer");
+  if (composer) document.documentElement.style.setProperty("--composer-h", `${Math.ceil(composer.getBoundingClientRect().height)}px`);
+  else document.documentElement.style.removeProperty("--composer-h");
+}
+
 function boardRoute() {
   if (splitLike()) return splitScreen("next");
   return shell("board", overview() ? boardOverview() : boardScreen());
@@ -792,6 +904,7 @@ function render() {
   else if (state.session?.state !== "unlocked") html = lockedScreen();
   else if (name === "questions") html = shell("questions", questionsScreen());
   else if (name === "machines") html = shell("machines", machinesScreen());
+  else if (name === "lead") html = leadRoute(params[0] ?? null);
   else if (name === "task") html = twoColumns() ? wideTaskScreen(params) : taskScreen(params);
   else if (name === "card") html = twoColumns() ? wideTaskScreen(params, cardPanel) : taskScreen(params, true);
   else if (name === "plan") html = twoColumns() ? wideTaskScreen(params, planPanel) : planScreen(params);
@@ -804,16 +917,19 @@ function render() {
   else html = boardRoute();
   const focused = document.activeElement?.id && root.contains(document.activeElement) ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
   const auth = isAuthScreen(html);
-  liftKeyboard(auth && html.includes("<input"));
+  liftKeyboard((auth && html.includes("<input")) || html.includes('id="lead-say"'));
   const reviewing = name === "review" || name === "diff";
   const listTop = listPane()?.scrollTop ?? (twoColumns() ? scrollY : 0);
   const anchor = twoColumns() && !listPane() ? rowTop(location.hash) : null;
   const panelTop = rendered === location.hash ? (root.querySelector(".panel")?.scrollTop ?? 0) : 0;
+  const stick = name === "lead" && atThreadEnd();
   root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`;
   rendered = location.hash;
   document.documentElement.classList.toggle("panes", twoColumns() && Boolean(root.querySelector(".app.with-panel")));
   document.documentElement.classList.toggle("has-send", Boolean(root.querySelector(".rv-sendbar")));
   document.documentElement.classList.toggle("has-fab", Boolean(root.querySelector(".fab, .idea-add")));
+  document.documentElement.classList.toggle("has-composer", Boolean(root.querySelector(".composer")));
+  fitComposer();
   if (reviewing) hangLines(root);
   const refocus = focused ? document.getElementById(focused.id) : null;
   if (refocus) {
@@ -827,6 +943,7 @@ function render() {
   const moved = anchor === null ? null : rowTop(location.hash);
   if (moved !== null) listPane()?.scrollBy(0, moved - anchor);
   if (panelTop) root.querySelector(".panel")?.scrollTo(0, panelTop);
+  if (stick) scrollThreadToEnd();
 }
 
 const rowTop = (hash) => root.querySelector(`.app > main.screen a[href="${CSS.escape(hash)}"]`)?.getBoundingClientRect().top ?? null;
@@ -1678,6 +1795,16 @@ root.addEventListener("click", (event) => {
     return render();
   }
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
+  if (action === "lead-pick") {
+    state.lead.picking = !state.lead.picking;
+    return render();
+  }
+  if (action === "lead-send") return sendLead();
+  if (action === "lead-away") return switchAway(target.checked);
+  if (action === "lead-older") {
+    state.lead.depth.set(state.lead.machine, (state.lead.depth.get(state.lead.machine) ?? 0) + 1);
+    return render();
+  }
   const decided = target.closest(".decide");
   if (decided) return decideAction(action, decided, target);
   if (action === "reload") {
@@ -1733,6 +1860,12 @@ root.addEventListener("input", (event) => {
     if (ui.composing) ui.composing.text = event.target.value;
     return;
   }
+  if (event.target.id === "lead-say") {
+    state.lead.draft = event.target.value;
+    const button = root.querySelector('[data-action="lead-send"]');
+    if (button) button.disabled = state.lead.busy || state.lead.draft.trim() === "";
+    return fitComposer(event.target);
+  }
   if (event.target.id === "email") state.draft.email = event.target.value;
   if (event.target.id === "code") state.draft.code = event.target.value;
   const draft = event.target.dataset?.draft;
@@ -1763,6 +1896,13 @@ root.addEventListener("input", (event) => {
   if (button) button.disabled = ui.busy || !answerReady(option, ui);
 });
 
+const writingToLead = () => document.activeElement?.id === "lead-say";
+root.addEventListener("focusin", (event) => event.target.id === "lead-say" && requestAnimationFrame(scrollThreadToEnd));
+globalThis.visualViewport?.addEventListener("resize", () => root.querySelector(".composer") && requestAnimationFrame(() => {
+  fitComposer();
+  if (writingToLead()) scrollThreadToEnd();
+}));
+
 root.addEventListener("keydown", (event) => {
   if (pageMode) return;
   if (event.key === "Enter" && event.target.matches?.("#email, #code")) {
@@ -1783,9 +1923,11 @@ addEventListener("hashchange", () => {
   if (name === "section") state.from = `section/${route().params[0]}`;
   if (name === "item") backlogUi(route().params[0]).visit = nowSeconds();
   state.sheet = false;
+  state.lead.picking = false;
   if (rendered === location.hash && !revealAfter) return;
   render();
-  if (!(twoColumns() && (name === "task" || name === "card" || name === "plan" || name === "item" || name === "idea"))) scrollListToTop();
+  if (name === "lead") scrollThreadToEnd();
+  else if (!(twoColumns() && (name === "task" || name === "card" || name === "plan" || name === "item" || name === "idea"))) scrollListToTop();
   const pending = revealAfter;
   revealAfter = null;
   if (pending) reveal(pending.selector, pending.offset);

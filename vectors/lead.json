@@ -1,0 +1,2622 @@
+{
+  "blob": {
+    "bytes": 1495,
+    "id": "blb_fe5a6db6da276ea89160141bf03d75988055865e987cce91bd2698a624c490d4",
+    "key": "_9LRAwxG5qvh1dHgmy_OmgEb6h36ZphHMyPLn4LnWlE",
+    "media_type": "application/vnd.kebbie.lead-thread+json"
+  },
+  "board": {
+    "accepts": [
+      "answer",
+      "push",
+      "lead-message",
+      "away"
+    ],
+    "away_since": 1761069000,
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": null,
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "lead": {
+      "replied_at": 1761069060,
+      "thread": {
+        "bytes": 1495,
+        "id": "blb_fe5a6db6da276ea89160141bf03d75988055865e987cce91bd2698a624c490d4",
+        "key": "_9LRAwxG5qvh1dHgmy_OmgEb6h36ZphHMyPLn4LnWlE",
+        "media_type": "application/vnd.kebbie.lead-thread+json"
+      },
+      "working_since": 1761069060
+    },
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
+  "board_from_a_machine_not_yet_updated": {
+    "accepts": [
+      "answer",
+      "push",
+      "lead-message",
+      "away"
+    ],
+    "away_since": 1761069000,
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": null,
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
+  "ciphertext": "dVc1cOt-0xO2eNv5D3g08z2Rp9MK12sPTej80mqiMP1KqQDSxg-A1x2Zdolk2o2eqk7j7oB4US9A1XWNYrGzZvSwRzF10FU58PNDm3b1Bufqxl-psZVWMp7JZPsg7IUH39uAXjNcQVAtdQVglMX79esEwBOBg3tZ41Eu0RfJAzEV5kEhX9Rop9E-1U74WVWA4H5vMfddw1j2r26gdf31VupgkVP79OEcz6jGxvlOsr3QytZKx6OG8lURwJjLh61u0l6LdT31lOcJi_kAsoTrjAUv0SaLfZWOsOHq6HsoNeVA8ub2GTTmVAUxscvdNCFbcPMBSveFw3dFtxQ9aLCE7atwBcOoPGF80HTKaBmotMXD-NPlsKiHKYU-COzP1DB8Tib45dBWGoQjNBs74fSdjvRN_WIyUt92FjGPRqVGzg1w63LhaBAh-bYNoBA2y3bw4l-H-z7iZ9OydyVfZMqgZ6MKtJ1jFWQ0nJP8rB166DAdQDR48GKPaC3bRnvySPxHofOf4GXPHvCdNSw4noTSIRGKFFgz1w5rOzZNzVHU2k0L6Gsfgq4cmKC4WjVR_UHQxS8MvNSiP1nP6j3NSfajSoSGgAgvWCTpADv_X857v7f6ObESWQlf8DFmQJi12T3xWd2ZVvHpexUMLbj7KNGtZAT-A-ixBiGfhKE-qEN9mkwG-_eoy_avxgqyZxThCqBDNI-UHWLfs-kdKA0XBuv1PkjddU8K_-Xt3KSXcAR-kBAALwPa3Fh2mw6tJStmo3c2C9WUXGwunr34-A1okE23cMyJZoFu2RETwvxwFiM07yzD1q5ghXYMFsL_E5-RmLDKZL4lS-Grg8qCRThJ_CPRN9Zok29iVXYvbCSU9jaP-5tK4T26SexaacuCWab9Eg3FcUmiURTdd2WsO30hYcdKG09LD825pJx33jSywe8sIxp5gXDQY6WBGY9lW4zWAEXylWj0dtediYfRB9tOfroUO91d13OC9sq3vSoMSS7Y2Em-wIPEhgArUZV81iz3cTFUqRKdeWonR91FpXt7TYtJcycM5AxZMZWVmZKPo1hq9J8mmoY42xe-2wV7O5aYCyu55ZL6MDNSTj-ngLKWwfjZxTeWU_WqW263q-dmcc8YmRxDTdYP-6LfI2h0__qTWu9PL8Jk_sPWx0M5ZIW9ovRkerCuG6jY3cMU-bne_ZwRdduWwhIWhCaTHGoo1fni1eFHwiA6Zsxx6UlxHyAOXWj7IdUcqfbqkJDOmDj8sGQpcbkiWiid6OYlMeWPKGJqaDj5IygzJG9L68GIXulURQk3yGFpcNjwRclt9weSw2GdOwxELWcyVejUF9_cXPAYLJD-r6MAJ16c8P68wQhP_a-i2rf8opxMwYcvCHHfGwFla4Y5H8q3yyeqjK9sUSFkYD0LhTkxWaFQuwbLIU9P6BU1C_zy4734pRGKMws6RKGnJuWFk-MEtVwgS8bD3MpmYIK-bEmOzbBT7ddlYRkGhpoO5geVE54JJq3L4odBLBRIOxvb61fE5ufXULVgrDI3toiNM0ePlD9xVniSevnXWNU_zD2QR_jv3qaqSR66X6j-ZcyBoqt5FhiVolEwL1IhrlWTN4qewL1iUsj3cFSZdN31kW2EKDCux-u4BvJta484buRBMcnFtMmxmFKCmZ39whnhtlGkcxsw_rFsBhMh7eh1LhuvRzTakv6ZgdcEQQUr3KlTQiSUQ5GN6QPvcJI5roL-EBPIsj-KWn-ePlZb3jn6_bwGZKk3ExmWttqsH9A7m3Lh6OeDAuc5NMrGrpuzJb31PiB-_Q9UNqU8Bx5B6cyzL4zqFSFlR51SDu7dY4CMj6nN8ezQvIDZyuy-S9VyZ-AnV4RLbzlK1rKCMe4gL1-F5HU_zj1EcSWU4PGQEVl3FMrxYv5JfHMxdFyaUq4PPsZCRjWSpeVJZ0qwKWqaV4JguwcTc7CSAPmvSIIgeyIjlqBrpZ1EmB_CB56DrlougJ1gGAeWvA2mHRYrnObOAdR-1NfUz9EWuw4yI8alamxjnt7ivIY",
+  "collapse": "l-mbp-lead",
+  "leads": [
+    {
+      "lead": {
+        "replied_at": 1761069060,
+        "thread": {
+          "bytes": 1495,
+          "id": "blb_fe5a6db6da276ea89160141bf03d75988055865e987cce91bd2698a624c490d4",
+          "key": "_9LRAwxG5qvh1dHgmy_OmgEb6h36ZphHMyPLn4LnWlE",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "working_since": 1761069060
+      },
+      "name": "a lead at work since its last reply",
+      "valid": true
+    },
+    {
+      "lead": {
+        "replied_at": null,
+        "thread": {
+          "bytes": 1495,
+          "id": "blb_fe5a6db6da276ea89160141bf03d75988055865e987cce91bd2698a624c490d4",
+          "key": "_9LRAwxG5qvh1dHgmy_OmgEb6h36ZphHMyPLn4LnWlE",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "working_since": null
+      },
+      "name": "a lead that is idle and has not replied yet",
+      "valid": true
+    },
+    {
+      "lead": {
+        "replied_at": 1761069060,
+        "thread": {
+          "bytes": 1495,
+          "id": "blb_fe5a6db6da276ea89160141bf03d75988055865e987cce91bd2698a624c490d4",
+          "key": "_9LRAwxG5qvh1dHgmy_OmgEb6h36ZphHMyPLn4LnWlE",
+          "media_type": "text/markdown"
+        },
+        "working_since": 1761069060
+      },
+      "name": "a thread that is not a thread page",
+      "valid": false
+    },
+    {
+      "lead": {
+        "replied_at": 1761069060,
+        "thread": {
+          "bytes": 1495,
+          "id": "blb_fe5a6db6da276ea89160141bf03d75988055865e987cce91bd2698a624c490d4",
+          "key": "_9LRAwxG5qvh1dHgmy_OmgEb6h36ZphHMyPLn4LnWlE",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [],
+        "working_since": 1761069060
+      },
+      "name": "a lead with a field it does not have",
+      "valid": false
+    }
+  ],
+  "max_message_chars": 4000,
+  "max_page_turns": 50,
+  "max_turn_chars": 16000,
+  "media_type": "application/vnd.kebbie.lead-thread+json",
+  "older_blob": {
+    "bytes": 301,
+    "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+    "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+    "media_type": "application/vnd.kebbie.lead-thread+json"
+  },
+  "older_ciphertext": "-Priuo0xqbJNry1LQ4925u5jl_O6Qxi_zMZ5ZRgiUsGrvfqGlm7IuwdFQNCT-lQPU--NpctqZmSzG7h3VzNpap6SEp6zxSB16PT6l-TUVb8tVcVeg5W5yElfQIMerWCQ-9jdnX2L66Kab5Dk2AMwIS9RBX16Qp4aDPsP1Kv7k15cN4cstw4NiT4QhbycGyasWmgfojZ0eoEjTuj03xKPeW0sXFSFFErEASYI-k5DRprR2EiwItVlO1ssWzWnCan-HtLAs8XVW_fu3H7Gqhtfkz7QQ1P-_T1XllUj6SgrqkERoyZjv55qx7vfxbuiUEAskE5jBym71SrQE9DVXEgr41WaH3Ht6t5OQem7tqGUOxOwxhqAPBNk9Doe1krYy56UXL_qIoP0CS3dmvSd8UVwDLyXnO0BgUI0ZvQmY6kk3NONdLxvfDKtSdc",
+  "older_page": {
+    "older": null,
+    "turns": [
+      {
+        "at": 1760979600,
+        "by": "you",
+        "id": "t-0001",
+        "text": "Run the shop suite on this machine and tell me if anything is red."
+      },
+      {
+        "at": 1760980620,
+        "by": "lead",
+        "id": "t-0002",
+        "text": "The suite is green: 412 tests in 6 minutes. `checkout_test` took 48 seconds, so I put it in the backlog."
+      }
+    ]
+  },
+  "page": {
+    "older": {
+      "bytes": 301,
+      "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+      "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+      "media_type": "application/vnd.kebbie.lead-thread+json"
+    },
+    "turns": [
+      {
+        "at": 1761062400,
+        "by": "you",
+        "id": "t-0003",
+        "text": "Take refunds through the obstacle flow, with the full review."
+      },
+      {
+        "at": 1761062460,
+        "by": "lead",
+        "id": "t-0004",
+        "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+      },
+      {
+        "at": 1761065600,
+        "by": "you",
+        "delivery": {
+          "at": 1761065610,
+          "state": "delivered"
+        },
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+        "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+      },
+      {
+        "at": 1761065670,
+        "by": "lead",
+        "id": "t-0005",
+        "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+      },
+      {
+        "at": 1761068280,
+        "by": "you",
+        "delivery": {
+          "state": "waiting-turn"
+        },
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+        "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+      },
+      {
+        "at": 1761069000,
+        "away": true,
+        "by": "you",
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+      },
+      {
+        "at": 1761069060,
+        "by": "lead",
+        "id": "t-0006",
+        "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "name": "a page with the page before it",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "the first page, with nothing before it",
+      "page": {
+        "older": null,
+        "turns": [
+          {
+            "at": 1760979600,
+            "by": "you",
+            "id": "t-0001",
+            "text": "Run the shop suite on this machine and tell me if anything is red."
+          },
+          {
+            "at": 1760980620,
+            "by": "lead",
+            "id": "t-0002",
+            "text": "The suite is green: 412 tests in 6 minutes. `checkout_test` took 48 seconds, so I put it in the backlog."
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "an empty thread",
+      "page": {
+        "older": null,
+        "turns": []
+      },
+      "valid": true
+    },
+    {
+      "name": "a message waiting while a draft is in the lead's input",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-draft"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "away mode switched off at the computer",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": false,
+            "by": "you",
+            "id": "t-away"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a reply at its length",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "fifty turns",
+      "page": {
+        "older": null,
+        "turns": [
+          {
+            "at": 1761069600,
+            "by": "lead",
+            "id": "t-0000",
+            "text": "x"
+          },
+          {
+            "at": 1761069601,
+            "by": "lead",
+            "id": "t-0001",
+            "text": "x"
+          },
+          {
+            "at": 1761069602,
+            "by": "lead",
+            "id": "t-0002",
+            "text": "x"
+          },
+          {
+            "at": 1761069603,
+            "by": "lead",
+            "id": "t-0003",
+            "text": "x"
+          },
+          {
+            "at": 1761069604,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "x"
+          },
+          {
+            "at": 1761069605,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "x"
+          },
+          {
+            "at": 1761069606,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "x"
+          },
+          {
+            "at": 1761069607,
+            "by": "lead",
+            "id": "t-0007",
+            "text": "x"
+          },
+          {
+            "at": 1761069608,
+            "by": "lead",
+            "id": "t-0008",
+            "text": "x"
+          },
+          {
+            "at": 1761069609,
+            "by": "lead",
+            "id": "t-0009",
+            "text": "x"
+          },
+          {
+            "at": 1761069610,
+            "by": "lead",
+            "id": "t-0010",
+            "text": "x"
+          },
+          {
+            "at": 1761069611,
+            "by": "lead",
+            "id": "t-0011",
+            "text": "x"
+          },
+          {
+            "at": 1761069612,
+            "by": "lead",
+            "id": "t-0012",
+            "text": "x"
+          },
+          {
+            "at": 1761069613,
+            "by": "lead",
+            "id": "t-0013",
+            "text": "x"
+          },
+          {
+            "at": 1761069614,
+            "by": "lead",
+            "id": "t-0014",
+            "text": "x"
+          },
+          {
+            "at": 1761069615,
+            "by": "lead",
+            "id": "t-0015",
+            "text": "x"
+          },
+          {
+            "at": 1761069616,
+            "by": "lead",
+            "id": "t-0016",
+            "text": "x"
+          },
+          {
+            "at": 1761069617,
+            "by": "lead",
+            "id": "t-0017",
+            "text": "x"
+          },
+          {
+            "at": 1761069618,
+            "by": "lead",
+            "id": "t-0018",
+            "text": "x"
+          },
+          {
+            "at": 1761069619,
+            "by": "lead",
+            "id": "t-0019",
+            "text": "x"
+          },
+          {
+            "at": 1761069620,
+            "by": "lead",
+            "id": "t-0020",
+            "text": "x"
+          },
+          {
+            "at": 1761069621,
+            "by": "lead",
+            "id": "t-0021",
+            "text": "x"
+          },
+          {
+            "at": 1761069622,
+            "by": "lead",
+            "id": "t-0022",
+            "text": "x"
+          },
+          {
+            "at": 1761069623,
+            "by": "lead",
+            "id": "t-0023",
+            "text": "x"
+          },
+          {
+            "at": 1761069624,
+            "by": "lead",
+            "id": "t-0024",
+            "text": "x"
+          },
+          {
+            "at": 1761069625,
+            "by": "lead",
+            "id": "t-0025",
+            "text": "x"
+          },
+          {
+            "at": 1761069626,
+            "by": "lead",
+            "id": "t-0026",
+            "text": "x"
+          },
+          {
+            "at": 1761069627,
+            "by": "lead",
+            "id": "t-0027",
+            "text": "x"
+          },
+          {
+            "at": 1761069628,
+            "by": "lead",
+            "id": "t-0028",
+            "text": "x"
+          },
+          {
+            "at": 1761069629,
+            "by": "lead",
+            "id": "t-0029",
+            "text": "x"
+          },
+          {
+            "at": 1761069630,
+            "by": "lead",
+            "id": "t-0030",
+            "text": "x"
+          },
+          {
+            "at": 1761069631,
+            "by": "lead",
+            "id": "t-0031",
+            "text": "x"
+          },
+          {
+            "at": 1761069632,
+            "by": "lead",
+            "id": "t-0032",
+            "text": "x"
+          },
+          {
+            "at": 1761069633,
+            "by": "lead",
+            "id": "t-0033",
+            "text": "x"
+          },
+          {
+            "at": 1761069634,
+            "by": "lead",
+            "id": "t-0034",
+            "text": "x"
+          },
+          {
+            "at": 1761069635,
+            "by": "lead",
+            "id": "t-0035",
+            "text": "x"
+          },
+          {
+            "at": 1761069636,
+            "by": "lead",
+            "id": "t-0036",
+            "text": "x"
+          },
+          {
+            "at": 1761069637,
+            "by": "lead",
+            "id": "t-0037",
+            "text": "x"
+          },
+          {
+            "at": 1761069638,
+            "by": "lead",
+            "id": "t-0038",
+            "text": "x"
+          },
+          {
+            "at": 1761069639,
+            "by": "lead",
+            "id": "t-0039",
+            "text": "x"
+          },
+          {
+            "at": 1761069640,
+            "by": "lead",
+            "id": "t-0040",
+            "text": "x"
+          },
+          {
+            "at": 1761069641,
+            "by": "lead",
+            "id": "t-0041",
+            "text": "x"
+          },
+          {
+            "at": 1761069642,
+            "by": "lead",
+            "id": "t-0042",
+            "text": "x"
+          },
+          {
+            "at": 1761069643,
+            "by": "lead",
+            "id": "t-0043",
+            "text": "x"
+          },
+          {
+            "at": 1761069644,
+            "by": "lead",
+            "id": "t-0044",
+            "text": "x"
+          },
+          {
+            "at": 1761069645,
+            "by": "lead",
+            "id": "t-0045",
+            "text": "x"
+          },
+          {
+            "at": 1761069646,
+            "by": "lead",
+            "id": "t-0046",
+            "text": "x"
+          },
+          {
+            "at": 1761069647,
+            "by": "lead",
+            "id": "t-0047",
+            "text": "x"
+          },
+          {
+            "at": 1761069648,
+            "by": "lead",
+            "id": "t-0048",
+            "text": "x"
+          },
+          {
+            "at": 1761069649,
+            "by": "lead",
+            "id": "t-0049",
+            "text": "x"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "fifty-one turns",
+      "page": {
+        "older": null,
+        "turns": [
+          {
+            "at": 1761069600,
+            "by": "lead",
+            "id": "t-0000",
+            "text": "x"
+          },
+          {
+            "at": 1761069601,
+            "by": "lead",
+            "id": "t-0001",
+            "text": "x"
+          },
+          {
+            "at": 1761069602,
+            "by": "lead",
+            "id": "t-0002",
+            "text": "x"
+          },
+          {
+            "at": 1761069603,
+            "by": "lead",
+            "id": "t-0003",
+            "text": "x"
+          },
+          {
+            "at": 1761069604,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "x"
+          },
+          {
+            "at": 1761069605,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "x"
+          },
+          {
+            "at": 1761069606,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "x"
+          },
+          {
+            "at": 1761069607,
+            "by": "lead",
+            "id": "t-0007",
+            "text": "x"
+          },
+          {
+            "at": 1761069608,
+            "by": "lead",
+            "id": "t-0008",
+            "text": "x"
+          },
+          {
+            "at": 1761069609,
+            "by": "lead",
+            "id": "t-0009",
+            "text": "x"
+          },
+          {
+            "at": 1761069610,
+            "by": "lead",
+            "id": "t-0010",
+            "text": "x"
+          },
+          {
+            "at": 1761069611,
+            "by": "lead",
+            "id": "t-0011",
+            "text": "x"
+          },
+          {
+            "at": 1761069612,
+            "by": "lead",
+            "id": "t-0012",
+            "text": "x"
+          },
+          {
+            "at": 1761069613,
+            "by": "lead",
+            "id": "t-0013",
+            "text": "x"
+          },
+          {
+            "at": 1761069614,
+            "by": "lead",
+            "id": "t-0014",
+            "text": "x"
+          },
+          {
+            "at": 1761069615,
+            "by": "lead",
+            "id": "t-0015",
+            "text": "x"
+          },
+          {
+            "at": 1761069616,
+            "by": "lead",
+            "id": "t-0016",
+            "text": "x"
+          },
+          {
+            "at": 1761069617,
+            "by": "lead",
+            "id": "t-0017",
+            "text": "x"
+          },
+          {
+            "at": 1761069618,
+            "by": "lead",
+            "id": "t-0018",
+            "text": "x"
+          },
+          {
+            "at": 1761069619,
+            "by": "lead",
+            "id": "t-0019",
+            "text": "x"
+          },
+          {
+            "at": 1761069620,
+            "by": "lead",
+            "id": "t-0020",
+            "text": "x"
+          },
+          {
+            "at": 1761069621,
+            "by": "lead",
+            "id": "t-0021",
+            "text": "x"
+          },
+          {
+            "at": 1761069622,
+            "by": "lead",
+            "id": "t-0022",
+            "text": "x"
+          },
+          {
+            "at": 1761069623,
+            "by": "lead",
+            "id": "t-0023",
+            "text": "x"
+          },
+          {
+            "at": 1761069624,
+            "by": "lead",
+            "id": "t-0024",
+            "text": "x"
+          },
+          {
+            "at": 1761069625,
+            "by": "lead",
+            "id": "t-0025",
+            "text": "x"
+          },
+          {
+            "at": 1761069626,
+            "by": "lead",
+            "id": "t-0026",
+            "text": "x"
+          },
+          {
+            "at": 1761069627,
+            "by": "lead",
+            "id": "t-0027",
+            "text": "x"
+          },
+          {
+            "at": 1761069628,
+            "by": "lead",
+            "id": "t-0028",
+            "text": "x"
+          },
+          {
+            "at": 1761069629,
+            "by": "lead",
+            "id": "t-0029",
+            "text": "x"
+          },
+          {
+            "at": 1761069630,
+            "by": "lead",
+            "id": "t-0030",
+            "text": "x"
+          },
+          {
+            "at": 1761069631,
+            "by": "lead",
+            "id": "t-0031",
+            "text": "x"
+          },
+          {
+            "at": 1761069632,
+            "by": "lead",
+            "id": "t-0032",
+            "text": "x"
+          },
+          {
+            "at": 1761069633,
+            "by": "lead",
+            "id": "t-0033",
+            "text": "x"
+          },
+          {
+            "at": 1761069634,
+            "by": "lead",
+            "id": "t-0034",
+            "text": "x"
+          },
+          {
+            "at": 1761069635,
+            "by": "lead",
+            "id": "t-0035",
+            "text": "x"
+          },
+          {
+            "at": 1761069636,
+            "by": "lead",
+            "id": "t-0036",
+            "text": "x"
+          },
+          {
+            "at": 1761069637,
+            "by": "lead",
+            "id": "t-0037",
+            "text": "x"
+          },
+          {
+            "at": 1761069638,
+            "by": "lead",
+            "id": "t-0038",
+            "text": "x"
+          },
+          {
+            "at": 1761069639,
+            "by": "lead",
+            "id": "t-0039",
+            "text": "x"
+          },
+          {
+            "at": 1761069640,
+            "by": "lead",
+            "id": "t-0040",
+            "text": "x"
+          },
+          {
+            "at": 1761069641,
+            "by": "lead",
+            "id": "t-0041",
+            "text": "x"
+          },
+          {
+            "at": 1761069642,
+            "by": "lead",
+            "id": "t-0042",
+            "text": "x"
+          },
+          {
+            "at": 1761069643,
+            "by": "lead",
+            "id": "t-0043",
+            "text": "x"
+          },
+          {
+            "at": 1761069644,
+            "by": "lead",
+            "id": "t-0044",
+            "text": "x"
+          },
+          {
+            "at": 1761069645,
+            "by": "lead",
+            "id": "t-0045",
+            "text": "x"
+          },
+          {
+            "at": 1761069646,
+            "by": "lead",
+            "id": "t-0046",
+            "text": "x"
+          },
+          {
+            "at": 1761069647,
+            "by": "lead",
+            "id": "t-0047",
+            "text": "x"
+          },
+          {
+            "at": 1761069648,
+            "by": "lead",
+            "id": "t-0048",
+            "text": "x"
+          },
+          {
+            "at": 1761069649,
+            "by": "lead",
+            "id": "t-0049",
+            "text": "x"
+          },
+          {
+            "at": 1761069650,
+            "by": "lead",
+            "id": "t-0050",
+            "text": "x"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a reply past its length",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a tool call",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "tool",
+            "id": "t-tool",
+            "text": "Bash: git status"
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "an empty reply",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "  "
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a reply with a terminal escape",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting.\u001b[2J"
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "turns out of order",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761060600,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "one id twice",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0003",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "an id with a slash",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "../t",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a message from the phone without its delivery",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a message at the computer with a delivery",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "delivered before it was written",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761064600,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a delivery state kebbie does not know",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "lost"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a text and away mode in one turn",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823",
+            "text": "away"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a turn of yours with neither text nor away",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "away mode with a delivery",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a device that is a machine",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a reply naming a device",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a page before that is not a thread page",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "text/markdown"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "an empty page with a page before it",
+      "page": {
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": []
+      },
+      "valid": false
+    },
+    {
+      "name": "a cursor, which a page does not have",
+      "page": {
+        "cursor": 3,
+        "older": {
+          "bytes": 301,
+          "id": "blb_ba0e79b4bce40471f90dc9e3dc6455bb12bae1604a1fda281391a8f92876bb8b",
+          "key": "QzGRD-D219cH-A7bkk2Oti1Xx65GSvCUngk2_GkMSt0",
+          "media_type": "application/vnd.kebbie.lead-thread+json"
+        },
+        "turns": [
+          {
+            "at": 1761062400,
+            "by": "you",
+            "id": "t-0003",
+            "text": "Take refunds through the obstacle flow, with the full review."
+          },
+          {
+            "at": 1761062460,
+            "by": "lead",
+            "id": "t-0004",
+            "text": "Starting. I take the obstacles in order: tests, lint, then the review."
+          },
+          {
+            "at": 1761065600,
+            "by": "you",
+            "delivery": {
+              "at": 1761065610,
+              "state": "delivered"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7fdf-8e37-edad4c9fba4c",
+            "text": "Good. Do the last-admin subtask first, and don't push until I've read step 5."
+          },
+          {
+            "at": 1761065670,
+            "by": "lead",
+            "id": "t-0005",
+            "text": "Understood. I take the subtask now and hold the push until you approve step 5 in the app."
+          },
+          {
+            "at": 1761068280,
+            "by": "you",
+            "delivery": {
+              "state": "waiting-turn"
+            },
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+            "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed."
+          },
+          {
+            "at": 1761069000,
+            "away": true,
+            "by": "you",
+            "device": "dev_01K83YV380329ARS69J86ZB9PB",
+            "id": "cmd_019a07ed-8d00-7959-8a73-84ac8e881823"
+          },
+          {
+            "at": 1761069060,
+            "by": "lead",
+            "id": "t-0006",
+            "text": "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"
+          }
+        ]
+      },
+      "valid": false
+    }
+  ],
+  "payloads": [
+    {
+      "name": "a message to the lead",
+      "payload": {
+        "text": "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed.",
+        "type": "lead-message"
+      },
+      "valid": true
+    },
+    {
+      "name": "a message over several lines",
+      "payload": {
+        "text": "Two things:\n\t1. hold the push\n\t2. ask me first",
+        "type": "lead-message"
+      },
+      "valid": true
+    },
+    {
+      "name": "a message at its length",
+      "payload": {
+        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "type": "lead-message"
+      },
+      "valid": true
+    },
+    {
+      "name": "a message past its length",
+      "payload": {
+        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "type": "lead-message"
+      },
+      "valid": false
+    },
+    {
+      "name": "an empty message",
+      "payload": {
+        "text": " \n",
+        "type": "lead-message"
+      },
+      "valid": false
+    },
+    {
+      "name": "a message with a terminal escape",
+      "payload": {
+        "text": "go\u001b[2J",
+        "type": "lead-message"
+      },
+      "valid": false
+    },
+    {
+      "name": "a message naming a task, which it does not",
+      "payload": {
+        "address": "payments@api",
+        "text": "go",
+        "type": "lead-message"
+      },
+      "valid": false
+    },
+    {
+      "name": "away mode on",
+      "payload": {
+        "on": true,
+        "type": "away"
+      },
+      "valid": true
+    },
+    {
+      "name": "away mode off",
+      "payload": {
+        "on": false,
+        "type": "away"
+      },
+      "valid": true
+    },
+    {
+      "name": "away mode without on",
+      "payload": {
+        "type": "away"
+      },
+      "valid": false
+    },
+    {
+      "name": "away mode with a reason",
+      "payload": {
+        "on": true,
+        "type": "away",
+        "until": 1761069600
+      },
+      "valid": false
+    },
+    {
+      "name": "the lead's answer as a notice",
+      "payload": {
+        "body": "Done. email-column is at step 3 of 5. Step 4 drops the old column and waits for your yes in Questions.",
+        "category": "lead-answered",
+        "open": {
+          "to": "lead"
+        },
+        "title": "Lead · MacBook",
+        "type": "notice"
+      },
+      "valid": true
+    },
+    {
+      "name": "a notice opening the lead of one task, which it cannot",
+      "payload": {
+        "body": "x",
+        "category": "lead-answered",
+        "open": {
+          "address": "payments@api",
+          "to": "lead"
+        },
+        "title": "x",
+        "type": "notice"
+      },
+      "valid": false
+    },
+    {
+      "name": "a message delivered",
+      "payload": {
+        "command": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "outcome": "done",
+        "text": "Delivered to the lead.",
+        "type": "result"
+      },
+      "valid": true
+    },
+    {
+      "name": "a message refused: no lead runs",
+      "payload": {
+        "command": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "outcome": "refused",
+        "reason": "no-lead",
+        "text": "Not delivered: no-lead.",
+        "type": "result"
+      },
+      "valid": true
+    },
+    {
+      "name": "a message refused: it waited past its week",
+      "payload": {
+        "command": "cmd_019a07ed-8d00-738c-a759-af57bb67adfe",
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "outcome": "refused",
+        "reason": "expired",
+        "text": "Not delivered: expired.",
+        "type": "result"
+      },
+      "valid": true
+    }
+  ],
+  "ttl": {
+    "away": [
+      604800,
+      604800
+    ],
+    "lead-message": [
+      604800,
+      604800
+    ]
+  }
+}

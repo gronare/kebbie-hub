@@ -37,6 +37,7 @@ use crate::device::{
 };
 use crate::envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, Urgency};
 use crate::ids::{Id, Prefix};
+use crate::lead::{Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, Turn};
 use crate::review::{
     AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
     MAX_REVIEW_COMMENTS_BYTES, REVIEW_MEDIA_TYPE, Review, ReviewComment, ReviewComments, ReviewFile, ReviewOffer,
@@ -288,6 +289,7 @@ fn board() -> Payload {
         accepts: None,
         devices: None,
         backlog: None,
+        lead: None,
     })
 }
 
@@ -1390,12 +1392,20 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         ("found-dismiss-opened-by-the-machine", "found-dismiss", Kind::FoundDismiss, found_dismiss()),
         ("found-keep-opened-by-the-machine", "found-keep", Kind::FoundKeep, found_keep()),
         ("review-send-opened-by-the-machine", "review-send", Kind::ReviewSend, review_send()),
+        ("lead-message-opened-by-the-machine", "lead-message", Kind::LeadMessage, lead_message()),
+        ("away-opened-by-the-machine", "away", Kind::Away, away(true)),
     ] {
         let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
         cases.push(opens(name, &sealed, machine, phone, payload));
     }
     let carded = seal_case("carded-board", machine_header("carded-board", Kind::Board, machine), &carded_board(), machine, &[machine, account]);
     cases.push(opens("board-with-a-sign-off-card-and-an-assessment-opened-by-the-account", &carded, account, machine, carded_board()));
+    let leading = seal_case("lead-board", machine_header("lead-board", Kind::Board, machine), &lead_board(), machine, &[machine, account]);
+    cases.push(opens("board-with-the-leads-thread-opened-by-the-account", &leading, account, machine, lead_board()));
+    let mut answered_header = machine_header("lead-answered", Kind::Notice, machine);
+    answered_header.collapse = Some("l-mbp-lead".into());
+    let answered = seal_case("lead-answered", answered_header, &lead_answered(), machine, &[phone, tablet]);
+    cases.push(opens("lead-answered-notice-opened-by-a-device", &Sealed { envelope: answered.envelope.for_recipient(&phone.id).unwrap(), randomness: answered.randomness.clone() }, phone, machine, lead_answered()));
     let ready = seal_case(
         "review-ready",
         machine_header("review-open", Kind::Result, machine),
@@ -3577,6 +3587,220 @@ fn cards_json() -> Value {
     })
 }
 
+fn lead_message() -> Payload {
+    Payload::LeadMessage(LeadMessage { text: "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed.".into() })
+}
+
+fn away(on: bool) -> Payload {
+    Payload::Away(Away { on })
+}
+
+fn you_said(id: &str, at: u64, text: &str) -> Turn {
+    Turn::You { id: id.into(), at, device: None, text: Some(text.into()), away: None, delivery: None }
+}
+
+fn lead_said(id: &str, at: u64, text: &str) -> Turn {
+    Turn::Lead { id: id.into(), at, text: text.into() }
+}
+
+fn from_phone(id: Id, at: u64, text: &str, delivery: Delivery) -> Turn {
+    Turn::You { id: id.to_string(), at, device: Some(Party::new("phone", Prefix::Device).id), text: Some(text.into()), away: None, delivery: Some(delivery) }
+}
+
+fn earlier_lead_page() -> LeadThread {
+    LeadThread {
+        turns: vec![
+            you_said("t-0001", AT - 90_000, "Run the shop suite on this machine and tell me if anything is red."),
+            lead_said("t-0002", AT - 88_980, "The suite is green: 412 tests in 6 minutes. `checkout_test` took 48 seconds, so I put it in the backlog."),
+        ],
+        older: None,
+    }
+}
+
+fn earlier_lead_blob() -> (BlobRef, Vec<u8>) {
+    seal_blob_with(&serde_json::to_vec(&earlier_lead_page()).unwrap(), LEAD_THREAD_MEDIA_TYPE, seed("lead/older/key"), seed("lead/older/nonce")[..12].try_into().unwrap())
+}
+
+fn lead_page() -> LeadThread {
+    LeadThread {
+        turns: vec![
+            you_said("t-0003", AT - 7_200, "Take refunds through the obstacle flow, with the full review."),
+            lead_said("t-0004", AT - 7_140, "Starting. I take the obstacles in order: tests, lint, then the review."),
+            from_phone(command_id("lead-earlier"), AT - 4_000, "Good. Do the last-admin subtask first, and don't push until I've read step 5.", Delivery::Delivered { at: AT - 3_990 }),
+            lead_said("t-0005", AT - 3_930, "Understood. I take the subtask now and hold the push until you approve step 5 in the app."),
+            from_phone(command_id("lead-message"), AT - 1_320, "Can you run email-column to step 3 while I'm out? Ask only if something changes what we agreed.", Delivery::WaitingTurn),
+            Turn::You { id: command_id("away").to_string(), at: AT - 600, device: Some(Party::new("phone", Prefix::Device).id), text: None, away: Some(true), delivery: None },
+            lead_said("t-0006", AT - 540, "Understood. While you're away I settle questions about method myself and write down what I chose:\n\n- questions about **what you want** wait in Questions\n- nothing is pushed past what you approved"),
+        ],
+        older: Some(earlier_lead_blob().0),
+    }
+}
+
+fn lead_blob() -> (BlobRef, Vec<u8>) {
+    seal_blob_with(&serde_json::to_vec(&lead_page()).unwrap(), LEAD_THREAD_MEDIA_TYPE, seed("lead/thread/key"), seed("lead/thread/nonce")[..12].try_into().unwrap())
+}
+
+fn lead_board() -> Payload {
+    let Payload::Board(mut board) = board() else {
+        unreachable!()
+    };
+    board.away_since = Some(AT - 600);
+    board.accepts = Some(vec![Kind::Answer, Kind::Push, Kind::LeadMessage, Kind::Away]);
+    board.lead = Some(Box::new(LeadRef { thread: lead_blob().0, working_since: Some(AT - 540), replied_at: Some(AT - 540) }));
+    Payload::Board(board)
+}
+
+fn lead_answered() -> Payload {
+    Payload::Notice(Notice {
+        category: NoticeCategory::LeadAnswered,
+        title: "Lead · MacBook".into(),
+        body: "Done. email-column is at step 3 of 5. Step 4 drops the old column and waits for your yes in Questions.".into(),
+        open: Target::Lead {},
+        retract: Vec::new(),
+    })
+}
+
+fn lead_delivered() -> Payload {
+    Payload::Result(CommandResult {
+        command: command_id("lead-message"),
+        device: Party::new("phone", Prefix::Device).id,
+        outcome: Outcome::Done,
+        text: "Delivered to the lead.".into(),
+        blob: None,
+    })
+}
+
+fn lead_json() -> Value {
+    let (blob, ciphertext) = lead_blob();
+    let (older, older_ciphertext) = earlier_lead_blob();
+    let page = serde_json::to_value(lead_page()).unwrap();
+    let change = |value: &Value, changes: &[(&str, Value)]| {
+        let mut changed = value.clone();
+        for (pointer, value) in changes {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            match changed.pointer_mut(parent).unwrap() {
+                Value::Array(list) => list[key.parse::<usize>().unwrap()] = value.clone(),
+                parent => parent[key] = value.clone(),
+            }
+        }
+        changed
+    };
+    let drop = |value: &Value, pointer: &str| {
+        let mut changed = value.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        changed.pointer_mut(parent).unwrap().as_object_mut().unwrap().remove(key);
+        changed
+    };
+    let phone = Party::new("phone", Prefix::Device).id;
+    let reply = |index: usize| json!({ "by": "lead", "id": format!("t-{index:04}"), "at": AT + index as u64, "text": "x" });
+    let pages = [
+        ("a page with the page before it", page.clone(), true),
+        ("the first page, with nothing before it", serde_json::to_value(earlier_lead_page()).unwrap(), true),
+        ("an empty thread", json!({ "turns": [], "older": null }), true),
+        ("a message waiting while a draft is in the lead's input", change(&page, &[("/turns/4/delivery", json!({ "state": "waiting-draft" }))]), true),
+        ("away mode switched off at the computer", change(&page, &[("/turns/5", json!({ "by": "you", "id": "t-away", "at": AT - 600, "away": false }))]), true),
+        ("a reply at its length", change(&page, &[("/turns/6/text", json!("x".repeat(MAX_LEAD_TURN_CHARS)))]), true),
+        ("fifty turns", json!({ "turns": (0..MAX_LEAD_PAGE_TURNS).map(reply).collect::<Vec<_>>(), "older": null }), true),
+        ("fifty-one turns", json!({ "turns": (0..=MAX_LEAD_PAGE_TURNS).map(reply).collect::<Vec<_>>(), "older": null }), false),
+        ("a reply past its length", change(&page, &[("/turns/6/text", json!("x".repeat(MAX_LEAD_TURN_CHARS + 1)))]), false),
+        ("a tool call", change(&page, &[("/turns/1", json!({ "by": "tool", "id": "t-tool", "at": AT - 7_140, "text": "Bash: git status" }))]), false),
+        ("an empty reply", change(&page, &[("/turns/1/text", json!("  "))]), false),
+        ("a reply with a terminal escape", change(&page, &[("/turns/1/text", json!("Starting.\u{1b}[2J"))]), false),
+        ("turns out of order", change(&page, &[("/turns/1/at", json!(AT - 9_000))]), false),
+        ("one id twice", change(&page, &[("/turns/1/id", json!("t-0003"))]), false),
+        ("an id with a slash", change(&page, &[("/turns/1/id", json!("../t"))]), false),
+        ("a message from the phone without its delivery", drop(&page, "/turns/4/delivery"), false),
+        ("a message at the computer with a delivery", change(&page, &[("/turns/0/delivery", json!({ "state": "waiting-turn" }))]), false),
+        ("delivered before it was written", change(&page, &[("/turns/2/delivery/at", json!(AT - 5_000))]), false),
+        ("a delivery state kebbie does not know", change(&page, &[("/turns/4/delivery/state", json!("lost"))]), false),
+        ("a text and away mode in one turn", change(&page, &[("/turns/5/text", json!("away"))]), false),
+        ("a turn of yours with neither text nor away", drop(&page, "/turns/5/away"), false),
+        ("away mode with a delivery", change(&page, &[("/turns/5/delivery", json!({ "state": "waiting-turn" }))]), false),
+        ("a device that is a machine", change(&page, &[("/turns/2/device", json!(Party::new("machine", Prefix::Machine).id))]), false),
+        ("a reply naming a device", change(&page, &[("/turns/1/device", json!(phone))]), false),
+        ("a page before that is not a thread page", change(&page, &[("/older/media_type", json!("text/markdown"))]), false),
+        ("an empty page with a page before it", change(&page, &[("/turns", json!([]))]), false),
+        ("a cursor, which a page does not have", change(&page, &[("/cursor", json!(3))]), false),
+    ];
+    let pages: Vec<Value> = pages
+        .into_iter()
+        .map(|(name, page, valid)| {
+            assert_eq!(LeadThread::read(page.to_string().as_bytes()).is_ok(), valid, "{name}");
+            json!({ "name": name, "page": page, "valid": valid })
+        })
+        .collect();
+    let board = serde_json::to_value(lead_board()).unwrap();
+    let lead = board["lead"].clone();
+    let leads = [
+        ("a lead at work since its last reply", lead.clone(), true),
+        ("a lead that is idle and has not replied yet", change(&lead, &[("/working_since", Value::Null), ("/replied_at", Value::Null)]), true),
+        ("a thread that is not a thread page", change(&lead, &[("/thread/media_type", json!("text/markdown"))]), false),
+        ("a lead with a field it does not have", change(&lead, &[("/turns", json!([]))]), false),
+    ];
+    let leads: Vec<Value> = leads
+        .into_iter()
+        .map(|(name, lead, valid)| {
+            let mut whole = board.clone();
+            whole["lead"] = lead.clone();
+            let parsed = serde_json::from_value::<Payload>(whole);
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "lead": lead, "valid": valid })
+        })
+        .collect();
+    let payloads = [
+        ("a message to the lead", serde_json::to_value(lead_message()).unwrap(), true),
+        ("a message over several lines", json!({ "type": "lead-message", "text": "Two things:\n\t1. hold the push\n\t2. ask me first" }), true),
+        ("a message at its length", json!({ "type": "lead-message", "text": "x".repeat(MAX_LEAD_MESSAGE_CHARS) }), true),
+        ("a message past its length", json!({ "type": "lead-message", "text": "x".repeat(MAX_LEAD_MESSAGE_CHARS + 1) }), false),
+        ("an empty message", json!({ "type": "lead-message", "text": " \n" }), false),
+        ("a message with a terminal escape", json!({ "type": "lead-message", "text": "go\u{1b}[2J" }), false),
+        ("a message naming a task, which it does not", json!({ "type": "lead-message", "text": "go", "address": "payments@api" }), false),
+        ("away mode on", serde_json::to_value(away(true)).unwrap(), true),
+        ("away mode off", serde_json::to_value(away(false)).unwrap(), true),
+        ("away mode without on", json!({ "type": "away" }), false),
+        ("away mode with a reason", json!({ "type": "away", "on": true, "until": AT }), false),
+        ("the lead's answer as a notice", serde_json::to_value(lead_answered()).unwrap(), true),
+        ("a notice opening the lead of one task, which it cannot", json!({ "type": "notice", "category": "lead-answered", "title": "x", "body": "x", "open": { "to": "lead", "address": "payments@api" } }), false),
+        ("a message delivered", serde_json::to_value(lead_delivered()).unwrap(), true),
+        ("a message refused: no lead runs", serde_json::to_value(refusal("lead-message", Reason::NoLead)).unwrap(), true),
+        ("a message refused: it waited past its week", serde_json::to_value(refusal("lead-message", Reason::Expired)).unwrap(), true),
+    ];
+    let payloads: Vec<Value> = payloads
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
+    let mut old = board.clone();
+    old.as_object_mut().unwrap().remove("lead");
+    assert_eq!(serde_json::from_value::<Payload>(old.clone()).unwrap().validate(), Ok(()), "a board from a machine not yet updated still opens");
+    json!({
+        "media_type": LEAD_THREAD_MEDIA_TYPE,
+        "max_page_turns": MAX_LEAD_PAGE_TURNS,
+        "max_turn_chars": MAX_LEAD_TURN_CHARS,
+        "max_message_chars": MAX_LEAD_MESSAGE_CHARS,
+        "ttl": { "lead-message": [Kind::LeadMessage.default_ttl(), Kind::LeadMessage.max_ttl()], "away": [Kind::Away.default_ttl(), Kind::Away.max_ttl()] },
+        "collapse": "l-mbp-lead",
+        "board": board,
+        "board_from_a_machine_not_yet_updated": old,
+        "page": page,
+        "blob": blob,
+        "ciphertext": b64(&ciphertext),
+        "older_page": serde_json::to_value(earlier_lead_page()).unwrap(),
+        "older_blob": older,
+        "older_ciphertext": b64(&older_ciphertext),
+        "pages": pages,
+        "leads": leads,
+        "payloads": payloads,
+    })
+}
+
+fn refusal(case: &str, reason: Reason) -> Payload {
+    Payload::Result(CommandResult { command: command_id(case), device: Party::new("phone", Prefix::Device).id, outcome: Outcome::Refused { reason }, text: format!("Not delivered: {}.", reason.key()), blob: None })
+}
+
 fn review_comments_json() -> Value {
     serde_json::to_value(review_comments()).unwrap()
 }
@@ -3610,7 +3834,7 @@ fn blobs_json() -> Value {
 }
 
 fn notices_json() -> Value {
-    let tags = ["q-0fc378cba90d48b44e5fe170", "p-1a2b", "d-1a2b", "i-1a2b", "r-a94051d90047441d5ac99a97", "c-1a2b", "s-1a2b", "q-", "x-1a2b", "Q-1a2b", "q", "question-1", "-q", "rq-1"];
+    let tags = ["q-0fc378cba90d48b44e5fe170", "p-1a2b", "d-1a2b", "i-1a2b", "r-a94051d90047441d5ac99a97", "c-1a2b", "s-1a2b", "l-mbp-lead", "q-", "x-1a2b", "Q-1a2b", "q", "question-1", "-q", "rq-1"];
     let fits = [
         (NoticeCategory::Questions, "q-1a2b", true),
         (NoticeCategory::Questions, "p-1a2b", true),
@@ -3618,6 +3842,8 @@ fn notices_json() -> Value {
         (NoticeCategory::NewDevice, "r-1a2b", false),
         (NoticeCategory::Ready, "ready-1", true),
         (NoticeCategory::Started, "q", true),
+        (NoticeCategory::LeadAnswered, "l-mbp-lead", true),
+        (NoticeCategory::Ready, "l-mbp-lead", false),
     ];
     let notice_of = |category| Notice { category, title: "refunds · shop".into(), body: "Ready to push.".into(), open: Target::Task { address: "refunds@shop".into() }, retract: Vec::new() };
     json!({
@@ -3646,6 +3872,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("notices.json", notices_json()),
         ("stages.json", stages_json()),
         ("cards.json", cards_json()),
+        ("lead.json", lead_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

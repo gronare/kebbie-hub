@@ -4,6 +4,7 @@ use crate::backlog::{HomeKind, ItemKey, is_section_key, is_text_hash};
 use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
+use crate::lead::{Away, LeadMessage};
 use crate::review::{AcceptStep, AcceptSubtask, ReviewComments, ReviewOpen, ReviewRead, ReviewSend};
 
 pub const MAX_PROMPT_CHARS: usize = 4_000;
@@ -46,6 +47,8 @@ pub enum Payload {
     FoundDismiss(FoundDismiss),
     FoundKeep(FoundKeep),
     ReviewSend(ReviewSend),
+    LeadMessage(LeadMessage),
+    Away(Away),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,16 +71,18 @@ pub enum NoticeCategory {
     Ready,
     CiFailed,
     Started,
+    LeadAnswered,
 }
 
 impl NoticeCategory {
-    pub const ALL: [NoticeCategory; 6] = [
+    pub const ALL: [NoticeCategory; 7] = [
         NoticeCategory::Questions,
         NoticeCategory::NewDevice,
         NoticeCategory::IdeaQuestions,
         NoticeCategory::Ready,
         NoticeCategory::CiFailed,
         NoticeCategory::Started,
+        NoticeCategory::LeadAnswered,
     ];
 
     pub fn name(self) -> &'static str {
@@ -88,6 +93,7 @@ impl NoticeCategory {
             NoticeCategory::Ready => "ready",
             NoticeCategory::CiFailed => "ci-failed",
             NoticeCategory::Started => "started",
+            NoticeCategory::LeadAnswered => "lead-answered",
         }
     }
 
@@ -103,7 +109,7 @@ impl NoticeCategory {
     }
 
     /// A collapse tag that starts with one of these and a hyphen names its notice's category, so a device that cannot open a notice still says what it is about.
-    pub const COLLAPSE_PREFIXES: [(&'static str, NoticeCategory); 7] = [
+    pub const COLLAPSE_PREFIXES: [(&'static str, NoticeCategory); 8] = [
         ("q", NoticeCategory::Questions),
         ("p", NoticeCategory::Questions),
         ("d", NoticeCategory::NewDevice),
@@ -111,6 +117,7 @@ impl NoticeCategory {
         ("r", NoticeCategory::Ready),
         ("c", NoticeCategory::CiFailed),
         ("s", NoticeCategory::Started),
+        ("l", NoticeCategory::LeadAnswered),
     ];
 
     pub fn of_collapse(tag: &str) -> Option<NoticeCategory> {
@@ -134,6 +141,7 @@ pub enum Target {
     Task { address: String },
     Item { item: ItemKey },
     Device { device: Id },
+    Lead {},
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -256,6 +264,7 @@ pub enum Reason {
     AlreadyStarted,
     UnknownDevice,
     SectionChanged,
+    NoLead,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -276,6 +285,7 @@ enum ReasonKey {
     AlreadyStarted,
     UnknownDevice,
     SectionChanged,
+    NoLead,
 }
 
 impl Reason {
@@ -296,6 +306,7 @@ impl Reason {
             Reason::AlreadyStarted => "already-started",
             Reason::UnknownDevice => "unknown-device",
             Reason::SectionChanged => "section-changed",
+            Reason::NoLead => "no-lead",
         }
     }
 
@@ -316,6 +327,7 @@ impl Reason {
             Reason::AlreadyStarted => ReasonKey::AlreadyStarted,
             Reason::UnknownDevice => ReasonKey::UnknownDevice,
             Reason::SectionChanged => ReasonKey::SectionChanged,
+            Reason::NoLead => ReasonKey::NoLead,
         }
     }
 
@@ -339,6 +351,7 @@ impl Reason {
             ReasonKey::AlreadyStarted => Reason::AlreadyStarted,
             ReasonKey::UnknownDevice => Reason::UnknownDevice,
             ReasonKey::SectionChanged => Reason::SectionChanged,
+            ReasonKey::NoLead => Reason::NoLead,
         })
     }
 }
@@ -506,6 +519,8 @@ impl Payload {
             Payload::FoundDismiss(_) => Kind::FoundDismiss,
             Payload::FoundKeep(_) => Kind::FoundKeep,
             Payload::ReviewSend(_) => Kind::ReviewSend,
+            Payload::LeadMessage(_) => Kind::LeadMessage,
+            Payload::Away(_) => Kind::Away,
         }
     }
 
@@ -563,7 +578,7 @@ impl Payload {
                 match &notice.open {
                     Target::Task { address } => check(is_address(address), "address is not task@repo")?,
                     Target::Device { device } => check(device.prefix() == Prefix::Device, "device is not a device id")?,
-                    Target::Item { .. } => {}
+                    Target::Item { .. } | Target::Lead {} => {}
                 }
                 check(
                     serde_json::to_vec(self).expect("a payload always serializes").len() <= MAX_NOTICE_BYTES,
@@ -591,8 +606,9 @@ impl Payload {
             Payload::FoundDismiss(dismiss) => check(dismiss.item.home() == HomeKind::Found, "the item is not one tasks found"),
             Payload::FoundKeep(keep) => check(keep.item.home() == HomeKind::Found, "the item is not one tasks found"),
             Payload::ReviewSend(send) => send.check(),
+            Payload::LeadMessage(message) => message.check(),
             Payload::Board(board) => board.check(),
-            Payload::StartItem(_) | Payload::Result(_) => Ok(()),
+            Payload::StartItem(_) | Payload::Result(_) | Payload::Away(_) => Ok(()),
         }
     }
 }
@@ -830,7 +846,28 @@ mod tests {
     fn categories_are_on_by_default_except_a_start_going_through() {
         assert_eq!(NoticeCategory::defaults().len(), NoticeCategory::ALL.len() - 1);
         assert!(!NoticeCategory::defaults().contains(&NoticeCategory::Started));
-        assert_eq!(NoticeCategory::ALL.map(NoticeCategory::name), ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"]);
+        assert!(NoticeCategory::defaults().contains(&NoticeCategory::LeadAnswered));
+        assert_eq!(NoticeCategory::ALL.map(NoticeCategory::name), ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started", "lead-answered"]);
+    }
+
+    #[test]
+    fn a_message_to_the_lead_and_away_mode_wait_a_week_for_a_machine_that_sleeps() {
+        let message = |text: &str| Payload::LeadMessage(LeadMessage { text: text.into() });
+        assert_eq!(message("Run email-column to step 3 while I'm out.\nAsk if it changes what we agreed.").validate(), Ok(()));
+        assert!(message(" ").validate().is_err());
+        assert!(message("stop\u{1b}[2J").validate().is_err());
+        assert!(message(&"x".repeat(crate::MAX_LEAD_MESSAGE_CHARS + 1)).validate().is_err());
+        assert_eq!(serde_json::to_value(message("x")).unwrap(), serde_json::json!({ "type": "lead-message", "text": "x" }));
+        assert!(serde_json::from_value::<Payload>(serde_json::json!({ "type": "lead-message", "text": "x", "machine": "all" })).is_err());
+        assert_eq!(serde_json::to_value(Payload::Away(Away { on: true })).unwrap(), serde_json::json!({ "type": "away", "on": true }));
+        for kind in [Kind::LeadMessage, Kind::Away] {
+            assert_eq!((kind.is_command(), kind.default_ttl(), kind.max_ttl()), (true, crate::KEPT_ANSWER_TTL, crate::KEPT_ANSWER_TTL));
+        }
+        let answered = Payload::Notice(Notice { category: NoticeCategory::LeadAnswered, title: "Lead · MacBook".into(), body: "Done. email-column is at step 3 of 5.".into(), open: Target::Lead {}, retract: Vec::new() });
+        assert_eq!(answered.validate(), Ok(()));
+        assert_eq!(serde_json::to_value(&answered).unwrap()["open"], serde_json::json!({ "to": "lead" }));
+        assert_eq!(NoticeCategory::of_collapse("l-01k7z"), Some(NoticeCategory::LeadAnswered));
+        assert_eq!(Reason::NoLead.key(), "no-lead");
     }
 
     #[test]

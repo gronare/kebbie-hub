@@ -237,6 +237,8 @@ const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
 // The hub cannot read which blobs a board references, so a blob lives this long after its machine last PUT it.
 pub const BLOB_KEEP_SECONDS: u64 = 14 * 86_400;
 pub const BLOB_QUOTA_BYTES: u64 = 32 * 1024 * 1024;
+// A subscription chose among these categories before lead-answered existed; a category it was not offered starts at its default.
+const OFFERED_BEFORE_LEAD: &str = r#"["questions","new-device","idea-questions","ready","ci-failed","started"]"#;
 
 pub struct Store {
     connection: Connection,
@@ -456,6 +458,13 @@ impl Store {
             .collect::<Result<_>>()?;
         if !device_columns.iter().any(|column| column == "removed_at") {
             tx.execute_batch("ALTER TABLE devices ADD COLUMN removed_at INTEGER")?;
+        }
+        let push_columns: Vec<String> = tx
+            .prepare("SELECT name FROM pragma_table_info('push_subscriptions')")?
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<_>>()?;
+        if !push_columns.iter().any(|column| column == "offered") {
+            tx.execute_batch(&format!("ALTER TABLE push_subscriptions ADD COLUMN offered TEXT NOT NULL DEFAULT '{OFFERED_BEFORE_LEAD}'"))?;
         }
         for copy in ["name", "kind"] {
             if device_columns.iter().any(|column| column == copy) {
@@ -840,7 +849,7 @@ impl Store {
     fn devices_where(&self, condition: &str, value: &str) -> Result<Vec<DeviceRow>> {
         let mut statement = self.connection.prepare(&format!(
             "SELECT devices.account_id, devices.cert, devices.created_at, devices.last_seen_at,
-                    push_subscriptions.categories, push_subscriptions.subscribed_at, devices.removed_at
+                    push_subscriptions.categories, push_subscriptions.subscribed_at, devices.removed_at, push_subscriptions.offered
              FROM devices LEFT JOIN push_subscriptions ON push_subscriptions.device_id = devices.device_id
              WHERE {condition}"
         ))?;
@@ -850,7 +859,10 @@ impl Store {
                 let categories: Option<String> = row.get(4)?;
                 let push = match categories {
                     Some(text) => Some(DevicePushRow {
-                        categories: serde_json::from_str(&text).map_err(|_| corrupt(4))?,
+                        categories: with_defaults_not_offered(
+                            serde_json::from_str(&text).map_err(|_| corrupt(4))?,
+                            &serde_json::from_str::<Vec<NoticeCategory>>(&row.get::<_, String>(7)?).map_err(|_| corrupt(7))?,
+                        ),
                         subscribed_at: row.get(5)?,
                     }),
                     None => None,
@@ -887,17 +899,18 @@ impl Store {
             None => Subscribed::New,
         };
         tx.execute(
-            "INSERT INTO push_subscriptions (device_id, endpoint, p256dh, auth, categories, subscribed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "INSERT INTO push_subscriptions (device_id, endpoint, p256dh, auth, categories, subscribed_at, offered)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT (device_id) DO UPDATE SET
-                 endpoint = ?2, p256dh = ?3, auth = ?4, categories = ?5, subscribed_at = ?6",
+                 endpoint = ?2, p256dh = ?3, auth = ?4, categories = ?5, subscribed_at = ?6, offered = ?7",
             params![
                 new.device.as_str(),
                 new.endpoint,
                 new.p256dh,
                 new.auth,
                 categories_text(new.categories),
-                new.now
+                new.now,
+                categories_text(&NoticeCategory::ALL)
             ],
         )?;
         tx.commit()?;
@@ -906,8 +919,8 @@ impl Store {
 
     pub fn set_categories(&self, device: &Id, categories: &[NoticeCategory]) -> Result<bool> {
         Ok(self.connection.execute(
-            "UPDATE push_subscriptions SET categories = ?2 WHERE device_id = ?1",
-            params![device.as_str(), categories_text(categories)],
+            "UPDATE push_subscriptions SET categories = ?2, offered = ?3 WHERE device_id = ?1",
+            params![device.as_str(), categories_text(categories), categories_text(&NoticeCategory::ALL)],
         )? > 0)
     }
 
@@ -2524,6 +2537,13 @@ fn connect_where(connection: &Connection, filter: &str, hash: &[u8]) -> Result<O
             },
         )
         .optional()
+}
+
+fn with_defaults_not_offered(mut chosen: Vec<NoticeCategory>, offered: &[NoticeCategory]) -> Vec<NoticeCategory> {
+    chosen.extend(NoticeCategory::defaults().into_iter().filter(|category| !offered.contains(category)));
+    chosen.sort();
+    chosen.dedup();
+    chosen
 }
 
 fn categories_text(categories: &[NoticeCategory]) -> String {

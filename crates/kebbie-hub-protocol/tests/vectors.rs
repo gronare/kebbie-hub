@@ -4,7 +4,7 @@ use std::path::Path;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use kebbie_hub_protocol::{
-    AccountKey, AppliedCommands, BacklogBody, BlobRef, Card, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, Machine, Notice, NoticeCategory, Payload, PublicKeys, Refusal, SecretKeys, Target, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
+    AccountKey, AppliedCommands, BacklogBody, BlobRef, Card, CommandResult, DeviceCert, DeviceTrust, Envelope, Id, ItemKey, Kind, LeadThread, Machine, Notice, NoticeCategory, Payload, PublicKeys, Refusal, SecretKeys, Target, Trust, VerifiedDevice, authorize, device_fingerprint, open, open_blob, open_command, text_hash, verify_command,
 };
 use serde_json::Value;
 
@@ -402,4 +402,40 @@ fn a_collapse_tag_names_its_notices_category_as_the_vectors_say() {
         let tag = row["tag"].as_str().unwrap();
         assert_eq!(notice.fits_collapse(tag), row["fits"].as_bool().unwrap(), "{tag}");
     }
+}
+
+#[test]
+fn the_leads_thread_opens_page_by_page_and_its_commands_hold_as_the_vectors_say() {
+    let vectors = load("lead.json");
+    let page = |blob: &str, ciphertext: &str| {
+        let blob: BlobRef = serde_json::from_value(vectors[blob].clone()).unwrap();
+        assert_eq!(blob.media_type, vectors["media_type"].as_str().unwrap());
+        LeadThread::read(&open_blob(&blob, &URL_SAFE_NO_PAD.decode(vectors[ciphertext].as_str().unwrap()).unwrap()).unwrap()).unwrap()
+    };
+    let newest = page("blob", "ciphertext");
+    assert_eq!(serde_json::to_value(&newest).unwrap(), vectors["page"]);
+    assert_eq!(serde_json::to_value(newest.older.as_ref().unwrap()).unwrap(), vectors["older_blob"]);
+    assert_eq!(vectors["board"]["lead"]["thread"], vectors["blob"]);
+    let older = page("older_blob", "older_ciphertext");
+    assert_eq!(serde_json::to_value(&older).unwrap(), vectors["older_page"]);
+    assert!(older.older.is_none());
+    for case in vectors["pages"].as_array().unwrap() {
+        assert_eq!(LeadThread::read(case["page"].to_string().as_bytes()).is_ok(), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    for case in vectors["leads"].as_array().unwrap() {
+        let mut board = vectors["board"].clone();
+        board["lead"] = case["lead"].clone();
+        let parsed = serde_json::from_value::<Payload>(board);
+        assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    for case in vectors["payloads"].as_array().unwrap() {
+        let parsed = serde_json::from_value::<Payload>(case["payload"].clone());
+        assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), case["valid"].as_bool().unwrap(), "{}", case["name"]);
+    }
+    for kind in [Kind::LeadMessage, Kind::Away] {
+        assert_eq!(vectors["ttl"][kind.name()], serde_json::json!([kind.default_ttl(), kind.max_ttl()]));
+    }
+    assert_eq!(NoticeCategory::of_collapse(vectors["collapse"].as_str().unwrap()), Some(NoticeCategory::LeadAnswered));
+    let old = serde_json::from_value::<Payload>(vectors["board_from_a_machine_not_yet_updated"].clone()).unwrap();
+    assert_eq!(old.validate(), Ok(()), "a board without a lead still opens");
 }

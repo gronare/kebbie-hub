@@ -10,6 +10,7 @@ mod crypto;
 mod device;
 mod envelope;
 mod ids;
+mod lead;
 mod message;
 mod review;
 #[cfg(any(test, feature = "test-vectors"))]
@@ -51,6 +52,7 @@ pub use device::{
 };
 pub use envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
+pub use lead::{Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, Turn};
 pub use message::{
     Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
     MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,

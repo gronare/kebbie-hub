@@ -16,6 +16,7 @@ export const CATEGORY_GROUPS = [
       { category: "questions", id: "n-ask", name: "Questions and prompts", meta: "A task asks you something, or an agent's prompt waits for a choice" },
       { category: "new-device", id: "n-device", name: "A new device to approve", meta: "A device wants to make changes on one of your machines" },
       { category: "idea-questions", id: "n-lead", name: "The lead's questions on an idea", meta: "The lead wrote out an idea and needs answers before it starts" },
+      { category: "lead-answered", id: "n-reply", name: "The lead answered", meta: "A machine's lead replied to you in its thread" },
     ],
   },
   {
@@ -76,6 +77,7 @@ export function routeOf(machine, open) {
   if (open?.to === "task") return `/#/task/${part(machine)}/${part(open.address)}`;
   if (open?.to === "item") return `/#/item/${part(open.item.startsWith("vault:") ? open.item : `${machine}|${open.item}`)}`;
   if (open?.to === "device") return `/account#device/${part(open.device)}`;
+  if (open?.to === "lead") return `/#/lead/${part(machine)}`;
   return "/#/board";
 }
 
@@ -113,6 +115,7 @@ const CATEGORY_TEXT = {
   ready: "A task is ready to push.",
   "ci-failed": "CI failed on a push.",
   started: "A start you asked for has news.",
+  "lead-answered": "A lead answered you.",
 };
 
 const machineIn = (listing, machine) => listing.list.list.machines.find((one) => one.machine === machine) ?? null;

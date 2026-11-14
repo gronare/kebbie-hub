@@ -5,7 +5,7 @@ use std::time::Duration;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
-use kebbie_hub_fakes::machine::{ApproveFrom, Backlog, Handled, Handling, MachineState, Posted, connect, every_command, join};
+use kebbie_hub_fakes::machine::{ApproveFrom, Backlog, Handled, Handling, LeadHold, MachineState, Posted, connect, every_command, join};
 use kebbie_hub_fakes::{load, save};
 use kebbie_hub_protocol::{Board, Card, Id, Item, ItemKey, Kind, Notice, NoticeCategory, Outcome, Review, Target, Urgency};
 use serde::Deserialize;
@@ -115,11 +115,34 @@ enum Command {
         item: Option<String>,
         #[arg(long, value_name = "DEVICE", group = "target", help = "Open the device page")]
         device: Option<String>,
+        #[arg(long, group = "target", help = "Open this machine's thread with its lead")]
+        lead: bool,
         #[arg(long, help = "Send with high urgency")]
         urgent: bool,
     },
     #[command(about = "Mark a notice's subject settled, so the next notice closes it")]
     Settle { collapse: String },
+    #[command(about = "Write to the lead as if at the computer; the lead starts working")]
+    LeadSay { text: String },
+    #[command(about = "Have the lead reply, post the thread and notify the devices that want lead-answered")]
+    LeadReply {
+        text: String,
+        #[arg(long, help = "Keep the lead working after this reply")]
+        working: bool,
+        #[arg(long, help = "Post the thread without a notice")]
+        quiet: bool,
+    },
+    #[command(about = "Hold the next messages from devices: while the lead finishes its turn, or while a draft is in its input")]
+    LeadHold { hold: Hold },
+    #[command(about = "Deliver every held message to the lead, post their results and the thread")]
+    LeadRelease,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Hold {
+    None,
+    Turn,
+    Draft,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -136,6 +159,7 @@ enum Category {
     Ready,
     CiFailed,
     Started,
+    LeadAnswered,
 }
 
 impl Category {
@@ -147,6 +171,7 @@ impl Category {
             Category::Ready => NoticeCategory::Ready,
             Category::CiFailed => NoticeCategory::CiFailed,
             Category::Started => NoticeCategory::Started,
+            Category::LeadAnswered => NoticeCategory::LeadAnswered,
         }
     }
 }
@@ -184,6 +209,7 @@ fn describe(handled: &Handled) -> String {
             format!("replayed the stored result: {}", outcome(result.outcome))
         }
         Handling::Waiting(device) => format!("held until {device} is approved"),
+        Handling::Held { did } => format!("held for the lead: {did}"),
         Handling::Dropped(dropped) => format!("dropped without a reply: {}", dropped.key()),
     };
     let posted = match handled.posted {
@@ -359,13 +385,14 @@ async fn run(cli: Cli) -> Result<(), String> {
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("approvals: {}", if state.approve_from == ApproveFrom::Devices { "from approved devices or here" } else { "only here at the machine" });
         }
-        Command::Notify { category, title, body, collapse, task, item, device, urgent } => {
+        Command::Notify { category, title, body, collapse, task, item, device, lead, urgent } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
-            let open = match (task, item, device) {
-                (Some(address), None, None) => Target::Task { address },
-                (None, Some(item), None) => Target::Item { item: ItemKey::parse(&item).map_err(|e| text(&e))? },
-                (None, None, Some(device)) => Target::Device { device: Id::parse(&device).map_err(|e| text(&e))? },
-                _ => return Err("pass one of --task, --item or --device".to_string()),
+            let open = match (task, item, device, lead) {
+                (Some(address), None, None, false) => Target::Task { address },
+                (None, Some(item), None, false) => Target::Item { item: ItemKey::parse(&item).map_err(|e| text(&e))? },
+                (None, None, Some(device), false) => Target::Device { device: Id::parse(&device).map_err(|e| text(&e))? },
+                (None, None, None, true) => Target::Lead {},
+                _ => return Err("pass one of --task, --item, --device or --lead".to_string()),
             };
             let notice = Notice { category: category.category(), title, body, open, retract: Vec::new() };
             let urgency = if urgent { Urgency::High } else { Urgency::Normal };
@@ -381,6 +408,40 @@ async fn run(cli: Cli) -> Result<(), String> {
             state.settle(&collapse);
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("the next notice closes {collapse}");
+        }
+        Command::LeadSay { text: said } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.say_at_the_computer(&said);
+            let posted = state.publish_lead().await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("posted board rev {posted}; the lead is working");
+        }
+        Command::LeadReply { text: reply, working, quiet } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.lead_replies(&reply, working);
+            let posted = state.publish_lead().await.map_err(|e| text(&e))?;
+            let pushed = if quiet { "no notice".to_string() } else {
+                let sent = state.notify_lead_answered().await.map_err(|e| text(&e))?;
+                format!("notice to {} device(s)", sent.recipients.len())
+            };
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("posted board rev {posted} with the lead's reply, {pushed}");
+        }
+        Command::LeadHold { hold } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            state.lead.hold = match hold {
+                Hold::None => LeadHold::None,
+                Hold::Turn => LeadHold::Turn,
+                Hold::Draft => LeadHold::Draft,
+            };
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("messages from devices: {}", match hold { Hold::None => "delivered at once", Hold::Turn => "wait for the lead's turn", Hold::Draft => "wait behind a draft" });
+        }
+        Command::LeadRelease => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let released = state.release_lead().await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            println!("delivered {} held message(s) to the lead", released.len());
         }
         Command::Takes { takes } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

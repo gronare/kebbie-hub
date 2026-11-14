@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { CARD_MEDIA_TYPE, MAX_ASSESSMENT_REASON_CHARS, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, readCard, CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { LEAD_THREAD_MEDIA_TYPE, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, readLeadThread, CARD_MEDIA_TYPE, MAX_ASSESSMENT_REASON_CHARS, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, readCard, CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -582,8 +582,8 @@ test("a notice is one line, a plain body and a target inside the app, small enou
     ["too many retracts", { retract: Array(9).fill("a") }],
     ["too large to push", { title: "€".repeat(MAX_NOTICE_TITLE_CHARS), body: "€".repeat(MAX_NOTICE_BODY_CHARS), retract: Array(8).fill("a".repeat(64)) }],
   ]) assert.equal(valid({ ...notice, ...wrong }), false, name);
-  assert.deepEqual(NOTICE_CATEGORIES, ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"]);
-  assert.deepEqual(DEFAULT_NOTICE_CATEGORIES, ["questions", "new-device", "idea-questions", "ready", "ci-failed"]);
+  assert.deepEqual(NOTICE_CATEGORIES, ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started", "lead-answered"]);
+  assert.deepEqual(DEFAULT_NOTICE_CATEGORIES, ["questions", "new-device", "idea-questions", "ready", "ci-failed", "lead-answered"]);
 });
 
 test("a device decision names the waiting device by id and fingerprint and lives an hour", async () => {
@@ -940,4 +940,42 @@ test("a review opens from the blob its result names, checked as Rust checks it, 
   const older = { ...offering, items: [{ ...offering.items[0], review: { step: 2, files: 3 } }] };
   checkPayload(older);
   assert.deepEqual(payloadOf(older).items[0].review, { subtask: "2", files: 3 }, "an older machine's offer names the step's number as its subtask");
+});
+
+test("the lead's thread opens page by page from its blobs, and its commands hold as Rust's validation says", async () => {
+  const lead = load("lead.json");
+  assert.deepEqual([lead.media_type, lead.max_page_turns, lead.max_turn_chars, lead.max_message_chars], [LEAD_THREAD_MEDIA_TYPE, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, MAX_LEAD_MESSAGE_CHARS]);
+  const page = async (blob, ciphertext) => readLeadThread(JSON.parse(new TextDecoder().decode(await openBlob(blob, fromB64(ciphertext)))));
+  assert.deepEqual(lead.board.lead.thread, lead.blob);
+  const newest = await page(lead.board.lead.thread, lead.ciphertext);
+  assert.deepEqual(newest, lead.page);
+  assert.deepEqual(newest.turns.map((turn) => [turn.by, turn.device ? "phone" : "computer", turn.delivery?.state ?? null]), [
+    ["you", "computer", null],
+    ["lead", "computer", null],
+    ["you", "phone", "delivered"],
+    ["lead", "computer", null],
+    ["you", "phone", "waiting-turn"],
+    ["you", "phone", null],
+    ["lead", "computer", null],
+  ]);
+  assert.deepEqual(newest.older, lead.older_blob);
+  const older = await page(newest.older, lead.older_ciphertext);
+  assert.deepEqual(older, lead.older_page);
+  assert.equal(older.older, null);
+  const holds = (check) => (value) => {
+    try {
+      check(value);
+      return true;
+    } catch (error) {
+      if (error.code !== "malformed") throw error;
+      return false;
+    }
+  };
+  assert.ok(lead.pages.length > 25);
+  for (const { name, page: candidate, valid } of lead.pages) assert.equal(holds(readLeadThread)(candidate), valid, name);
+  for (const { name, lead: candidate, valid } of lead.leads) assert.equal(holds(checkPayload)({ ...lead.board, lead: candidate }), valid, name);
+  for (const { name, payload, valid } of lead.payloads) assert.equal(holds(checkPayload)(payload), valid, name);
+  for (const kind of ["lead-message", "away"]) assert.deepEqual([KINDS[kind].ttl, KINDS[kind].maxTtl, KINDS[kind].command], [...lead.ttl[kind], true]);
+  assert.equal(noticeCategoryOf(lead.collapse), "lead-answered");
+  assert.ok(holds(checkPayload)(lead.board_from_a_machine_not_yet_updated), "a board without a lead still opens");
 });

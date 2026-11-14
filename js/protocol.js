@@ -44,9 +44,9 @@ export const MAX_NOTICE_TITLE_CHARS = 120;
 export const MAX_NOTICE_BODY_CHARS = 600;
 export const MAX_NOTICE_BYTES = 2048;
 export const MAX_RETRACTS = 8;
-export const NOTICE_CATEGORIES = ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"];
+export const NOTICE_CATEGORIES = ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started", "lead-answered"];
 export const DEFAULT_NOTICE_CATEGORIES = NOTICE_CATEGORIES.filter((category) => category !== "started");
-export const NOTICE_COLLAPSE_PREFIXES = { q: "questions", p: "questions", d: "new-device", i: "idea-questions", r: "ready", c: "ci-failed", s: "started" };
+export const NOTICE_COLLAPSE_PREFIXES = { q: "questions", p: "questions", d: "new-device", i: "idea-questions", r: "ready", c: "ci-failed", s: "started", l: "lead-answered" };
 export function noticeCategoryOf(tag) {
   const at = typeof tag === "string" ? tag.indexOf("-") : -1;
   return at < 0 ? null : (Object.hasOwn(NOTICE_COLLAPSE_PREFIXES, tag.slice(0, at)) ? NOTICE_COLLAPSE_PREFIXES[tag.slice(0, at)] : null);
@@ -56,6 +56,10 @@ export const MAX_LABEL_BYTES = 256;
 export const BACKLOG_BODY_MEDIA_TYPE = "application/vnd.kebbie.backlog-item+json";
 export const REVIEW_MEDIA_TYPE = "application/vnd.kebbie.review+json";
 export const CARD_MEDIA_TYPE = "application/vnd.kebbie.card+json";
+export const LEAD_THREAD_MEDIA_TYPE = "application/vnd.kebbie.lead-thread+json";
+export const MAX_LEAD_PAGE_TURNS = 50;
+export const MAX_LEAD_TURN_CHARS = 16000;
+export const MAX_LEAD_MESSAGE_CHARS = 4000;
 export const MAX_BUILT_LINES = 6;
 export const MAX_CARD_LINE_CHARS = 600;
 export const MAX_DECISIONS = 64;
@@ -91,6 +95,8 @@ export const KINDS = {
   "found-dismiss": { ...command, maxTtl: COMMAND_TTL },
   "found-keep": { ...command, maxTtl: COMMAND_TTL },
   "review-send": { ...command, maxTtl: COMMAND_TTL },
+  "lead-message": { ...command, maxTtl: KEPT_ANSWER_TTL, ttl: KEPT_ANSWER_TTL },
+  away: { ...command, maxTtl: KEPT_ANSWER_TTL, ttl: KEPT_ANSWER_TTL },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -589,6 +595,30 @@ export function readCard(body) {
   return body;
 }
 
+const isTurnText = (max) => (value) => isText(max)(value) && !/[^\P{Cc}\n\t]/u.test(value);
+const delivery = (value) =>
+  isPlainObject(value) && (value.state === "delivered" ? shape({ state: string, at: u64v })(value) : shape({ state: oneOf("waiting-turn", "waiting-draft") })(value));
+const yourTurn = (value) =>
+  shape({ by: string, id: (one) => typeof one === "string" && COLLAPSE.test(one), at: u64v, device: optionalField((one) => prefixOf(one) === "dev"), text: optionalField(isTurnText(MAX_LEAD_TURN_CHARS)), away: optionalField(bool), delivery: optionalField(delivery) })(value) &&
+  absent(value.text) !== absent(value.away) &&
+  (absent(value.away) || absent(value.delivery)) &&
+  (absent(value.text) || absent(value.device) === absent(value.delivery)) &&
+  (value.delivery?.state !== "delivered" || value.delivery.at >= value.at);
+const leadTurn = shape({ by: string, id: (one) => typeof one === "string" && COLLAPSE.test(one), at: u64v, text: isTurnText(MAX_LEAD_TURN_CHARS) });
+const turn = (value) => isPlainObject(value) && (value.by === "you" ? yourTurn(value) : value.by === "lead" && leadTurn(value));
+const leadThread = (value) =>
+  shape({ turns: list(turn), older: optionalField((older) => blobRef(older) && older.media_type === LEAD_THREAD_MEDIA_TYPE) })(value) &&
+  value.turns.length <= MAX_LEAD_PAGE_TURNS &&
+  (absent(value.older) || value.turns.length > 0) &&
+  value.turns.every((one, index) => index === 0 || value.turns[index - 1].at <= one.at) &&
+  new Set(value.turns.map((one) => one.id)).size === value.turns.length;
+const leadRef = shape({ thread: (thread) => blobRef(thread) && thread.media_type === LEAD_THREAD_MEDIA_TYPE, working_since: optionalField(u64v), replied_at: optionalField(u64v) });
+
+export function readLeadThread(body) {
+  if (!leadThread(body)) throw new ProtocolError("malformed");
+  return body;
+}
+
 export function checkReview(body) {
   readReview(body);
 }
@@ -618,13 +648,14 @@ const STANDINGS = {
 };
 const standing = (value) => isPlainObject(value) && string(value.state) && Object.hasOwn(STANDINGS, value.state) && STANDINGS[value.state](value);
 const devices = (value) => isPlainObject(value) && Object.entries(value).every(([key, entry]) => prefixOf(key) === "dev" && standing(entry));
-const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started", "unknown-device", "section-changed"];
+const REASONS = ["already-settled", "head-moved", "unknown-repo", "not-allowed", "expired", "undecryptable", "bad-request", "not-approved", "denied", "unknown-item", "question-changed", "questions-open", "already-started", "unknown-device", "section-changed", "no-lead"];
 const isAddress = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}@[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
 const isLine = (max) => (value) => isText(max)(value) && !/\p{Cc}/u.test(value);
 const TARGETS = {
   task: shape({ to: string, address: isAddress }),
   item: shape({ to: string, item: isItemKey }),
   device: shape({ to: string, device: (value) => prefixOf(value) === "dev" }),
+  lead: shape({ to: string }),
 };
 const target = (value) => isPlainObject(value) && string(value.to) && Object.hasOwn(TARGETS, value.to) && TARGETS[value.to](value);
 const notice = (value) =>
@@ -653,6 +684,7 @@ const PAYLOADS = {
     accepts: optionalField(list(string)),
     devices: optionalField(devices),
     backlog: optionalField(backlog),
+    lead: optionalField(leadRef),
   }),
   notice,
   result: (value) =>
@@ -680,6 +712,8 @@ const PAYLOADS = {
   "found-dismiss": typed({ item: isFoundKey }),
   "found-keep": typed({ item: isFoundKey }),
   "review-send": typed({ address: isAddress, subtask: optionalField(isSubtaskId) }),
+  "lead-message": typed({ text: isTurnText(MAX_LEAD_MESSAGE_CHARS) }),
+  away: typed({ on: bool }),
 };
 
 export function checkPayload(payload) {

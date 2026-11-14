@@ -34,10 +34,10 @@ test("Safari in a tab asks for the Home Screen, a refusal in iOS greys the switc
 });
 
 test("categories keep the cards' order, start with everything but a start going through, and ignore a corrupt kept list", () => {
-  assert.deepEqual(CATEGORY_GROUPS.flatMap((group) => group.rows.map((row) => row.category)), ["questions", "new-device", "idea-questions", "ready", "ci-failed", "started"]);
-  assert.deepEqual(keptCategories(null), ["questions", "new-device", "idea-questions", "ready", "ci-failed"]);
+  assert.deepEqual(CATEGORY_GROUPS.flatMap((group) => group.rows.map((row) => row.category)), ["questions", "new-device", "idea-questions", "lead-answered", "ready", "ci-failed", "started"]);
+  assert.deepEqual(keptCategories(null), ["questions", "new-device", "idea-questions", "ready", "ci-failed", "lead-answered"]);
   assert.deepEqual(keptCategories(["ready", "questions"]), ["questions", "ready"]);
-  assert.deepEqual(keptCategories(["ready", "summary"]), ["questions", "new-device", "idea-questions", "ready", "ci-failed"]);
+  assert.deepEqual(keptCategories(["ready", "summary"]), ["questions", "new-device", "idea-questions", "ready", "ci-failed", "lead-answered"]);
   assert.deepEqual(withCategory(["questions", "ready"], "started", true), ["questions", "ready", "started"]);
   assert.deepEqual(withCategory(["questions", "ready"], "questions", false), ["ready"]);
 });
@@ -47,6 +47,7 @@ test("a tap opens the task, the item at its questions or the device's page", () 
   assert.equal(routeOf("mch_1", { to: "item", item: "local:retry.md" }), `/#/item/${encodeURIComponent("mch_1|local:retry.md")}`);
   assert.equal(routeOf("mch_1", { to: "item", item: "vault:Projects/retry" }), `/#/item/${encodeURIComponent("vault:Projects/retry")}`);
   assert.equal(routeOf("mch_1", { to: "device", device: "dev_1" }), "/account#device/dev_1");
+  assert.equal(routeOf("mch_1", { to: "lead" }), "/#/lead/mch_1");
   assert.equal(routeOf("mch_1", undefined), "/#/board");
 });
 

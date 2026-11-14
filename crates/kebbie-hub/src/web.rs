@@ -38,6 +38,7 @@ pub const ASSETS: &[(&str, &str, &[u8])] = &[
     asset!("/device-name.js", "web/device-name.js", JS),
     asset!("/signin.js", "web/signin.js", JS),
     asset!("/email.js", "web/email.js", JS),
+    asset!("/lead.js", "web/lead.js", JS),
     asset!("/markdown.js", "web/markdown.js", JS),
     asset!("/pages.js", "web/pages.js", JS),
     asset!("/screens.js", "web/screens.js", JS),

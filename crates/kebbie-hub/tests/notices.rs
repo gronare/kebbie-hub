@@ -686,3 +686,39 @@ async fn devices_and_notifications_close_with_the_command_switch_and_the_account
     person.use_device(laptop.0, laptop.1);
     assert_eq!(refusal_of(person.register_device().await), inactive);
 }
+
+#[tokio::test]
+async fn the_leads_answer_is_a_notice_on_by_default_even_for_a_subscription_older_than_it() {
+    let test = push_hub(|_| {}).await;
+    let mut service = PushService::start().await;
+    let (mut machine, mut person) = notifying(&test).await;
+    let secret = subscribed(&mut person, &service, "phone", &NoticeCategory::defaults()).await;
+    let wanted = |machine: &MachineState| {
+        let machine = machine.clone();
+        async move { machine.notified_devices().await.unwrap().devices[0].notifications.clone().unwrap() }
+    };
+    assert!(wanted(&machine).await.contains(&NoticeCategory::LeadAnswered));
+
+    let connection = rusqlite::Connection::open(test.hub.config().database()).unwrap();
+    connection
+        .execute(
+            r#"UPDATE push_subscriptions SET categories = '["questions","new-device","idea-questions","ready","ci-failed"]', offered = '["questions","new-device","idea-questions","ready","ci-failed","started"]'"#,
+            [],
+        )
+        .unwrap();
+    assert!(wanted(&machine).await.contains(&NoticeCategory::LeadAnswered), "a category the subscription was never offered starts at its default");
+    assert!(!wanted(&machine).await.contains(&NoticeCategory::Started));
+
+    machine.lead_replies(&format!("{MARKER} Done. email-column is at step 3 of 5."), false);
+    machine.publish_lead().await.unwrap();
+    let sent = machine.notify_lead_answered().await.unwrap();
+    assert_eq!((sent.recipients.len(), sent.pushes), (1, 1));
+    let (envelope, notice) = opened_push(&secret, &person, &service.next().await).unwrap();
+    assert_eq!((notice.category, notice.open), (NoticeCategory::LeadAnswered, Target::Lead {}));
+    assert_eq!(envelope.header.collapse.as_deref(), Some("l-lead"));
+    assert!(notice.body.starts_with(MARKER));
+
+    person.set_categories(&[NoticeCategory::Questions]).await.unwrap();
+    assert_eq!(wanted(&machine).await, [NoticeCategory::Questions], "once chosen among every category, off stays off");
+    assert_eq!(machine.notify_lead_answered().await.unwrap().recipients.len(), 0);
+}

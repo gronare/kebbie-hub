@@ -10,7 +10,7 @@ use crate::{PROTOCOL_VERSION, SCHEMA};
 const HEADER_DOMAIN: &[u8] = b"kebbie-hub envelope\0";
 pub(crate) const MAX_COLLAPSE_CHARS: usize = 64;
 const KEY_COMMIT_CHARS: usize = 43;
-/// How long an answer to kebbie's own question may wait on the hub for a machine that sleeps.
+/// How long an answer to kebbie's own question, a message to the lead or away mode may wait on the hub for a machine that sleeps.
 pub const KEPT_ANSWER_TTL: u64 = 7 * 86_400;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -39,10 +39,12 @@ pub enum Kind {
     FoundDismiss,
     FoundKeep,
     ReviewSend,
+    LeadMessage,
+    Away,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 23] = [
+    pub const ALL: [Kind; 25] = [
         Kind::Board,
         Kind::Notice,
         Kind::Result,
@@ -66,6 +68,8 @@ impl Kind {
         Kind::FoundDismiss,
         Kind::FoundKeep,
         Kind::ReviewSend,
+        Kind::LeadMessage,
+        Kind::Away,
     ];
 
     pub fn name(self) -> &'static str {
@@ -93,6 +97,8 @@ impl Kind {
             Kind::FoundDismiss => "found-dismiss",
             Kind::FoundKeep => "found-keep",
             Kind::ReviewSend => "review-send",
+            Kind::LeadMessage => "lead-message",
+            Kind::Away => "away",
         }
     }
 
@@ -119,6 +125,8 @@ impl Kind {
                 | Kind::FoundDismiss
                 | Kind::FoundKeep
                 | Kind::ReviewSend
+                | Kind::LeadMessage
+                | Kind::Away
         )
     }
 
@@ -140,6 +148,7 @@ impl Kind {
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem | Kind::FoundStart => 86_400,
+            Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
         }
     }
 
@@ -148,7 +157,7 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer => KEPT_ANSWER_TTL,
+            Kind::Answer | Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
             Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
