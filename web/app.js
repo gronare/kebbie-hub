@@ -1,14 +1,14 @@
 import { blobReader, blobSlot, failedLine, kb, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
 import { backlogList, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startedEntry, startsAnyway } from "./backlog.js";
-import { arrange, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks } from "./board.js";
+import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
-import { textHash } from "../js/protocol.js";
-import { answerBlock, answerReady, APPROVAL_STATES, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
+import { KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
+import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
@@ -21,7 +21,7 @@ import { outOfRangeScroll } from "./scroll.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, obstacleBlock, OPENABLE_STEPS, pushOrder, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, obstacleBlock, OPENABLE_STEPS, pushOrder, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -253,7 +253,11 @@ function questionBlock(found) {
     const context = [found.repo, item.summary].filter(Boolean).join(" · ");
     return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}${answerArea(found)}`;
   }
-  return promptBlock(found, promptArea(found));
+  if (item.prompt) return promptBlock(found, promptArea(found));
+  const question = item.kebbie_questions[0];
+  const context = [found.repo, item.summary].filter(Boolean).join(" · ");
+  const card = [taskFacts(item), stageList(item, nowSeconds())].filter(Boolean).join("");
+  return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${card ? `<section class="task">${card}</section>` : ""}${answerArea(found)}`;
 }
 
 function cardBlock(found, selected = null) {
@@ -266,6 +270,7 @@ function cardBlock(found, selected = null) {
   lines.push(taskFacts(item));
   if (item.next_for_you) lines.push(`<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>`);
   lines.push(obstacleBlock(item, nowSeconds()));
+  lines.push(stageList(item, nowSeconds()));
   const subtasks = subtaskList(item, { expandable: true, href: (id) => subtaskHref(found.machine, item.address, id), selected, more: uiOf(found.machine, item.address).moreSteps });
   if (subtasks) lines.push(`<h3 class="sec">Subtasks · ${item.subtasks.length}</h3>${subtasks}`);
   lines.push(reviewLines(item));
@@ -305,14 +310,19 @@ function sentFor(found, kind, question = null, prompt = null) {
 }
 
 function answerArea(found) {
-  const question = found.item.question;
+  const question = shownQuestion(found.item);
   const access = commandGate();
   if (access === "off") return optionCards(question.options, question.recommend) + machineAnswerNote();
   if (access === "refused") return optionCards(question.options, question.recommend) + refusedBlock(state.refused.url);
   if (access === "view-only") return optionCards(question.options, question.recommend) + viewOnlyBlock();
   if (!takes(found.accepts, "answer")) return optionCards(question.options, question.recommend) + notTakenBlock("answer", found.name, found.accepts);
   const { sent, state: shown, standing } = sentFor(found, "answer", question.id);
-  return decide(found, answerBlock({ key: uiKey(found.machine, found.item.address), question, ui: uiOf(found.machine, found.item.address), sent, state: shown, standing }));
+  const key = uiKey(found.machine, found.item.address);
+  const ui = uiOf(found.machine, found.item.address);
+  if (!question.kind) return decide(found, answerBlock({ key, question, ui, sent, state: shown, standing }));
+  const waits = question.kind === "verify" && shown === "done" && sent.choice === 1;
+  if (waits) return decide(found, kebbieAnswerStatus(sent, shown, { standing }) + answerBlock({ key, question, ui, sent: null, state: null, describe: kebbieAnswerStatus }));
+  return decide(found, answerBlock({ key, question, ui, sent, state: shown, standing, describe: kebbieAnswerStatus }));
 }
 
 function promptArea(found) {
@@ -343,14 +353,14 @@ function pushArea(found) {
 }
 
 function taskBody(found, selected = null) {
-  return found.item.question || found.item.prompt ? questionBlock(found) : cardBlock(found, selected);
+  return asksYou(found.item) ? questionBlock(found) : cardBlock(found, selected);
 }
 
 function taskScreen([machine, address]) {
   const back = overview() ? backButton(backHref("task", state.from)) : "";
   const found = findTask(state.opened, machine, address);
   if (!found) return shell("board", back + top("Task") + `<div class="center">This task is no longer on the board.</div>`);
-  const asks = found.item.question || found.item.prompt;
+  const asks = asksYou(found.item);
   return shell(asks ? "questions" : "board", back + top(taskName(found.item, found.task), esc(found.name)) + taskBody(found));
 }
 
@@ -908,7 +918,7 @@ function collect() {
   return collecting;
 }
 
-async function send(target, payload, meta) {
+async function send(target, payload, meta, ttl = undefined) {
   const { machine, address } = target.dataset;
   const ui = uiOf(machine, address);
   const keys = keysOf(machine);
@@ -920,7 +930,7 @@ async function send(target, payload, meta) {
     const identity = state.session.identity;
     if (state.allowed !== true) throw new CommandProblem("view-only");
     state.device = await ensureDevice({ store: deviceStore, calls: account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: state.device });
-    const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta });
+    const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta, ttl });
     state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
     await keepSent(deviceStore, identity.id, state.kept);
     state.ui.set(uiKey(machine, address), freshUi());
@@ -937,12 +947,12 @@ async function send(target, payload, meta) {
 function sendAnswer(target) {
   const { machine, address } = target.dataset;
   const found = findTask(state.opened, machine, address);
-  const question = found?.item.question;
+  const question = found ? shownQuestion(found.item) : null;
   const ui = uiOf(machine, address);
   const option = ui.free ? undefined : question?.options[ui.picked];
   if (!question || !answerReady(option, ui)) return;
   const choice = ui.free ? null : ui.picked;
-  send(target, { type: "answer", address, question: question.id, choice, comment: ui.note.trim() }, { question: question.id, choice, label: option?.label ?? null, machineName: found.name });
+  send(target, { type: "answer", address, question: question.id, choice, comment: ui.note.trim() }, { question: question.id, choice, label: option?.label ?? null, machineName: found.name }, question.kind ? KEPT_ANSWER_TTL : undefined);
 }
 
 function sendPromptAnswer(target) {
@@ -1663,7 +1673,7 @@ root.addEventListener("input", (event) => {
   const ui = uiOf(decided.dataset.machine, decided.dataset.address);
   ui.note = field.value;
   const found = findTask(state.opened, decided.dataset.machine, decided.dataset.address);
-  const option = ui.free ? undefined : found?.item.question?.options[ui.picked];
+  const option = ui.free ? undefined : (found ? shownQuestion(found.item) : null)?.options[ui.picked];
   const button = decided.querySelector('[data-action="answer"]');
   if (button) button.disabled = ui.busy || !answerReady(option, ui);
 });

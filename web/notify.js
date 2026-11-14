@@ -89,7 +89,7 @@ export function isSettled(data, opened) {
     return data.category === "idea-questions" ? !row || row.questions === 0 : false;
   }
   const item = board.items?.find((one) => one.address === open.address);
-  if (data.category === "questions") return !item || (!item.question && !item.prompt);
+  if (data.category === "questions") return !item || (!item.question && !item.prompt && !item.kebbie_questions?.length);
   if (data.category === "ready") return !item || item.group !== "READY TO PUSH";
   if (data.category === "ci-failed") return !item || item.ci?.state !== "failed";
   return false;

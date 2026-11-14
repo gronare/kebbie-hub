@@ -90,6 +90,19 @@ export function answerStatus(sent, state, { standing = null, now = Math.floor(Da
   return block("wait", `Sent to ${machine}`, `Your answer ${said} is on its way to the task.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
 }
 
+const day = (seconds) => new Date(seconds * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+export function kebbieAnswerStatus(sent, state, { standing = null, now = Math.floor(Date.now() / 1000) } = {}) {
+  const machine = esc(sent.machineName);
+  const said = sent.label ? `"${esc(sent.label)}"` : "your answer";
+  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing, now, what: { goes: `Your answer ${said} goes to kebbie`, again: "answer again" } });
+  if (state === "done") return block("done", `✓ Answered: ${esc(sent.label ?? "your own answer")}`, esc(sent.result.text), `${from(sent)}${approvedAt(sent, standing)}`);
+  if (state === "refused") return block("refused", ...refusal("Not answered", sent.result.text), from(sent));
+  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep for a week`, `Answer again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(day(sent.exp))}`);
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `The hub keeps your answer ${said} until ${machine} wakes up.`, `Sent ${from(sent)} · kept until ${esc(day(sent.exp))}`);
+  return block("wait", `Sent to ${machine}`, `Your answer ${said} is on its way to kebbie.`, `Sent ${from(sent)} · kept until ${esc(day(sent.exp))}`);
+}
+
 export function pushStatus(sent, state, { standing = null, now = Math.floor(Date.now() / 1000) } = {}) {
   const machine = esc(sent.machineName);
   const sha = esc(sent.short);
@@ -156,13 +169,13 @@ export function answerReady(option, ui) {
   return option !== undefined && (!noteNeeded(option) || ui.note.trim() !== "");
 }
 
-export function answerBlock({ key, question, ui, sent, state, standing = null }) {
+export function answerBlock({ key, question, ui, sent, state, standing = null, describe = answerStatus }) {
   const live = sent && !settled(state);
   const picked = live ? (sent.choice ?? null) : ui.picked;
   const chosen = live || picked !== null || ui.free;
   const cards = question.options.map((option, index) => optionCard(option, index, { recommend: question.recommend, picked, pickable: !live && !ui.busy }));
   const options = `<div class="options${chosen ? " chosen" : ""}">${cards.join("")}</div>`;
-  const status = sent ? answerStatus(sent, state, { standing }) : "";
+  const status = sent ? describe(sent, state, { standing }) : "";
   if (live) return options + status;
   const error = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
   const busy = ui.busy ? " disabled" : "";
@@ -185,6 +198,12 @@ export function pushReady(item) {
 
 export const pushHead = (item) => item.pushable?.through ?? item.head;
 export const pushCount = (item) => item.pushable?.count ?? item.git?.ahead ?? 0;
+const HELD_UNTIL = { deploy: "has deployed", check: "passes its check", verified: "is verified" };
+export function pushStage(item) {
+  const last = item.pushable ? item.order?.[item.pushable.count - 1] : null;
+  const at = (item.stages ?? []).findIndex((stage) => stage.id === last?.stage);
+  return at < 0 ? null : { number: at + 1, stage: item.stages[at], next: item.stages[at + 1] ?? null };
+}
 
 export function pushBlock({ item, machineName, ui, sent, state, standing = null }) {
   const head = pushHead(item);
@@ -192,17 +211,18 @@ export function pushBlock({ item, machineName, ui, sent, state, standing = null 
   const commits = pushCount(item);
   const count = `${commits} ${commits === 1 ? "commit" : "commits"}`;
   const part = head !== item.head;
+  const staged = pushStage(item);
   const live = sent && !settled(state);
   const status = sent ? pushStatus(sent, state, { standing }) : "";
   if (live || (part && state === "done")) return status;
   const error = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
   if (ui.confirming) {
     const reviewed = !part && item.verdict?.verdict === "ok" && !item.verdict.stale ? ", reviewer passed" : "";
-    const rest = part ? " from the top of the push order; the rest stay here" : "";
+    const rest = staged ? ` of stage ${staged.number}, ${esc(staged.stage.title)}${staged.next ? `; stage ${staged.number + 1} stays locked until this one ${HELD_UNTIL[staged.stage.requirement.kind]}` : ""}` : part ? " from the top of the push order; the rest stay here" : "";
     const busy = ui.busy ? " disabled" : "";
     return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push ${esc(count)} · ${esc(short)} to main?</b></p><p>${esc(count)}${rest}${reviewed}. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push"${busy}>Push</button></div></div>` + error;
   }
-  return status + `<button type="button" class="btn primary" data-action="push-ask">Push ${esc(count)} · ${esc(short)}</button>` + error;
+  return status + `<button type="button" class="btn primary" data-action="push-ask">Push ${esc(count)} · ${staged ? `stage ${esc(staged.number)}` : esc(short)}</button>` + error;
 }
 
 export function refusedBlock(url) {

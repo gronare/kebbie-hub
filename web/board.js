@@ -84,6 +84,8 @@ export async function openBoards(listing, identity, now, marks = emptyMarks()) {
 export const isAsleep = (machine, now) => machine.lastSeen === null || now - machine.lastSeen > SLEEP_AFTER;
 
 export const acceptRequired = (item) => item.require_accept === true;
+export const asksYou = (item) => Boolean(item?.question || item?.prompt || item?.kebbie_questions?.length);
+export const shownQuestion = (item) => item.question ?? (item.prompt ? null : (item.kebbie_questions?.[0] ?? null));
 
 export const toAccept = (item) => (acceptRequired(item) ? (item.subtasks ?? []).filter((subtask) => subtask.state === "ready").length : 0);
 
@@ -108,7 +110,7 @@ export function arrange(opened, now) {
     .filter((machine) => machine.expired || (machine.board && isAsleep(machine, now)))
     .map((machine) => ({ machine: machine.machine, name: machine.name, lastSeen: machine.lastSeen ?? machine.storedAt, working: machine.board ? machine.board.items.filter((item) => item.group === "WORKING").length : null }));
   const problems = opened.filter((machine) => machine.problem).map(({ machine, name, problem }) => ({ machine, name, problem }));
-  const questions = rows.filter((row) => row.item.question || row.item.prompt).sort(byUrgency);
+  const questions = rows.filter((row) => asksYou(row.item)).sort(byUrgency);
   const waiting = rows.reduce((sum, row) => sum + toAccept(row.item), 0);
   const next = awake.filter((machine) => Array.isArray(machine.board.next)).map(nextOf);
   const set = awake.flatMap((machine) => (machine.board.later ?? []).map((later) => ({ machine: machine.machine, name: machine.name, later, ...splitAddress(later.address) })));

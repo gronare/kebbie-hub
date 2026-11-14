@@ -177,6 +177,13 @@ mod tests {
     use crate::message::Outcome;
 
     #[test]
+    fn no_command_outlives_the_week_its_result_is_kept_to_refuse_a_replay() {
+        assert!(crate::Kind::ALL.iter().filter(|kind| kind.is_command()).all(|kind| kind.max_ttl() <= AppliedCommands::KEEP_SECONDS));
+        assert_eq!((crate::Kind::Answer.default_ttl(), crate::Kind::Answer.max_ttl()), (3_600, crate::KEPT_ANSWER_TTL), "an answer to kebbie's own question waits a week for a machine that sleeps");
+        assert_eq!(crate::KEPT_ANSWER_TTL, AppliedCommands::KEEP_SECONDS);
+    }
+
+    #[test]
     fn applied_commands_replay_per_device_and_forget_after_a_week() {
         let mut applied = AppliedCommands::default();
         let phone = Id::ulid(Prefix::Device, 1, [1; 10]).unwrap();

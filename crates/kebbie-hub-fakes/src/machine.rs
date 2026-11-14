@@ -15,6 +15,7 @@ use kebbie_hub_protocol::{
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, AcceptSubtask, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
     FoundAdd, FoundDismiss, FoundStart, PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState, pushable_of,
+    Answer, KebbieQuestionKind, MAX_STAGE_NOTE_CHARS, StageState, unlock_stages,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -773,9 +774,59 @@ impl MachineState {
         for row in item.order.iter_mut().flatten().filter(|row| commits.contains(&row.sha)) {
             row.accepted = true;
         }
-        item.pushable = item.order.as_deref().and_then(pushable_of);
+        item.pushable = item.order.as_deref().and_then(|order| pushable_of(order, item.stages.as_deref().unwrap_or_default()));
         self.board_changed = true;
         Ok(format!("Accepted {title} of {}.", accept.address))
+    }
+
+    fn asked_by_kebbie(&self, answer: &Answer) -> bool {
+        self.board.iter().flat_map(|board| &board.items).filter(|item| item.address == answer.address).flat_map(|item| item.kebbie_questions.iter().flatten()).any(|question| question.id == answer.question)
+    }
+
+    fn answer_kebbie(&mut self, answer: &Answer) -> Result<String, Reason> {
+        let item = self.board.as_mut().and_then(|board| board.items.iter_mut().find(|item| item.address == answer.address)).ok_or(Reason::UnknownItem)?;
+        let questions = item.kebbie_questions.as_mut().ok_or(Reason::QuestionChanged)?;
+        let index = questions.iter().position(|question| question.id == answer.question).ok_or(Reason::QuestionChanged)?;
+        let question = questions[index].clone();
+        let settled = question.kind == KebbieQuestionKind::Close || answer.choice != Some(1);
+        if settled {
+            questions.remove(index);
+        }
+        if questions.is_empty() {
+            item.kebbie_questions = None;
+        }
+        self.board_changed = true;
+        if question.kind == KebbieQuestionKind::Close {
+            if answer.choice == Some(0) {
+                let address = item.address.clone();
+                self.board.as_mut().expect("the item was on the board").items.retain(|item| item.address != address);
+                return Ok(format!("Closed {address}."));
+            }
+            return Ok(format!("{} stays open.", answer.address));
+        }
+        let Some(stage) = question.stage.as_deref().and_then(|id| item.stages.iter_mut().flatten().find(|stage| stage.id == id)) else {
+            return Ok(format!("Told {} what you saw.", answer.address));
+        };
+        let title = stage.title.clone();
+        match answer.choice {
+            Some(0) => {
+                stage.state = StageState::Met;
+                stage.met_at = Some(now());
+                stage.note = None;
+            }
+            Some(1) => return Ok(format!("{title} waits on your verification.")),
+            _ => {
+                stage.state = StageState::Failed;
+                stage.note = answer.comment.lines().next().map(|line| line.chars().take(MAX_STAGE_NOTE_CHARS).collect()).filter(|line: &String| !line.trim().is_empty());
+            }
+        }
+        let stages = item.stages.as_mut().expect("the stage is the item's");
+        unlock_stages(stages);
+        item.pushable = item.order.as_deref().and_then(|order| pushable_of(order, stages));
+        Ok(match answer.choice {
+            Some(0) => format!("Verified {title} of {}.", answer.address),
+            _ => format!("Told {} that {title} is wrong.", answer.address),
+        })
     }
 
     fn push_text(&self, push: &PushApproval) -> (String, String) {
@@ -1002,6 +1053,10 @@ impl MachineState {
             blob: None,
         };
         match payload {
+            Payload::Answer(answer) if self.asked_by_kebbie(answer) => (
+                format!("answer kebbie's question {} on {} with {}", answer.question, answer.address, answer.choice.map_or_else(|| format!("{:?}", answer.comment), |choice| format!("choice {choice}"))),
+                self.answer_kebbie(answer).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
             Payload::Answer(answer) => {
                 let choice = match answer.choice {
                     Some(choice) => format!("choice {choice}"),
@@ -1275,6 +1330,8 @@ fn started_task(address: &str, title: &str) -> Item {
         pushable: None,
         require_accept: None,
         obstacle: None,
+        stages: None,
+        kebbie_questions: None,
         title: Some(title.to_string()),
         profile: None,
         recipe: Some("small-fix".to_string()),

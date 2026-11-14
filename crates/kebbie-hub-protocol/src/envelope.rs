@@ -10,6 +10,8 @@ use crate::{PROTOCOL_VERSION, SCHEMA};
 const HEADER_DOMAIN: &[u8] = b"kebbie-hub envelope\0";
 pub(crate) const MAX_COLLAPSE_CHARS: usize = 64;
 const KEY_COMMIT_CHARS: usize = 43;
+/// How long an answer to kebbie's own question may wait on the hub for a machine that sleeps.
+pub const KEPT_ANSWER_TTL: u64 = 7 * 86_400;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -38,6 +40,30 @@ pub enum Kind {
 }
 
 impl Kind {
+    pub const ALL: [Kind; 21] = [
+        Kind::Board,
+        Kind::Notice,
+        Kind::Result,
+        Kind::Answer,
+        Kind::Push,
+        Kind::Start,
+        Kind::Routine,
+        Kind::PromptAnswer,
+        Kind::Idea,
+        Kind::ItemAnswer,
+        Kind::StartItem,
+        Kind::ItemEdit,
+        Kind::DeviceDecision,
+        Kind::ReviewOpen,
+        Kind::ReviewComments,
+        Kind::ReviewRead,
+        Kind::AcceptStep,
+        Kind::AcceptSubtask,
+        Kind::FoundStart,
+        Kind::FoundAdd,
+        Kind::FoundDismiss,
+    ];
+
     pub fn name(self) -> &'static str {
         match self {
             Kind::Board => "board",
@@ -114,7 +140,8 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
+            Kind::Answer => KEPT_ANSWER_TTL,
+            Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss => 3_600,

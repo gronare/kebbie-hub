@@ -32,6 +32,7 @@ export const CLOCK_SKEW = 300;
 export const COMMAND_TTL = 3600;
 export const PROMPT_ANSWER_TTL = 600;
 export const START_ITEM_TTL = DAY;
+export const KEPT_ANSWER_TTL = 7 * DAY;
 export const MAX_IDEA_CHARS = 2000;
 export const MAX_ITEM_ANSWER_CHARS = 2000;
 export const MAX_QUESTION_CHARS = 4000;
@@ -63,7 +64,7 @@ export const KINDS = {
   board: { prefix: "brd", maxTtl: DAY, command: false },
   notice: { prefix: "ntc", maxTtl: DAY, command: false },
   result: { prefix: "cmd", maxTtl: 7 * DAY, command: false },
-  answer: command,
+  answer: { ...command, maxTtl: KEPT_ANSWER_TTL },
   push: command,
   start: command,
   routine: command,
@@ -225,7 +226,37 @@ const subtask = shape({ id: isSubtaskId, title: string, state: oneOf(...SUBTASK_
 export const MAX_MOVED_REASON_CHARS = 500;
 const commitTests = (value) => shape({ state: oneOf("passed", "failed", "running", "not-run"), at: optionalField(u64v) })(value) && (value.state !== "not-run" || absent(value.at));
 const moved = (value) => shape({ from: u32v, reason: string })(value) && value.from >= 1 && isLine(MAX_MOVED_REASON_CHARS)(value.reason);
-const orderRow = shape({ sha: string, subject: string, subtask: string, accepted: optionalField(bool), group: optionalField(isSubtaskId), tests: optionalField(commitTests), moved: optionalField(moved) });
+const orderRow = shape({ sha: string, subject: string, subtask: string, accepted: optionalField(bool), group: optionalField(isSubtaskId), tests: optionalField(commitTests), moved: optionalField(moved), stage: optionalField(string) });
+export const MAX_STAGES = 16;
+export const MAX_STAGE_TITLE_CHARS = 200;
+export const MAX_STAGE_DETAIL_CHARS = 500;
+export const MAX_STAGE_NOTE_CHARS = 500;
+export const MAX_KEBBIE_QUESTIONS = 4;
+export const MAX_KEBBIE_QUESTION_ID_CHARS = 64;
+export const MAX_KEBBIE_QUESTION_CHARS = 2000;
+export const MAX_MEANING_CHARS = 300;
+export const VERIFY_OPTIONS = ["Verified", "Not yet", "Something is wrong"];
+export const CLOSE_OPTIONS = ["Close", "Not yet"];
+const PUSHED_STAGES = ["pushed", "waiting", "met", "failed"];
+const stage = (value) =>
+  shape({ id: isSubtaskId, title: string, state: oneOf("locked", "open", ...PUSHED_STAGES), requirement: shape({ kind: oneOf("deploy", "check", "verified"), detail: optionalField(string) }), through: optionalField(string), pushed_at: optionalField(u64v), met_at: optionalField(u64v), note: optionalField(string) })(value) &&
+  isLine(MAX_STAGE_TITLE_CHARS)(value.title) &&
+  (value.requirement.kind === "deploy" ? absent(value.requirement.detail) : isLine(MAX_STAGE_DETAIL_CHARS)(value.requirement.detail)) &&
+  (absent(value.through) || isFullSha(value.through)) &&
+  absent(value.through) === absent(value.pushed_at) &&
+  PUSHED_STAGES.includes(value.state) === !absent(value.through) &&
+  (value.state === "met") === !absent(value.met_at) &&
+  (absent(value.note) || isLine(MAX_STAGE_NOTE_CHARS)(value.note));
+const KEBBIE_ANSWERS = { verify: VERIFY_OPTIONS, close: CLOSE_OPTIONS };
+const takesComment = (kind, index) => kind === "verify" && index === 2;
+const kebbieQuestion = (value) =>
+  shape({ id: string, kind: oneOf("verify", "close"), text: string, options: list(shape({ label: string, meaning: string, comment: optionalField(bool) })), stage: optionalField(string), at: u64v })(value) &&
+  new RegExp(`^[A-Za-z0-9_-]{1,${MAX_KEBBIE_QUESTION_ID_CHARS}}$`).test(value.id) &&
+  isText(MAX_KEBBIE_QUESTION_CHARS)(value.text) &&
+  !/[^\P{Cc}\n]/u.test(value.text) &&
+  value.options.length === KEBBIE_ANSWERS[value.kind].length &&
+  value.options.every((option, index) => option.label === KEBBIE_ANSWERS[value.kind][index] && (option.comment === true) === takesComment(value.kind, index) && isLine(MAX_MEANING_CHARS)(option.meaning)) &&
+  (absent(value.stage) || value.kind === "verify");
 const pushable = shape({ count: u32v, through: string, subtasks: list(string) });
 const obstacleText = (value) => isText(MAX_OBSTACLE_CHARS)(value) && !/[^\P{Cc}\n]/u.test(value);
 const obstacleDecision = shape({ kind: oneOf("workaround", "subtask", "task", "ask"), by: oneOf("investigator", "lead", "you"), text: obstacleText });
@@ -237,7 +268,7 @@ const boardStep = shape({ number: (value) => u32v(value) && value >= 1, title: s
 const boardSteps = (value) => shape({ pushed: u32v, items: list(boardStep), required: optionalField(bool) })(value) && value.items.every((step) => absent(step.commits) || absent(step.sha));
 const reviewOffer = (value) => shape({ subtask: optionalField(isSubtaskId), step: optionalField((step) => u32v(step) && step >= 1), files: u32v })(value) && (absent(value.subtask) || absent(value.step));
 const runOf = (order, count) => [...new Set(order.slice(0, count).map((row) => row.subtask))];
-const PLAN_KEYS = ["subtasks", "order", "pushable", "require_accept"];
+const PLAN_KEYS = ["subtasks", "order", "pushable", "require_accept", "stages"];
 function subtasksOf(steps) {
   const commitsOf = (step) => step.commits ?? (absent(step.sha) ? [] : [{ sha: step.sha, subject: step.title }]);
   const subtasks = steps.items.map((step) => {
@@ -255,8 +286,9 @@ const splitsAGroup = (order, count) => {
   const inRun = new Set(order.slice(0, count).map((row) => row.group).filter((group) => !absent(group)));
   return order.slice(count).some((row) => inRun.has(row.group));
 };
-export function pushableOf(order) {
-  let count = order.findIndex((row) => row.accepted !== true);
+const opens = (stages, id) => absent(id) || stages.slice(0, Math.max(0, stages.findIndex((one) => one.id === id))).every((one) => one.state === "met");
+export function pushableOf(order, stages = []) {
+  let count = order.findIndex((row) => row.accepted !== true || !opens(stages, row.stage));
   if (count === -1) count = order.length;
   while (count > 0 && splitsAGroup(order, count)) count -= 1;
   return count === 0 ? null : { count, through: order[count - 1].sha, subtasks: runOf(order, count) };
@@ -318,9 +350,41 @@ function planHolds(item) {
   if (absent(item.pushable)) return true;
   const { count, through, subtasks } = item.pushable;
   const run = runOf(order, count);
-  return count >= 1 && count <= order.length && order[count - 1].sha === through && run.length === subtasks.length && run.every((id, index) => subtasks[index] === id) && order.slice(0, count).every((row) => row.accepted) && !splitsAGroup(order, count);
+  const stages = item.stages ?? [];
+  return count >= 1 && count <= order.length && order[count - 1].sha === through && run.length === subtasks.length && run.every((id, index) => subtasks[index] === id) && order.slice(0, count).every((row) => row.accepted && opens(stages, row.stage)) && !splitsAGroup(order, count);
 }
-const itemHolds = (raw) => (absent(raw.steps) || PLAN_KEYS.every((key) => absent(raw[key]))) && planHolds(itemOf(raw));
+function stagesHold(item) {
+  const order = item.order ?? [];
+  if (absent(item.stages)) return order.every((row) => absent(row.stage));
+  const stages = item.stages;
+  if (absent(item.subtasks) || stages.length < 1 || stages.length > MAX_STAGES || new Set(stages.map((one) => one.id)).size !== stages.length) return false;
+  const lockedRight = stages.every((one, index) => !absent(one.through) || stages.slice(0, index).some((earlier) => earlier.state !== "met") === (one.state === "locked"));
+  if (!lockedRight) return false;
+  const place = (id) => stages.findIndex((one) => one.id === id);
+  const ofSubtask = new Map();
+  const ofGroup = new Map();
+  let last = 0;
+  for (const row of order) {
+    const at = absent(row.stage) ? -1 : place(row.stage);
+    if (at < last) return false;
+    last = at;
+    if ((ofSubtask.get(row.subtask) ?? row.stage) !== row.stage) return false;
+    ofSubtask.set(row.subtask, row.stage);
+    if (!absent(row.group)) {
+      if ((ofGroup.get(row.group) ?? row.stage) !== row.stage) return false;
+      ofGroup.set(row.group, row.stage);
+    }
+  }
+  return true;
+}
+function questionsHold(item) {
+  if (absent(item.kebbie_questions)) return true;
+  const questions = item.kebbie_questions;
+  const ids = [...(absent(item.question) ? [] : [item.question.id]), ...questions.map((one) => one.id)];
+  const waits = (id) => (item.stages ?? []).some((one) => one.id === id && one.requirement.kind === "verified" && one.state === "waiting");
+  return questions.length <= MAX_KEBBIE_QUESTIONS && new Set(ids).size === ids.length && questions.every((one) => absent(one.stage) || waits(one.stage));
+}
+const itemHolds = (raw) => (absent(raw.steps) || PLAN_KEYS.every((key) => absent(raw[key]))) && planHolds(itemOf(raw)) && stagesHold(raw) && questionsHold(raw);
 const item = shape({
   address: string,
   group: oneOf("NEEDS YOU", "WORKING", "TO REVIEW", "READY TO PUSH", "CI RUNNING", "WAITING FOR WORK"),
@@ -357,6 +421,8 @@ const item = shape({
   pushable: optionalField(pushable),
   require_accept: optionalField(bool),
   obstacle: optionalField(obstacle),
+  stages: optionalField(list(stage)),
+  kebbie_questions: optionalField(list(kebbieQuestion)),
   steps: optionalField(boardSteps),
   title: optionalField(string),
   profile: optionalField(string),
@@ -921,10 +987,11 @@ export function commandId(millis = Date.now(), randomBytes = random(10)) {
   return `cmd_${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function sealCommand({ device, account, machine, payload, at, id = commandId(at * 1000) }) {
+export async function sealCommand({ device, account, machine, payload, at, id = commandId(at * 1000), ttl = KINDS[payload.type].ttl }) {
   checkPayload(payload);
+  if (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > KINDS[payload.type].maxTtl) throw new ProtocolError("ttl");
   if (device.cert.device !== device.id || !(await verifyDeviceCert(account, device.cert))) throw new ProtocolError("cert-mismatch");
-  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: device.id, machine: machine.id, at, exp: at + KINDS[payload.type].ttl, schema: SCHEMA, cert: structuredClone(device.cert) };
+  const header = { v: PROTOCOL_VERSION, id, kind: payload.type, from: device.id, machine: machine.id, at, exp: at + ttl, schema: SCHEMA, cert: structuredClone(device.cert) };
   const recipients = [{ id: machine.id, encryption: machine.keys.encryption }, { id: account.account, encryption: account.keys.encryption }];
   return sealEnvelope(header, text.encode(JSON.stringify(payload)), device, recipients);
 }

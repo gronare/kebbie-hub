@@ -93,10 +93,10 @@ export async function ensureDevice({ store, calls, identity, name, now, kept = u
   return device;
 }
 
-export async function sendCommand({ calls, identity, device, allowed, machine, payload, at, meta = {} }) {
+export async function sendCommand({ calls, identity, device, allowed, machine, payload, at, meta = {}, ttl = undefined }) {
   if (allowed !== true) throw new CommandProblem("view-only");
   if (!device) throw new CommandProblem("no-device");
-  const envelope = await sealCommand({ device, account: identity.key, machine, payload, at });
+  const envelope = await sealCommand({ device, account: identity.key, machine, payload, at, ttl });
   await calls.command(envelope);
   return { id: envelope.id, kind: payload.type, machine: machine.id, address: payload.address, at, exp: envelope.exp, device: device.id, deviceName: device.cert.name, ...meta, result: null };
 }

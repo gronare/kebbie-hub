@@ -110,7 +110,7 @@ async fn accepting_a_subtask_accepts_each_of_its_commits_and_the_run_stops_befor
     let building = item.subtasks.iter_mut().flatten().find(|subtask| subtask.id == "board-retries").unwrap();
     building.commits.push(later.clone());
     let order = item.order.as_mut().unwrap();
-    order.push(OrderRow { sha: later, subject: "Show a retry on the board".into(), subtask: "board-retries".into(), accepted: false, group: Some("retry-board".into()), tests: None, moved: None });
+    order.push(OrderRow { sha: later, subject: "Show a retry on the board".into(), subtask: "board-retries".into(), accepted: false, group: Some("retry-board".into()), tests: None, moved: None, stage: None });
     order[1].group = Some("retry-board".into());
     order[0].accepted = true;
     let first = order[0].sha.clone();

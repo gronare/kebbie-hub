@@ -1,4 +1,4 @@
-import { acceptRequired } from "./board.js";
+import { acceptRequired, asksYou } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
 
@@ -42,6 +42,7 @@ export const OPENABLE_STEPS = ["ready", "accepted"];
 const SHOWN_PLANNED = 2;
 const CHEV_RIGHT = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
 const CHEV_DOWN = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>`;
+const LOCK = `<svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 const CHEV_UP = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-5 5 5"/></svg>`;
 
 export function waited(seconds) {
@@ -67,7 +68,7 @@ const NEXT_PARTS = [
   { key: "read", title: "To read" },
 ];
 const NEXT_ICONS = { push: "↑", read: "◆" };
-const nextIcon = (row) => NEXT_ICONS[row.part] ?? (row.item?.question || row.item?.prompt ? "?" : "!");
+const nextIcon = (row) => NEXT_ICONS[row.part] ?? (asksYou(row.item) ? "?" : "!");
 
 export function countsLine(counts) {
   if (!counts) return "";
@@ -180,6 +181,14 @@ const dim = (html) => `<span class="dim">${html}</span>`;
 export const runCount = (item) => item.pushable?.count ?? 0;
 export const pushedCount = (item) => Math.max(0, (item.subtasks ?? []).reduce((sum, one) => sum + one.commits.length, 0) - (item.order ?? []).length);
 
+const stageAt = (item, id) => (item.stages ?? []).findIndex((stage) => stage.id === id);
+export function heldBy(item, row) {
+  const at = stageAt(item, row?.stage);
+  return at < 0 ? null : (item.stages.slice(0, at).find((stage) => stage.state !== "met") ?? null);
+}
+const stageName = (item, stage) => `stage ${stageAt(item, stage.id) + 1}`;
+const HOLD_VERB = { deploy: "has deployed", check: "passes its check", verified: "is verified" };
+
 export function blockerOf(item) {
   const row = (item.order ?? []).slice(runCount(item)).find((one) => !one.accepted);
   const owner = row ? item.subtasks?.find((one) => one.id === row.subtask) : null;
@@ -211,6 +220,8 @@ export function subtaskLabel(item, subtask) {
   if (inRun(item, subtask)) return "accepted · ready to push";
   const blocker = blockerOf(item);
   const waiting = (item.order ?? []).some((row) => row.subtask === subtask.id);
+  const held = heldBy(item, rowsOf(item, subtask)[0]);
+  if (waiting && held) return `accepted ${dim(`· waits for ${esc(stageName(item, held))}`)}`;
   return waiting && blocker ? `accepted ${dim(`· waits for ${esc(blocker.title)}`)}` : "accepted";
 }
 
@@ -254,6 +265,8 @@ function orderLabel(item, row, index) {
   const order = item.order ?? [];
   const count = runCount(item);
   const blocking = order.findIndex((one, at) => at >= count && !one.accepted);
+  const held = heldBy(item, row);
+  if (row.accepted && index >= count && held) return `${title} ${dim(`· waits for ${esc(stageName(item, held))}`)}`;
   if (row.accepted && index >= count && blocking >= 0) return `${title} ${dim(`· waits for no. ${blocking + 1}`)}`;
   if (row.accepted) return owner?.state === "accepted" ? title : `${title} · accepted`;
   if (owner?.state === "ready") return `${title} · to review`;
@@ -267,9 +280,16 @@ function orderRow(item, row, index) {
   return `<div class="step s-${esc(state)}"><span class="what"><span class="mark">${STEP_MARKS[state] ?? ""}</span><span class="number">${index + 1}</span><span class="tt"><span class="step-title">${esc(row.subject)}</span><span class="label">${orderLabel(item, row, index)}${testsMark(row.tests)}</span>${moved}</span></span><span class="mono meta">${esc(row.sha.slice(0, 7))}</span></div>`;
 }
 
+function stageHead(item, row) {
+  const stage = (item.stages ?? [])[stageAt(item, row.stage)];
+  return stage ? `<div class="stage-h">${esc(stageName(item, stage))} · ${esc(stage.title)}${stage.state === "locked" ? ` ${LOCK}` : ""}</div>` : "";
+}
+
 function orderRows(item, rows, from) {
   const html = [];
   for (let at = 0; at < rows.length; ) {
+    const before = at === 0 ? item.order[from - 1] : rows[at - 1];
+    if (rows[at].stage && rows[at].stage !== before?.stage) html.push(stageHead(item, rows[at]));
     const group = rows[at].group;
     let end = at + 1;
     while (group && end < rows.length && rows[end].group === group) end += 1;
@@ -307,6 +327,58 @@ export function obstacleBlock(item, now = Date.now() / 1000) {
   return `<h3 class="sec">Obstacle</h3><div class="obs">${said}${verdict}${change}</div>`;
 }
 
+const at = (seconds, now) => {
+  const date = new Date(seconds * 1000);
+  const time = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return date.toDateString() === new Date(now * 1000).toDateString() ? time : `${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
+};
+const MET = { deploy: "✓ deploy succeeded", check: "✓ check passed", verified: "✓ verified by you" };
+const WAITS = { deploy: "deploy", check: "check", verified: "verified by you" };
+const FAILED = { deploy: "✕ deploy failed", check: "✕ check failed", verified: "✕ something is wrong" };
+const STAGE_MARKS = { open: "→", pushed: "↑", waiting: "?", met: "↑", failed: "!" };
+
+export function stageLabel(item, stage, now = Date.now() / 1000) {
+  const kind = stage.requirement.kind;
+  const commits = (item.order ?? []).filter((row) => row.stage === stage.id).length;
+  const left = commits ? plural(commits, "commit", "commits") : "";
+  const pushed = stage.pushed_at ? `pushed ${at(stage.pushed_at, now)}` : "";
+  const detail = kind === "check" ? `: ${stage.requirement.detail}` : "";
+  if (stage.state === "locked") {
+    const held = item.stages.slice(0, stageAt(item, stage.id)).find((one) => one.state !== "met");
+    return esc([`locked until ${stageName(item, held)} ${HOLD_VERB[held.requirement.kind]}`, left].filter(Boolean).join(" · "));
+  }
+  if (stage.state === "open") return esc(["open", left ? `${left} to push` : ""].filter(Boolean).join(" · "));
+  if (stage.state === "met") return `${esc([pushed, left ? `${left} more` : ""].filter(Boolean).join(" · "))} · <span class="ok">${esc(MET[kind])}</span>`;
+  if (stage.state === "failed") return `${esc(pushed)} · <span class="warn">${esc(FAILED[kind])}</span>`;
+  if (stage.state === "waiting") return esc(`${pushed} · waiting: ${WAITS[kind]}${detail}`);
+  return esc(`${pushed} · next: ${WAITS[kind]}${detail}`);
+}
+
+export function stageList(item, now = Date.now() / 1000) {
+  const stages = item.stages ?? [];
+  if (!stages.length) return "";
+  const rows = stages.map((stage, index) => {
+    const mark = stage.state === "locked" ? LOCK : esc(STAGE_MARKS[stage.state] ?? "");
+    const note = stage.note ? `<span class="note${stage.state === "failed" ? " warn" : ""}">${esc(stage.note)}</span>` : "";
+    return `<div class="step st-${esc(stage.state)}"><span class="what"><span class="mark">${mark}</span><span class="number">${index + 1}</span><span class="tt"><span class="step-title">${esc(stage.title)}</span><span class="label">${stageLabel(item, stage, now)}</span>${note}</span></span></div>`;
+  });
+  return `<h3 class="sec">Stages · ${esc(stages.length)}</h3><div class="steps go stages">${rows.join("")}</div>`;
+}
+
+export function stageLine(item) {
+  const stages = item.stages ?? [];
+  const last = stages.findLastIndex((stage) => stage.through);
+  const stage = stages[last];
+  const next = stages[last + 1];
+  if (!stage) return stages[0]?.state === "open" ? "stage 1 open" : "";
+  const name = `stage ${last + 1}`;
+  if (stage.state === "waiting") return `<span class="accept">${esc(name)} waits: ${esc(WAITS[stage.requirement.kind])}</span>`;
+  if (stage.state === "failed") return `<span class="warn">${esc(name)}: ${esc(FAILED[stage.requirement.kind])}</span>`;
+  if (stage.state === "met" && next) return `<span class="ok">✓ ${esc(name)} done</span> · stage ${esc(last + 2)} ${next.state === "open" ? "open" : "locked"}`;
+  if (stage.state === "met") return `<span class="ok">✓ every stage done</span>`;
+  return `${esc(name)} pushed`;
+}
+
 export function stepSummary(item) {
   const subtasks = item.subtasks ?? [];
   const of = (...states) => subtasks.filter((one) => states.includes(one.state)).length;
@@ -317,13 +389,17 @@ export function stepSummary(item) {
   if (ready) parts.push(`<span class="accept">◆ ${accepted ? `${esc(ready)} to review` : `${esc(ready)} of ${esc(total)} subtasks to review`}</span>`);
   if (building) parts.push(`<span class="prog">${esc(building)} in progress</span>`);
   if (total && !ready && !building && pushedCount(item)) parts.push(`↑ ${esc(plural(pushedCount(item), "commit", "commits"))} pushed`);
+  const stage = stageLine(item);
+  if (stage) parts.push(stage);
   if (OBSTACLE_WORDS[item.obstacle?.state]) parts.push(`<span class="warn">${OBSTACLE_WORDS[item.obstacle.state]}</span>`);
   return parts.length ? `<div class="step-line">${parts.join(" · ")}</div>` : "";
 }
 
 export function stepsWanted(item, machineName) {
   const ready = (item.subtasks ?? []).find((one) => one.state === "ready");
-  const asks = [runCount(item) ? `push ${plural(runCount(item), "commit", "commits")}` : "", ready ? `review ${ready.title}` : ""].filter(Boolean);
+  const kebbie = item.kebbie_questions?.[0];
+  const verify = kebbie?.stage ? `verify ${stageName(item, item.stages[stageAt(item, kebbie.stage)])}` : kebbie?.kind === "verify" ? "verify a check" : kebbie ? "close the task" : "";
+  const asks = [verify, runCount(item) ? `push ${plural(runCount(item), "commit", "commits")}` : "", ready ? `review ${ready.title}` : ""].filter(Boolean);
   return asks.length ? `${asks.join(" or ")} on ${machineName}` : null;
 }
 

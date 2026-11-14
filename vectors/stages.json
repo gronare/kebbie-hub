@@ -1,0 +1,4970 @@
+{
+  "answers": [
+    {
+      "name": "verified",
+      "payload": {
+        "address": "email-column@api",
+        "choice": 0,
+        "comment": "",
+        "question": "verify-backfill",
+        "type": "answer"
+      }
+    },
+    {
+      "name": "not yet",
+      "payload": {
+        "address": "email-column@api",
+        "choice": 1,
+        "comment": "",
+        "question": "verify-backfill",
+        "type": "answer"
+      }
+    },
+    {
+      "name": "something is wrong, and what",
+      "payload": {
+        "address": "email-column@api",
+        "choice": 2,
+        "comment": "Half the rows still have no email",
+        "question": "verify-backfill",
+        "type": "answer"
+      }
+    },
+    {
+      "name": "an answer of your own",
+      "payload": {
+        "address": "email-column@api",
+        "choice": null,
+        "comment": "Wait for the nightly sync first",
+        "question": "verify-backfill",
+        "type": "answer"
+      }
+    }
+  ],
+  "board": {
+    "away_since": null,
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
+  "cases": [
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a migration in three stages, the second waiting on your verification",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "read-new",
+            "drop-old"
+          ],
+          "through": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+        },
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "met_at": 1761069300,
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "met",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "open",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "verified: the third stage opens and its accepted commits can go out",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "note": "The backfill stopped at row 40 000: a null email",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "failed",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage that failed says why and keeps the next locked",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "stage": "backfill",
+            "subject": "Skip rows without an email in the backfill",
+            "subtask": "skip-null"
+          },
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 1,
+          "subtasks": [
+            "skip-null"
+          ],
+          "through": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+        },
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "note": "The backfill stopped at row 40 000: a null email",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "failed",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "skip-null",
+            "state": "accepted",
+            "title": "Skip rows without an email"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a fix in the failed stage goes out while the next stays locked",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "detail": "Every new row has an email in both columns",
+              "kind": "check"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a requirement checked by a command after the deploy",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "kebbie_questions": [
+          {
+            "at": 1761069480,
+            "id": "check-mail",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          },
+          {
+            "at": 1761069540,
+            "id": "close-docs",
+            "kind": "close",
+            "options": [
+              {
+                "label": "Close",
+                "meaning": "The task closes and its worktree is freed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays open"
+              }
+            ],
+            "text": "The task says it is done: the README names every flag. Close it?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a manual check and a close, without stages",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069600,
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "options": [],
+          "plan": null,
+          "recommend": null,
+          "text": "Keep the old column's index?"
+        },
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "kebbie's verification beside the task's own question",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 1,
+          "subtasks": [
+            "read-new"
+          ],
+          "through": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+        },
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a pushable run into a locked stage",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "open",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage open while the one before it waits",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "met_at": 1761069300,
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "met",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage locked though every stage before it is met",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "met_at": 1761069600,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage met before anything of it is pushed",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage pushed without when",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage met without when",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage's last pushed commit named by a short sha",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "detail": "CI is green",
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a deploy requirement with a detail",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a verification without its question",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Look",
+              "kind": "manual"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a requirement kebbie does not know",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "done",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage state kebbie does not know",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill\nthe old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage title over two lines",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "both",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a stage listed twice",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "stages without subtasks",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a commit without its stage in a task in stages",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "nope",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a commit naming a stage the task does not have",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "stage": "switch",
+            "subject": "Skip rows without an email in the backfill",
+            "subtask": "skip-null"
+          },
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "backfill",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "note": "The backfill stopped at row 40 000: a null email",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "failed",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "skip-null",
+            "state": "accepted",
+            "title": "Skip rows without an email"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a later stage's commit before an earlier stage's",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "stage": "both",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a commit naming a stage in a task without stages",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Yes",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "kebbie's question offering other answers",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "recommend": 0,
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "kebbie's question recommending an answer",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "both",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": null,
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a verification of a stage not waiting on you",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "kebbie_questions": [
+          {
+            "at": 1761069480,
+            "id": "check-mail",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          },
+          {
+            "at": 1761069540,
+            "id": "close-docs",
+            "kind": "close",
+            "options": [
+              {
+                "label": "Close",
+                "meaning": "The task closes and its worktree is freed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays open"
+              }
+            ],
+            "stage": "both",
+            "text": "The task says it is done: the README names every flag. Close it?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "a close naming a stage",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "email-column@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 0,
+          "rules": {
+            "state": "ok"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+        "kebbie_questions": [
+          {
+            "at": 1761069000,
+            "id": "verify-backfill",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "Stage 3 unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "Stage 3 stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; stage 3 stays locked"
+              }
+            ],
+            "stage": "backfill",
+            "text": "Stage 2 is out. Has the backfill gone through in production?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "sha": "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b",
+            "stage": "switch",
+            "subject": "Read the email from the new column",
+            "subtask": "read-new",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "stage": "switch",
+            "subject": "Drop the old email column",
+            "subtask": "drop-old",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069600,
+          "id": "verify-backfill",
+          "kept_for_user": false,
+          "options": [],
+          "plan": null,
+          "recommend": null,
+          "text": "x"
+        },
+        "recipe": "rollout-in-stages",
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "stages": [
+          {
+            "id": "both",
+            "met_at": 1761063000,
+            "pushed_at": 1761062400,
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "met",
+            "through": "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Add the new column, write to both"
+          },
+          {
+            "id": "backfill",
+            "pushed_at": 1761068100,
+            "requirement": {
+              "detail": "Has the backfill gone through in production?",
+              "kind": "verified"
+            },
+            "state": "waiting",
+            "through": "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3",
+            "title": "Fill the old rows"
+          },
+          {
+            "id": "switch",
+            "requirement": {
+              "kind": "deploy"
+            },
+            "state": "locked",
+            "title": "Read the new column, drop the old"
+          }
+        ],
+        "subtasks": [
+          {
+            "commits": [
+              "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "both",
+            "state": "pushed",
+            "title": "Write to both columns"
+          },
+          {
+            "commits": [
+              "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "backfill",
+            "state": "pushed",
+            "title": "Fill the old rows"
+          },
+          {
+            "commits": [
+              "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b"
+            ],
+            "id": "read-new",
+            "state": "accepted",
+            "title": "Read the new column"
+          },
+          {
+            "commits": [
+              "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3"
+            ],
+            "id": "drop-old",
+            "state": "accepted",
+            "title": "Drop the old column"
+          }
+        ],
+        "summary": "5 commits · 3 pushed",
+        "title": "Move the email to its own column",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "kebbie's question with the task's question's id",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "payments@api",
+        "agent": {
+          "status": "working"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 4,
+          "behind": 0,
+          "rules": {
+            "state": "checking"
+          },
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "WORKING",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "kebbie_questions": [
+          {
+            "at": 1761069480,
+            "id": "check-0",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          },
+          {
+            "at": 1761069480,
+            "id": "check-1",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          },
+          {
+            "at": 1761069480,
+            "id": "check-2",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          },
+          {
+            "at": 1761069480,
+            "id": "check-3",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          },
+          {
+            "at": 1761069480,
+            "id": "check-4",
+            "kind": "verify",
+            "options": [
+              {
+                "label": "Verified",
+                "meaning": "The task unlocks and can be pushed"
+              },
+              {
+                "label": "Not yet",
+                "meaning": "The task stays locked and this question waits"
+              },
+              {
+                "comment": true,
+                "label": "Something is wrong",
+                "meaning": "Tell the task what you see; the task stays locked"
+              }
+            ],
+            "text": "Does the signup mail arrive at a Gmail address?"
+          }
+        ],
+        "next_for_you": null,
+        "order": [
+          {
+            "accepted": true,
+            "moved": {
+              "from": 2,
+              "reason": "The gateway reads the currency on every amount"
+            },
+            "sha": "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2",
+            "subject": "Name the currency on every amount",
+            "subtask": "currency",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "sha": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+            "subject": "Add the PaymentGateway trait",
+            "subtask": "gateway",
+            "tests": {
+              "at": 1761068700,
+              "state": "passed"
+            }
+          },
+          {
+            "accepted": true,
+            "group": "ci-gateway",
+            "sha": "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f",
+            "subject": "Run the payment tests on CI",
+            "subtask": "tests",
+            "tests": {
+              "state": "running"
+            }
+          },
+          {
+            "accepted": false,
+            "group": "ci-gateway",
+            "sha": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+            "subject": "Charge orders through the gateway in cents",
+            "subtask": "gateway",
+            "tests": {
+              "state": "not-run"
+            }
+          }
+        ],
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "pushable": {
+          "count": 2,
+          "subtasks": [
+            "currency",
+            "gateway"
+          ],
+          "through": "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90"
+        },
+        "question": null,
+        "recover": null,
+        "report": null,
+        "routine": null,
+        "subtasks": [
+          {
+            "commits": [
+              "1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3a2918f7e"
+            ],
+            "id": "docs",
+            "state": "pushed",
+            "title": "Say what a gateway is"
+          },
+          {
+            "added": {
+              "at": 1761068400,
+              "reason": "Amounts carry no currency the gateway can read"
+            },
+            "commits": [
+              "5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2"
+            ],
+            "id": "currency",
+            "state": "accepted",
+            "title": "Name the currency on every amount"
+          },
+          {
+            "commits": [
+              "a41c9e07d2b35f8e61a0c4d7b9e2f13a5c6d8e90",
+              "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a"
+            ],
+            "id": "gateway",
+            "rules": {
+              "state": "ok"
+            },
+            "state": "ready",
+            "title": "Charge through a PaymentGateway"
+          },
+          {
+            "commits": [
+              "c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f"
+            ],
+            "id": "tests",
+            "state": "accepted",
+            "title": "Run the payment tests on CI"
+          },
+          {
+            "commits": [],
+            "id": "new-gateway",
+            "state": "in-progress",
+            "title": "Add the new gateway"
+          },
+          {
+            "commits": [],
+            "id": "remove-old",
+            "state": "planned",
+            "title": "Remove the old payment client"
+          }
+        ],
+        "summary": "4 commits",
+        "urgency": 0,
+        "verdict": null
+      },
+      "name": "five of kebbie's questions",
+      "valid": false
+    }
+  ],
+  "close_options": [
+    "Close",
+    "Not yet"
+  ],
+  "kept_answer_ttl": 604800,
+  "max_kebbie_question_chars": 2000,
+  "max_kebbie_question_id_chars": 64,
+  "max_kebbie_questions": 4,
+  "max_meaning_chars": 300,
+  "max_stage_detail_chars": 500,
+  "max_stage_note_chars": 500,
+  "max_stage_title_chars": 200,
+  "max_stages": 16,
+  "verify_options": [
+    "Verified",
+    "Not yet",
+    "Something is wrong"
+  ]
+}

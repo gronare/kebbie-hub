@@ -1029,6 +1029,57 @@
     },
     {
       "accepts": [
+        "answer",
+        "push",
+        "start",
+        "routine",
+        "prompt-answer"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1760551600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "gqOvq_wI66Q23m-ymXO02Lo2RRU2UWahoJciJlwMV4N5UyrhJLZoZgaNuQpLbyHyG7QUAnyO3kt3MCAtpv5u0pADHguUhJdGpDvzf49vlH2JROtrepjm9Dj9kbLWC2mPyXn_h04CQj9JNTQv9001gjakuO5n9Y2_guMER0M6fw",
+        "exp": 1761156400,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7b73-800d-0a5cd93a2e98",
+        "kc": "WsFljoZCzrRJZM3eyF6MoyxRX5lV3eVP2KuEsy8OxpI",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "Y1Ep4xV9HrE5j26Ns6W3f3Xz4PxPhoHwRmr7a-Wy8UM6eWaaTzNNSC8eJwCs0W4jUG-x1kG491HP5uoIQZzSKr6C4bjh9afPIOxp6eWfARg",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "yyyydiXv8bWXSSMMSWwTdDNZbj8FdQmJIP8v2bNAsmf40yc1jRrG9z-C5O-WrwGoyVVXgsyx6d7W4LlyLZUa7gbJcP0o48b6geEWkZn-v3c"
+        },
+        "kind": "answer",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "kr7Iw8mGh88lCNAIi-_wMj9gxwOe2FoAFJfPEP76GDIvrA5C5ZBpHSanm985ASY4fj2qcHl_DRQzzrySV1ZqBA",
+        "v": 1
+      },
+      "expect": {
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "payload": {
+          "address": "email-column@api",
+          "choice": 0,
+          "comment": "",
+          "question": "verify-backfill",
+          "type": "answer"
+        }
+      },
+      "name": "answer-to-kebbies-question-collected-six-days-later-is-applied",
+      "trust": "account"
+    },
+    {
+      "accepts": [
         "answer"
       ],
       "applied": {
@@ -1640,19 +1691,19 @@
           "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
-        "ct": "7wXOhHfFRrWcSo14RmTQwo8W1DqBPHUFtr1S0ZEcNFMhhBC-HD4PE_vPZSIh8Q8i-eGsYcwg_K8dwwv6-HhdDoGcbVHJzrbHqduEBD02PeWrZ97hQjZoN4ykPRjgDXmho-gF0TTOkNvofeGnsCgwmKdn7Vyu1X_GImiWsgpXFenIrPbIHVo",
-        "exp": 1761156001,
+        "ct": "7wXOhHfFRrWcSo14RmTQwo8W1DqBPHUFtr1S0ZEcNFMhhBC-HD4PE_vPZSIh8Q8i-eGsYcwg_K8dwwv6-HhdDoGcbVHJzrbHqduEBD02PeWrZ97hQjZoN4ykPRjgDXmho-gF0TTOkNvofeGnsCgwmKdn7Vyu1a4iSXAnWuEycgN1DjEJFK4",
+        "exp": 1761674401,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
         "id": "cmd_019a07ed-8d00-7eea-a407-6a4b2b783fab",
         "kc": "Abt0nXVMEqp5VH1pmKHDjZd0vovN4RnzQdPzRO0oT1Q",
         "keys": {
-          "acc_z-BiJIkbeoXcLA526_0PrQ": "oojViPRdFzspwtYokDrbw8K_sbqHunRftd0gLo_Fp2R0Or64aDgPFILBQULmMKZM5h5a8Gs7zH6ZpdrmgDTLkqcMUICVx0r4BJiYA8sQuJk",
-          "mch_01K83YV380DYJHQAD9KTY48MZ4": "y8yHrIYgwRSAjobYWxGg-GE2Ax44UMt0oA_7ZVxqfS4Y5B6Bus5wkeL0TKSjWMx5biDGsTBkJzhEmsz-cu5R5EQ3Eox8ix19F2oNCosVN1c"
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "oojViPRdFzspwtYokDrbw8K_sbqHunRftd0gLo_Fp2R0Or64aDgPFILBQULmMKZM5h5a8Gs7zH6ZpdrmgDTLktFNjAHxDLUQZUAK62mrQ2I",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "y8yHrIYgwRSAjobYWxGg-GE2Ax44UMt0oA_7ZVxqfS4Y5B6Bus5wkeL0TKSjWMx5biDGsTBkJzhEmsz-cu5R5DaguVKCJBsHUkQWmoOlPPk"
         },
         "kind": "answer",
         "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
         "schema": 1,
-        "sig": "9oZNcIwK1zobRTnTqBdiwTl0zknghnYrXuUgmvAPD9oZvdublO1DpzyhFIkEHDJWLF2FOSzq_im4aCKV8clTDA",
+        "sig": "tTy0edgTBdq1_rfr-s5tlk9ktXJBZhok09_GV0rUcnyrrz3O-Phnz1LBaErDXtnC9g3aG6OMvmO_GuFmkKP0Bw",
         "v": 1
       },
       "expect": {

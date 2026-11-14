@@ -151,6 +151,10 @@ pub struct Item {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obstacle: Option<Obstacle>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stages: Option<Vec<Stage>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kebbie_questions: Option<Vec<KebbieQuestion>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
@@ -197,6 +201,10 @@ struct ItemWire {
     #[serde(default)]
     obstacle: Option<Obstacle>,
     #[serde(default)]
+    stages: Option<Vec<Stage>>,
+    #[serde(default)]
+    kebbie_questions: Option<Vec<KebbieQuestion>>,
+    #[serde(default)]
     steps: Option<Steps>,
     #[serde(default)]
     title: Option<String>,
@@ -221,7 +229,7 @@ impl TryFrom<ItemWire> for Item {
                 let order = wire.order.map(|rows| rows.into_iter().map(|row| row.read(wire.subtasks.as_deref().unwrap_or_default())).collect());
                 (wire.subtasks, order, wire.pushable, wire.require_accept)
             }
-            Some(_) if wire.subtasks.is_some() || wire.order.is_some() || wire.pushable.is_some() || wire.require_accept.is_some() => return Err("an item carries subtasks or, from an older machine, steps"),
+            Some(_) if wire.subtasks.is_some() || wire.order.is_some() || wire.pushable.is_some() || wire.require_accept.is_some() || wire.stages.is_some() => return Err("an item carries subtasks or, from an older machine, steps"),
             Some(steps) => {
                 let (subtasks, order, pushable) = steps.as_subtasks();
                 (Some(subtasks), Some(order), pushable, steps.required)
@@ -252,6 +260,8 @@ impl TryFrom<ItemWire> for Item {
             pushable,
             require_accept,
             obstacle: wire.obstacle,
+            stages: wire.stages,
+            kebbie_questions: wire.kebbie_questions,
             title: wire.title,
             profile: wire.profile,
             recipe: wire.recipe,
@@ -318,6 +328,8 @@ pub struct OrderRow {
     pub tests: Option<CommitTests>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub moved: Option<Moved>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -334,12 +346,14 @@ struct OrderRowWire {
     tests: Option<CommitTests>,
     #[serde(default)]
     moved: Option<Moved>,
+    #[serde(default)]
+    stage: Option<String>,
 }
 
 impl OrderRowWire {
     fn read(self, subtasks: &[Subtask]) -> OrderRow {
         let accepted = self.accepted.unwrap_or_else(|| subtasks.iter().any(|subtask| subtask.id == self.subtask && subtask.state == SubtaskState::Accepted));
-        OrderRow { sha: self.sha, subject: self.subject, subtask: self.subtask, accepted, group: self.group, tests: self.tests, moved: self.moved }
+        OrderRow { sha: self.sha, subject: self.subject, subtask: self.subtask, accepted, group: self.group, tests: self.tests, moved: self.moved, stage: self.stage }
     }
 }
 
@@ -418,6 +432,137 @@ pub enum DecidedBy {
     Investigator,
     Lead,
     You,
+}
+
+pub const MAX_STAGES: usize = 16;
+pub const MAX_STAGE_TITLE_CHARS: usize = 200;
+pub const MAX_STAGE_DETAIL_CHARS: usize = 500;
+pub const MAX_STAGE_NOTE_CHARS: usize = 500;
+
+/// A boundary in the push order: nothing after a stage goes out until every stage before it is met.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Stage {
+    pub id: String,
+    pub title: String,
+    pub state: StageState,
+    pub requirement: Requirement,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub through: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushed_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub met_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StageState {
+    Locked,
+    Open,
+    Pushed,
+    Waiting,
+    Met,
+    Failed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Requirement {
+    pub kind: RequirementKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RequirementKind {
+    Deploy,
+    Check,
+    Verified,
+}
+
+pub const MAX_KEBBIE_QUESTIONS: usize = 4;
+pub const MAX_KEBBIE_QUESTION_ID_CHARS: usize = 64;
+pub const MAX_KEBBIE_QUESTION_CHARS: usize = 2_000;
+pub const MAX_MEANING_CHARS: usize = 300;
+pub const VERIFY_OPTIONS: [&str; 3] = ["Verified", "Not yet", "Something is wrong"];
+pub const CLOSE_OPTIONS: [&str; 2] = ["Close", "Not yet"];
+
+/// A question kebbie asks itself, beside the task's own: it never holds the task, and its answer is kept for the machine while it sleeps.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KebbieQuestion {
+    pub id: String,
+    pub kind: KebbieQuestionKind,
+    pub text: String,
+    pub options: Vec<QuestionOption>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<String>,
+    pub at: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum KebbieQuestionKind {
+    Verify,
+    Close,
+}
+
+impl KebbieQuestionKind {
+    pub fn labels(self) -> &'static [&'static str] {
+        match self {
+            KebbieQuestionKind::Verify => &VERIFY_OPTIONS,
+            KebbieQuestionKind::Close => &CLOSE_OPTIONS,
+        }
+    }
+
+    fn takes_comment(self, index: usize) -> bool {
+        self == KebbieQuestionKind::Verify && index == 2
+    }
+}
+
+impl Stage {
+    pub fn is_pushed(&self) -> bool {
+        self.through.is_some()
+    }
+
+    fn check(&self) -> Result<(), &'static str> {
+        check(is_subtask_id(&self.id), "a stage's id is not a short plain name")?;
+        check(is_line(&self.title, MAX_STAGE_TITLE_CHARS), "a stage's title is empty, too long or not one line")?;
+        match (self.requirement.kind, &self.requirement.detail) {
+            (RequirementKind::Deploy, detail) => check(detail.is_none(), "a deploy requirement has no detail")?,
+            (_, detail) => check(detail.as_deref().is_some_and(|detail| is_line(detail, MAX_STAGE_DETAIL_CHARS)), "a check or a verification says on one line what it holds to")?,
+        }
+        check(self.through.as_deref().is_none_or(is_full_sha), "a stage's last pushed commit is not a full sha")?;
+        check(self.through.is_some() == self.pushed_at.is_some(), "a stage pushed says when, and only a pushed one")?;
+        let pushed = matches!(self.state, StageState::Pushed | StageState::Waiting | StageState::Met | StageState::Failed);
+        check(self.is_pushed() == pushed, "a stage is locked or open until something of it is pushed")?;
+        check((self.state == StageState::Met) == self.met_at.is_some(), "a stage says when it was met, and only a met one")?;
+        check(self.note.as_deref().is_none_or(|note| is_line(note, MAX_STAGE_NOTE_CHARS)), "a stage's note is empty, too long or not one line")
+    }
+}
+
+impl KebbieQuestion {
+    fn check(&self, stages: &[Stage]) -> Result<(), &'static str> {
+        let id = self.id.as_bytes();
+        check((1..=MAX_KEBBIE_QUESTION_ID_CHARS).contains(&id.len()) && id.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')), "a question's id is not a short plain name")?;
+        check(is_obstacle_text(&self.text) && self.text.chars().count() <= MAX_KEBBIE_QUESTION_CHARS, "a question's text is empty, too long or holds control characters")?;
+        let labels = self.kind.labels();
+        check(self.options.len() == labels.len(), "kebbie's question offers its kind's fixed answers")?;
+        for (index, (option, label)) in self.options.iter().zip(labels).enumerate() {
+            check(option.label == *label && option.comment == self.kind.takes_comment(index), "kebbie's question offers its kind's fixed answers")?;
+            check(is_line(&option.meaning, MAX_MEANING_CHARS), "an answer's meaning is empty, too long or not one line")?;
+        }
+        let Some(stage) = &self.stage else {
+            return Ok(());
+        };
+        check(self.kind == KebbieQuestionKind::Verify, "only a verification names a stage")?;
+        let stage = stages.iter().find(|one| &one.id == stage).ok_or("a verification names a stage the task does not have")?;
+        check(stage.requirement.kind == RequirementKind::Verified && stage.state == StageState::Waiting, "a stage is asked about while it waits on your verification")
+    }
 }
 
 pub fn is_subtask_id(text: &str) -> bool {
@@ -510,12 +655,75 @@ impl Item {
         check(order[count - 1].sha == pushable.through, "a pushable run ends at its last commit")?;
         check(run_of(&order[..count]) == pushable.subtasks, "a pushable run names the subtasks of its commits in order")?;
         check(order[..count].iter().all(|row| row.accepted), "every commit in a pushable run is accepted")?;
-        check(!splits_a_group(order, count), "a pushable run never splits a group")
+        check(!splits_a_group(order, count), "a pushable run never splits a group")?;
+        let stages = self.stages.as_deref().unwrap_or_default();
+        check(order[..count].iter().all(|row| opens(stages, row.stage.as_deref())), "a pushable run stops where a stage before it is not met")
+    }
+
+    fn check_stages(&self) -> Result<(), &'static str> {
+        let order = self.order.as_deref().unwrap_or_default();
+        let Some(stages) = self.stages.as_deref() else {
+            return check(order.iter().all(|row| row.stage.is_none()), "a commit names a stage the task does not have");
+        };
+        check(self.subtasks.is_some(), "stages belong to a task's subtasks")?;
+        check((1..=MAX_STAGES).contains(&stages.len()), "a task holds one to sixteen stages")?;
+        let mut ids = BTreeSet::new();
+        for (index, stage) in stages.iter().enumerate() {
+            stage.check()?;
+            check(ids.insert(stage.id.as_str()), "a stage is listed once")?;
+            if !stage.is_pushed() {
+                let held = stages[..index].iter().any(|earlier| earlier.state != StageState::Met);
+                check(held == (stage.state == StageState::Locked), "a stage is locked exactly while a stage before it is not met")?;
+            }
+        }
+        let place = |id: &str| stages.iter().position(|stage| stage.id == id);
+        let mut last = 0;
+        let mut of_subtask: BTreeMap<&str, &str> = BTreeMap::new();
+        let mut of_group: BTreeMap<&str, &str> = BTreeMap::new();
+        for row in order {
+            let stage = row.stage.as_deref().ok_or("every commit of a task in stages names its stage")?;
+            let at = place(stage).ok_or("a commit names a stage the task does not have")?;
+            check(at >= last, "a stage's commits sit after the stages before it")?;
+            last = at;
+            check(*of_subtask.entry(row.subtask.as_str()).or_insert(stage) == stage, "a subtask's commits sit in one stage")?;
+            if let Some(group) = row.group.as_deref() {
+                check(*of_group.entry(group).or_insert(stage) == stage, "a group's commits sit in one stage")?;
+            }
+        }
+        Ok(())
+    }
+
+    fn check_questions(&self) -> Result<(), &'static str> {
+        let Some(questions) = self.kebbie_questions.as_deref() else {
+            return Ok(());
+        };
+        check(questions.len() <= MAX_KEBBIE_QUESTIONS, "a task holds four of kebbie's questions at most")?;
+        let mut ids: BTreeSet<&str> = self.question.iter().map(|question| question.id.as_str()).collect();
+        for question in questions {
+            question.check(self.stages.as_deref().unwrap_or_default())?;
+            check(ids.insert(question.id.as_str()), "a question is asked once")?;
+        }
+        Ok(())
     }
 }
 
-pub fn pushable_of(order: &[OrderRow]) -> Option<Pushable> {
-    let mut count = order.iter().take_while(|row| row.accepted).count();
+/// Sets each stage nothing of which is pushed yet to locked or open, by whether every stage before it is met.
+pub fn unlock_stages(stages: &mut [Stage]) {
+    let mut held = false;
+    for stage in stages {
+        if !stage.is_pushed() {
+            stage.state = if held { StageState::Locked } else { StageState::Open };
+        }
+        held |= stage.state != StageState::Met;
+    }
+}
+
+fn opens(stages: &[Stage], stage: Option<&str>) -> bool {
+    stage.is_none_or(|id| stages.iter().take_while(|stage| stage.id != id).all(|stage| stage.state == StageState::Met))
+}
+
+pub fn pushable_of(order: &[OrderRow], stages: &[Stage]) -> Option<Pushable> {
+    let mut count = order.iter().take_while(|row| row.accepted && opens(stages, row.stage.as_deref())).count();
     while count > 0 && splits_a_group(order, count) {
         count -= 1;
     }
@@ -609,9 +817,9 @@ impl Steps {
             rules: step.rules.clone(),
         }).collect();
         let order: Vec<OrderRow> = self.items.iter().filter(|step| !matches!(step.state, StepState::Pushed)).flat_map(|step| {
-            commits(step).into_iter().map(|(sha, subject)| OrderRow { sha, subject, subtask: step.number.to_string(), accepted: matches!(step.state, StepState::Accepted), group: None, tests: None, moved: None })
+            commits(step).into_iter().map(|(sha, subject)| OrderRow { sha, subject, subtask: step.number.to_string(), accepted: matches!(step.state, StepState::Accepted), group: None, tests: None, moved: None, stage: None })
         }).collect();
-        let pushable = pushable_of(&order);
+        let pushable = pushable_of(&order, &[]);
         (subtasks, order, pushable)
     }
 }
@@ -788,7 +996,9 @@ impl Board {
             item.git.iter().filter_map(|git| git.rules.as_ref()).try_for_each(Rules::check)?;
             item.obstacle.as_ref().map_or(Ok(()), Obstacle::check)?;
             item.review.as_ref().map_or(Ok(()), |offer| check(offer.subtask.as_deref().is_none_or(is_subtask_id), "a review offer names a subtask by its id"))?;
-            item.check_plan()
+            item.check_plan()?;
+            item.check_stages()?;
+            item.check_questions()
         })
     }
 }
@@ -1004,7 +1214,7 @@ mod tests {
 
     fn computed(item: &serde_json::Value) -> Option<(u32, String)> {
         let item: Item = serde_json::from_value(item.clone()).unwrap();
-        pushable_of(item.order.as_deref().unwrap_or_default()).map(|run| (run.count, run.through))
+        pushable_of(item.order.as_deref().unwrap_or_default(), item.stages.as_deref().unwrap_or_default()).map(|run| (run.count, run.through))
     }
 
     #[test]
@@ -1154,7 +1364,7 @@ mod tests {
         ] });
         let item: Item = serde_json::from_value(oldest).unwrap();
         assert_eq!(item.subtasks.as_ref().unwrap()[0].state, SubtaskState::Ready, "committed reads as ready");
-        assert_eq!(item.order.unwrap(), vec![OrderRow { sha: sha('2'), subject: "Charge through a PaymentGateway".into(), subtask: "1".into(), accepted: false, group: None, tests: None, moved: None }]);
+        assert_eq!(item.order.unwrap(), vec![OrderRow { sha: sha('2'), subject: "Charge through a PaymentGateway".into(), subtask: "1".into(), accepted: false, group: None, tests: None, moved: None, stage: None }]);
         assert_eq!(item.pushable, None);
         let mut both = stepped;
         both["subtasks"] = serde_json::json!([]);
@@ -1225,6 +1435,204 @@ mod tests {
         assert!(serde_json::from_value::<Item>(leaked).is_err(), "a blob ref never carries its content");
         asked["question"]["plan"]["at"] = serde_json::json!(1_761_068_280u64);
         assert!(serde_json::from_value::<Item>(asked).is_err(), "the plan's time sits on the question, not in the ref");
+    }
+
+    fn staged() -> serde_json::Value {
+        let mut item = plain();
+        item["subtasks"] = serde_json::json!([
+            { "id": "both", "title": "Write to both columns", "state": "pushed", "commits": [sha('1')] },
+            { "id": "backfill", "title": "Fill the old rows", "state": "pushed", "commits": [sha('2')] },
+            { "id": "read-new", "title": "Read the new column", "state": "accepted", "commits": [sha('3')] },
+            { "id": "drop-old", "title": "Drop the old column", "state": "accepted", "commits": [sha('4')] },
+        ]);
+        item["order"] = serde_json::json!([
+            { "sha": sha('3'), "subject": "Read the email from the new column", "subtask": "read-new", "accepted": true, "stage": "switch" },
+            { "sha": sha('4'), "subject": "Drop the old email column", "subtask": "drop-old", "accepted": true, "stage": "switch" },
+        ]);
+        item["stages"] = serde_json::json!([
+            { "id": "both", "title": "Add the new column, write to both", "state": "met", "requirement": { "kind": "deploy" }, "through": sha('1'), "pushed_at": 1_761_062_000u64, "met_at": 1_761_062_600u64 },
+            { "id": "backfill", "title": "Fill the old rows", "state": "waiting", "requirement": { "kind": "verified", "detail": "Has the backfill gone through in production?" }, "through": sha('2'), "pushed_at": 1_761_066_000u64 },
+            { "id": "switch", "title": "Read the new column, drop the old", "state": "locked", "requirement": { "kind": "deploy" } },
+        ]);
+        item["kebbie_questions"] = serde_json::json!([{ "id": "verify-backfill", "kind": "verify", "text": "Stage 2 is out. Has the backfill gone through in production?", "stage": "backfill", "at": 1_761_066_600u64, "options": [
+            { "label": "Verified", "meaning": "Stage 3 unlocks and can be pushed" },
+            { "label": "Not yet", "meaning": "Stage 3 stays locked and this question waits" },
+            { "label": "Something is wrong", "meaning": "Tell the task what you see; stage 3 stays locked", "comment": true },
+        ] }]);
+        item
+    }
+
+    fn verified() -> serde_json::Value {
+        let mut item = with(staged(), &[("/stages/1/state", serde_json::json!("met")), ("/stages/2/state", serde_json::json!("open"))]);
+        item["stages"][1]["met_at"] = serde_json::json!(1_761_067_000u64);
+        item.as_object_mut().unwrap().remove("kebbie_questions");
+        item["pushable"] = serde_json::json!({ "count": 2, "through": sha('4'), "subtasks": ["read-new", "drop-old"] });
+        item
+    }
+
+    #[test]
+    fn a_task_in_stages_pushes_nothing_past_a_stage_whose_requirement_before_it_is_not_met() {
+        assert_eq!(checked(staged()), Ok(()));
+        let item: Item = serde_json::from_value(staged()).unwrap();
+        assert_eq!(serde_json::to_value(&item).unwrap(), staged());
+        let stages = item.stages.as_deref().unwrap();
+        assert_eq!(stages.iter().map(|stage| (stage.state, stage.requirement.kind)).collect::<Vec<_>>(), [(StageState::Met, RequirementKind::Deploy), (StageState::Waiting, RequirementKind::Verified), (StageState::Locked, RequirementKind::Deploy)]);
+        assert_eq!(computed(&staged()), None, "both commits are accepted, but their stage waits on stage 2");
+        let mut pushed = staged();
+        pushed["pushable"] = serde_json::json!({ "count": 1, "through": sha('3'), "subtasks": ["read-new"] });
+        assert_eq!(checked(pushed), Err("a pushable run stops where a stage before it is not met".into()));
+        assert_eq!(checked(verified()), Ok(()));
+        assert_eq!(computed(&verified()), Some((2, sha('4'))), "verifying stage 2 opens stage 3, and the run goes through it");
+        let fix = {
+            let mut item = verified();
+            item["stages"][1]["state"] = serde_json::json!("waiting");
+            item["stages"][1].as_object_mut().unwrap().remove("met_at");
+            item["stages"][2]["state"] = serde_json::json!("locked");
+            item["subtasks"].as_array_mut().unwrap().insert(0, serde_json::json!({ "id": "fix", "title": "Write both in one transaction", "state": "accepted", "commits": [sha('5')] }));
+            item["order"].as_array_mut().unwrap().insert(0, serde_json::json!({ "sha": sha('5'), "subject": "Write both in one transaction", "subtask": "fix", "accepted": true, "stage": "both" }));
+            item["pushable"] = serde_json::json!({ "count": 1, "through": sha('5'), "subtasks": ["fix"] });
+            item
+        };
+        assert_eq!(checked(fix.clone()), Ok(()), "a fix in a met stage goes out while a later stage waits");
+        assert_eq!(computed(&fix), Some((1, sha('5'))));
+        let regressed = with(fix, &[("/stages/0/state", serde_json::json!("waiting")), ("/stages/1/state", serde_json::json!("met"))]);
+        let mut regressed = regressed;
+        regressed["stages"][0].as_object_mut().unwrap().remove("met_at");
+        regressed["stages"][1]["met_at"] = serde_json::json!(1_761_067_000u64);
+        assert_eq!(computed(&regressed), Some((1, sha('5'))), "stage 3 stays locked while stage 1 waits again, though stage 2 is met");
+        assert_eq!(checked(regressed), Ok(()));
+    }
+
+    #[test]
+    fn a_stage_says_where_its_requirement_stands_and_its_commits_sit_together_after_the_stages_before() {
+        let wrong: Vec<(&str, serde_json::Value)> = vec![
+            ("/stages/2/state", serde_json::json!("open")),
+            ("/stages/2/state", serde_json::json!("met")),
+            ("/stages/2/state", serde_json::json!("done")),
+            ("/stages/1/state", serde_json::json!("open")),
+            ("/stages/1/id", serde_json::json!("both")),
+            ("/stages/1/id", serde_json::json!("../backfill")),
+            ("/stages/1/title", serde_json::json!("Fill\nthe rows")),
+            ("/stages/1/through", serde_json::json!("2222222")),
+            ("/stages/0/requirement", serde_json::json!({ "kind": "deploy", "detail": "CI is green" })),
+            ("/stages/1/requirement", serde_json::json!({ "kind": "verified" })),
+            ("/stages/1/requirement", serde_json::json!({ "kind": "check", "detail": " " })),
+            ("/stages/1/requirement", serde_json::json!({ "kind": "manual", "detail": "Look" })),
+            ("/stages/1/note", serde_json::json!("Two\nlines")),
+            ("/order/0/stage", serde_json::json!("nope")),
+            ("/order/1/stage", serde_json::json!("both")),
+            ("/order/0/stage", serde_json::Value::Null),
+            ("/kebbie_questions/0/stage", serde_json::json!("both")),
+            ("/kebbie_questions/0/stage", serde_json::json!("nope")),
+            ("/kebbie_questions/0/kind", serde_json::json!("close")),
+            ("/kebbie_questions/0/options/0/label", serde_json::json!("Yes")),
+            ("/kebbie_questions/0/options/2/comment", serde_json::json!(false)),
+            ("/kebbie_questions/0/options/1/meaning", serde_json::json!(" ")),
+            ("/kebbie_questions/0/text", serde_json::json!("a\u{7}b")),
+            ("/kebbie_questions/0/id", serde_json::json!("a b")),
+        ];
+        for (pointer, value) in wrong {
+            let mut item = staged();
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            item.pointer_mut(parent).unwrap()[key] = value.clone();
+            assert!(checked(item).is_err(), "{pointer} = {value}");
+        }
+        for (key, stage) in [("pushed_at", 0), ("met_at", 0), ("through", 1)] {
+            let mut item = staged();
+            item["stages"][stage].as_object_mut().unwrap().remove(key);
+            assert!(checked(item).is_err(), "a stage without {key}");
+        }
+        let mut early = staged();
+        early["stages"][2]["met_at"] = serde_json::json!(1);
+        assert_eq!(checked(early), Err("a stage says when it was met, and only a met one".into()));
+        let mut split = staged();
+        split["subtasks"][2]["commits"] = serde_json::json!([sha('3'), sha('4')]);
+        split["subtasks"].as_array_mut().unwrap().remove(3);
+        split["order"][1]["subtask"] = serde_json::json!("read-new");
+        assert_eq!(checked(split.clone()), Ok(()));
+        split["stages"][1]["state"] = serde_json::json!("met");
+        split["stages"][1]["met_at"] = serde_json::json!(1);
+        split["stages"][2]["state"] = serde_json::json!("open");
+        split.as_object_mut().unwrap().remove("kebbie_questions");
+        split["subtasks"].as_array_mut().unwrap().push(serde_json::json!({ "id": "fix", "title": "Fix", "state": "accepted", "commits": [sha('5')] }));
+        split["order"].as_array_mut().unwrap().push(serde_json::json!({ "sha": sha('5'), "subject": "Fix", "subtask": "fix", "accepted": true, "stage": "both" }));
+        assert_eq!(checked(split.clone()), Err("a stage's commits sit after the stages before it".into()));
+        let moved = split["order"].as_array_mut().unwrap().pop().unwrap();
+        split["order"].as_array_mut().unwrap().insert(0, moved);
+        split["order"][0]["subtask"] = serde_json::json!("read-new");
+        split["subtasks"][2]["commits"] = serde_json::json!([sha('5'), sha('3'), sha('4')]);
+        split["subtasks"].as_array_mut().unwrap().pop();
+        assert_eq!(checked(split), Err("a subtask's commits sit in one stage".into()));
+        let grouped = row(&row(&verified(), 0, "group", serde_json::json!("swap")), 1, "group", serde_json::json!("swap"));
+        assert_eq!(checked(grouped.clone()), Ok(()));
+        let mut across = grouped;
+        across["subtasks"].as_array_mut().unwrap().insert(0, serde_json::json!({ "id": "fix", "title": "Fix", "state": "accepted", "commits": [sha('5')] }));
+        across["order"].as_array_mut().unwrap().insert(0, serde_json::json!({ "sha": sha('5'), "subject": "Fix", "subtask": "fix", "accepted": true, "stage": "backfill", "group": "swap" }));
+        across["order"][2].as_object_mut().unwrap().remove("group");
+        across["pushable"] = serde_json::json!({ "count": 2, "through": sha('3'), "subtasks": ["fix", "read-new"] });
+        assert_eq!(checked(across), Err("a group's commits sit in one stage".into()));
+        let mut unstaged = planned();
+        unstaged["order"][0]["stage"] = serde_json::json!("both");
+        assert_eq!(checked(unstaged), Err("a commit names a stage the task does not have".into()));
+        let mut bare = staged();
+        bare.as_object_mut().unwrap().remove("subtasks");
+        bare.as_object_mut().unwrap().remove("order");
+        assert_eq!(checked(bare), Err("stages belong to a task's subtasks".into()));
+        let mut none = staged();
+        none["stages"] = serde_json::json!([]);
+        none["order"] = serde_json::json!([]);
+        none.as_object_mut().unwrap().remove("kebbie_questions");
+        assert_eq!(checked(none), Err("a task holds one to sixteen stages".into()));
+        let mut stepped = plain();
+        stepped["steps"] = serde_json::json!({ "pushed": 0, "items": [] });
+        stepped["stages"] = staged()["stages"].clone();
+        assert!(serde_json::from_value::<Item>(stepped).is_err(), "stages never ride with steps from an older machine");
+    }
+
+    #[test]
+    fn unlocking_opens_each_stage_not_yet_pushed_whose_stages_before_it_are_met() {
+        let mut item: Item = serde_json::from_value(staged()).unwrap();
+        let stages = item.stages.as_mut().unwrap();
+        stages[1].state = StageState::Met;
+        stages[1].met_at = Some(1);
+        unlock_stages(stages);
+        assert_eq!(stages[2].state, StageState::Open);
+        stages[0].state = StageState::Failed;
+        stages[0].met_at = None;
+        unlock_stages(stages);
+        assert_eq!(stages.iter().map(|stage| stage.state).collect::<Vec<_>>(), [StageState::Failed, StageState::Met, StageState::Locked], "a pushed stage keeps its state, and one not pushed locks behind a stage that failed");
+    }
+
+    #[test]
+    fn kebbie_asks_beside_the_task_with_its_kinds_fixed_answers() {
+        let mut both = staged();
+        both["question"] = serde_json::json!({ "id": "q1", "text": "Keep the old endpoint?", "options": [], "recommend": null, "kept_for_user": false, "plan": null, "at": 1_761_069_600u64 });
+        assert_eq!(checked(both.clone()), Ok(()), "a verification never holds the task's own question back");
+        both["question"]["id"] = serde_json::json!("verify-backfill");
+        assert_eq!(checked(both), Err("a question is asked once".into()));
+        let close = serde_json::json!({ "id": "close-docs", "kind": "close", "text": "docs says it is done: the README names every flag. Close it?", "at": 1_761_069_000u64, "options": [
+            { "label": "Close", "meaning": "The task closes and its worktree is freed" },
+            { "label": "Not yet", "meaning": "The task stays open" },
+        ] });
+        let manual = serde_json::json!({ "id": "check-mail", "kind": "verify", "text": "Does the signup mail arrive at a Gmail address?", "at": 1_761_069_000u64, "options": staged()["kebbie_questions"][0]["options"].clone() });
+        let mut asked = plain();
+        asked["kebbie_questions"] = serde_json::json!([close.clone(), manual.clone()]);
+        assert_eq!(checked(asked.clone()), Ok(()), "a manual check and a close need no stages");
+        let item: Item = serde_json::from_value(asked.clone()).unwrap();
+        assert_eq!(item.kebbie_questions.as_ref().unwrap().iter().map(|question| question.kind).collect::<Vec<_>>(), [KebbieQuestionKind::Close, KebbieQuestionKind::Verify]);
+        assert_eq!(serde_json::to_value(&item).unwrap(), asked);
+        let mut staged_close = asked.clone();
+        staged_close["kebbie_questions"][0]["stage"] = serde_json::json!("both");
+        assert_eq!(checked(staged_close), Err("only a verification names a stage".into()));
+        let mut verify_answers = asked.clone();
+        verify_answers["kebbie_questions"][0]["options"] = manual["options"].clone();
+        assert_eq!(checked(verify_answers), Err("kebbie's question offers its kind's fixed answers".into()));
+        let mut five = plain();
+        five["kebbie_questions"] = serde_json::json!((0..=MAX_KEBBIE_QUESTIONS).map(|n| { let mut one = manual.clone(); one["id"] = serde_json::json!(format!("check-{n}")); one }).collect::<Vec<_>>());
+        assert_eq!(checked(five), Err("a task holds four of kebbie's questions at most".into()));
+        let mut extra = asked;
+        extra["kebbie_questions"][0]["recommend"] = serde_json::json!(0);
+        assert!(serde_json::from_value::<Item>(extra).is_err(), "kebbie recommends nothing");
     }
 
     fn plain_board() -> serde_json::Value {

@@ -22,6 +22,8 @@ use crate::board::{
     Added, Agent, BlobRef, AgentStatus, CommitTests, Moved, TestsState, Board, Checkout, Counts, DeviceStanding, Git, Group, Item, Later, LaterState, NextPart,
     MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, NextRow, Obstacle, ObstacleState, OrderRow, Prompt, PromptOption, Pushable, Question,
     QuestionOption, Report, RoutineSummary, Rules, RulesState, SecondOpinion, Subtask, SubtaskState, Verdict, VerdictOutcome,
+    CLOSE_OPTIONS, KebbieQuestion, KebbieQuestionKind, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS,
+    MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, Requirement, RequirementKind, Stage, StageState, VERIFY_OPTIONS, pushable_of,
 };
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 use crate::crypto::{
@@ -32,7 +34,7 @@ use crate::device::{
     DEVICE_CERT_DOMAIN, DEVICE_FINGERPRINT_DOMAIN, DeviceCert, DeviceKey, DeviceKind, DeviceTrust,
     Trust, VerifiedDevice, device_fingerprint,
 };
-use crate::envelope::{Envelope, Header, Kind, Urgency};
+use crate::envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, Urgency};
 use crate::ids::{Id, Prefix};
 use crate::review::{
     AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
@@ -269,6 +271,8 @@ fn board() -> Payload {
             pushable: None,
             require_accept: None,
             obstacle: None,
+            stages: None,
+            kebbie_questions: None,
             title: None,
             profile: None,
             recipe: None,
@@ -310,6 +314,7 @@ fn planned_board() -> Payload {
         group: None,
         tests: Some(CommitTests { state: tests, at: matches!(tests, TestsState::Passed | TestsState::Failed).then_some(AT - 900) }),
         moved: None,
+        stage: None,
     };
     board.items = vec![Item {
         address: "payments@api".into(),
@@ -358,6 +363,8 @@ fn planned_board() -> Payload {
         pushable: Some(Pushable { count: 2, through: FIRST_COMMIT.into(), subtasks: vec!["currency".into(), "gateway".into()] }),
         require_accept: None,
         obstacle: None,
+        stages: None,
+        kebbie_questions: None,
         title: None,
         profile: None,
         recipe: None,
@@ -366,6 +373,60 @@ fn planned_board() -> Payload {
         review: None,
     }];
     Payload::Board(board)
+}
+
+const BOTH_COMMIT: &str = "b07c0a1d2e3f405162738495a6b7c8d9e0f1a2b3";
+const BACKFILL_COMMIT: &str = "bacf111d2e3f405162738495a6b7c8d9e0f1a2b3";
+const READ_NEW_COMMIT: &str = "3eade3a1d2e3f405162738495a6b7c8d9e0f1a2b";
+const DROP_OLD_COMMIT: &str = "d309c01d2e3f405162738495a6b7c8d9e0f1a2b3";
+const STAGED: &str = "email-column@api";
+const VERIFY_QUESTION: &str = "verify-backfill";
+
+fn verify_options(next: &str) -> Vec<QuestionOption> {
+    let meanings = [format!("{next} unlocks and can be pushed"), format!("{next} stays locked and this question waits"), format!("Tell the task what you see; {} stays locked", next.to_lowercase())];
+    VERIFY_OPTIONS.iter().zip(meanings).enumerate().map(|(index, (label, meaning))| QuestionOption { label: (*label).into(), meaning, comment: index == 2 }).collect()
+}
+
+fn staged_board() -> Payload {
+    let Payload::Board(mut board) = planned_board() else {
+        unreachable!()
+    };
+    let subtask = |id: &str, title: &str, state: SubtaskState, sha: &str| Subtask { id: id.into(), title: title.into(), state, commits: vec![sha.into()], added: None, rules: None };
+    let row = |sha: &str, subject: &str, subtask: &str| OrderRow { sha: sha.into(), subject: subject.into(), subtask: subtask.into(), accepted: true, group: None, tests: Some(CommitTests { state: TestsState::Passed, at: Some(AT - 900) }), moved: None, stage: Some("switch".into()) };
+    let stage = |id: &str, title: &str, state: StageState, kind: RequirementKind, detail: Option<&str>| Stage { id: id.into(), title: title.into(), state, requirement: Requirement { kind, detail: detail.map(Into::into) }, through: None, pushed_at: None, met_at: None, note: None };
+    let item = &mut board.items[0];
+    item.address = STAGED.into();
+    item.title = Some("Move the email to its own column".into());
+    item.recipe = Some("rollout-in-stages".into());
+    item.summary = "5 commits · 3 pushed".into();
+    item.head = Some(DROP_OLD_COMMIT.into());
+    item.git = Some(Git { upstream: "main".into(), ahead: 2, behind: 0, uncommitted: 0, rules: Some(rules(RulesState::Ok)) });
+    item.subtasks = Some(vec![
+        subtask("both", "Write to both columns", SubtaskState::Pushed, BOTH_COMMIT),
+        subtask("backfill", "Fill the old rows", SubtaskState::Pushed, BACKFILL_COMMIT),
+        subtask("read-new", "Read the new column", SubtaskState::Accepted, READ_NEW_COMMIT),
+        subtask("drop-old", "Drop the old column", SubtaskState::Accepted, DROP_OLD_COMMIT),
+    ]);
+    item.order = Some(vec![row(READ_NEW_COMMIT, "Read the email from the new column", "read-new"), row(DROP_OLD_COMMIT, "Drop the old email column", "drop-old")]);
+    item.pushable = None;
+    item.stages = Some(vec![
+        Stage { through: Some(BOTH_COMMIT.into()), pushed_at: Some(AT - 7_200), met_at: Some(AT - 6_600), ..stage("both", "Add the new column, write to both", StageState::Met, RequirementKind::Deploy, None) },
+        Stage { through: Some(BACKFILL_COMMIT.into()), pushed_at: Some(AT - 1_500), ..stage("backfill", "Fill the old rows", StageState::Waiting, RequirementKind::Verified, Some("Has the backfill gone through in production?")) },
+        stage("switch", "Read the new column, drop the old", StageState::Locked, RequirementKind::Deploy, None),
+    ]);
+    item.kebbie_questions = Some(vec![KebbieQuestion {
+        id: VERIFY_QUESTION.into(),
+        kind: KebbieQuestionKind::Verify,
+        text: "Stage 2 is out. Has the backfill gone through in production?".into(),
+        options: verify_options("Stage 3"),
+        stage: Some("backfill".into()),
+        at: AT - 600,
+    }]);
+    Payload::Board(board)
+}
+
+fn verify_answer(choice: Option<u8>, comment: &str) -> Payload {
+    Payload::Answer(Answer { address: STAGED.into(), question: VERIFY_QUESTION.into(), choice, comment: comment.into() })
 }
 
 fn next_board() -> Payload {
@@ -1127,6 +1188,20 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         planned_board(),
     ));
+    let staged = seal_case(
+        "staged-board",
+        machine_header("staged-board", Kind::Board, machine),
+        &staged_board(),
+        machine,
+        &[machine, account],
+    );
+    cases.push(opens(
+        "board-with-stages-and-a-verification-opened-by-the-account",
+        &staged,
+        account,
+        machine,
+        staged_board(),
+    ));
     let next = seal_case(
         "next-board",
         machine_header("next-board", Kind::Board, machine),
@@ -1801,29 +1876,7 @@ fn envelopes_json(parties: &Parties) -> Value {
             })
         })
         .collect();
-    let max_ttl: BTreeMap<&str, u64> = [
-        Kind::Board,
-        Kind::Notice,
-        Kind::Result,
-        Kind::Answer,
-        Kind::Push,
-        Kind::Start,
-        Kind::Routine,
-        Kind::PromptAnswer,
-        Kind::Idea,
-        Kind::ItemAnswer,
-        Kind::StartItem,
-        Kind::ItemEdit,
-        Kind::DeviceDecision,
-        Kind::ReviewOpen,
-        Kind::ReviewComments,
-        Kind::ReviewRead,
-        Kind::AcceptStep,
-        Kind::AcceptSubtask,
-        Kind::FoundStart,
-        Kind::FoundAdd,
-        Kind::FoundDismiss,
-    ]
+    let max_ttl: BTreeMap<&str, u64> = Kind::ALL
     .into_iter()
     .map(|kind| (kind.name(), kind.max_ttl()))
     .collect();
@@ -1957,6 +2010,10 @@ fn authorize_json(parties: &Parties) -> Value {
         phone,
         &[account, machine],
     );
+    let mut kept = command_header("authorize/kept-answer", Kind::Answer, &phone_cert, machine);
+    kept.at = NOW - 6 * 86_400;
+    kept.exp = kept.at + KEPT_ANSWER_TTL;
+    let kept = seal_case("authorize/kept-answer", kept, &verify_answer(Some(0), ""), phone, &[account, machine]).envelope;
     let mut lingering = command_header("authorize/prompt-over-ten-minutes", Kind::PromptAnswer, &phone_cert, machine);
     lingering.exp = lingering.at + 601;
     let lingering = seal_bypassing_checks(
@@ -2310,6 +2367,7 @@ fn authorize_json(parties: &Parties) -> Value {
             expired("authorize/expired"),
             Err(Refusal::Answer(Reason::Expired)),
         ),
+        case("answer-to-kebbies-question-collected-six-days-later-is-applied", kept.clone(), applies(verify_answer(Some(0), ""))),
         AuthorizeCase {
             name: "kind-the-machine-does-not-take-is-refused",
             accepts: vec![Kind::Answer],
@@ -3204,6 +3262,124 @@ fn plans_json() -> Value {
     json!({ "max_subtask_id_chars": crate::MAX_SUBTASK_ID_CHARS, "max_added_reason_chars": crate::MAX_ADDED_REASON_CHARS, "max_obstacle_chars": crate::MAX_OBSTACLE_CHARS, "max_moved_reason_chars": crate::MAX_MOVED_REASON_CHARS, "cases": cases })
 }
 
+fn stages_json() -> Value {
+    let board = serde_json::to_value(staged_board()).unwrap();
+    let staged = board["items"][0].clone();
+    let change = |item: &Value, changes: &[(&str, Value)]| {
+        let mut changed = item.clone();
+        for (pointer, value) in changes {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            match changed.pointer_mut(parent).unwrap() {
+                Value::Array(list) => list[key.parse::<usize>().unwrap()] = value.clone(),
+                parent => parent[key] = value.clone(),
+            }
+        }
+        changed
+    };
+    let drop = |item: &Value, pointer: &str| {
+        let mut changed = item.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        changed.pointer_mut(parent).unwrap().as_object_mut().unwrap().remove(key);
+        changed
+    };
+    let verified = {
+        let mut item = change(&staged, &[("/stages/1/state", json!("met")), ("/stages/1/met_at", json!(AT - 300)), ("/stages/2/state", json!("open")), ("/pushable", json!({ "count": 2, "through": DROP_OLD_COMMIT, "subtasks": ["read-new", "drop-old"] }))]);
+        item.as_object_mut().unwrap().remove("kebbie_questions");
+        item
+    };
+    let failed = {
+        let mut item = change(&staged, &[("/stages/1/state", json!("failed")), ("/stages/1/note", json!("The backfill stopped at row 40 000: a null email"))]);
+        item.as_object_mut().unwrap().remove("kebbie_questions");
+        item
+    };
+    let fix = {
+        let mut item = change(&failed, &[("/pushable", json!({ "count": 1, "through": BETWEEN_COMMIT, "subtasks": ["skip-null"] }))]);
+        item["subtasks"].as_array_mut().unwrap().insert(2, json!({ "id": "skip-null", "title": "Skip rows without an email", "state": "accepted", "commits": [BETWEEN_COMMIT] }));
+        item["order"].as_array_mut().unwrap().insert(0, json!({ "sha": BETWEEN_COMMIT, "subject": "Skip rows without an email in the backfill", "subtask": "skip-null", "accepted": true, "stage": "backfill" }));
+        item
+    };
+    let manual = json!({ "id": "check-mail", "kind": "verify", "text": "Does the signup mail arrive at a Gmail address?", "at": AT - 120, "options": serde_json::to_value(verify_options("The task")).unwrap() });
+    let close = json!({ "id": "close-docs", "kind": "close", "text": "The task says it is done: the README names every flag. Close it?", "at": AT - 60, "options": CLOSE_OPTIONS.iter().zip(["The task closes and its worktree is freed", "The task stays open"]).map(|(label, meaning)| json!({ "label": label, "meaning": meaning })).collect::<Vec<_>>() });
+    let unstaged = serde_json::to_value(planned_board()).unwrap()["items"][0].clone();
+    let asked = { let mut item = unstaged.clone(); item["kebbie_questions"] = json!([manual.clone(), close.clone()]); item };
+    let cases = [
+        ("a migration in three stages, the second waiting on your verification", staged.clone(), true),
+        ("verified: the third stage opens and its accepted commits can go out", verified.clone(), true),
+        ("a stage that failed says why and keeps the next locked", failed.clone(), true),
+        ("a fix in the failed stage goes out while the next stays locked", fix.clone(), true),
+        ("a requirement checked by a command after the deploy", change(&staged, &[("/stages/0/requirement", json!({ "kind": "check", "detail": "Every new row has an email in both columns" }))]), true),
+        ("a manual check and a close, without stages", asked.clone(), true),
+        ("kebbie's verification beside the task's own question", { let mut item = staged.clone(); item["question"] = json!({ "id": QUESTION, "text": "Keep the old column's index?", "options": [], "recommend": null, "kept_for_user": false, "plan": null, "at": AT }); item }, true),
+        ("a pushable run into a locked stage", change(&staged, &[("/pushable", json!({ "count": 1, "through": READ_NEW_COMMIT, "subtasks": ["read-new"] }))]), false),
+        ("a stage open while the one before it waits", change(&staged, &[("/stages/2/state", json!("open"))]), false),
+        ("a stage locked though every stage before it is met", change(&verified, &[("/stages/2/state", json!("locked")), ("/pushable", json!(null))]), false),
+        ("a stage met before anything of it is pushed", change(&staged, &[("/stages/2/state", json!("met")), ("/stages/2/met_at", json!(AT))]), false),
+        ("a stage pushed without when", drop(&staged, "/stages/1/pushed_at"), false),
+        ("a stage met without when", drop(&staged, "/stages/0/met_at"), false),
+        ("a stage's last pushed commit named by a short sha", change(&staged, &[("/stages/0/through", json!("b07c0a1"))]), false),
+        ("a deploy requirement with a detail", change(&staged, &[("/stages/0/requirement", json!({ "kind": "deploy", "detail": "CI is green" }))]), false),
+        ("a verification without its question", change(&staged, &[("/stages/1/requirement", json!({ "kind": "verified" }))]), false),
+        ("a requirement kebbie does not know", change(&staged, &[("/stages/1/requirement", json!({ "kind": "manual", "detail": "Look" }))]), false),
+        ("a stage state kebbie does not know", change(&staged, &[("/stages/0/state", json!("done"))]), false),
+        ("a stage title over two lines", change(&staged, &[("/stages/1/title", json!("Fill\nthe old rows"))]), false),
+        ("a stage listed twice", change(&staged, &[("/stages/1/id", json!("both"))]), false),
+        ("stages without subtasks", { let mut item = drop(&drop(&staged, "/subtasks"), "/order"); item["stages"][2]["state"] = json!("locked"); item }, false),
+        ("a commit without its stage in a task in stages", drop(&staged, "/order/0/stage"), false),
+        ("a commit naming a stage the task does not have", change(&staged, &[("/order/0/stage", json!("nope"))]), false),
+        ("a later stage's commit before an earlier stage's", change(&fix, &[("/order/0/stage", json!("switch")), ("/order/1/stage", json!("backfill")), ("/pushable", json!(null))]), false),
+        ("a commit naming a stage in a task without stages", change(&unstaged, &[("/order/0/stage", json!("both"))]), false),
+        ("kebbie's question offering other answers", change(&staged, &[("/kebbie_questions/0/options/0/label", json!("Yes"))]), false),
+        ("kebbie's question recommending an answer", change(&staged, &[("/kebbie_questions/0/recommend", json!(0))]), false),
+        ("a verification of a stage not waiting on you", change(&staged, &[("/kebbie_questions/0/stage", json!("both"))]), false),
+        ("a close naming a stage", { let mut item = asked.clone(); item["kebbie_questions"][1]["stage"] = json!("both"); item }, false),
+        ("kebbie's question with the task's question's id", change(&staged, &[("/question", json!({ "id": VERIFY_QUESTION, "text": "x", "options": [], "recommend": null, "kept_for_user": false, "plan": null, "at": AT }))]), false),
+        ("five of kebbie's questions", { let mut item = unstaged.clone(); item["kebbie_questions"] = json!((0..=MAX_KEBBIE_QUESTIONS).map(|n| { let mut one = manual.clone(); one["id"] = json!(format!("check-{n}")); one }).collect::<Vec<_>>()); item }, false),
+    ];
+    let cases: Vec<Value> = cases
+        .into_iter()
+        .map(|(name, item, valid)| {
+            let mut whole = board.clone();
+            whole["items"] = json!([item.clone()]);
+            let parsed = serde_json::from_value::<Payload>(whole);
+            assert_eq!(parsed.as_ref().is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            if let (true, Ok(Payload::Board(board))) = (valid, parsed.as_ref()) {
+                let item = &board.items[0];
+                assert_eq!(pushable_of(item.order.as_deref().unwrap_or_default(), item.stages.as_deref().unwrap_or_default()), item.pushable, "{name}: a valid case carries the whole run");
+            }
+            json!({ "name": name, "item": item, "valid": valid })
+        })
+        .collect();
+    let answers = [
+        ("verified", verify_answer(Some(0), "")),
+        ("not yet", verify_answer(Some(1), "")),
+        ("something is wrong, and what", verify_answer(Some(2), "Half the rows still have no email")),
+        ("an answer of your own", verify_answer(None, "Wait for the nightly sync first")),
+    ];
+    let answers: Vec<Value> = answers
+        .into_iter()
+        .map(|(name, payload)| {
+            assert_eq!(payload.validate(), Ok(()), "{name}");
+            json!({ "name": name, "payload": payload })
+        })
+        .collect();
+    json!({
+        "max_stages": MAX_STAGES,
+        "max_stage_title_chars": MAX_STAGE_TITLE_CHARS,
+        "max_stage_detail_chars": MAX_STAGE_DETAIL_CHARS,
+        "max_stage_note_chars": MAX_STAGE_NOTE_CHARS,
+        "max_kebbie_questions": MAX_KEBBIE_QUESTIONS,
+        "max_kebbie_question_id_chars": MAX_KEBBIE_QUESTION_ID_CHARS,
+        "max_kebbie_question_chars": MAX_KEBBIE_QUESTION_CHARS,
+        "max_meaning_chars": MAX_MEANING_CHARS,
+        "verify_options": VERIFY_OPTIONS,
+        "close_options": CLOSE_OPTIONS,
+        "kept_answer_ttl": KEPT_ANSWER_TTL,
+        "board": board,
+        "cases": cases,
+        "answers": answers,
+    })
+}
+
 fn review_comments_json() -> Value {
     serde_json::to_value(review_comments()).unwrap()
 }
@@ -3271,6 +3447,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("backlog.json", backlog_json()),
         ("review.json", review_json()),
         ("notices.json", notices_json()),
+        ("stages.json", stages_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

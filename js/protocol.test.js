@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -157,6 +157,46 @@ test("a board item's subtasks, push order and pushable run carry only their own 
   }
 });
 
+test("a task in stages pushes nothing past a stage whose stages before it are not met, as Rust's validation and run say", () => {
+  const stages = load("stages.json");
+  assert.deepEqual(
+    [stages.max_stages, stages.max_stage_title_chars, stages.max_stage_detail_chars, stages.max_stage_note_chars, stages.max_kebbie_questions, stages.max_kebbie_question_id_chars, stages.max_kebbie_question_chars, stages.max_meaning_chars, stages.verify_options, stages.close_options],
+    [MAX_STAGES, MAX_STAGE_TITLE_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_KEBBIE_QUESTIONS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTION_CHARS, MAX_MEANING_CHARS, VERIFY_OPTIONS, CLOSE_OPTIONS],
+  );
+  const staged = envelopes.cases.find((vector) => vector.name === "board-with-stages-and-a-verification-opened-by-the-account").expect.payload;
+  assert.deepEqual(staged, stages.board);
+  checkPayload(staged);
+  const item = staged.items[0];
+  assert.deepEqual(item.stages.map((one) => [one.state, one.requirement.kind]), [["met", "deploy"], ["waiting", "verified"], ["locked", "deploy"]]);
+  assert.equal(pushableOf(item.order, item.stages), null, "both commits are accepted, and stage 3 waits on stage 2");
+  assert.notEqual(pushableOf(item.order), null, "without its stages the same order would go out");
+  assert.deepEqual(item.kebbie_questions.map((one) => [one.kind, one.stage, one.options.map((option) => option.label)]), [["verify", "backfill", VERIFY_OPTIONS]]);
+  assert.ok(stages.cases.length > 25);
+  for (const { name, item: candidate, valid } of stages.cases) {
+    const passes = (() => {
+      try {
+        checkPayload({ ...staged, items: [candidate] });
+        return true;
+      } catch (error) {
+        if (error.code !== "malformed") throw error;
+        return false;
+      }
+    })();
+    assert.equal(passes, valid, name);
+    if (valid) assert.deepEqual(pushableOf(candidate.order ?? [], candidate.stages), candidate.pushable ?? null, `${name}: the run is what the rule computes`);
+  }
+});
+
+test("an answer to kebbie's question is the task's answer command, kept a week for a machine that sleeps", () => {
+  const stages = load("stages.json");
+  assert.deepEqual([stages.kept_answer_ttl, envelopes.max_ttl.answer, KINDS.answer.maxTtl, KINDS.answer.ttl], [KEPT_ANSWER_TTL, KEPT_ANSWER_TTL, KEPT_ANSWER_TTL, COMMAND_TTL]);
+  for (const { name, payload } of stages.answers) checkPayload(payload, name);
+  const kept = load("authorize.json").cases.find((vector) => vector.name === "answer-to-kebbies-question-collected-six-days-later-is-applied");
+  assert.equal(kept.envelope.exp - kept.envelope.at, KEPT_ANSWER_TTL);
+  checkShape(kept.envelope);
+  assert.throws(() => checkShape({ ...kept.envelope, exp: kept.envelope.at + KEPT_ANSWER_TTL + 1 }), (error) => error.code === "malformed");
+});
+
 test("steps from a machine not yet updated open as Rust opens them: subtasks named by their numbers, in order, with the run of accepted steps pushable", async () => {
   const [one, many] = load("review.json").steps_from_a_machine_not_yet_updated;
   for (const { board, opens_as } of [one, many]) {
@@ -273,7 +313,7 @@ test("a header of the wrong types is refused before any crypto", () => {
     [{ v: "1" }, "unsupported-version"],
     [{ schema: 2 }, "unsupported-schema"],
     [{ at: String(good.at) }, "malformed"],
-    [{ exp: good.at + 86_401 }, "malformed"],
+    [{ exp: good.at + KEPT_ANSWER_TTL + 1 }, "malformed"],
     [{ kind: "toString" }, "malformed"],
     [{ kc: 7 }, "malformed"],
     [{ keys: [] }, "malformed"],
@@ -555,6 +595,19 @@ test("a device decision names the waiting device by id and fingerprint and lives
   assert.deepEqual([KINDS["device-decision"].command, KINDS["device-decision"].ttl, KINDS["device-decision"].maxTtl], [true, 3600, 3600]);
   const envelope = await sealCommand({ device: await certifiedPhone(), account: devices.key, machine: { id: parties.machine.id, keys: parties.machine.public }, payload: decision, at: envelopes.now });
   assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, decision);
+});
+
+test("an answer to kebbie's question is sealed to live a week, and no command lives past what its kind allows", async () => {
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  const device = await certifiedPhone();
+  const verified = load("stages.json").answers[0].payload;
+  const kept = await sealCommand({ device, account: devices.key, machine, payload: verified, at: envelopes.now, ttl: KEPT_ANSWER_TTL });
+  assert.equal(kept.exp - kept.at, KEPT_ANSWER_TTL);
+  assert.deepEqual((await openCommand(kept, await identity("machine"), devices.key, envelopes.now + 6 * 86_400)).payload, verified);
+  const plain = await sealCommand({ device, account: devices.key, machine, payload: verified, at: envelopes.now });
+  assert.equal(plain.exp - plain.at, COMMAND_TTL, "an answer to the task's own question keeps its hour");
+  const push = { type: "push", address: "refunds@shop", head: "a".repeat(40), card_sha: null };
+  await assert.rejects(sealCommand({ device, account: devices.key, machine, payload: push, at: envelopes.now, ttl: KEPT_ANSWER_TTL }), (error) => error.code === "ttl");
 });
 
 test("a command without its device's certificate, or from the account, has no valid shape", () => {

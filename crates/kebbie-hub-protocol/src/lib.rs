@@ -31,10 +31,12 @@ pub use backlog::{
 pub use blob::{BLOB_DOMAIN, BLOB_OVERHEAD, BlobError, MAX_BLOB_BYTES, open_blob, seal_blob, seal_blob_with};
 pub use board::{
     Added, Agent, CommitTests, DecidedBy, DecisionKind, AgentStatus, BlobRef, Board, CardRef, Checkout, Ci, CiState, Counts, DeviceStanding, Git, Group, Item,
-    Later, LaterState, MAX_ADDED_REASON_CHARS, MAX_MOVED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, MAX_SUBTASK_ID_CHARS, NextPart, NextRow,
+    KebbieQuestion, KebbieQuestionKind, Later, LaterState, CLOSE_OPTIONS, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS,
+    MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, Requirement, RequirementKind, Stage, StageState,
+    VERIFY_OPTIONS, MAX_ADDED_REASON_CHARS, MAX_MOVED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_RULE_NAME_CHARS, MAX_RULE_NAMES, MAX_SUBTASK_ID_CHARS, NextPart, NextRow,
     Moved, Obstacle, ObstacleDecision, ObstacleState, OrderRow, OverrideBy, Prompt, PromptOption, PushPermission, Pushable,
     Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Subtask, SubtaskState,
-    TestsState, Verdict, VerdictOutcome, is_subtask_id, pushable_of,
+    TestsState, Verdict, VerdictOutcome, is_subtask_id, pushable_of, unlock_stages,
 };
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 pub use crypto::{
@@ -45,7 +47,7 @@ pub use device::{
     BadCert, DEVICE_CERT_DOMAIN, DEVICE_FINGERPRINT_DOMAIN, DeviceCert, DeviceKey, DeviceKind,
     DeviceTrust, MAX_DEVICE_NAME_CHARS, Trust, TrustAccount, VerifiedDevice, device_fingerprint,
 };
-pub use envelope::{Envelope, Header, Kind, ShapeError, Urgency};
+pub use envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, ShapeError, Urgency};
 pub use ids::{Id, IdError, Prefix};
 pub use message::{
     Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundStart, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
