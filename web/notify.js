@@ -216,13 +216,25 @@ export function failureLine(failure, now) {
   return `The last notification, at ${clock(failure.at, now)}${failure.name ? ` from ${failure.name}` : ""}, couldn't be opened: ${why}`;
 }
 
-export async function showPushed(registration, envelope, { get, now, put = null, del = null, boards = null }) {
+export const PUSHED = "pushed";
+
+export async function watching(clients) {
+  if (!clients) return [];
+  const windows = await clients.matchAll({ type: "window", includeUncontrolled: true }).catch(() => []);
+  return windows.filter((client) => client.visibilityState === "visible" && client.focused);
+}
+
+// WebKit counts a push as shown once showNotification is called inside its event, so a quiet notice can be closed at once without the subscription being revoked.
+export async function showPushed(registration, envelope, { get, now, put = null, del = null, boards = null, clients = null }) {
   const shown = await pushedNotice(envelope, { get, now, put, boards });
+  const open = await watching(clients);
   if (shown.failure && put) await put(NOTICE_FAILURE, shown.failure).catch(() => undefined);
   if (!shown.failure && del) await del(NOTICE_FAILURE).catch(() => undefined);
   if (shown.retract.length) {
     for (const notification of await registration.getNotifications()) if (shown.retract.includes(notification.tag)) notification.close();
   }
-  await registration.showNotification(shown.title, { body: shown.body, tag: shown.tag, data: shown.data, icon: "/icon-192.png" });
-  return shown;
+  for (const client of open) client.postMessage({ type: PUSHED, tag: shown.tag, url: shown.data.url });
+  await registration.showNotification(shown.title, { body: shown.body, tag: shown.tag, data: shown.data, icon: "/icon-192.png", silent: open.length > 0 });
+  if (open.length) for (const notification of await registration.getNotifications({ tag: shown.tag })) if (notification.tag === shown.tag) notification.close();
+  return { ...shown, quiet: open.length > 0 };
 }

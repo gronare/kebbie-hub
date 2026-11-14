@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceId, emptyMachineList, importIdentity, machineListWith, newAccountSecrets, newDeviceKey, sealEnvelope, signMachineList } from "../js/protocol.js";
-import { CATEGORY_GROUPS, closeSettled, deviceWord, failureLine, GENERIC, isSettled, keptCategories, LISTING, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, pushedNotice, routeOf, showPushed, switchable, withCategory } from "./notify.js";
+import { CATEGORY_GROUPS, closeSettled, deviceWord, failureLine, GENERIC, isSettled, keptCategories, LISTING, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, pushedNotice, PUSHED, routeOf, showPushed, switchable, withCategory } from "./notify.js";
 
 const { parties } = JSON.parse(readFileSync(new URL("../vectors/keys.json", import.meta.url), "utf8"));
 const NOW = 1_761_070_000;
@@ -220,6 +220,62 @@ test("the service worker closes what the notice retracts and shows the notice un
   assert.deepEqual(closed, ["q-old"]);
   assert.equal(shown.length, 1);
   assert.deepEqual([shown[0].title, shown[0].body, shown[0].tag], ["refunds · shop", "Keep the old endpoint for a release?", "q-refunds"]);
+});
+
+const tray = () => {
+  const shown = [];
+  const closed = [];
+  const registration = {
+    getNotifications: async ({ tag } = {}) => shown.filter((one) => !tag || one.tag === tag).map((one) => ({ tag: one.tag, close: () => closed.push(one.tag) })),
+    showNotification: async (title, options) => shown.push({ title, ...options }),
+  };
+  return { registration, shown, closed };
+};
+
+const windows = (...states) => {
+  const posted = [];
+  const list = states.map(([visibilityState, focused], index) => ({ visibilityState, focused, postMessage: (message) => posted.push({ index, message }) }));
+  const asked = [];
+  return { posted, asked, clients: { matchAll: async (options) => (asked.push(options), list) } };
+};
+
+test("a push while a window of the app is visible and focused tells that window, shows the notice silently and closes it at once", async () => {
+  const { get, seal } = await world();
+  const { registration, shown, closed } = tray();
+  const { clients, posted, asked } = windows(["hidden", false], ["visible", true]);
+  const result = await showPushed(registration, await seal(notice), { get, now: NOW, clients });
+  assert.deepEqual(asked, [{ type: "window", includeUncontrolled: true }]);
+  assert.match(shown[0].data.url, /^\/#\/task\//);
+  assert.deepEqual(posted, [{ index: 1, message: { type: PUSHED, tag: "q-refunds", url: shown[0].data.url } }]);
+  assert.equal(shown.length, 1);
+  assert.deepEqual([shown[0].tag, shown[0].silent], ["q-refunds", true]);
+  assert.deepEqual(closed, ["q-refunds"]);
+  assert.equal(result.quiet, true);
+});
+
+test("a push with no window in view, or one visible but not focused, shows the notice with its sound and leaves it", async () => {
+  const { get, seal } = await world();
+  for (const states of [[], [["hidden", false]], [["visible", false]], [["hidden", true]]]) {
+    const { registration, shown, closed } = tray();
+    const { clients, posted } = windows(...states);
+    const result = await showPushed(registration, await seal(notice), { get, now: NOW, clients });
+    assert.deepEqual([shown.length, shown[0].silent, closed.length, posted.length, result.quiet], [1, false, 0, 0, false], JSON.stringify(states));
+  }
+});
+
+test("a push still shows its notice when the worker can't list its windows", async () => {
+  const { get, seal } = await world();
+  const { registration, shown, closed } = tray();
+  await showPushed(registration, await seal(notice), { get, now: NOW, clients: { matchAll: async () => Promise.reject(new Error("gone")) } });
+  assert.deepEqual([shown.length, shown[0].silent, closed.length], [1, false, 0]);
+});
+
+test("a notice that couldn't be opened is quiet too while the app is in view", async () => {
+  const { get } = await world();
+  const { registration, shown, closed } = tray();
+  const { clients, posted } = windows(["visible", true]);
+  await showPushed(registration, null, { get, now: NOW, clients });
+  assert.deepEqual([shown[0].silent, closed, posted[0].message.url], [true, ["kebbie"], "/#/board"]);
 });
 
 test("the service worker's shell holds every module the app and the worker import", async () => {

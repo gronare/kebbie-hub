@@ -15,7 +15,7 @@ import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
-import { closeSettled } from "./notify.js";
+import { closeSettled, PUSHED } from "./notify.js";
 import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, wholePage } from "./review.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
@@ -2072,6 +2072,7 @@ async function start() {
   showHint();
   if ("serviceWorker" in navigator) {
     watchShell(navigator.serviceWorker);
+    navigator.serviceWorker.addEventListener("message", (event) => event.data?.type === PUSHED && refresh());
     watchUpdate(navigator.serviceWorker, () => {
       state.updated = true;
       render();
