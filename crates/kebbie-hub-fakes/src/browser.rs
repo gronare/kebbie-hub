@@ -567,6 +567,10 @@ impl Browser {
         self.get("/v1/a/account").await
     }
 
+    pub async fn start_trial(&mut self) -> Result<kebbie_hub_api::HubPlan, HubError> {
+        self.post("/v1/a/plan/trial", &serde_json::json!({})).await
+    }
+
     pub fn knows(&mut self, machine: &Id, keys: PublicKeys) {
         self.machines.insert(machine.clone(), keys);
     }
@@ -926,10 +930,15 @@ impl Browser {
     }
 
     pub async fn deny_connect(&mut self, code: &str) -> Result<(), HubError> {
+        self.stop_connect(code, false).await
+    }
+
+    pub async fn stop_connect(&mut self, code: &str, pro: bool) -> Result<(), HubError> {
         self.post::<_, Option<()>>(
             "/v1/a/connect/deny",
             &ConnectDenial {
                 code: code.to_string(),
+                pro,
             },
         )
         .await

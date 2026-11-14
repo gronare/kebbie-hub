@@ -236,6 +236,8 @@ export function refusedBlock(url) {
 export const COMMAND_TEXT = {
   "commands-off": "This hub doesn't take answers or pushes.",
   "plan-inactive": "Answering and pushing are not enabled for your account on this hub.",
+  "pro-required": "That is part of Pro.",
+  "trial-used": "Your Pro trial has been used. Pro is bought in your browser.",
   "unknown-machine": "This machine isn't on your account any more.",
   "queue-full": "Too much waits for that machine. Try again later.",
   "rate-limited": "Too many tries. Wait a minute.",

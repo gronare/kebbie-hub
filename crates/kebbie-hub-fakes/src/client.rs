@@ -1,7 +1,7 @@
 use std::fmt;
 use std::time::Duration;
 
-use kebbie_hub_api::{ErrorBody, PLAN_INACTIVE, PairingState, PairingView};
+use kebbie_hub_api::{ErrorBody, PLAN_INACTIVE, PRO_REQUIRED, PairingState, PairingView};
 use reqwest::{Method, RequestBuilder};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -14,6 +14,7 @@ const LONGEST_WAIT: u64 = 25;
 pub enum HubError {
     Status { status: u16, code: String },
     CommandsRefused { url: Option<String> },
+    ProRequired { url: Option<String> },
     Transport(String),
 }
 
@@ -21,7 +22,7 @@ impl HubError {
     pub fn status(&self) -> Option<u16> {
         match self {
             HubError::Status { status, .. } => Some(*status),
-            HubError::CommandsRefused { .. } => Some(402),
+            HubError::CommandsRefused { .. } | HubError::ProRequired { .. } => Some(402),
             HubError::Transport(_) => None,
         }
     }
@@ -30,6 +31,7 @@ impl HubError {
         match self {
             HubError::Status { code, .. } => Some(code),
             HubError::CommandsRefused { .. } => Some(PLAN_INACTIVE),
+            HubError::ProRequired { .. } => Some(PRO_REQUIRED),
             HubError::Transport(_) => None,
         }
     }
@@ -40,6 +42,9 @@ impl HubError {
         match body {
             Some(body) if status.as_u16() == 402 && body.error == PLAN_INACTIVE => {
                 HubError::CommandsRefused { url: body.url }
+            }
+            Some(body) if status.as_u16() == 402 && body.error == PRO_REQUIRED => {
+                HubError::ProRequired { url: body.url }
             }
             Some(body) => HubError::Status {
                 status: status.as_u16(),
@@ -66,6 +71,8 @@ impl fmt::Display for HubError {
             HubError::CommandsRefused { url: None } => {
                 formatter.write_str("this hub takes no commands for this machine's account")
             }
+            HubError::ProRequired { url: Some(url) } => write!(formatter, "that is part of Pro; see {url}"),
+            HubError::ProRequired { url: None } => formatter.write_str("that is part of Pro"),
             HubError::Transport(message) => write!(formatter, "could not reach the hub: {message}"),
         }
     }

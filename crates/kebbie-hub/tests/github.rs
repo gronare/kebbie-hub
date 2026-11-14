@@ -675,7 +675,7 @@ async fn an_embedder_that_keeps_email_gets_the_verified_primary_address_from_git
     let kept: Arc<Mutex<Vec<(String, String)>>> = Arc::default();
     let recorded = Arc::clone(&kept);
     let hooks = Hooks {
-        command_gate: None,
+        plans: None,
         account_email: Some(Box::new(move |_, account, email| {
             recorded.lock().unwrap().push((account.to_string(), email.to_string()));
             Ok(())

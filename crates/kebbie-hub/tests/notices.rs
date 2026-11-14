@@ -659,9 +659,9 @@ async fn devices_and_notifications_close_with_the_command_switch_and_the_account
     assert_eq!(refusal_of(person.subscribe_push(&secret.subscription(&[])).await), (404, "commands-off".to_string()));
 
     let open = Arc::new(std::sync::atomic::AtomicBool::new(true));
-    let gate: kebbie_hub::CommandGate = {
+    let gate: Box<dyn kebbie_hub::Plans> = {
         let open = Arc::clone(&open);
-        Box::new(move |_, _| if open.load(std::sync::atomic::Ordering::SeqCst) { Ok(()) } else { Err(kebbie_hub::Refusal { url: Some("https://example.com/plan".into()) }) })
+        Box::new(move |_: &kebbie_hub::store::Store, _: &str, _: kebbie_hub::Gated| if open.load(std::sync::atomic::Ordering::SeqCst) { Ok(()) } else { Err(kebbie_hub::Refusal { url: Some("https://example.com/plan".into()), pro: false }) })
     };
     let test = start_hub_with(
         |config| {

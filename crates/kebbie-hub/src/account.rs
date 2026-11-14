@@ -157,7 +157,10 @@ pub fn account_view(hub: &Hub, account: &str, access: Access) -> Result<AccountV
         .store()
         .account(account)?
         .ok_or_else(ApiError::unauthorized)?;
-    let key = hub.store().account_key(account)?;
+    let (key, plan) = {
+        let store = hub.store();
+        (store.account_key(account)?, hub.plan_of(&store, account))
+    };
     Ok(AccountView {
         key,
         account: row.id,
@@ -166,6 +169,7 @@ pub fn account_view(hub: &Hub, account: &str, access: Access) -> Result<AccountV
         owner: row.owner,
         github: row.github_login,
         key_access: access == Access::Key,
+        plan,
     })
 }
 
@@ -554,7 +558,7 @@ pub async fn hub_info(
     hub.limit_anonymous(&client.address)?;
     Ok(Json(HubInfo {
         signup: hub.config().signup,
-        plans: hub.has_command_gate(),
+        plans: hub.has_plans(),
         needs_setup: hub.store().account_count()? == 0,
         github: hub.github().is_some(),
         commands: hub.config().commands,

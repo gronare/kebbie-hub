@@ -10,7 +10,7 @@ use serde::Deserialize;
 use crate::auth::{KeyAccount, SameOrigin};
 use crate::error::ApiError;
 use crate::store::{DeviceRow, DeviceWrite, NewDevice};
-use crate::{Hub, MAX_STORED_INTEGER, now};
+use crate::{Gated, Hub, MAX_STORED_INTEGER, now};
 
 const PAGE: u64 = 50;
 
@@ -50,7 +50,7 @@ pub async fn post_device(
         return Err(ApiError::bad_request("wrong-account"));
     }
     let mut store = hub.store();
-    hub.check_account_gate(&store, &account)?;
+    hub.check_gate(&store, &account, Gated::Device)?;
     let key = store
         .account_key(&account)?
         .ok_or(ApiError::conflict("no-key"))?;
@@ -150,7 +150,8 @@ pub async fn device_commands(
         {
             return Err(unknown());
         }
-        store.device_commands(&account, &device, query.before, PAGE + 1)?
+        let since = hub.history_of(&store, &account).map_or(0, |reach| now().saturating_sub(reach));
+        store.device_commands(&account, &device, query.before, since, PAGE + 1)?
     };
     let more = rows.len() as u64 > PAGE;
     let opened = |text: &str| {

@@ -22,7 +22,7 @@ use crate::error::ApiError;
 use crate::pairing::{Side, Watch, view as pairing_view};
 use crate::store::{self, Connect, ConnectPairing, NewConnect, Pairing, Store};
 use crate::wake::pairing_key;
-use crate::{Hub, clean_name, now};
+use crate::{Gated, Hub, clean_name, now};
 
 const SLOW_DOWN_STEP: u64 = 5;
 
@@ -104,7 +104,10 @@ pub async fn token(
         }
         ConnectState::Denied => {
             store.end_connect(&hash)?;
-            Err(grant(CONNECT_DENIED))
+            match &connect.account {
+                Some(account) => Err(hub.check_gate(&store, account, Gated::Machine).err().unwrap_or_else(|| grant(CONNECT_DENIED))),
+                None => Err(grant(CONNECT_DENIED)),
+            }
         }
         ConnectState::Approved => {
             let token = new_token(MACHINE_TOKEN_PREFIX);
@@ -211,6 +214,7 @@ pub async fn approve(
     if connect.passkey_account.as_deref() != Some(account.as_str()) || connect.passkey_until.is_none_or(|until| until <= at) {
         return Err(ApiError::forbidden("passkey-required"));
     }
+    hub.check_gate(&store, &account, Gated::Machine)?;
     let placeholder = random::<32>();
     let approved = store
         .approve_connect(&store::ConnectApproval {
@@ -244,7 +248,8 @@ pub async fn deny(
     let at = now();
     let store = hub.store();
     let (code, _) = pending(&store, &request.code, at)?;
-    store.deny_connect(&digest(&code), at)?;
+    let refused = request.pro && hub.check_gate(&store, &account, Gated::Machine).is_err();
+    store.deny_connect(&digest(&code), refused.then_some(account.as_str()), at)?;
     store.log(at, "connect.denied", None, Some(&account))?;
     Ok(StatusCode::NO_CONTENT)
 }

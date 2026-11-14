@@ -100,6 +100,29 @@ pub struct ErrorBody {
 
 // The code of the 402 a command gate answers with; kebbie matches it, so it never changes.
 pub const PLAN_INACTIVE: &str = "plan-inactive";
+// The code of the 402 for one action the account's plan does not include, such as a push or a second machine.
+pub const PRO_REQUIRED: &str = "pro-required";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "kebab-case")]
+pub enum PlanState {
+    Free,
+    Trial { until: u64 },
+    Pro,
+    Expired { until: u64, trial: bool },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HubPlan {
+    #[serde(flatten)]
+    pub state: PlanState,
+    // The command kinds that need Pro; every other kind is free.
+    pub pro: Vec<String>,
+    // How many machines the plan connects; None is no limit.
+    pub machines: Option<u64>,
+    pub trial_days: u64,
+    pub billing: Option<String>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JoinRequest {
@@ -375,6 +398,9 @@ pub struct AccountView {
     // False for a session email or GitHub opened: it reaches the account, and what needs the account key waits for a passkey.
     #[serde(default = "key_access_default")]
     pub key_access: bool,
+    // Set by a hub with plans; a hub without them has no limits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<HubPlan>,
 }
 
 fn key_access_default() -> bool {
@@ -391,7 +417,7 @@ pub enum SignupMode {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HubInfo {
     pub signup: SignupMode,
-    // kebbie releases that read this answer require the field; it says whether a command gate is set.
+    // kebbie releases that read this answer require the field; it says whether the hub has plans.
     pub plans: bool,
     pub needs_setup: bool,
     #[serde(default)]
@@ -669,6 +695,9 @@ pub struct ConnectApproved {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConnectDenial {
     pub code: String,
+    // True when the person stops because a second machine is part of Pro; the waiting machine then hears the 402.
+    #[serde(default)]
+    pub pro: bool,
 }
 
 pub const EVENT_BOARD: &str = "board";

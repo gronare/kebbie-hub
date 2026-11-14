@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use axum::Router;
-use kebbie_hub::{CommandGate, Config, DEV_ORIGIN, Hooks, Hub, serve_with};
+use kebbie_hub::{Config, DEV_ORIGIN, Hooks, Hub, Plans, serve_with};
 use kebbie_hub_api::{
     CreationCeremony, LoginBegin, LoginFinish, PasskeyView,
     RegisterBegin, RegisterFinish, RequestCeremony,
@@ -40,10 +40,10 @@ pub async fn start_hub(configure: impl FnOnce(&mut Config)) -> TestHub {
 
 pub async fn start_hub_with(
     configure: impl FnOnce(&mut Config),
-    gate: Option<CommandGate>,
+    plans: Option<Box<dyn Plans>>,
     extra: Router<Arc<Hub>>,
 ) -> TestHub {
-    start_hub_hooks(configure, Hooks { command_gate: gate, ..Hooks::default() }, extra).await
+    start_hub_hooks(configure, Hooks { plans, ..Hooks::default() }, extra).await
 }
 
 pub async fn start_hub_hooks(

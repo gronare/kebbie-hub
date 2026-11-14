@@ -6,11 +6,12 @@ import { account, connectCalls, HubError } from "./hub.js";
 import { put, get, del } from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, heldDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 import { fromB64, toB64 } from "../js/protocol.js";
-import { decisionBlock, standingOn } from "./decide.js";
+import { COMMAND_TEXT, decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
+import { currentPlan, machineNeedsPro, placeSheet, proCard } from "./pro.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
 
 export const PAGES = ["/setup", "/signup", "/connect", "/account"];
@@ -76,7 +77,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, notifying: false, kept: null, deciding: false };
+  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, notifying: false, kept: null, deciding: false, pro: null };
   const hub = { account, credentials: navigator.credentials };
   const path = location.pathname;
   const code = params.get("code") ?? "";
@@ -92,7 +93,9 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     liftKeyboard(auth && html.includes("<input"));
     const focused = document.activeElement?.id && root.contains(document.activeElement) ? document.activeElement.id : null;
     const main = `<main class="screen page${inApp ? " in-app" : ""}${auth ? " auth" : ""}">${html}</main>`;
-    root.innerHTML = inApp ? `<div class="app">${nav({ active: "account", deskOnly: true })}${main}</div>` : main;
+    const sheet = state.pro ? proCard({ plan: currentPlan(state.me?.plan, nowSeconds()), kind: "machine", machine: state.view?.name ?? null, busy: state.pro.busy, error: state.pro.error }) : "";
+    root.innerHTML = (inApp ? `<div class="app">${nav({ active: "account", deskOnly: true })}${main}</div>` : main) + sheet;
+    placeSheet(root);
     if (focused) document.getElementById(focused)?.focus({ preventScroll: true });
   };
 
@@ -487,7 +490,49 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     state.machines = (listing?.boards ?? []).map((entry) => entry.name || entry.machine.slice(-6));
   }
 
+  function askMachine() {
+    return new Promise((resolve) => {
+      state.pro = { resolve, busy: false, error: null };
+      draw();
+    });
+  }
+
+  async function startTrial() {
+    if (!state.pro || state.pro.busy) return;
+    Object.assign(state.pro, { busy: true, error: null });
+    draw();
+    try {
+      const plan = await account.startTrial();
+      state.me = { ...state.me, plan };
+      const { resolve } = state.pro;
+      state.pro = null;
+      resolve(true);
+    } catch (error) {
+      Object.assign(state.pro, { busy: false, error: COMMAND_TEXT[error?.code] ?? message(error) });
+      if (error?.code === "trial-used") state.me = await account.me().catch(() => state.me);
+      draw();
+    }
+  }
+
+  async function stopForPro() {
+    const pro = state.pro;
+    state.pro = null;
+    await connectCalls.deny(code, true).catch(() => undefined);
+    state.phase = "cancelled";
+    pro?.resolve(false);
+    draw();
+  }
+
+  function closeCard() {
+    const pro = state.pro;
+    state.pro = null;
+    state.busy = false;
+    pro?.resolve(false);
+    draw();
+  }
+
   async function connect() {
+    if (state.me && machineNeedsPro(currentPlan(state.me.plan, nowSeconds()), state.machines.length) && !(await askMachine())) return;
     state.busy = true;
     state.notice = null;
     draw();
@@ -534,6 +579,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
         return draw();
       }
       if (state.phase === "pairing") state.phase = "start";
+      if (error instanceof HubError && error.code === "pro-required") {
+        state.busy = false;
+        state.me = await account.me().catch(() => state.me);
+        if (await askMachine()) return connect();
+        return;
+      }
       fail(error);
     }
   }
@@ -734,6 +785,9 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       return draw();
     }
     try {
+      if (action === "pro-trial") return await startTrial();
+      if (action === "pro-close") return await stopForPro();
+      if (action === "pro-continue") return setTimeout(closeCard);
       if (action === "decide-device") return await decideDevice(target.dataset.machine, target.dataset.approve === "true");
       if (action === "device-older") return await showOlder();
       if (action === "device-remove") return await removeDevice();

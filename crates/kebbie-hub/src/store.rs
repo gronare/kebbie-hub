@@ -974,6 +974,7 @@ impl Store {
         account: &str,
         device: &Id,
         before: Option<u64>,
+        since: u64,
         limit: u64,
     ) -> Result<Vec<DeviceCommandRow>> {
         let mut statement = self.connection.prepare(
@@ -982,12 +983,12 @@ impl Store {
                     results.envelope, results.stored_at
              FROM commands LEFT JOIN results
                  ON results.account_id = commands.account_id AND results.command_id = commands.command_id
-             WHERE commands.account_id = ?1 AND commands.device_id = ?2 AND commands.rowid < ?3
+             WHERE commands.account_id = ?1 AND commands.device_id = ?2 AND commands.rowid < ?3 AND commands.queued_at >= ?5
              ORDER BY commands.rowid DESC LIMIT ?4",
         )?;
         statement
             .query_map(
-                params![account, device.as_str(), before.unwrap_or(i64::MAX as u64), limit],
+                params![account, device.as_str(), before.unwrap_or(i64::MAX as u64), limit, since],
                 |row| {
                     Ok(DeviceCommandRow {
                         position: row.get(0)?,
@@ -1653,11 +1654,12 @@ impl Store {
         Ok(connect)
     }
 
-    pub fn deny_connect(&self, user_code_hash: &[u8], now: u64) -> Result<bool> {
+    // An account given here is one a second machine was refused for; the waiting machine then hears that refusal.
+    pub fn deny_connect(&self, user_code_hash: &[u8], refused_for: Option<&str>, now: u64) -> Result<bool> {
         Ok(self.connection.execute(
-            "UPDATE connects SET state = 'denied'
+            "UPDATE connects SET state = 'denied', account_id = ?3
              WHERE user_code_hash = ?1 AND state = 'pending' AND expires_at > ?2",
-            params![user_code_hash, now],
+            params![user_code_hash, now, refused_for],
         )? > 0)
     }
 

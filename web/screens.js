@@ -1,6 +1,7 @@
 import { acceptRequired, asksYou } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
+import { planGroup } from "./pro.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
@@ -699,7 +700,7 @@ export function accountScreen({ me, github, email = false, codes = false, changi
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifyRow(notify) : "")) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  return brand + `<h1 class="title">Account</h1>` + planGroup(me.plan, now) + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifyRow(notify) : "")) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {

@@ -20,6 +20,7 @@ import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fi
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
+import { currentPlan, endingChip, needsPro, placeSheet, proCard, showTrialLine } from "./pro.js";
 import { awayOn, chosenLead, composerHtml, leadHead, leadHref, leadMachines, panelHead, pendingMessages, pickRow, popHtml, previewOf, shortWhen, threadHtml, threadOf, unseenReplies, awaySwitch, awayNote } from "./lead.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
@@ -30,7 +31,9 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const PLAN_INACTIVE = "plan-inactive";
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const myPlan = () => currentPlan(state.me?.plan, nowSeconds());
 let reloading = false;
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
@@ -171,7 +174,7 @@ function boardHeader(view) {
   const phone = `<span class="phone-only">${boardCounts(view)}</span>`;
   const dots = state.offline ? `<span class="desk-only">${esc(freshness())}</span>` : machineDots(awakeFirst(state.opened, now).map((opened) => ({ name: opened.name, awake: awakeNow(opened, now), lastSeen: opened.lastSeen || opened.storedAt ? lastSeenText(opened.lastSeen ?? opened.storedAt, now) : null })));
   const accept = view.toAccept ? `<span class="desk-only">${acceptCount(view.toAccept)}</span>` : "";
-  return top("Board", phone + dots + accept);
+  return top("Board", phone + dots + accept + endingChip(myPlan(), now));
 }
 
 function boardNotices(view, now) {
@@ -213,7 +216,8 @@ function boardOverview() {
   const sections = boardSections(view);
   if (sections.length === 0) return boardScreen();
   const body = view.next.length ? nextList(view.next, now) : boardColumns(view, null, now);
-  return `<h1 class="big-title">Board</h1><p class="lead">${boardCounts(view)}</p>` + boardNotices(view, now) + sectionPills(sections) + body + problemsBlock(view) + installHint(state.hint);
+  const ending = endingChip(myPlan(), now);
+  return `<h1 class="big-title">Board</h1><p class="lead">${boardCounts(view)}${ending ? ` ${ending}` : ""}</p>` + boardNotices(view, now) + sectionPills(sections) + body + problemsBlock(view) + installHint(state.hint);
 }
 
 function sectionList(view, key, selected) {
@@ -855,6 +859,7 @@ async function sendLead() {
 async function switchAway(on) {
   const machines = state.opened.filter((one) => one.board && !one.problem && (one.board.accepts ?? []).includes("away"));
   const ui = { busy: false, error: null };
+  if (machines.length && !(await proAllows("away"))) return render();
   for (const machine of machines) await sendTo({ machine: { machine: machine.machine, name: machine.name }, payload: { type: "away", on }, meta: { on }, ui });
   state.lead.error = ui.error;
   render();
@@ -978,13 +983,17 @@ function render() {
   const panelTop = rendered === location.hash ? (root.querySelector(".panel")?.scrollTop ?? 0) : 0;
   const stick = name === "lead" && atThreadEnd();
   const pageTop = rendered === location.hash && !twoColumns() ? scrollY : null;
-  root.innerHTML = html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`;
+  const sheet = state.pro ? proCard({ plan: myPlan(), kind: state.pro.kind, busy: state.pro.busy, error: state.pro.error }) : "";
+  root.innerHTML = (html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`) + sheet;
+  if (state.trialLine && state.trialLine.hash !== location.hash) state.trialLine = null;
+  showTrialLine(root, state.trialLine, nowSeconds());
   rendered = location.hash;
   document.documentElement.classList.toggle("panes", twoColumns() && Boolean(root.querySelector(".app.with-panel")));
   document.documentElement.classList.toggle("has-send", Boolean(root.querySelector(".rv-sendbar")));
   document.documentElement.classList.toggle("has-fab", Boolean(root.querySelector(".fab, .idea-add")));
   document.documentElement.classList.toggle("has-composer", Boolean(root.querySelector(".composer")));
   fitComposer();
+  placeSheet(root);
   if (reviewing) hangLines(root);
   const refocus = focused ? document.getElementById(focused.id) : null;
   if (refocus) {
@@ -1156,10 +1165,11 @@ function collect() {
   return collecting;
 }
 
-async function send(target, payload, meta, ttl = undefined) {
+async function send(target, payload, meta, ttl = undefined, retried = false) {
   const { machine, address } = target.dataset;
   const ui = uiOf(machine, address);
   const keys = keysOf(machine);
+  if (!retried && !(await proAllows(payload.type))) return render();
   ui.busy = true;
   ui.error = null;
   render();
@@ -1176,7 +1186,8 @@ async function send(target, payload, meta, ttl = undefined) {
     ui.busy = false;
     ui.error = commandText(error);
     await refusedDevice(error);
-    if (error instanceof HubError && error.status === 402) state.refused = { url: error.url };
+    if (error instanceof HubError && error.code === PLAN_INACTIVE) state.refused = { url: error.url };
+    if (!retried && (await proRefused(error, payload.type))) return send(target, payload, meta, ttl, true);
   }
   render();
   collect();
@@ -1233,8 +1244,12 @@ function sendNoticed(target, action, key) {
 
 const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
 
-async function sendTo({ machine, payload, meta, ui }) {
+async function sendTo({ machine, payload, meta, ui }, retried = false) {
   const keys = keysOf(machine.machine);
+  if (!retried && !(await proAllows(payload.type))) {
+    render();
+    return null;
+  }
   ui.busy = true;
   ui.error = null;
   render();
@@ -1252,7 +1267,8 @@ async function sendTo({ machine, payload, meta, ui }) {
     ui.busy = false;
     ui.error = commandText(error);
     await refusedDevice(error);
-    if (error instanceof HubError && error.status === 402) state.refused = { url: error.url };
+    if (error instanceof HubError && error.code === PLAN_INACTIVE) state.refused = { url: error.url };
+    if (!retried && (await proRefused(error, payload.type))) return sendTo({ machine, payload, meta, ui }, true);
     render();
     return null;
   } finally {
@@ -1529,7 +1545,7 @@ function decideAction(action, target, element) {
     Object.assign(ui, { picked: index, free: false, error: null });
   } else if (action === "write-own") Object.assign(ui, { picked: null, free: true, note: "", error: null });
   else if (action === "pick-instead") Object.assign(ui, { free: false, note: "", error: null });
-  else if (action === "push-ask") Object.assign(ui, { confirming: true, error: null });
+  else if (action === "push-ask") return askPush(ui);
   else if (action === "push-cancel") Object.assign(ui, { confirming: false, error: null });
   else if (action === "answer") return sendAnswer(target);
   else if (action === "choose") return sendPromptAnswer(target);
@@ -1538,6 +1554,52 @@ function decideAction(action, target, element) {
   else if (action === "card-seen") markSeen(machine, address, Number(element.dataset.version));
   else if (NOTICED_ACTIONS.some((one) => one.action === action)) return sendNoticed(target, action, element.dataset.item);
   render();
+}
+
+async function askPush(ui) {
+  if (!(await proAllows("push"))) return;
+  Object.assign(ui, { confirming: true, error: null });
+  render();
+}
+
+function proAllows(kind) {
+  if (!needsPro(myPlan(), kind)) return Promise.resolve(true);
+  state.pro?.resolve(false);
+  return new Promise((resolve) => {
+    state.pro = { kind, resolve, busy: false, error: null };
+    render();
+  });
+}
+
+function closePro(allowed) {
+  const pro = state.pro;
+  if (!pro) return;
+  state.pro = null;
+  pro.resolve(allowed);
+  render();
+}
+
+async function startTrial() {
+  const pro = state.pro;
+  if (!pro || pro.busy) return;
+  Object.assign(pro, { busy: true, error: null });
+  render();
+  try {
+    const plan = await account.startTrial();
+    state.me = { ...state.me, plan };
+    if (plan.state === "trial") state.trialLine = { kind: pro.kind, until: plan.until, hash: location.hash };
+    closePro(true);
+  } catch (error) {
+    Object.assign(pro, { busy: false, error: commandText(error) });
+    if (error instanceof HubError && error.code === "trial-used") state.me = await account.me().catch(() => state.me);
+    render();
+  }
+}
+
+async function proRefused(error, kind) {
+  if (!(error instanceof HubError && error.code === "pro-required")) return false;
+  state.me = await account.me().catch(() => state.me);
+  return needsPro(myPlan(), kind) && (await proAllows(kind));
 }
 
 function stopCommands() {
@@ -1879,6 +1941,9 @@ root.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
+  if (action === "pro-close") return closePro(false);
+  if (action === "pro-continue") return setTimeout(() => closePro(false));
+  if (action === "pro-trial") return startTrial();
   if (action.startsWith("rv-")) return reviewAction(action, target);
   if (action === "steps-more") {
     const ui = uiOf(route().params[0], route().params[1]);

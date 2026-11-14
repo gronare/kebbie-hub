@@ -55,6 +55,7 @@ export const account = {
   subscribePush: (device, subscription) => call("PUT", `/v1/a/devices/${query(device)}/push`, { body: subscription }),
   setCategories: (device, categories) => call("PUT", `/v1/a/devices/${query(device)}/categories`, { body: { categories } }),
   unsubscribePush: (device) => call("DELETE", `/v1/a/devices/${query(device)}/push`),
+  startTrial: () => call("POST", "/v1/a/plan/trial", { body: {} }),
   deviceCommands: (device, before = null) => call("GET", `/v1/a/devices/${query(device)}/commands${before === null ? "" : `?before=${before}`}`),
 };
 
@@ -62,7 +63,7 @@ export const connectCalls = {
   peek: (code) => call("GET", `/v1/connect?code=${query(code)}`),
   view: (code) => call("GET", `/v1/a/connect?code=${query(code)}`),
   approve: (approval) => call("POST", "/v1/a/connect/approve", { body: approval }),
-  deny: (code) => call("POST", "/v1/a/connect/deny", { body: { code } }),
+  deny: (code, pro = false) => call("POST", "/v1/a/connect/deny", { body: pro ? { code, pro } : { code } }),
   watch: (pairing, seen, wait) => call("GET", `/v1/a/pairings/${query(pairing)}?seen=${seen}&wait=${wait}`),
   reveal: (pairing, key, nonce) => call("POST", `/v1/a/pairings/${query(pairing)}/reveal`, { body: { key, nonce } }),
   boards: () => call("GET", "/v1/a/boards"),

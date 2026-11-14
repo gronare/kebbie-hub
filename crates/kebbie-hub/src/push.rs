@@ -14,7 +14,7 @@ use crate::auth::{KeyAccount, MachineAuth, SameOrigin};
 use crate::error::ApiError;
 use crate::store::{NewSubscription, Subscribed};
 use crate::webpush::{MAX_PUSH_PLAINTEXT, SubscriptionKeys, Vapid, audience, check_endpoint, encrypt, parse_keys, topic};
-use crate::{Hub, now};
+use crate::{Gated, Hub, now};
 
 const VAPID_TOKEN_SECONDS: u64 = 12 * 3_600;
 const LONGEST_BACKOFF: Duration = Duration::from_secs(60);
@@ -73,7 +73,7 @@ fn notifying_device(hub: &Hub, account: &str, id: &str) -> Result<Id, ApiError> 
     }
     let device = owned_device(hub, account, id)?;
     let store = hub.store();
-    hub.check_account_gate(&store, account)?;
+    hub.check_gate(&store, account, Gated::Notifications)?;
     if store.device(&device)?.is_some_and(|row| row.removed_at.is_some()) {
         return Err(ApiError::new(StatusCode::GONE, "device-removed"));
     }
@@ -155,7 +155,7 @@ pub async fn notified_devices(
     let Some(account) = store.machine_owner(&machine)? else {
         return Ok(Json(NotifiedDevices { devices: Vec::new() }));
     };
-    if !hub.config().commands || hub.check_account_gate(&store, &account).is_err() {
+    if !hub.config().commands || hub.check_gate(&store, &account, Gated::Notifications).is_err() {
         return Ok(Json(NotifiedDevices { devices: Vec::new() }));
     }
     let devices = store
@@ -219,7 +219,7 @@ pub async fn post_notice(
         let store = hub.store();
         let account = store.machine_owner(&machine)?;
         if let Some(owner) = &account {
-            hub.check_account_gate(&store, owner)?;
+            hub.check_gate(&store, owner, Gated::Notifications)?;
         }
         if !store.record_notice(&machine, &header.id, header.exp)? {
             return Err(ApiError::conflict("replayed-envelope"));

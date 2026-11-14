@@ -30,7 +30,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
-use kebbie_hub_api::{MAX_WAIT_SECONDS, SignupMode, code_from_random};
+use kebbie_hub_api::{HubPlan, MAX_WAIT_SECONDS, SignupMode, code_from_random};
 use kebbie_hub_protocol::{Envelope, Id, Kind, MAX_BLOB_BYTES};
 use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
@@ -66,17 +66,48 @@ const SETUP_TTL: u64 = 30 * 86_400;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Refusal {
     pub url: Option<String>,
+    // True when the plan lacks this one action (a 402 pro-required); false refuses the account outright (a 402 plan-inactive).
+    pub pro: bool,
 }
 
-// Called with the store locked, so a gate reads through the Store it is given and never calls Hub::store.
-pub type CommandGate = Box<dyn Fn(&Store, &str) -> Result<(), Refusal> + Send + Sync>;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gated {
+    Command(Kind),
+    // A machine joining the account through connect; the policy counts the machines it already has.
+    Machine,
+    Device,
+    Notifications,
+}
+
+// Called with the store locked, so a policy reads through the Store it is given and never calls Hub::store.
+pub trait Plans: Send + Sync {
+    fn check(&self, store: &Store, account: &str, gated: Gated) -> Result<(), Refusal>;
+
+    fn plan(&self, _store: &Store, _account: &str) -> Option<HubPlan> {
+        None
+    }
+
+    // How far back an account's command history reaches, in seconds; None keeps all the hub stores.
+    fn history(&self, _store: &Store, _account: &str) -> Option<u64> {
+        None
+    }
+}
+
+impl<F> Plans for F
+where
+    F: Fn(&Store, &str, Gated) -> Result<(), Refusal> + Send + Sync,
+{
+    fn check(&self, store: &Store, account: &str, gated: Gated) -> Result<(), Refusal> {
+        self(store, account, gated)
+    }
+}
 
 // Set by an embedder that keeps account email and serves /v1/a/email; called with the store locked, an account and the verified primary address GitHub gave.
 pub type AccountEmailHook = Box<dyn Fn(&Store, &str, &str) -> store::Result<()> + Send + Sync>;
 
 #[derive(Default)]
 pub struct Hooks {
-    pub command_gate: Option<CommandGate>,
+    pub plans: Option<Box<dyn Plans>>,
     pub account_email: Option<AccountEmailHook>,
     // Set by an embedder that serves its own sign-in routes on the keyless-session seam; /v1/hub advertises it and a connect sign-up then needs one of those routes or GitHub, never a bare passkey.
     pub email_sign_in: bool,
@@ -317,10 +348,15 @@ pub struct Hub {
     github: Option<GitHub>,
     origin: String,
     feeds: Mutex<HashMap<String, usize>>,
-    command_gate: Option<CommandGate>,
+    plans: Option<Box<dyn Plans>>,
     account_email: Option<AccountEmailHook>,
     email_sign_in: bool,
     config: Config,
+}
+
+fn refused(refusal: Refusal) -> ApiError {
+    let code = if refusal.pro { kebbie_hub_api::PRO_REQUIRED } else { kebbie_hub_api::PLAN_INACTIVE };
+    ApiError::new(StatusCode::PAYMENT_REQUIRED, code).with_url(refusal.url)
 }
 
 pub struct FeedPermit {
@@ -349,8 +385,8 @@ impl Hub {
         Hub::open_with(config, None)
     }
 
-    pub fn open_with(config: Config, command_gate: Option<CommandGate>) -> Result<Arc<Hub>, OpenError> {
-        Hub::open_with_hooks(config, Hooks { command_gate, ..Hooks::default() })
+    pub fn open_with(config: Config, plans: Option<Box<dyn Plans>>) -> Result<Arc<Hub>, OpenError> {
+        Hub::open_with_hooks(config, Hooks { plans, ..Hooks::default() })
     }
 
     pub fn open_with_hooks(config: Config, hooks: Hooks) -> Result<Arc<Hub>, OpenError> {
@@ -398,7 +434,7 @@ impl Hub {
             github,
             origin,
             feeds: Mutex::new(HashMap::new()),
-            command_gate: hooks.command_gate,
+            plans: hooks.plans,
             account_email: hooks.account_email,
             email_sign_in: hooks.email_sign_in,
             config,
@@ -502,24 +538,30 @@ impl Hub {
         }
     }
 
-    pub fn has_command_gate(&self) -> bool {
-        self.command_gate.is_some()
+    pub fn has_plans(&self) -> bool {
+        self.plans.is_some()
     }
 
-    pub(crate) fn check_command_gate(&self, store: &Store, machine: &Id) -> Result<(), ApiError> {
+    pub(crate) fn check_command_gate(&self, store: &Store, machine: &Id, kind: Kind) -> Result<(), ApiError> {
         match store.machine_owner(machine)? {
-            Some(account) => self.check_account_gate(store, &account),
+            Some(account) => self.check_gate(store, &account, Gated::Command(kind)),
             None => Ok(()),
         }
     }
 
-    pub(crate) fn check_account_gate(&self, store: &Store, account: &str) -> Result<(), ApiError> {
-        let Some(gate) = &self.command_gate else {
+    pub(crate) fn check_gate(&self, store: &Store, account: &str, gated: Gated) -> Result<(), ApiError> {
+        let Some(plans) = &self.plans else {
             return Ok(());
         };
-        gate(store, account).map_err(|refusal| {
-            ApiError::new(StatusCode::PAYMENT_REQUIRED, kebbie_hub_api::PLAN_INACTIVE).with_url(refusal.url)
-        })
+        plans.check(store, account, gated).map_err(refused)
+    }
+
+    pub(crate) fn plan_of(&self, store: &Store, account: &str) -> Option<HubPlan> {
+        self.plans.as_ref().and_then(|plans| plans.plan(store, account))
+    }
+
+    pub(crate) fn history_of(&self, store: &Store, account: &str) -> Option<u64> {
+        self.plans.as_ref().and_then(|plans| plans.history(store, account))
     }
 
     pub fn mint_invite(&self) -> store::Result<String> {

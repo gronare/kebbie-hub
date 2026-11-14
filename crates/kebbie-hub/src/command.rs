@@ -76,7 +76,7 @@ pub async fn post_command(
     if store.machine_owner(machine)?.as_deref() != Some(account.as_str()) {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "unknown-machine"));
     }
-    hub.check_command_gate(&store, machine)?;
+    hub.check_command_gate(&store, machine, header.kind)?;
     if let Some((held, seq)) = store.resent_command(&account, &header.id)?
         && held == digest
     {

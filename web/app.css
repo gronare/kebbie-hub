@@ -904,3 +904,21 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .pop-scrim { position: fixed; inset: 0; z-index: 6; background: rgba(0, 0, 0, 0.22); }
 :root.pose-desk .composer { left: 200px; bottom: 0; padding-bottom: 12px; }
 :root.has-composer.pose-desk main.screen.in-app, :root.has-composer.pose-desk .panel { padding-bottom: calc(var(--composer-h, 61px) + 16px); }
+.pro-scrim { position: fixed; inset: 0; z-index: 9; background: rgba(0, 0, 0, 0.42); }
+.pro-sheet { position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; display: grid; gap: 12px; background: var(--card); border-top: 1px solid var(--line); border-radius: 22px 22px 0 0; padding: 20px calc(env(safe-area-inset-right) + 20px) calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 20px); box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.32); }
+.pro-sheet .grab { justify-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--line); margin: -8px 0 2px; }
+.pro-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.pro-title { font: 700 24px/1.15 var(--display); margin: -6px 0 0; text-wrap: balance; }
+.pro-sub { margin: -4px 0 0; font-size: 14px; color: var(--muted); }
+.pro-gives { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 8px; font-size: 15px; }
+.pro-gives li { display: flex; gap: 10px; align-items: flex-start; }
+.pro-gives svg { flex: none; width: 18px; height: 18px; margin-top: 2px; fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.pro-fine { margin: 0; font-size: 13px; color: var(--muted); }
+.pro-acts { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.pro-acts .btn.fit { min-height: 48px; }
+.pro-acts .ext { width: 16px; height: 16px; margin-left: 6px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.trial-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding: 2px 2px 0; }
+.chip.trial { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); font-family: var(--sans); font-weight: 600; text-decoration: none; }
+.plan-row .meta { margin-top: 2px; }
+.plan-row .head { display: flex; align-items: center; gap: 8px; }
+.plan-row .head .name { flex: 1; }
