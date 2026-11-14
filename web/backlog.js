@@ -127,7 +127,7 @@ export function machinePicker(candidates, chosen, { label, choosing }) {
 }
 
 export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null }) {
-  const field = `<div class="note-field"><label for="idea">What you want, in a line. The lead writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="2" maxlength="2000">${esc(text)}</textarea></div>`;
+  const field = `<div class="note-field"><label for="idea">Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
   if (!chosen) return field + `<div class="pro">No machine takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
   const ready = text.trim() !== "" && !busy;
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
