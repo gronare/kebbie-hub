@@ -194,6 +194,37 @@ export function lockWhenDue(relock, { store = deviceStore, page = globalThis.doc
   };
 }
 
+// WebKit rejects a modal get() with NotAllowedError while the document lacks focus, so a prompt waits for focus.
+export function unlockOnShow(prompt, locked, { page = globalThis.document, win = globalThis } = {}) {
+  let armed = true;
+  let waiting = false;
+  const run = () => {
+    waiting = false;
+    if (!armed || page.visibilityState !== "visible" || !locked()) return;
+    armed = false;
+    prompt();
+  };
+  const shown = () => {
+    if (!armed || waiting || page.visibilityState !== "visible") return;
+    waiting = true;
+    if (page.hasFocus?.() === false) win.addEventListener?.("focus", run, { once: true });
+    else queueMicrotask(run);
+  };
+  page?.addEventListener?.("visibilitychange", () => {
+    if (page.visibilityState !== "visible") armed = true;
+    else setTimeout(() => locked() && shown(), 0);
+  });
+  return {
+    shown,
+    arm() {
+      armed = true;
+    },
+    disarm() {
+      armed = false;
+    },
+  };
+}
+
 export async function signedInAccount(account, store = deviceStore) {
   try {
     return await account.me();

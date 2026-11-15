@@ -12,7 +12,7 @@ import { CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
 import { assessmentBlock, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea } from "./card.js";
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
-import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
@@ -86,6 +86,7 @@ const twoColumns = () => splitLike() || pose === "desk";
 const overview = () => overviewPose(pose, innerHeight > innerWidth);
 const lists = { boards: account.boards, putMachines: connectCalls.putMachines };
 const unlockEnds = lockWhenDue(lockBoards);
+const unlockPrompt = unlockOnShow(() => signInWithPasskey(rememberedCredential()), () => passkeyLocked());
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
@@ -952,6 +953,8 @@ function lockedScreen() {
   return authScreen({ intro: `<div class="center">${esc(STATE_TEXT[status] ?? STATE_TEXT.locked)}</div>`, actions: `<button type="button" class="btn primary" data-action="other-passkey">Try another passkey</button>`, notice: state.notice });
 }
 
+const passkeyLocked = () => cryptoReady() && !state.unlocking && Boolean(state.me) && !signedInWaits() && state.session?.state === "locked" && !needsFirstPasskey(state.me, state.session);
+
 const emailSignIn = () => Boolean(state.info?.email_signin);
 const liftKeyboard = keyboardLift();
 
@@ -1017,6 +1020,7 @@ function render() {
   root.innerHTML = (html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`) + sheet;
   if (state.trialLine && state.trialLine.hash !== location.hash) state.trialLine = null;
   showTrialLine(root, state.trialLine, nowSeconds());
+  if (passkeyLocked()) unlockPrompt.shown();
   rendered = location.hash;
   document.documentElement.classList.toggle("panes", twoColumns() && Boolean(root.querySelector(".app.with-panel")));
   document.documentElement.classList.toggle("has-send", Boolean(root.querySelector(".rv-sendbar")));
@@ -1660,6 +1664,7 @@ function lockBoards() {
   following = null;
   state.opened = [];
   state.session = { state: "locked", me: state.me };
+  unlockPrompt.arm();
   render();
 }
 
@@ -2040,7 +2045,10 @@ root.addEventListener("click", (event) => {
   } else if (action === "use-passkey") signInWithPasskey(null);
   else if (action === "add-email") addEmail();
   else if (action === "confirm-email") confirmEmail();
-  else if (action === "sign-in") signInWithPasskey(rememberedCredential());
+  else if (action === "sign-in") {
+    unlockPrompt.disarm();
+    signInWithPasskey(rememberedCredential());
+  }
   else if (action === "other-passkey") signInWithPasskey(null);
   else if (action === "add-passkey") addPasskey();
   else if (action === "not-now") {

@@ -6,7 +6,7 @@ import { fromB64, importSender, openEnvelope, toB64, unwrapAccountSecrets, wrapp
 import { HubError } from "./hub.js";
 import { signUpWith, signInWith } from "./signin.js";
 import { passkeySignInScreen, signedOutStep } from "./email.js";
-import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter } from "./unlock.js";
+import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter, unlockOnShow } from "./unlock.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -395,6 +395,85 @@ test("a page that locked or unlocked anew does not lock on the old hour", async 
   ends.watch({ state: "locked" });
   t.mock.timers.tick(KEEP_MS);
   assert.equal(locked, 0);
+});
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+const lockedApp = ({ focused = true } = {}) => {
+  const shown = page();
+  shown.hasFocus = () => focused;
+  const win = new EventTarget();
+  const app = { locked: true, prompts: 0, page: shown, win, focus: () => ((focused = true), win.dispatchEvent(new Event("focus"))) };
+  app.unlock = unlockOnShow(() => app.prompts++, () => app.locked, { page: shown, win });
+  app.leave = () => ((shown.visibilityState = "hidden"), shown.dispatchEvent(new Event("visibilitychange")));
+  app.back = () => ((shown.visibilityState = "visible"), shown.dispatchEvent(new Event("visibilitychange")));
+  return app;
+};
+
+test("the lock screen asks for the passkey once when it appears, and not again after a cancel while the app stays open", async () => {
+  const app = lockedApp();
+  app.unlock.shown();
+  app.unlock.shown();
+  await settle();
+  assert.equal(app.prompts, 1);
+  app.unlock.shown();
+  await settle();
+  assert.equal(app.prompts, 1);
+});
+
+test("the lock screen asks again when the app comes back from the background, once", async () => {
+  const app = lockedApp();
+  app.unlock.shown();
+  await settle();
+  app.leave();
+  app.back();
+  app.unlock.shown();
+  await settle();
+  assert.equal(app.prompts, 2);
+});
+
+test("an app that comes back unlocked does not ask for the passkey", async () => {
+  const app = lockedApp();
+  app.unlock.shown();
+  await settle();
+  app.locked = false;
+  app.leave();
+  app.back();
+  await settle();
+  assert.equal(app.prompts, 1);
+});
+
+test("a hidden lock screen waits until it is shown, and an unfocused one until it has focus", async () => {
+  const app = lockedApp({ focused: false });
+  app.page.visibilityState = "hidden";
+  app.unlock.shown();
+  await settle();
+  assert.equal(app.prompts, 0);
+  app.back();
+  await settle();
+  assert.equal(app.prompts, 0);
+  app.focus();
+  await settle();
+  assert.equal(app.prompts, 1);
+});
+
+test("a tap on Unlock takes over from the prompt still waiting for focus", async () => {
+  const app = lockedApp({ focused: false });
+  app.unlock.shown();
+  app.unlock.disarm();
+  app.focus();
+  await settle();
+  assert.equal(app.prompts, 0);
+});
+
+test("boards that lock again while the app is open ask once more", async () => {
+  const app = lockedApp();
+  app.unlock.shown();
+  await settle();
+  app.unlock.arm();
+  app.unlock.shown();
+  await settle();
+  assert.equal(app.prompts, 2);
 });
 
 test("a kept unlock is never readable as key bytes", async () => {
