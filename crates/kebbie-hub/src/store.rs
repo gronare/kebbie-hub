@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS machines (
     last_seq INTEGER NOT NULL DEFAULT 0,
     joined_at INTEGER NOT NULL,
     last_seen INTEGER,
-    account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL
+    account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    worker_os TEXT
 );
 CREATE TABLE IF NOT EXISTS join_codes (
     code_hash BLOB PRIMARY KEY,
@@ -204,14 +205,20 @@ CREATE TABLE IF NOT EXISTS blobs (
     stored_at INTEGER NOT NULL,
     PRIMARY KEY (id, machine_id)
 );
+CREATE TABLE IF NOT EXISTS machine_jobs (
+    worker_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    master_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    until INTEGER NOT NULL,
+    PRIMARY KEY (worker_id, master_id)
+);
 ";
 
-const SCHEMA_VERSION: i64 = 18;
-// Schema 17 opens as 18 in place: devices lose name and kind and gain removed_at, push subscriptions gain offered.
-const MIGRATED_IN_PLACE: [i64; 1] = [17];
-// Schemas 13 and 14 open as 18: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
+const SCHEMA_VERSION: i64 = 19;
+// Schemas 17 and 18 open as 19 in place: devices lose name and kind and gain removed_at, push subscriptions gain offered, machines gain worker_os.
+const MIGRATED_IN_PLACE: [i64; 2] = [17, 18];
+// Schemas 13 and 14 open as 19: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
 const COMPATIBLE_VERSIONS: [i64; 2] = [13, 14];
-// Schemas 15 and 16 open as 18 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
+// Schemas 15 and 16 open as 19 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
 const DEVICE_KEYS_FROM: [i64; 2] = [15, 16];
 const DROPPED_FOR_DEVICE_KEYS: &str = "
 DROP TABLE IF EXISTS results;
@@ -469,6 +476,14 @@ impl Store {
         if !push_columns.iter().any(|column| column == "offered") {
             tx.execute_batch(&format!("ALTER TABLE push_subscriptions ADD COLUMN offered TEXT NOT NULL DEFAULT '{OFFERED_BEFORE_LEAD}'"))?;
         }
+        let worker: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM pragma_table_info('machines') WHERE name = 'worker_os')",
+            [],
+            |row| row.get(0),
+        )?;
+        if !worker {
+            tx.execute_batch("ALTER TABLE machines ADD COLUMN worker_os TEXT")?;
+        }
         for copy in ["name", "kind"] {
             if device_columns.iter().any(|column| column == copy) {
                 tx.execute_batch(&format!("ALTER TABLE devices DROP COLUMN {copy}"))?;
@@ -558,6 +573,40 @@ impl Store {
             params![machine.as_str(), now],
         )?;
         Ok(())
+    }
+
+    pub fn set_worker_os(&self, machine: &Id, os: Option<&str>) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE machines SET worker_os = ?2 WHERE id = ?1",
+            params![machine.as_str(), os],
+        )? == 1)
+    }
+
+    pub fn worker_os(&self, machine: &Id) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT worker_os FROM machines WHERE id = ?1",
+                [machine.as_str()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map(Option::flatten)
+    }
+
+    pub fn account_machines(&self, account: &str) -> Result<Vec<AccountMachine>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, name, worker_os, last_seen FROM machines WHERE account_id = ?1 ORDER BY id",
+        )?;
+        statement
+            .query_map([account], |row| {
+                Ok(AccountMachine {
+                    machine: id_at(row, 0)?,
+                    name: row.get(1)?,
+                    worker_os: row.get(2)?,
+                    last_seen: row.get(3)?,
+                })
+            })?
+            .collect()
     }
 
     pub fn board_rev(&self, machine: &Id) -> Result<Option<u64>> {
@@ -677,6 +726,23 @@ impl Store {
         )?;
         tx.commit()?;
         Ok(seq)
+    }
+
+    pub fn allow_reports(&self, worker: &Id, master: &Id, until: u64) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO machine_jobs (worker_id, master_id, until) VALUES (?1, ?2, ?3)
+             ON CONFLICT (worker_id, master_id) DO UPDATE SET until = max(until, excluded.until)",
+            params![worker.as_str(), master.as_str(), until],
+        )?;
+        Ok(())
+    }
+
+    pub fn reports_allowed(&self, worker: &Id, master: &Id, now: u64) -> Result<bool> {
+        self.connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM machine_jobs WHERE worker_id = ?1 AND master_id = ?2 AND until > ?3)",
+            params![worker.as_str(), master.as_str(), now],
+            |row| row.get(0),
+        )
     }
 
     pub fn machines_of_account(&self, account: &str) -> Result<Vec<Id>> {
@@ -2133,6 +2199,8 @@ impl Store {
         )?;
         self.connection
             .execute("DELETE FROM queue WHERE expires_at <= ?1", [now])?;
+        self.connection
+            .execute("DELETE FROM machine_jobs WHERE until <= ?1", [now])?;
         self.connection.execute(
             "DELETE FROM commands WHERE queued_at + ?2 <= ?1",
             params![now, COMMAND_KEEP_SECONDS],
@@ -2164,6 +2232,13 @@ pub struct Sweep {
 pub struct BoardHead {
     pub machine: Id,
     pub board: Option<(String, u64)>,
+}
+
+pub struct AccountMachine {
+    pub machine: Id,
+    pub name: String,
+    pub worker_os: Option<String>,
+    pub last_seen: Option<u64>,
 }
 
 pub struct MachineRow {

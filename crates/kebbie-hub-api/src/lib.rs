@@ -472,6 +472,50 @@ pub struct PasskeyView {
     pub unlocks: bool,
 }
 
+pub const NO_ACCOUNT: &str = "no-account";
+pub const NOT_A_WORKER: &str = "not-a-worker";
+pub const NO_JOB: &str = "no-job";
+pub const MAX_WORKER_OS_CHARS: usize = 32;
+
+pub fn is_worker_os(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    (1..=MAX_WORKER_OS_CHARS).contains(&bytes.len())
+        && bytes[0].is_ascii_lowercase()
+        && bytes.iter().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerOs {
+    pub os: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountMachine {
+    pub machine: Id,
+    pub name: String,
+    pub worker_os: Option<String>,
+    pub last_seen: Option<u64>,
+}
+
+// The machines are routing hints the hub keeps; only the account-signed list says which keys belong to which machine.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AccountMachines {
+    pub list: Option<SignedMachineList>,
+    pub machines: Vec<AccountMachine>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MessageUpload {
+    pub envelope: Envelope,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageQueued {
+    pub message: Id,
+    pub seq: u64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Passkeys {
     pub passkeys: Vec<PasskeyView>,
@@ -743,6 +787,16 @@ mod tests {
         assert_eq!(normalize_code("0l23-ZYXW").as_deref(), Some("0123-ZYXW"));
         assert_eq!(normalize_code("0123-ZYXU"), None);
         assert_eq!(normalize_code("0123-ZYX"), None);
+    }
+
+    #[test]
+    fn a_worker_names_its_os_in_one_short_lowercase_word() {
+        for os in ["macos", "linux", "windows", "linux-arm64"] {
+            assert!(is_worker_os(os), "{os}");
+        }
+        for os in ["", "macOS", "mac os", "-linux", "1linux", "../x", &"x".repeat(MAX_WORKER_OS_CHARS + 1)] {
+            assert!(!is_worker_os(os), "{os}");
+        }
     }
 
     #[test]

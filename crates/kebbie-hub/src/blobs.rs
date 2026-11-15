@@ -71,3 +71,21 @@ pub async fn blob(
     ];
     Ok((headers, ciphertext).into_response())
 }
+
+pub async fn machine_blob(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
+    let id = blob_id(&id).ok_or_else(ApiError::not_found)?;
+    let ciphertext = {
+        let store = hub.store();
+        let account = store.machine_owner(&machine)?.ok_or_else(ApiError::not_found)?;
+        store.blob_for_account(&id, &account)?.ok_or_else(ApiError::not_found)?
+    };
+    let headers = [
+        (CONTENT_TYPE, "application/octet-stream"),
+        (CACHE_CONTROL, "private, no-store"),
+    ];
+    Ok((headers, ciphertext).into_response())
+}

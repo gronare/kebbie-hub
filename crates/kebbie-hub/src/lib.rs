@@ -13,6 +13,7 @@ mod github;
 mod limit;
 mod machine;
 mod pairing;
+mod peers;
 mod push;
 mod server;
 mod signin;
@@ -699,7 +700,13 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         )
         .route(
             "/v1/m/blobs/{id}",
-            put(blobs::put_blob).layer(DefaultBodyLimit::max(MAX_BLOB_BYTES)).delete(blobs::delete_blob),
+            put(blobs::put_blob).layer(DefaultBodyLimit::max(MAX_BLOB_BYTES)).delete(blobs::delete_blob).get(blobs::machine_blob),
+        )
+        .route("/v1/m/worker", put(peers::set_worker).delete(peers::clear_worker))
+        .route("/v1/m/machines", get(peers::machines))
+        .route(
+            "/v1/m/messages",
+            post(peers::post_message).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
         )
         .route("/v1/a/blobs/{id}", get(blobs::blob))
         .route("/v1/m/name", put(machine::rename))
