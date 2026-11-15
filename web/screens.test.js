@@ -446,10 +446,13 @@ test("Next lists what needs you in kebbie's order under its parts, with each tas
   assert.match(html, /<span class="chip codex">codex<\/span>/);
 });
 
-test("an empty Next says nothing needs you, several machines get a list each under their name, and a board without Next shows none", () => {
+test("an empty Next says nothing needs you once, machines with something get a list each under their name, and a board without Next shows none", () => {
   assert.equal(text(nextList([{ machine: "mch_a", name: "mac", rows: [], counts: { working: 2, queued: 0, parked: 0 } }], NOW)), "Nothing needs you. 2 working");
   const two = nextList([{ machine: "mch_a", name: "mac", rows: [nextRow(1, "push", "a@web", "1 commit", NOW)], counts: null }, { machine: "mch_b", name: "studio", rows: [], counts: null }], NOW);
-  assert.equal(text(two), "mac Push, in this order 1 a 1 commit now studio Nothing needs you.");
+  assert.equal(text(two), "Push, in this order 1 a 1 commit now", "a machine with nothing for you takes no room, and the one left needs no name");
+  const three = nextList([{ machine: "mch_q", name: "quiet", rows: [], counts: null }, { machine: "mch_a", name: "mac", rows: [nextRow(1, "push", "a@web", "1 commit", NOW)], counts: null }, { machine: "mch_b", name: "studio", rows: [nextRow(1, "push", "b@web", "1 commit", NOW)], counts: null }], NOW);
+  assert.equal(text(three), "mac Push, in this order 1 a 1 commit now studio Push, in this order 1 b 1 commit now");
+  assert.equal(text(nextList([{ machine: "mch_a", name: "mac", rows: [], counts: null }, { machine: "mch_b", name: "studio", rows: [], counts: { working: 1, queued: 0, parked: 0 } }], NOW)), "Nothing needs you.", "with nothing anywhere, it says so once");
   assert.equal(nextList([], NOW), "");
   assert.deepEqual([waited(30), waited(42 * 60), waited(3600), waited(3 * 86_400)], ["now", "42 min", "1 h", "3 d"]);
 });

@@ -91,8 +91,10 @@ function nextRows(list, now, selected) {
     .join("");
 }
 
-export function nextList(lists, now, selected = null) {
-  if (lists.length === 0) return "";
+export function nextList(all, now, selected = null) {
+  if (all.length === 0) return "";
+  const busy = all.filter((list) => list.rows.length);
+  const lists = busy.length ? busy : all.length === 1 ? all : [{ ...all[0], counts: null }];
   const many = lists.length > 1;
   const blocks = lists.map((list) => {
     const name = many ? `<div class="nmachine">${esc(list.name)}</div>` : "";
