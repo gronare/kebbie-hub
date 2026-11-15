@@ -26,7 +26,7 @@ import { awayOn, chosenLead, composerHtml, leadHead, leadHref, leadMachines, pan
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstQuestionOf, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, orderOpens, pushSection, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskAbout, taskFacts, taskHead, taskKey, taskName, taskRow, unlockingScreen, unlockScreen, linkRows, planPeek, planRead, withoutUrls } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, orderOpens, pushSection, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskAbout, taskFacts, taskHead, taskKey, taskName, taskRow, unlockingScreen, unlockScreen, linkRows, planRead, withoutUrls } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -296,10 +296,8 @@ function planBox(found) {
   const plan = question.plan;
   if (!plan) return "";
   const read = `<a class="btn" href="${planHref(found.machine, item.address)}">Read the whole plan</a>`;
-  if (!vaultPlan(plan)) return `<section class="task"><h3 class="sec">Plan</h3>${slot(plan, { kind: "plan", look: "md md-peek" })}${read}</section>`;
-  const { body, line } = planBodyOf(plan);
-  const shown = body ? planPeek(body) : `<div class="plan"><div>${esc(line)}</div></div>`;
-  return `<section class="task plan-box"><h3 class="sec">Plan</h3><div class="meta">${esc(noteMeta(question))}</div>${shown}${read}</section>`;
+  const meta = vaultPlan(plan) ? `<div class="meta">${esc(noteMeta(question))}</div>` : "";
+  return `<section class="task plan-box"><h3 class="sec">Plan</h3>${meta}${read}</section>`;
 }
 
 function questionBlock(found) {

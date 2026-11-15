@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { linkAddress, linkRows, planPeek, planRead, taskAbout, taskHead, withoutUrls, backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, orderOpens, pushSection, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { linkAddress, linkRows, planRead, taskAbout, taskHead, withoutUrls, backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, orderOpens, pushSection, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -818,9 +818,8 @@ test("the card's facts and links say what the task did, what it waits on, its pl
   assert.equal(text(taskAbout(working, pinnedWhen)), "Task work 3 commits subtasks 3 · 1 pushed · 1 ready · 1 planned waits on the agent");
 });
 
-test("a vault plan shows its goal and first open questions beside the question, and whole as the backlog card reads a note", () => {
+test("a vault plan reads whole as the backlog card reads a note", () => {
   const body = { sections: [{ key: "background", heading: "Background", text: "Why.", required: true }, { key: "goal", heading: "Goal", text: "Ship the app.\n\nThen more.", required: true }, { key: "questions", heading: "Open questions", text: "", required: false }], questions: ["One?", "Two?", "Three?", "Four?"].map((question, index) => ({ text: question, blocks: index === 0, pending_answer: null })), questions_key: "questions" };
-  assert.equal(text(planPeek(body)), "Goal Ship the app. Open questions · 4 - One? - Two? - Three? 1 more in the plan");
   const whole = planRead(body);
   assert.equal(text(whole), "Background Why. Goal Ship the app. Then more. Open questions One? Two? Three? Four?");
   assert.match(whole, /<div class="opt bq"><b><span class="qmark warn" aria-hidden="true">\?<\/span>One\?<\/b><\/div>/);

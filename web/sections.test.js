@@ -65,6 +65,13 @@ test("the plan beside a question goes back by the strip's Back with the card but
   assert.doesNotMatch(app, /Back to the question<\/a>/);
 });
 
+test("the plan under a question's options offers the whole plan and never repeats its goal, which the user gave", () => {
+  const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  const box = app.slice(app.indexOf("function planBox("), app.indexOf("\n}\n", app.indexOf("function planBox(")));
+  assert.match(box, /Read the whole plan/);
+  assert.doesNotMatch(box, /planPeek|planBodyOf/);
+});
+
 test("the Questions tab opens its first question beside the list in two columns, and the route uses it", () => {
   assert.deepEqual(firstQuestionOf({ questions: [{ machine: "mch_b", item: { address: "verify@hub" } }, { machine: "mch_a", item: { address: "x@y" } }] }), ["mch_b", "verify@hub"]);
   assert.equal(firstQuestionOf({ questions: [] }), null);

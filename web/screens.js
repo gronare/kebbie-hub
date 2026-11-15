@@ -544,24 +544,9 @@ export function taskAbout(item, when) {
   return `<section class="task task-about"><h3 class="sec">Task</h3><dl class="facts">${facts.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join("")}</dl>${links}</section>`;
 }
 
-const SHOWN_PLAN_QUESTIONS = 3;
 const secBlock = (heading, inner) => `<section class="sec-block"><div class="sec-head"><h3 class="sec">${esc(heading)}</h3></div>${inner}</section>`;
-const goalOf = (body) => body.sections.find((part) => part.key === "goal") ?? body.sections.find((part) => /goal/i.test(part.heading)) ?? body.sections.find((part) => part.text.trim());
 
 // The plan beside its question: the goal's first paragraph and the first open questions.
-export function planPeek(body) {
-  const goal = goalOf(body);
-  const first = goal?.text.trim().split(/\n\s*\n/)[0] ?? "";
-  const parts = first ? [secBlock(goal.heading, `<div class="md" data-markdown>${esc(first)}</div>`)] : [];
-  const { questions } = body;
-  if (questions.length) {
-    const shown = questions.slice(0, SHOWN_PLAN_QUESTIONS).map((question) => `- ${question.text.replace(/\s+/g, " ")}`).join("\n");
-    const more = questions.length > SHOWN_PLAN_QUESTIONS ? `<div class="meta pad">${questions.length - SHOWN_PLAN_QUESTIONS} more in the plan</div>` : "";
-    parts.push(secBlock(`Open questions · ${questions.length}`, `<div class="md" data-markdown>${esc(shown)}</div>${more}`));
-  }
-  return parts.join("");
-}
-
 const planQuestion = (question) => `<div class="opt bq${question.blocks ? "" : " plain"}"><b><span class="qmark${question.blocks ? " warn" : ""}" aria-hidden="true">${question.blocks ? "?" : "·"}</span>${esc(question.text)}</b></div>`;
 
 // The whole plan as the backlog card reads a note: its sections in order and the open questions as cards under theirs.
