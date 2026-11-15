@@ -18,3 +18,23 @@ test("the viewport lets people zoom", () => {
   const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /user-scalable\s*=\s*no|maximum-scale/);
 });
+
+test("on the unfolded Duo in landscape the card button sits under Back, never on top of it", () => {
+  const rule = (selector) => rules.find((one) => one.selector === selector)?.body ?? "";
+  const offset = (body, side) => Number(body.match(new RegExp(`${side}:\\s*calc\\(var\\(--strip-status(?:-bottom)?, 120px\\) \\+ (\\d+)px\\)`))?.[1] ?? 0);
+  const at = (body, side) => body.match(new RegExp(`${side}:\\s*var\\(--strip-status(?:-bottom)?, 120px\\)`)) !== null;
+  assert.ok(at(rule(".pose-split .back-btn"), "top"), "Back sits at the clock");
+  assert.ok(at(rule(".pose-split.strip-cam-bottom .back-btn"), "bottom"), "Back sits at the clock with the camera at the bottom");
+  const size = Number(rule(".pose-split .back-btn").match(/height:\s*(\d+)px/)?.[1]);
+  assert.ok(offset(rule(".pose-split .back-row:has(> .back-btn) .switch-btn"), "top") > size, "the card button starts below Back");
+  const bottom = rule(".pose-split.strip-cam-bottom .back-row:has(> .back-btn) .switch-btn");
+  assert.ok(offset(bottom, "bottom") > size && /top:\s*auto/.test(bottom), "with the camera at the bottom the card button sits above Back, further from the clock");
+});
+
+test("a page with a Back row shows Back in every pose, and only a pending strip hides it", () => {
+  const index = (selector) => rules.findIndex((one) => one.selector === selector);
+  const shown = index(".back-row > .back-btn");
+  assert.ok(shown >= 0 && /display:\s*grid/.test(rules[shown].body), "Back on a Back row is shown");
+  assert.ok(index(".back-btn") < shown, "the default that hides a lone Back comes first");
+  assert.ok(shown < index(".strip-pending :is(.back-btn, .switch-btn)"), "a strip that has not settled still hides it");
+});

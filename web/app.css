@@ -412,6 +412,7 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .round .tab-icon { display: block; }
 .back-btn { display: none; }
 .back-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.back-row > .back-btn { display: grid; }
 .switch-btn { position: relative; margin-left: auto; }
 .switch-btn .badge { position: absolute; top: -2px; right: -4px; font-size: 10px; }
 .qwait { gap: 6px; }
@@ -536,6 +537,7 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
   .strip-right .switch-btn { right: calc((env(safe-area-inset-right) - 52px) / 2); }
   .pose-split.strip-left .switch-btn { left: calc((env(safe-area-inset-left) - 44px) / 2); }
   .pose-split.strip-right .switch-btn { right: calc((env(safe-area-inset-right) - 44px) / 2); }
+  .pose-split .back-row:has(> .back-btn) .switch-btn { top: calc(var(--strip-status, 120px) + 56px); }
   :is(.strip-left, .strip-right) .back-link { display: none; }
   :is(.strip-left, .strip-right) .screen { max-width: none; padding-bottom: var(--content-bottom); }
   .strip-cam-bottom .tabbar:not(.desk-nav) { top: calc(env(safe-area-inset-top) + 12px); bottom: auto; }
@@ -543,6 +545,7 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
   .pose-split.strip-cam-bottom .back-btn { bottom: var(--strip-status-bottom, 120px); }
   .strip-cam-bottom .switch-btn { top: auto; bottom: calc(var(--strip-status-bottom, 175px) + 64px); }
   .pose-split.strip-cam-bottom .switch-btn { bottom: var(--strip-status-bottom, 120px); }
+  .pose-split.strip-cam-bottom .back-row:has(> .back-btn) .switch-btn { top: auto; bottom: calc(var(--strip-status-bottom, 120px) + 56px); }
   .fold.strip-cam-bottom .screen { padding-bottom: calc(var(--content-bottom) + var(--d-edge, 24px)); }
   @media (orientation: landscape) { .fold:not(.strip-cam-bottom) .screen { padding-top: calc(env(safe-area-inset-top) + 14px + var(--d-edge, 24px)); } }
 }
