@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { answerableQuestions, answerCommand, answers, answersToSend, answersWithLead, backlogList, bodyShown, nextQuestion, sendAnswers, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
+import { answerableQuestions, answerCommand, answers, answersToSend, answersWithLead, backlogList, bodyShown, sendAllLabel, sendAnswers, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -76,7 +76,7 @@ test("an answer sent shows with the lead, and once the body carries it the quest
   const shared = mergeBacklog(opened, NOW)[0];
   const chosen = chooseMachine(shared.machines, { repo: "webapp" });
   const picked = itemBody(shared, { body, access: "ready", ui: ui({ open: new Set([Q0]), answers: new Map([[Q0, "Renew on every request"]]) }), candidates: shared.machines, chosen, now: NOW });
-  assert.match(text(picked), /Your answer Renew on every request Send to the lead/);
+  assert.match(text(picked), /Your answer Renew on every request Does a password .* Send 1 answer/);
   const done = { sent: sentAt({ kind: "item-answer", index: 0, text: "Renew on every request", result: { outcome: "done", reason: null, text: "ok", at: NOW - 60 } }), state: "done", standing: null, live: true };
   const sentFor = (index) => (index === 0 ? done : null);
   const answered = text(itemBody(shared, { body, access: "ready", ui: ui(), sentFor, candidates: shared.machines, chosen, now: NOW }));
@@ -88,7 +88,7 @@ test("an answer sent shows with the lead, and once the body carries it the quest
   assert.match(text(html), /1 waits on you before it starts/);
 });
 
-test("each open question keeps its own draft across a re-render, and two filled answers share one Send button", () => {
+test("each open question keeps its own draft across a re-render, and every filled answer goes out with one Send button", () => {
   const shared = mergeBacklog(opened, NOW)[0];
   const chosen = chooseMachine(shared.machines, { repo: "webapp" });
   const drafts = ui({ open: new Set([Q0, Q1, Q2]), answers: new Map([[Q0, "Renew on every request"], [Q1, "Yes, every device"]]) });
@@ -98,20 +98,37 @@ test("each open question keeps its own draft across a re-render, and two filled 
   assert.deepEqual(values(card()), values(card()), "a second render shows the same drafts");
   const two = card();
   assert.match(two, /<div class="answers-send"><button type="button" class="btn primary" data-action="send-item-answers">Send 2 answers<\/button><\/div>/);
-  assert.equal((two.match(/data-action="send-item-answer" data-index="\d" data-key="[^"]*"(?: disabled)? hidden/g) ?? []).length, 3, "the per-question buttons step aside");
+  assert.equal((two.match(/data-action="send-item-answers?"/g) ?? []).length, 1, "one button sends them all");
   drafts.answers.delete(Q1);
-  const one = card();
-  assert.match(one, /<div class="answers-send" hidden>/);
-  assert.match(one, /data-action="send-item-answer" data-index="0" data-key="[^"]*">Send to the lead/, "a single filled answer keeps its own button");
+  assert.match(card(), /data-action="send-item-answers">Send 1 answer</);
+  drafts.answers.delete(Q0);
+  assert.match(card(), /<div class="answers-send" hidden>/, "nothing to send, nothing to press");
+  drafts.answers.set(Q0, "Renew on every request");
+  drafts.answering.batch = { done: 1, total: 2 };
+  assert.match(card(), /data-action="send-item-answers" disabled>Sending 2 of 2…</, "while it sends it says so and takes no second press");
 });
 
-test("after a send the next unanswered question takes the focus, wrapping past the ones sent", () => {
-  assert.equal(nextQuestion([0, 1, 2], [0]), 1);
-  assert.equal(nextQuestion([0, 1, 2], [2]), 0);
-  assert.equal(nextQuestion([0, 1, 2], [0, 2]), 1);
-  assert.equal(nextQuestion([0, 1, 2], [0, 1, 2]), null);
+test("the Send button counts what it sends, and counts up while it sends", () => {
+  assert.equal(sendAllLabel(1), "Send 1 answer");
+  assert.equal(sendAllLabel(3), "Send 3 answers");
+  assert.equal(sendAllLabel(3, { done: 0, total: 3 }), "Sending 1 of 3…");
+  assert.equal(sendAllLabel(3, { done: 3, total: 3 }), "Sending 3 of 3…");
   const sent = { sent: sentAt({ kind: "item-answer", index: 0, text: "x" }), state: "sent", standing: null, live: true };
-  assert.deepEqual(answerableQuestions(body, (index) => (index === 0 ? sent : null)), [1, 2], "a question with an answer on its way is not next");
+  assert.deepEqual(answerableQuestions(body, (index) => (index === 0 ? sent : null)), [1, 2], "a question with an answer on its way is not sent again");
+});
+
+test("a sent answer keeps its draft: hidden while it is on its way, back in its field with the reason when it is refused", () => {
+  const shared = mergeBacklog(opened, NOW)[0];
+  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const drafts = ui({ open: new Set([Q0]), answers: new Map([[Q0, "Renew on every request"]]) });
+  const sent = (state, result = null) => (index) => (index === 0 ? { sent: sentAt({ kind: "item-answer", index: 0, question: Q0, text: "Renew on every request", result }), state, standing: null, live: state === "sent" } : null);
+  const going = itemBody(shared, { body, access: "ready", ui: drafts, sentFor: sent("sent"), candidates: shared.machines, chosen, now: NOW });
+  assert.doesNotMatch(going, /<textarea id="answer-0"/);
+  assert.match(text(going), /Sent to work-mac Your answer "Renew on every request" is on its way to the lead/);
+  const refused = itemBody(shared, { body, access: "ready", ui: drafts, sentFor: sent("refused", { outcome: "refused", reason: null, text: "That question is no longer on the item.", at: NOW - 30 }), candidates: shared.machines, chosen, now: NOW });
+  assert.match(text(refused), /Not answered.*That question is no longer on the item\./);
+  assert.match(refused, /<textarea id="answer-0"[^>]*>Renew on every request<\/textarea>/, "the text is still there to send again");
+  assert.match(refused, /data-action="send-item-answers">Send 1 answer</);
 });
 
 test("Send N answers sends N item-answer commands in order, and stops at the first one refused", async () => {

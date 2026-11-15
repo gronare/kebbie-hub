@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { answerableQuestions, answers, answersToSend, keyAt, answersWithLead, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, nextQuestion, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answers, answersToSend, answersWithLead, keyAt, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
@@ -1531,28 +1531,21 @@ async function addIdea() {
   go(twoColumns() ? entryHref(`idea:${sent.id}`) : "#/backlog");
 }
 
-// iOS keeps the keyboard up only for a focus the tap itself makes, so the next field is opened and focused before the first await.
-function sendItemAnswers(entry, indices) {
+async function sendItemAnswers(entry) {
   const ui = backlogUi(entry.id);
   const { body } = bodyOf(entry);
   const chosen = chooseMachine(candidatesOf(entry, "item-answer"), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine });
-  const answers = answersToSend(body, ui, indices);
-  if (!chosen || answers.length === 0 || ui.answering.busy) return;
-  const next = nextQuestion(answerableQuestions(body, answerSentFor(entry)), answers.map((one) => one.index));
-  if (next !== null) ui.open.add(keyAt(body, next));
+  const answers = answersToSend(body, ui, filledAnswers(ui, body, answerableQuestions(body, answerSentFor(entry))));
+  if (!chosen || answers.length === 0 || ui.answering.busy || ui.answering.batch) return;
+  ui.answering.batch = { done: 0, total: answers.length };
+  ui.answering.error = null;
   render();
-  if (next !== null) focusAnswer(next);
-  return sendInOrder(entry, chosen, answers);
-}
-
-async function sendInOrder(entry, chosen, answers) {
-  const ui = backlogUi(entry.id);
-  const sent = (key) => {
-    ui.answers.delete(key);
-    ui.open.delete(key);
+  try {
+    await sendAnswers(entry, answers, { send: ({ payload, meta }) => sendBacklog({ machine: chosen, payload, meta, ui: ui.answering }), sent: () => (ui.answering.batch.done += 1) });
+  } finally {
+    ui.answering.batch = null;
     render();
-  };
-  if (!(await sendAnswers(entry, answers, { send: ({ payload, meta }) => sendBacklog({ machine: chosen, payload, meta, ui: ui.answering }), sent }))) render();
+  }
 }
 
 function focusAnswer(index) {
@@ -1618,7 +1611,7 @@ function openEditor(entry, section) {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
-const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "send-item-answers", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
+const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answers", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
 
 function backlogAction(action, target) {
   const id = target.closest("[data-item]")?.dataset.item ?? null;
@@ -1630,8 +1623,7 @@ function backlogAction(action, target) {
   if (action === "item-edit-save" && entry) return sendItemEdit(entry);
   if (action === "item-edit-cancel") ui.editing = null;
   if (action === "add-idea") return addIdea();
-  if (action === "send-item-answer" && entry) return sendItemAnswers(entry, [Number(target.dataset.index)]);
-  if (action === "send-item-answers" && entry) return sendItemAnswers(entry, filledAnswers(ui, bodyOf(entry).body, answerableQuestions(bodyOf(entry).body, answerSentFor(entry))));
+  if (action === "send-item-answers" && entry) return sendItemAnswers(entry);
   if (action === "pick-question" && entry) return pickQuestion(entry, Number(target.dataset.index));
   if (action === "start-item" && entry) return startItem(entry);
   if (action === "write-item" && entry) return writeItem(entry);
@@ -2191,15 +2183,10 @@ root.addEventListener("input", (event) => {
 });
 
 function patchAnswerButtons(scope, ui) {
-  const fields = [...scope.querySelectorAll('textarea[data-draft="item-answer"]')];
-  const filled = fields.filter((field) => field.value.trim() !== "").length;
-  for (const button of scope.querySelectorAll('[data-action="send-item-answer"]')) {
-    button.hidden = filled >= 2;
-    button.disabled = ui.answering.busy || draftOf(ui, button.dataset.key).trim() === "";
-  }
   const all = scope.querySelector(".answers-send");
-  if (!all) return;
-  all.hidden = filled < 2;
+  if (!all || ui.answering.batch) return;
+  const filled = [...scope.querySelectorAll('textarea[data-draft="item-answer"]')].filter((field) => draftOf(ui, field.dataset.key).trim() !== "").length;
+  all.hidden = filled === 0;
   all.querySelector("button").textContent = sendAllLabel(filled);
 }
 
