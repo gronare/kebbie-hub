@@ -142,6 +142,16 @@ test("a ready task offers a push, asks once, then reports the machine's result",
   assert.match(pushBlock({ item, machineName: "mac", ui: idle(), sent: { ...pushed, result: null }, state: "waiting" }), /Waiting for mac/);
 });
 
+test("a plain push says what it pushes in words, with no sha, and stays the main action even while a full review is recommended", () => {
+  const item = { address: "osc8@board", group: "READY TO PUSH", head: HEAD, git: { ahead: 1 }, assessment: { word: "recommended", reason: "touches the board" } };
+  const button = pushBlock({ item, machineName: "mac", ui: idle(), sent: null, state: null, plain: true });
+  assert.match(button, /<button type="button" class="btn primary" data-action="push-ask">Push 1 commit<\/button>/);
+  assert.doesNotMatch(button, /9f3c2a1/);
+  const confirm = pushBlock({ item, machineName: "mac", ui: { ...idle(), confirming: true }, sent: null, state: null, plain: true });
+  assert.match(confirm, /<b>Push 1 commit to main\?<\/b>/);
+  assert.match(confirm, /data-action="push"/, "the confirmed push sends the same command as before");
+});
+
 const prompt = { id: "3f2a9c1d", question: "Run it?", options: [{ label: "Yes, proceed (y)", takes_text: false, key: "y" }, { label: "No, and tell Codex what to do differently (esc)", takes_text: false, key: "esc" }, { label: "Type something", takes_text: true, key: "3" }] };
 const chose = (extra = {}) => ({ id: "cmd_q", kind: "prompt-answer", machine: "mch_1", machineName: "mac", address: "hub@kebbie", prompt: "3f2a9c1d", key: "y", label: "Yes, proceed (y)", at: AT, exp: AT + 600, result: null, ...extra });
 

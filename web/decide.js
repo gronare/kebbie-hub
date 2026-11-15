@@ -207,7 +207,7 @@ export function pushStage(item) {
   return at < 0 ? null : { number: at + 1, stage: item.stages[at], next: item.stages[at + 1] ?? null };
 }
 
-export function pushBlock({ item, machineName, ui, sent, state, standing = null }) {
+export function pushBlock({ item, machineName, ui, sent, state, standing = null, plain = false }) {
   const head = pushHead(item);
   const short = head.slice(0, 7);
   const commits = pushCount(item);
@@ -222,10 +222,11 @@ export function pushBlock({ item, machineName, ui, sent, state, standing = null 
     const reviewed = !part && item.verdict?.verdict === "ok" && !item.verdict.stale ? ", reviewer passed" : "";
     const rest = staged ? ` of stage ${staged.number}, ${esc(staged.stage.title)}${staged.next ? `; stage ${staged.number + 1} stays locked until this one ${HELD_UNTIL[staged.stage.requirement.kind]}` : ""}` : part ? " from the top of the push order; the rest stay here" : "";
     const busy = ui.busy ? " disabled" : "";
-    return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push ${esc(count)} · ${esc(short)} to main?</b></p><p>${esc(count)}${rest}${reviewed}. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push"${busy}>Push</button></div></div>` + error;
+    return status + `<div class="confirm" role="group" aria-label="Confirm push"><p><b>Push ${esc(count)}${plain ? "" : ` · ${esc(short)}`} to main?</b></p><p>${esc(count)}${rest}${reviewed}. ${esc(machineName)} rebases onto the latest main first; on a conflict its Claude resolves it before pushing.</p><div class="row2"><button type="button" class="btn" data-action="push-cancel"${busy}>Cancel</button><button type="button" class="btn primary" data-action="push"${busy}>Push</button></div></div>` + error;
   }
-  const reviewFirst = item.assessment?.word === "recommended" && !item.verdict?.running;
-  return status + `<button type="button" class="btn${reviewFirst ? "" : " primary"}" data-action="push-ask">Push ${esc(count)} · ${staged ? `stage ${esc(staged.number)}` : esc(short)}</button>` + error;
+  const reviewFirst = !plain && item.assessment?.word === "recommended" && !item.verdict?.running;
+  const what = staged ? `stage ${staged.number}` : plain ? "" : short;
+  return status + `<button type="button" class="btn${reviewFirst ? "" : " primary"}" data-action="push-ask">Push ${esc(count)}${what ? ` · ${esc(what)}` : ""}</button>` + error;
 }
 
 export function refusedBlock(url) {
