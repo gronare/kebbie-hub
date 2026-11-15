@@ -1,6 +1,6 @@
 import { foundStatus } from "./backlog.js";
-import { clock, settled, speaksFor, takes } from "./decide.js";
-import { esc } from "./screens.js";
+import { clock, pushCount, settled, speaksFor, takes } from "./decide.js";
+import { CHEV_DOWN, CHEV_UP, esc } from "./screens.js";
 
 export const DECIDERS = { you: "you", lead: "lead", investigator: "investigator", task: "task" };
 const SOURCES = { question: "question", method: "question of method", obstacle: "obstacle", plan: "approved with the plan", message: "message", "through-lead": "through the lead" };
@@ -81,4 +81,42 @@ export function assessmentBlock(item, { access, accepts, sent: maybe = null, bus
   if (access !== "ready" || !takes(accepts, "review-send")) return box + shown;
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
   return `${box}${shown}<button type="button" class="btn primary fit" data-action="review-send"${busy ? " disabled" : ""}>Send to review</button>${failed}`;
+}
+
+const SENTENCE_BREAK = /(?<=[.!?])\s+(?=[\p{Lu}`"(])/u;
+const sentences = (paragraph) => paragraph.trim().split(SENTENCE_BREAK).filter(Boolean);
+const TESTED = /^(Tested|Testat|Testad|Testade)\b/i;
+const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+
+export function cardLead(card) {
+  const summary = sentences(card.built[0] ?? "")[0] ?? "";
+  const found = card.built.flatMap(sentences).find((one) => TESTED.test(one)) ?? null;
+  const tested = found === summary ? null : found;
+  const rest = card.built.map((paragraph, at) => sentences(paragraph).filter((one, index) => !(at === 0 && index === 0) && one !== tested).join(" ")).filter(Boolean);
+  return { summary, tested, rest };
+}
+
+export function reviewHold(item) {
+  const verdict = item.verdict;
+  if (!verdict) return null;
+  const holds = verdict.held !== false;
+  const after = holds ? "Push waits for the reviewer's pass." : "The push does not wait for it.";
+  if (verdict.running) return { holds, line: `Under review. ${after}` };
+  if (verdict.verdict === "changes" && !verdict.stale) return { holds, line: `The review found ${plural(verdict.findings ?? 0, "finding", "findings")}. ${after}` };
+  return null;
+}
+
+export function readyPush(item, control) {
+  const hold = reviewHold(item);
+  const said = [hold?.line, item.push_waits].filter(Boolean).map((line) => `<div class="meta ready-hold">${esc(line)}</div>`).join("");
+  if (!hold?.holds) return said + control;
+  return `${said}<button type="button" class="btn primary off" disabled>Push ${esc(plural(pushCount(item), "commit", "commits"))}</button>`;
+}
+
+export function readyCard({ summary = "", tested = null, note = "", push = "", details = "", open = false }) {
+  const lead = summary ? `<p class="ready-sum">${inline(summary)}</p>` : note ? `<div class="meta">${esc(note)}</div>` : "";
+  const proof = tested ? `<p class="ready-proof">${inline(tested)}</p>` : "";
+  const toggle = details ? `<button type="button" class="details-toggle" data-action="card-details" aria-expanded="${open}">Details${open ? CHEV_UP : CHEV_DOWN}</button>` : "";
+  const shown = details && open ? `<div class="ready-details">${details}</div>` : "";
+  return `<div class="ready">${lead}${proof}<div class="ready-push">${push}</div>${toggle}${shown}</div>`;
 }

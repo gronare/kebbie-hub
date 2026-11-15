@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { assessmentBlock, cardChanges, cardParts, changedNotice, inline, noticedArea } from "./card.js";
+import { assessmentBlock, cardChanges, cardLead, cardParts, changedNotice, inline, noticedArea, readyCard, readyPush, reviewHold } from "./card.js";
 import { assessmentText, reviewLines } from "./screens.js";
 
 const cards = JSON.parse(readFileSync(new URL("../vectors/cards.json", import.meta.url), "utf8"));
@@ -105,4 +105,65 @@ test("a review sent for an earlier recommendation gives way to Send to review fo
   assert.doesNotMatch(html, /<i>status<\/i>/);
   const going = { ...done, result: null };
   assert.doesNotMatch(assessmentBlock(newer, options({ sent: { sent: going, state: "sending" }, status })), /<button/, "one still on its way holds the button");
+});
+
+const OSC8 = {
+  ...card,
+  previous: undefined,
+  built: [
+    "A board row's task name opens its pull request: the board writes OSC 8 hyperlinks. Terminals without them show the plain name.",
+    "The link carries the PR's address from the task. Tested: `cargo test board` passes and iTerm2 opens the PR on a click.",
+  ],
+};
+const order = (html, marks) => marks.map((mark) => html.indexOf(mark));
+
+test("a ready card leads with the first sentence of Built and takes the tested sentence as its proof, leaving the rest for Details", () => {
+  const lead = cardLead(OSC8);
+  assert.equal(lead.summary, "A board row's task name opens its pull request: the board writes OSC 8 hyperlinks.");
+  assert.equal(lead.tested, "Tested: `cargo test board` passes and iTerm2 opens the PR on a click.");
+  assert.deepEqual(lead.rest, ["Terminals without them show the plain name.", "The link carries the PR's address from the task."]);
+  assert.equal(cardLead({ ...OSC8, built: ["Testat: allt grönt."] }).tested, null, "a summary is never repeated as its proof");
+  assert.equal(cardLead({ ...OSC8, built: ["Swedish: Testat med `npm test`, grönt."] }).tested, null, "only a sentence that opens with Tested or Testat is proof");
+  assert.equal(cardLead({ ...OSC8, built: ["Rader länkar. Testat: iTerm öppnar PR:en."] }).tested, "Testat: iTerm öppnar PR:en.");
+  assert.deepEqual(cardLead({ ...OSC8, built: [] }), { summary: "", tested: null, rest: [] });
+});
+
+test("a ready card shows the summary, then the proof, then Push, then a closed Details holding the rest", () => {
+  const { summary, tested } = cardLead(OSC8);
+  const push = `<button type="button" class="btn primary" data-action="push-ask">Push 1 commit</button>`;
+  const details = `<section class="task"><h3 class="sec">Decisions · 5</h3></section>`;
+  const closed = readyCard({ summary, tested, push, details });
+  const at = order(closed, ['class="ready-sum"', 'class="ready-proof"', 'data-action="push-ask"', 'data-action="card-details"']);
+  assert.ok(at.every((one, index) => one >= 0 && (index === 0 || one > at[index - 1])), `in order: ${at}`);
+  assert.match(closed, /<p class="ready-proof">Tested: <code>cargo test board<\/code> passes/);
+  assert.match(closed, /aria-expanded="false">Details/);
+  assert.doesNotMatch(closed, /Decisions/, "Details is collapsed until opened");
+  const open = readyCard({ summary, tested, push, details, open: true });
+  assert.match(open, /aria-expanded="true">Details.*<div class="ready-details"><section class="task"><h3 class="sec">Decisions · 5/s);
+  assert.doesNotMatch(readyCard({ summary, push }), /ready-proof|card-details/, "no proof and nothing more shows neither");
+  assert.match(readyCard({ note: "Loading the card", push }), /<div class="meta">Loading the card<\/div><div class="ready-push">/);
+});
+
+test("a ready card never carries the full-review prompt, even when the machine recommends one", () => {
+  const push = readyPush(item, `<button type="button" class="btn primary" data-action="push-ask">Push 2 commits</button>`);
+  const html = readyCard({ ...cardLead(card), push, details: "<p>rest</p>", open: true });
+  assert.equal(item.assessment.word, "recommended");
+  assert.doesNotMatch(html, /review-send|Send to review|full review is recommended/);
+  assert.match(html, /class="btn primary" data-action="push-ask"/);
+});
+
+test("under review, or with changes asked by the review, a ready card says so in one line and holds Push disabled", () => {
+  const control = `<button type="button" class="btn primary" data-action="push-ask">Push 2 commits</button>`;
+  const running = readyPush({ ...item, verdict: { running: true, stale: false } }, control);
+  assert.equal(running, `<div class="meta ready-hold">Under review. Push waits for the reviewer&#39;s pass.</div><button type="button" class="btn primary off" disabled>Push 2 commits</button>`);
+  const changes = readyPush({ ...item, verdict: { verdict: "changes", findings: 3, stale: false } }, control);
+  assert.match(changes, /The review found 3 findings\. Push waits/);
+  assert.match(changes, /disabled>Push/);
+  assert.doesNotMatch(changes, /push-ask/);
+  assert.equal(readyPush({ ...item, verdict: { verdict: "changes", findings: 3, stale: true } }, control), control, "a stale verdict speaks for an older head");
+  assert.equal(readyPush({ ...item, verdict: { verdict: "ok", stale: false } }, control), control);
+  const free = readyPush({ ...item, verdict: { running: true, stale: false, held: false } }, control);
+  assert.match(free, /Under review\. The push does not wait for it\.<\/div><button type="button" class="btn primary" data-action="push-ask">/, "a review that does not hold the push leaves Push enabled");
+  assert.equal(reviewHold({ ...item, verdict: undefined }), null);
+  assert.match(readyPush({ ...item, push_waits: "Waits for main's CI" }, control), /<div class="meta ready-hold">Waits for main&#39;s CI<\/div><button/);
 });

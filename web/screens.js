@@ -42,9 +42,9 @@ export const STEP_MARKS = { planned: "○", "in-progress": "◐", ready: "●", 
 export const OPENABLE_STEPS = ["ready", "accepted"];
 const SHOWN_PLANNED = 2;
 const CHEV_RIGHT = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
-const CHEV_DOWN = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>`;
+export const CHEV_DOWN = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>`;
 const LOCK = `<svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
-const CHEV_UP = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-5 5 5"/></svg>`;
+export const CHEV_UP = `<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-5 5 5"/></svg>`;
 
 export function waited(seconds) {
   if (seconds < 60) return "now";
