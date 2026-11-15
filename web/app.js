@@ -16,7 +16,7 @@ import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememb
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
-import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, keptTaskView, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
+import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fileAt, foldCommitsOn, freshReviewUi, hangLines, openFileAt, openOf, readKey, keptTaskView, readOf, readShaOf, reviewEntry, rowOf, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 import { hasTextField, keepFieldsAboveKeyboard } from "./keyboard.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
@@ -1432,18 +1432,18 @@ async function sendComments(found, v) {
   render();
 }
 
-async function markRead(found, v, index) {
+async function markRead(found, v, dataset) {
   const { ui } = v;
-  const file = filesOf(v)[index];
+  const file = fileAt(v, dataset);
   const read = !readOf(v, file);
   ui.read.set(readKey(file), read);
   ui.open.set(readKey(file), !read);
   if (ui.composing?.path === file.path) ui.composing = null;
   render();
-  reveal(`#rv-f-${index}`);
+  reveal(rowOf(dataset));
   if (!v.canRead) return;
   const quiet = { busy: false, error: null };
-  const sha = v.page.kind === "commit" ? shaOf(v) : null;
+  const sha = readShaOf(v, dataset);
   const payload = { type: "review-read", address: v.address, path: file.path, read, content: file.content, ...(sha ? { sha } : {}) };
   const sent = await sendTo({ machine: machineOf(found), payload, meta: { path: file.path, read, content: file.content, sha }, ui: quiet });
   if (!sent) ui.error = quiet.error;
@@ -1473,7 +1473,7 @@ function reviewAction(action, target) {
   const { ui } = v;
   const id = Number(target.dataset.id);
   const draft = ui.drafts.find((one) => one.id === id);
-  const file = filesOf(v)[Number(target.dataset.file)];
+  const file = fileAt(v, target.dataset);
   if (action === "rv-retry") {
     Object.assign(ui, { requested: null, error: null });
     return requestReview(found, v.subtask, reviewHead(found, v.subtask));
@@ -1484,7 +1484,7 @@ function reviewAction(action, target) {
     return render();
   }
   if (action === "rv-send") return sendComments(found, v);
-  if (action === "rv-read" && file) return markRead(found, v, Number(target.dataset.file));
+  if (action === "rv-read" && file) return markRead(found, v, target.dataset);
   if (action === "rv-accept") return acceptSubtask(found, v);
   if (action === "rv-line" && file) {
     if (ui.composing || !v.canComment) return;
@@ -2036,7 +2036,7 @@ root.addEventListener("click", (event) => {
     return openComposer();
   }
   const fileRow = event.target.closest("a[data-open-file]");
-  if (fileRow) return openFile(fileRow);
+  if (fileRow) return openFile(event, fileRow);
   const target = event.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
@@ -2120,13 +2120,18 @@ root.addEventListener("click", (event) => {
   }
 });
 
-function openFile(link) {
+function openFile(event, link) {
   const viewed = routeView();
-  const index = Number(link.dataset.openFile);
-  const file = viewed ? filesOf(viewed.v)[index] : null;
-  if (!file) return;
-  viewed.v.ui.open.set(readKey(file), true);
-  revealAfter = { selector: `#rv-f-${index}`, offset: twoColumns() ? 8 : null };
+  const opened = viewed ? openFileAt(viewed.v, link.dataset, link.getAttribute("href"), location.hash) : null;
+  if (!opened) return;
+  const offset = twoColumns() ? 8 : null;
+  if (!opened.redrawHere) {
+    revealAfter = { selector: opened.selector, offset };
+    return;
+  }
+  event.preventDefault();
+  render();
+  reveal(opened.selector, offset);
 }
 
 root.addEventListener("input", (event) => {

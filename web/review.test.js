@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS } from "../js/protocol.js";
-import { againOf, besideLevel, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, keptTaskView, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
+import { againOf, besideLevel, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, fileAt, filesOf, openFileAt, readShaOf, rowOf, freshReviewUi, keptTaskView, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -59,7 +59,7 @@ test("the subtask page names the subtask, places each commit in the push order w
   assert.match(html, /<a class="btn fit" href="#\/diff\/mch_a\/payments%40api\/gateway\/2">Read the diff · 3 files<\/a>/);
   assert.doesNotMatch(html, /rv-diff|rv-line|A float drops cents/, "neither diffs nor the folded messages show");
   assert.match(html, /<a class="btn fit" href="#\/diff\/mch_a\/payments%40api\/gateway\/all">Read the whole subtask · 3 files<\/a>/);
-  assert.match(html, /<a class="rv-fh-name" href="#\/diff\/mch_a\/payments%40api\/gateway\/all" data-open-file="0">/);
+  assert.match(html, /<a class="rv-fh-name" href="#\/diff\/mch_a\/payments%40api\/gateway\/all" data-open-file="0" data-of="subtask">/);
   assert.doesNotMatch(html, /rv-end|Accept step/, "nothing to accept while a file is unread");
   const opened = view();
   opened.ui.commits.add(last.sha);
@@ -246,4 +246,45 @@ test("two columns show the level above: the task beside a subtask and beside its
   assert.equal(beside(["gateway", "all"], true), "task", "the whole subtask's diff never repeats the subtask beside it");
   assert.equal(beside(["gateway", "2"], true), "subtask", "a commit");
   assert.equal(beside([], true), "task", "the changes of a task without subtasks");
+});
+
+test("a file row of the subtask opens its own file beside a commit, and only that one", () => {
+  const v = view({ page: page("commit", 0) });
+  const left = subtaskPage(v, { top, left: true, selected: 0 });
+  const rows = [...left.matchAll(/data-open-file="(\d+)" data-of="subtask"/g)].map((match) => Number(match[1]));
+  assert.ok(rows.includes(1), "the row for the subtask's second file names its place in the subtask");
+  assert.equal(fileAt(v, { openFile: "1", of: "subtask" })?.path, "src/orders.rs", "beside commit 1, which changes only gateway.rs, the row still finds orders.rs");
+  assert.equal(fileAt(v, { file: "0" })?.path, "src/gateway.rs", "a row of the commit's own diff finds the commit's file");
+  const whole = diffHref("mch_a", item.address, ID);
+  assert.equal(openFileAt(v, { openFile: "1", of: "subtask" }, whole, subtaskHref("mch_a", item.address, ID))?.file.path, "src/orders.rs");
+  assert.deepEqual([...v.ui.open].filter(([, open]) => open).map(([key]) => key), [readKey(review.subtask.files[1])], "one tap opens one file");
+});
+
+test("the subtask's file rows never share an id with a diff's file sections", () => {
+  const v = view({ page: page("commit", 0) });
+  const left = subtaskPage(v, { top, left: true, selected: 0 });
+  const right = commitPage(v, { top, inPanel: true });
+  const ids = (html) => [...html.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(ids(left).filter((id) => ids(right).includes(id)), []);
+  assert.equal(rowOf({ file: "2", of: "subtask" }), "#rv-s-2", "marking a subtask row read keeps that row in view");
+  assert.ok(left.includes('id="rv-s-2"'));
+  assert.equal(rowOf({ file: "0" }), "#rv-f-0");
+  assert.ok(right.includes('id="rv-f-0"'));
+});
+
+test("a tap on a file row of the page already shown redraws it at once; one that leads to another page waits for that page", () => {
+  const v = view({ page: page("whole") });
+  const whole = diffHref("mch_a", item.address, ID);
+  const here = openFileAt(v, { openFile: "2", of: "subtask" }, whole, whole);
+  assert.equal(here.redrawHere, true, "no address change follows, so nothing else would draw the opened file");
+  assert.equal(here.selector, "#rv-f-2", "the file's section on the whole diff is brought into view");
+  const away = openFileAt(view(), { openFile: "2", of: "subtask" }, whole, subtaskHref("mch_a", item.address, ID));
+  assert.equal(away.redrawHere, false, "the address change draws the diff");
+});
+
+test("Mark read reports a commit's sha only for a file of that commit's own diff, never for a subtask row beside it", () => {
+  const beside = view({ page: page("commit", 0) });
+  assert.equal(readShaOf(beside, { file: "0" }), first.sha, "a file of commit 1's diff is read in commit 1");
+  assert.equal(readShaOf(beside, { file: "1", of: "subtask" }), null, "a subtask row beside commit 1 is read for the subtask");
+  assert.equal(readShaOf(view(), { file: "1", of: "subtask" }), null, "on the subtask page itself");
 });

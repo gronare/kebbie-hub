@@ -69,6 +69,22 @@ export function filesOf(v) {
   return v.page.kind === "commit" ? (part.commits[v.page.commit]?.files ?? []) : part.files;
 }
 
+export function fileAt(v, dataset) {
+  const list = dataset.of === "subtask" ? (v.review?.subtask?.files ?? []) : filesOf(v);
+  return list[Number(dataset.file ?? dataset.openFile)] ?? null;
+}
+
+export const rowOf = (dataset) => `#rv-${dataset.of === "subtask" ? "s" : "f"}-${Number(dataset.file ?? dataset.openFile)}`;
+
+export const readShaOf = (v, dataset) => (v.page.kind === "commit" && dataset.of !== "subtask" ? shaOf(v) : null);
+
+export function openFileAt(v, dataset, href, hash) {
+  const file = fileAt(v, dataset);
+  if (!file) return null;
+  v.ui.open.set(readKey(file), true);
+  return { file, redrawHere: href === hash, selector: `#rv-f-${Number(dataset.openFile)}` };
+}
+
 export function shaOf(v) {
   const part = v.review?.subtask;
   if (!part) return null;
@@ -148,10 +164,10 @@ function subtaskFileRow(v, file, index) {
   const status = file.status === "added" ? "new file" : file.status === "deleted" ? "deleted" : file.status === "renamed" ? `renamed from ${esc(file.old_path)}` : "";
   const meta = [stat(file), read ? `<span class="ok">read</span>` : again ? `<span class="again">read in ${esc(short(again.read))} · changed again in ${esc(short(again.again))}</span>` : "", status, notes ? plural(notes, "comment", "comments") : ""].filter(Boolean).join(" · ");
   const whole = diffHref(v.machine, v.address, v.subtask);
-  const opener = `<a class="rv-icon rv-fold" href="${whole}" data-open-file="${index}" aria-label="Read ${esc(file.path)} in the whole subtask">${ICON_CHEVRON}</a>`;
-  const name = `<a class="rv-fh-name" href="${whole}" data-open-file="${index}"><span class="mono">${esc(file.path)}</span><span class="meta">${meta}</span></a>`;
-  const check = `<button type="button" class="rv-icon rv-check" data-action="rv-read" data-file="${index}" aria-pressed="${read}" aria-label="${read ? "Mark unread" : "Mark read"}"><span class="box">${ICON_CHECK}</span></button>`;
-  return `<section class="rv-fsec" id="rv-f-${index}"><header class="rv-fh${read ? " is-read" : ""}">${opener}${name}${check}</header></section>`;
+  const opener = `<a class="rv-icon rv-fold" href="${whole}" data-open-file="${index}" data-of="subtask" aria-label="Read ${esc(file.path)} in the whole subtask">${ICON_CHEVRON}</a>`;
+  const name = `<a class="rv-fh-name" href="${whole}" data-open-file="${index}" data-of="subtask"><span class="mono">${esc(file.path)}</span><span class="meta">${meta}</span></a>`;
+  const check = `<button type="button" class="rv-icon rv-check" data-action="rv-read" data-file="${index}" data-of="subtask" aria-pressed="${read}" aria-label="${read ? "Mark unread" : "Mark read"}"><span class="box">${ICON_CHECK}</span></button>`;
+  return `<section class="rv-fsec" id="rv-s-${index}"><header class="rv-fh${read ? " is-read" : ""}">${opener}${name}${check}</header></section>`;
 }
 
 export const subtaskTitle = (v) => v.boardSubtask?.title ?? v.review?.subtask?.title ?? "";
