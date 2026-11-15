@@ -25,7 +25,7 @@ import { currentPlan, endingChip, needsPro, placeSheet, proCard, showTrialLine }
 import { awayOn, chosenLead, composerHtml, leadHead, leadHref, leadMachines, panelHead, pendingMessages, pickRow, popHtml, previewOf, shortWhen, threadHtml, threadOf, unseenReplies, awaySwitch, awayNote } from "./lead.js";
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
-import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
+import { backHref, boardSections, firstQuestionOf, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
 import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, orderOpens, pushSection, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskAbout, taskFacts, taskHead, taskKey, taskName, taskRow, unlockingScreen, unlockScreen, linkRows, planPeek, planRead, withoutUrls } from "./screens.js";
 
 const root = document.getElementById("app");
@@ -243,6 +243,11 @@ function questionsScreen(selected = null) {
   const { questions } = arrange(state.opened, nowSeconds());
   const list = questions.length ? questions.map((row) => taskRow(row, selected)).join("") : `<div class="center">No questions wait for you.</div>`;
   return `<div class="narrow">${top("Questions", questions.length ? `${questions.length} waiting` : "")}${list}</div>`;
+}
+
+function questionsRoute() {
+  const first = twoColumns() ? firstQuestionOf(arrange(state.opened, nowSeconds())) : null;
+  return first ? wideTaskScreen(first) : shell("questions", questionsScreen());
 }
 
 function slot(ref, options) {
@@ -1047,7 +1052,7 @@ function render() {
   else if (!state.me) html = signedOutScreen();
   else if (signedInWaits()) html = signedInScreen(signedInWaits());
   else if (state.session?.state !== "unlocked") html = lockedScreen();
-  else if (name === "questions") html = shell("questions", questionsScreen());
+  else if (name === "questions") html = questionsRoute();
   else if (name === "machines") html = shell("machines", machinesScreen());
   else if (name === "lead") html = leadRoute(params[0] ?? null);
   else if (name === "task") html = twoColumns() ? wideTaskScreen(params) : taskScreen(params);

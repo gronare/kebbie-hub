@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { arrange } from "./board.js";
 import { taskKey } from "./screens.js";
-import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
+import { backHref, boardSections, firstQuestionOf, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
 
 const NOW = 1_761_070_000;
 const item = (address, group, extra = {}) => ({ address, group, urgency: 0, agent: { kind: "claude", status: "idle" }, summary: "1 commit", ...extra });
@@ -48,6 +49,21 @@ test("the task shown beside a section is Next's first by rank, else the section'
   assert.deepEqual(firstTaskOf(view, "next"), ["mch_a", "refunds@shop"]);
   assert.deepEqual(firstTaskOf(view, "working"), ["mch_a", "payments@api"]);
   assert.equal(firstTaskOf(view, "routines"), null);
+});
+
+test("Next opens beside it the first row of the first machine that has one, so a machine with nothing for you listed first leaves no empty panel", () => {
+  const quiet = { machine: "mch_q", name: "MacBook", rows: [], counts: null };
+  const busy = view.next.map((list) => ({ ...list, rows: list.rows.map((row) => ({ ...row })) }));
+  assert.deepEqual(firstTaskOf({ ...view, next: [quiet, ...busy] }, "next"), firstTaskOf(view, "next"));
+  assert.equal(firstTaskOf({ ...view, next: [quiet] }, "next"), null);
+});
+
+test("the Questions tab opens its first question beside the list in two columns, and the route uses it", () => {
+  assert.deepEqual(firstQuestionOf({ questions: [{ machine: "mch_b", item: { address: "verify@hub" } }, { machine: "mch_a", item: { address: "x@y" } }] }), ["mch_b", "verify@hub"]);
+  assert.equal(firstQuestionOf({ questions: [] }), null);
+  const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  assert.match(app, /else if \(name === "questions"\) html = questionsRoute\(\);/);
+  assert.match(app, /const first = twoColumns\(\) \? firstQuestionOf\(arrange\(state\.opened, nowSeconds\(\)\)\) : null;\n  return first \? wideTaskScreen\(first\) : shell\("questions", questionsScreen\(\)\);/);
 });
 
 test("back from a task card returns to where it was opened, and back from a section to the board", () => {

@@ -13,10 +13,12 @@ export function boardSections(view) {
 
 export const sectionHref = (key) => `#/section/${encodeURIComponent(key)}`;
 
+export const firstQuestionOf = (view) => (view.questions[0] ? [view.questions[0].machine, view.questions[0].item.address] : null);
+
 export function firstTaskOf(view, key) {
   const section = boardSections(view).find((candidate) => candidate.key === key);
   if (section?.kind === "next") {
-    const row = view.next[0]?.rows.filter((candidate) => candidate.item).sort((a, b) => a.rank - b.rank)[0];
+    const row = view.next.map((list) => list.rows.filter((candidate) => candidate.item).sort((a, b) => a.rank - b.rank)[0]).find(Boolean);
     return row ? [row.machine, row.address] : null;
   }
   const row = section?.kind === "group" ? section.rows[0] : null;
