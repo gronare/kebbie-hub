@@ -607,9 +607,11 @@ export function promptBlock({ item, repo }, answer = promptCards(item.prompt) + 
   return `<p class="q">${esc(question)}</p>${context ? `<div class="meta pad">${context}</div>` : ""}${detail}${cmd}${answer}`;
 }
 
-export function machineRow({ machine, name, awake, facts }) {
+export function machineRow({ machine, name, awake, facts, main = null }) {
   const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(machine)}" data-name="${esc(name)}">Remove</button>`;
-  return `<div class="mrow${awake ? "" : " asleep"}"><span class="dot${awake ? " awake" : ""}" aria-hidden="true"></span><div class="about"><b>${esc(name)}</b><small>${esc([awake ? "awake" : "asleep", ...facts].join(" · "))}</small></div>${remove}</div>`;
+  const head = main === null ? "" : `<button type="button" class="btn small${main ? " primary" : ""}" data-action="main-machine" data-id="${esc(machine)}" aria-pressed="${main}">${main ? "Main machine" : "Make main"}</button>`;
+  const said = [awake ? "awake" : "asleep", ...(main ? ["gets ideas, answers and starts first"] : []), ...facts];
+  return `<div class="mrow${awake ? "" : " asleep"}"><span class="dot${awake ? " awake" : ""}" aria-hidden="true"></span><div class="about"><b>${esc(name)}</b><small>${esc(said.join(" · "))}</small></div>${head}${remove}</div>`;
 }
 
 export function machineDots(machines) {
@@ -853,7 +855,7 @@ export function devicesSection(devices, now) {
   return `<h2 class="group g-muted">Devices · ${kept.length}</h2>${kept.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>${gone}`;
 }
 
-const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "item-write": "Write-out of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of", "found-keep": "Keeping of", "review-send": "Full review of" };
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "item-answers": "Answers on", "start-item": "Start of", "item-edit": "Edit of", "item-write": "Write-out of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of", "found-keep": "Keeping of", "review-send": "Full review of" };
 const clip = (text, length = 60) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept|found):/, "").replace(/\.md$/, "");
 
@@ -869,7 +871,7 @@ function subject(entry) {
   if (payload.type === "routine") return payload.id;
   if (payload.type === "start") return `${payload.name}@${payload.repo}`;
   if (payload.type === "idea") return `${entry.machineName}: ${clip(payload.text)}`;
-  if (["item-answer", "start-item", "item-edit", "item-write", "found-start", "found-add", "found-dismiss", "found-keep"].includes(payload.type)) return itemName(entry);
+  if (["item-answer", "item-answers", "start-item", "item-edit", "item-write", "found-start", "found-add", "found-dismiss", "found-keep"].includes(payload.type)) return itemName(entry);
   if (payload.type === "device-decision") return entry.targetName ?? payload.device.slice(-6);
   return payload.address;
 }
@@ -889,6 +891,7 @@ export function historyEntry(entry, now) {
     if (kind === "idea") return { icon: "✓", what: `Idea for ${what}`, said: "filed in its backlog", at: entry.at };
     if (kind === "device-decision") return { icon: "✓", what: `${entry.payload.approve ? "Approved" : "Denied"} ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "item-answer") return { icon: "✓", what: `Answered a question on ${what}`, said: `"${clip(entry.payload.answer)}" · on ${machine}`, at: entry.at };
+    if (kind === "item-answers") return { icon: "✓", what: `Answered ${plural(entry.payload.answers.length, "question", "questions")} on ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "item-edit") return { icon: "✓", what: `Edited ${entry.payload.section === null || entry.payload.section === undefined ? "the title" : `“${entry.heading ?? entry.payload.section}”`} of ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "item-write") return { icon: "✓", what: `Asked the lead to write out ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-open") return { icon: "✓", what: `Opened the review of ${what}`, said: `on ${machine}`, at: entry.at };

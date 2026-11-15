@@ -117,7 +117,7 @@ export function answersWithLead(entry, sentList, { shown, storedAt, body = null 
   if (!entry.key || !entry.row.blocking) return 0;
   const machines = new Set(entry.machines.map((one) => one.machine));
   const indexes = new Set();
-  for (const sent of sentList) {
+  for (const sent of answerSents(sentList)) {
     if (sent.kind !== "item-answer" || sent.address !== entry.key || !machines.has(sent.machine)) continue;
     const question = body?.questions[body.questions.findIndex((_, index) => answers(sent, body.questions, index))];
     if (body && !(question?.blocks && (question.pending_answer ?? null) === null)) continue;
@@ -178,30 +178,35 @@ export function backlogList({ entries, selected = null, now, top, action = "", f
   return `<div class="narrow">${top("Backlog", esc(entries.length ? aside : ""))}${tools}${backlogResults(view, { entries, selected, now, find, textOf })}</div>${action}`;
 }
 
-export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen = null } = {}) {
+export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen = null, main = null } = {}) {
   if (candidates.length === 0) return null;
   const picked = candidates.find((one) => one.machine === chosen);
   if (picked) return { ...picked, why: "you chose it" };
-  const withRepo = repo ? candidates.find((one) => one.repos.includes(repo)) : null;
-  if (withRepo) return { ...withRepo, why: `it has ${repo}` };
-  const last = candidates.find((one) => one.machine === lastUsed);
-  if (last) return { ...last, why: "you used it last" };
-  const awake = candidates.find((one) => !one.asleep) ?? candidates[0];
-  return { ...awake, why: awake.asleep ? "asleep now" : "awake now" };
+  const head = candidates.find((one) => one.machine === main);
+  if (head && !head.asleep) return { ...head, why: "main machine" };
+  const others = head ? candidates.filter((one) => one !== head && !one.asleep) : candidates;
+  if (head && others.length === 0) return { ...head, why: "main machine, asleep now" };
+  const fallback = (one, why) => ({ ...one, why: head ? `main machine is offline, sent to ${one.name}` : why });
+  const withRepo = repo ? others.find((one) => one.repos.includes(repo)) : null;
+  if (withRepo) return fallback(withRepo, `it has ${repo}`);
+  const last = others.find((one) => one.machine === lastUsed);
+  if (last) return fallback(last, "you used it last");
+  const awake = others.find((one) => !one.asleep) ?? others[0];
+  return fallback(awake, awake.asleep ? "asleep now" : "awake now");
 }
 
-export function machinePicker(candidates, chosen, { label, choosing }) {
+export function machinePicker(candidates, chosen, { label, choosing, main = null }) {
   const change = candidates.length > 1 ? `<button type="button" class="btn small" data-action="backlog-choose">${choosing ? "Done" : "Change"}</button>` : "";
-  const list = choosing ? `<div class="options">${candidates.map((one) => `<div class="opt pick${one.machine === chosen.machine ? " picked" : ""}" role="button" tabindex="0" data-action="backlog-machine" data-machine="${esc(one.machine)}" aria-pressed="${one.machine === chosen.machine}"><b>${esc(one.name)}</b><small>${one.asleep ? "asleep" : "awake"}</small></div>`).join("")}</div>` : "";
+  const list = choosing ? `<div class="options">${candidates.map((one) => `<div class="opt pick${one.machine === chosen.machine ? " picked" : ""}" role="button" tabindex="0" data-action="backlog-machine" data-machine="${esc(one.machine)}" aria-pressed="${one.machine === chosen.machine}"><b>${esc(one.name)}</b><small>${one.asleep ? "asleep" : "awake"}${one.machine === main ? " · main machine" : ""}</small></div>`).join("")}</div>` : "";
   return `<section class="task"><div class="row"><div><div class="meta">${esc(label)}</div><div class="name">${esc(chosen.name)}</div><div class="meta">${esc(chosen.why)}</div></div>${change}</div></section>${list}`;
 }
 
-export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null }) {
+export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null }) {
   const field = `<div class="note-field"><label for="idea">Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
   if (!chosen) return field + `<div class="pro">No machine takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
   const ready = text.trim() !== "" && !busy;
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
-  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
+  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing, main }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
@@ -311,13 +316,32 @@ function sectionBlock(entry, part, edit, after = "") {
   return `<section class="sec-block" data-item="${esc(entry.id)}" data-section="${esc(part.key)}">${head}${shown}</section>${after}`;
 }
 
+const stillHere = (count = 1) => (count === 1 ? "Your answer is still here." : "Your answers are still here.");
+const NOT_DELIVERED = {
+  "question-changed": () => "the item changed while you answered",
+  "unknown-item": (machine) => `the item is no longer on ${machine}`,
+  "already-settled": () => "the question already has an answer",
+  "not-allowed": (machine) => `${machine} takes no answers from the hub`,
+  "bad-request": (machine) => `${machine} could not read it`,
+};
+
+export function notDelivered(sent, state) {
+  const machine = sent.machineName;
+  if (state === "expired") return `Not delivered: ${machine} stayed asleep past the hour. ${stillHere()}`;
+  if (state === "not-approved") return `Not delivered: ${machine} has not approved this device. ${stillHere()}`;
+  if (state === "denied") return `Not delivered: ${machine} turned this device away. ${stillHere()}`;
+  const said = NOT_DELIVERED[sent.result?.reason]?.(machine) ?? (sent.result?.outcome === "failed" ? `something went wrong on ${machine}` : `${machine} turned it down`);
+  return `Not delivered: ${said}. ${stillHere()}`;
+}
+
+const deliveryLine = (line) => `<div class="center left warn" role="alert">${esc(line)}</div>`;
+
 export function answerStatus(sent, state, { standing = null, now }) {
   const machine = esc(sent.machineName);
   const said = `"${esc(sent.text)}"`;
-  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing, now, what: { goes: `Your answer ${said} goes to the lead`, again: "answer again" } });
+  if (state === "approval") return approvalStatus(sent, state, { standing, now, what: { goes: `Your answer ${said} goes to the lead`, again: "answer again" } });
+  if (settled(state)) return deliveryLine(notDelivered(sent, state));
   if (state === "done") return withLead(sent.text, `${from(sent)} · on ${machine}`);
-  if (state === "refused") return block("refused", ...refusal("Not answered", sent.result.text), from(sent));
-  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep past the hour`, `Answer again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
   if (state === "waiting") return block("wait", `Waiting for ${machine}`, `Your answer ${said} goes to the lead when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
   return block("wait", `Sent to ${machine}`, `Your answer ${said} is on its way to the lead.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
 }
@@ -326,17 +350,38 @@ const withLead = (text, meta) => block("wait", `With the lead: "${esc(text)}"`, 
 
 const pendingOf = (question) => question.pending_answer !== null && question.pending_answer !== undefined;
 const answerable = (question, sent) => !pendingOf(question) && !(sent && !settled(sent.state));
+const retried = (question, sent) => Boolean(sent) && settled(sent.state) && !pendingOf(question);
 
 const nthOf = (questions, index) => questions.slice(0, index).filter((question) => question.text === questions[index].text).length;
 const keyOf = (text, nth) => (nth ? `${nth}\u0000${text}` : text);
 export const questionKey = (questions, index) => keyOf(questions[index].text, nthOf(questions, index));
 export const answers = (sent, questions, index) => (sent.question === undefined ? sent.index === index : sent.question === questions[index].text && (sent.nth ?? 0) === nthOf(questions, index));
 export const keyAt = (body, index) => (body?.questions[index] ? questionKey(body.questions, index) : null);
+export const sentKey = (sent) => keyOf(sent.question, sent.nth ?? 0);
+const textOfKey = (key) => key.slice(key.indexOf("\u0000") + 1);
+
+export const answerSents = (sentList) => sentList.flatMap((sent) => (sent.kind === "item-answers" ? (sent.answers ?? []).map((one) => ({ ...sent, kind: "item-answer", question: one.question, nth: one.nth ?? 0, text: one.text })) : [sent]));
 
 export const answerableQuestions = (body, sentFor) => (body?.questions ?? []).flatMap((question, index, questions) => (answerable(question, sentFor(index, questions)) ? [index] : []));
 export const draftOf = (ui, key) => ui.answers?.get(key) ?? "";
 export const filledAnswers = (ui, body, indices) => indices.filter((index) => ui.open?.has(keyAt(body, index)) && draftOf(ui, keyAt(body, index)).trim() !== "");
-export const sendAllLabel = (count, batch = null) => (batch ? `Sending ${Math.min(batch.done + 1, batch.total)} of ${batch.total}…` : count === 1 ? "Send 1 answer" : `Send ${count} answers`);
+const plainAnswers = (count) => (count === 1 ? "1 answer" : `${count} answers`);
+export const sendAllLabel = (count, batch = null) => (batch ? `Sending ${plainAnswers(batch.total)}…` : `Send ${plainAnswers(count)}`);
+
+export function startAnswering(ui, { chosen, answers: going, keys = going.map((one) => one.key) }) {
+  if (ui.answering.batch || ui.answering.busy) return null;
+  if (!chosen) {
+    ui.answering.error = `Not sent: no machine takes answers from the hub right now. ${stillHere(going.length)}`;
+    return null;
+  }
+  if (going.length === 0) {
+    ui.answering.error = "Write an answer first, then send it.";
+    return null;
+  }
+  ui.answering.batch = { total: going.length, keys };
+  ui.answering.error = null;
+  return ui.answering.batch;
+}
 
 export function bodyShown(held, shown) {
   if (!held) return shown ? { body: shown, bodyState: "ready" } : { body: null, bodyState: "loading" };
@@ -345,49 +390,129 @@ export function bodyShown(held, shown) {
 
 export const answersToSend = (body, ui, indices) => indices.filter((index) => body?.questions[index]).map((index) => ({ index, key: keyAt(body, index), nth: nthOf(body.questions, index), question: body.questions[index], answer: draftOf(ui, keyAt(body, index)).trim() })).filter((one) => one.answer);
 export const answerCommand = (entry, { index, nth, question, answer }) => ({ payload: { type: "item-answer", item: entry.key, index, question: question.text, answer }, meta: { address: entry.key, index, question: question.text, nth, text: answer, label: entry.row.title } });
+export const answersCommand = (entry, going) => ({
+  payload: { type: "item-answers", item: entry.key, answers: going.map(({ question, answer }) => ({ question: question.text, answer })) },
+  meta: { address: entry.key, label: entry.row.title, answers: going.map(({ question, nth, answer }) => ({ question: question.text, nth, text: answer })) },
+});
+export const takesBatch = (machine, going) => takes(machine?.accepts, "item-answers") && new Set(going.map((one) => one.question.text)).size === going.length;
 
-export async function sendAnswers(entry, answers, { send, sent }) {
-  for (const one of answers) {
-    if (!(await send(answerCommand(entry, one)))) return false;
-    sent(one.key);
+export async function sendAnswers(entry, going, { send, batch }) {
+  if (batch) return (await send(answersCommand(entry, going))) ? [] : going.map((one) => one.key);
+  const failed = [];
+  for (const one of going) if (!(await send(answerCommand(entry, one)))) failed.push(one.key);
+  return failed;
+}
+
+const keysOf = (body) => (body?.questions ?? []).map((_, index, questions) => questionKey(questions, index));
+
+export function settleDrafts(ui, body, sentOf) {
+  const keys = keysOf(body);
+  let changed = false;
+  for (const [key] of ui.answers) {
+    const index = keys.indexOf(key);
+    if (sentOf(key)?.state === "done" || (index >= 0 && pendingOf(body.questions[index]))) changed = ui.answers.delete(key) || changed;
   }
-  return true;
+  keys.forEach((key, index) => {
+    const sent = sentOf(key);
+    if (retried(body.questions[index], sent) && draftOf(ui, key).trim() === "" && sent.sent.text) {
+      ui.answers.set(key, sent.sent.text);
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+export function strayDrafts(ui, body, sentOf) {
+  const keys = new Set(keysOf(body));
+  return [...ui.answers].filter(([key, text]) => !keys.has(key) && text.trim() !== "" && !(sentOf(key) && !settled(sentOf(key).state))).map(([key, text]) => ({ key, question: textOfKey(key), text }));
+}
+
+const draftsKey = (id) => `kebbie-answers:${id}`;
+const mainKey = (account) => `kebbie-main-machine:${account}`;
+
+export function readMain(storage, account) {
+  try {
+    return storage?.getItem(mainKey(account)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function keepMain(storage, account, machine) {
+  try {
+    if (machine) storage?.setItem(mainKey(account), machine);
+    else storage?.removeItem(mainKey(account));
+  } catch {}
+}
+
+export function readDrafts(storage, id) {
+  try {
+    const raw = JSON.parse(storage?.getItem(draftsKey(id)) ?? "null");
+    return new Map(Object.entries(raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}).filter(([, text]) => typeof text === "string" && text.trim() !== ""));
+  } catch {
+    return new Map();
+  }
+}
+
+export function keepDrafts(storage, id, drafts) {
+  try {
+    const kept = [...drafts].filter(([, text]) => text.trim() !== "");
+    if (kept.length) storage?.setItem(draftsKey(id), JSON.stringify(Object.fromEntries(kept)));
+    else storage?.removeItem(draftsKey(id));
+  } catch {}
 }
 
 function questionCard(question, index, { key, pickable, ui, sent, now }) {
   const pending = pendingOf(question);
   const live = sent && !settled(sent.state);
   const answered = pending || (live && sent.state === "done");
-  const picked = Boolean(ui.open?.has(key)) && answerable(question, sent);
+  const again = pickable && retried(question, sent);
+  const picked = (again || Boolean(ui.open?.has(key))) && answerable(question, sent);
   const mark = question.blocks ? `<span class="qmark${answered ? "" : " warn"}" aria-hidden="true">?</span>` : `<span class="qmark" aria-hidden="true">·</span>`;
-  const press = pickable && !pending && !live;
+  const press = pickable && !pending && !live && !again;
   const classes = ["opt", "bq", question.blocks ? "" : "plain", press ? "pick" : "", picked ? "picked" : "", answered ? "answered" : ""].filter(Boolean).join(" ");
   const attributes = press ? ` role="button" tabindex="0" data-action="pick-question" data-index="${index}" data-key="${esc(key)}" aria-pressed="${picked}"` : "";
   const card = `<div class="${classes}"${attributes}><b>${mark}${esc(question.text)}</b>${question.blocks ? "" : "<small>the work can settle it</small>"}</div>`;
+  if (again) return card + deliveryLine(notDelivered(sent.sent, sent.state)) + answerRow(index, key, ui, { again: true });
   const row = picked && press ? answerRow(index, key, ui) : "";
   if (sent && (live || !pending)) return card + answerStatus(sent.sent, sent.state, { standing: sent.standing, now }) + row;
   if (pending) return card + withLead(question.pending_answer, "with the lead on its machine");
   return card + row;
 }
 
-function answerRow(index, key, ui) {
-  return `<div class="answer-row"><div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" data-index="${index}" data-key="${esc(key)}" rows="2" maxlength="2000">${esc(draftOf(ui, key))}</textarea></div></div>`;
+function againButton(key, batch) {
+  const sending = Boolean(batch?.keys.includes(key));
+  return `<button type="button" class="btn" data-action="send-item-answers" data-key="${esc(key)}"${batch ? " disabled" : ""}>${sending ? "Sending…" : "Send again"}</button>`;
 }
 
-function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, heading = `<h3 class="sec">Open questions</h3>` }) {
+function answerRow(index, key, ui, { again = false } = {}) {
+  const field = `<div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" data-index="${index}" data-key="${esc(key)}"${again ? " data-again" : ""} rows="2" maxlength="2000">${esc(draftOf(ui, key))}</textarea></div>`;
+  return `<div class="answer-row">${field}${again ? againButton(key, ui.answering?.batch ?? null) : ""}</div>`;
+}
+
+function strayBlock(strays) {
+  if (strays.length === 0) return "";
+  const one = ({ key, question, text }) => `<div class="opt bq plain"><b>${esc(question)}</b><small>no longer on the item</small></div>${deliveryLine(`Not delivered: the item changed while you answered. ${stillHere()} Copy it into the question as it reads now.`)}<div class="answer-row"><div class="md"><p>${esc(text)}</p></div><button type="button" class="btn" data-action="drop-answer" data-key="${esc(key)}">Remove</button></div>`;
+  return `<div class="options qlist strays">${strays.map(one).join("")}</div>`;
+}
+
+function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, strays = [], heading = `<h3 class="sec">Open questions</h3>` }) {
   const questions = body.questions;
   const head = counts.left > 0 ? `${counts.left === 1 ? "1 waits" : `${counts.left} wait`} on you before it starts` : "none blocks the start";
   const pickable = access === "ready" && takesAnswers;
-  const indices = pickable ? answerableQuestions(body, sentFor) : [];
-  const filled = filledAnswers(ui, body, indices).length;
+  const fresh = (pickable ? answerableQuestions(body, sentFor) : []).filter((index) => !retried(questions[index], sentFor(index, questions)));
+  const filled = filledAnswers(ui, body, fresh).length;
   const cards = questions.map((question, index) => questionCard(question, index, { key: questionKey(questions, index), pickable, ui, sent: sentFor(index, questions), now })).join("");
   const batch = ui.answering?.batch ?? null;
-  const opened = indices.some((index) => ui.open?.has(keyAt(body, index)));
-  const all = opened || batch ? `<div class="answers-send"${filled >= 1 || batch ? "" : " hidden"}><button type="button" class="btn primary" data-action="send-item-answers"${ui.answering?.busy || batch ? " disabled" : ""}>${esc(sendAllLabel(filled, batch))}</button></div>` : "";
-  const failed = pickable && ui.answering?.error ? `<div class="center warn" role="alert">${esc(ui.answering.error)}</div>` : "";
+  const freshKeys = new Set(fresh.map((index) => keyAt(body, index)));
+  const sending = batch && batch.keys.some((key) => freshKeys.has(key)) ? batch : null;
+  const opened = fresh.some((index) => ui.open?.has(keyAt(body, index)));
+  const all = opened || sending ? `<div class="answers-send"${filled >= 1 || sending ? "" : " hidden"}><button type="button" class="btn primary" data-action="send-item-answers"${ui.answering?.busy || batch ? " disabled" : ""}>${esc(sendAllLabel(filled, sending))}</button></div>` : "";
+  const failed = pickable && ui.answering?.error ? deliveryLine(ui.answering.error) : "";
   const gate = access === "refused" ? proLine("Answering its questions from this device comes with Hub Pro.", refusedUrl) : access === "view-only" && questions.length ? viewOnlyBlock() : "";
-  if (questions.length === 0) return `${heading}<div class="meta pad">None open.</div>`;
-  return `${heading}<div class="meta pad">${head}</div><div class="options qlist">${cards}</div>${all}${failed}${gate}`;
+  const stray = pickable ? strayBlock(strays) : "";
+  if (questions.length === 0) return `${heading}<div class="meta pad">None open.</div>${stray}`;
+  return `${heading}<div class="meta pad">${head}</div><div class="options qlist">${cards}</div>${stray}${all}${failed}${gate}`;
 }
 
 export function startStatus(sent, state, { title, standing = null, now, taskHref = "#/board" }) {
@@ -401,7 +526,7 @@ export function startStatus(sent, state, { title, standing = null, now, taskHref
   return block("wait", `Sent to ${machine}`, `The lead on ${machine} picks the recipe and queues ${esc(title)}.`, `Sent ${from(sent)} · expires in ${hours(sent.exp - now)}`);
 }
 
-function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref }) {
+function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref, main }) {
   if (entry.row.state === "to-write") return "";
   if (access === "off") return "";
   if (access === "refused") return proLine("Starting it from this device comes with Hub Pro.", refusedUrl);
@@ -410,7 +535,7 @@ function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, n
   const status = start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : "";
   if (start && !settled(start.state)) return status;
   const failed = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
-  const picker = candidates.length > 1 ? machinePicker(candidates, chosen, { label: "Starts on", choosing: ui.choosing }) : "";
+  const picker = candidates.length > 1 ? machinePicker(candidates, chosen, { label: "Starts on", choosing: ui.choosing, main }) : "";
   return `${status}${picker}<div class="pair-answer"><a class="btn" href="#/backlog">Save to backlog</a><button type="button" class="btn primary" data-action="start-item"${ui.busy ? " disabled" : ""}>Start</button></div><div class="meta pad">The lead on ${esc(chosen.name)} picks the recipe and queues it.</div>${failed}`;
 }
 
@@ -478,7 +603,7 @@ function foundBody(entry, facts, options) {
   return facts + sources + `<div class="decide found-area thumb-end" data-item="${esc(entry.id)}">${foundArea(entry, options)}</div>`;
 }
 
-export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null, write = null }) {
+export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null, write = null, main = null, strays = [] }) {
   if (entry.idea) return ideaCard(entry, now);
   if (entry.gone) return `<div class="decide start-area">${start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : ""}</div><div class="meta pad">It left the backlog when it started.</div>`;
   const counts = body ? questionsLeft(body, sentFor) : { left: entry.row.blocking, withLead: 0 };
@@ -486,15 +611,15 @@ export function itemBody(entry, { body = null, bodyState = null, access = "off",
   const facts = itemFacts(entry, counts, now, entry.key && !isFound(entry) ? titleArea(entry, edit) : "");
   if (isFound(entry) && found) return foundBody(entry, facts, { access, refusedUrl, found, ui, now });
   const writing = writeArea(entry, { access, write, ui, now });
-  const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${writing}${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref })}</div>`;
+  const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${writing}${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref, main })}</div>`;
   if (!entry.row.body && entry.row.state === "ready") return facts + (entry.row.goal ? section("Goal", entry.row.goal) : "") + area;
   if (!entry.row.body) {
     const said = entry.row.state === "drafting" ? "The lead is writing it out from the code, the notes and your chat. Its sections show here when it is saved." : `The lead on ${entry.machines[0].name} writes it out from the code, the notes and your chats. Its sections show here when it is saved.`;
     return facts + `<div class="md"><p>${esc(said)}</p></div>` + area;
   }
   if (!body) return facts + `<div class="plan"><div>${esc(bodyState === "failed" ? failedLine("item") : loadingLine("item", entry.row.body))}</div></div>` + area;
-  const takesAnswers = Boolean(chosen && takes(chosen.accepts, "item-answer")) || entry.machines.some((one) => takes(one.accepts, "item-answer"));
-  const questions = (heading) => `<div class="decide" data-item="${esc(entry.id)}">${questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, heading })}</div>`;
+  const takesAnswers = entry.machines.some((one) => takes(one.accepts, "item-answer") || takes(one.accepts, "item-answers"));
+  const questions = (heading) => `<div class="decide" data-item="${esc(entry.id)}">${questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, strays, heading })}</div>`;
   const parts = body.sections.map((part) => (part.key === body.questions_key ? sectionBlock(entry, part, edit, questions("")) : sectionBlock(entry, part, edit))).join("");
   const trailing = body.questions_key || body.questions.length === 0 ? "" : questions(undefined);
   return facts + parts + trailing + area;

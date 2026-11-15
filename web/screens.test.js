@@ -431,6 +431,8 @@ test("the selected task is outlined on the board, and only that one", () => {
 test("a machine reads awake or asleep beside its dot, and the board's header lists every machine", () => {
   assert.equal(text(machineRow({ machine: "mch_a", name: "mac", awake: true, facts: ["kebbie 0.24.0"] })), "mac awake · kebbie 0.24.0 Remove");
   assert.match(machineRow({ machine: "mch_a", name: "studio", awake: false, facts: [] }), /class="mrow asleep"><span class="dot"/);
+  assert.equal(text(machineRow({ machine: "mch_a", name: "mac", awake: true, facts: ["kebbie 0.24.0"], main: true })), "mac awake · gets ideas, answers and starts first · kebbie 0.24.0 Main machine Remove");
+  assert.match(machineRow({ machine: "mch_b", name: "studio", awake: true, facts: [], main: false }), /<button type="button" class="btn small" data-action="main-machine" data-id="mch_b" aria-pressed="false">Make main<\/button>/);
   assert.equal(text(machineDots([{ name: "mac", awake: true, lastSeen: "12:00" }, { name: "studio", awake: false, lastSeen: "Fri 17:40" }])), "mac studio · last seen Fri 17:40");
 });
 
@@ -629,8 +631,9 @@ test("a device's history names what it sent to the backlog: the idea and its mac
       historyEntry(entry({ type: "idea", text: "ci push retry flaky", repo: null }), now).what,
       historyEntry(entry({ type: "item-answer", item: "vault:Projects/session.md", index: 0, question: "Q?", answer: "Renew it" }, { label: "Session drops on reload" }), now).what,
       historyEntry(entry({ type: "start-item", item: "local:retry-a-flaky-ci-push", anyway: false }), now).what,
+      historyEntry(entry({ type: "item-answers", item: "vault:Projects/session.md", answers: [{ question: "Q?", answer: "Renew it" }, { question: "R?", answer: "Yes" }] }, { label: "Session drops on reload" }), now).what,
     ],
-    ["Idea for MacBook: ci push retry flaky", "Answered a question on Session drops on reload", "Started retry-a-flaky-ci-push"],
+    ["Idea for MacBook: ci push retry flaky", "Answered a question on Session drops on reload", "Started retry-a-flaky-ci-push", "Answered 2 questions on Session drops on reload"],
   );
   const refused = historyEntry(entry({ type: "start-item", item: "vault:Projects/session.md", anyway: false }, { label: "Session drops on reload", result: { outcome: "refused", reason: "questions-open", blocking: 2, text: "Not started: 2 questions wait on you." } }), now);
   assert.deepEqual([refused.what, refused.said], ["Start of Session drops on reload refused", "Not started: 2 questions wait on you."]);

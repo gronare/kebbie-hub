@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { answerableQuestions, answers, answersToSend, answersWithLead, keyAt, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answers, answerSents, answersToSend, answersWithLead, keepDrafts, keepMain, keyAt, bodyShown, readDrafts, readMain, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
@@ -637,15 +637,18 @@ function setFind(find, { patch = false } = {}) {
 }
 
 function backlogUi(id) {
-  if (!state.backlogUi.has(id)) state.backlogUi.set(id, { answers: new Map(), open: new Set(), answering: { busy: false, error: null }, shownBody: null, busy: false, error: null, choosing: false, machine: null, visit: nowSeconds(), editing: null });
+  const drafts = () => readDrafts(deviceStorage(), id);
+  if (!state.backlogUi.has(id)) state.backlogUi.set(id, { answers: drafts(), open: new Set(drafts().keys()), answering: { busy: false, error: null }, shownBody: null, busy: false, error: null, choosing: false, machine: null, visit: nowSeconds(), editing: null });
   return state.backlogUi.get(id);
 }
 
 const candidatesOf = (entry, kind) => entry.machines.filter((one) => takes(one.accepts, kind));
 
+const mainMachine = () => readMain(deviceStorage(), state.session?.identity?.id);
+
 function chosenFor(entry, kind) {
   const ui = backlogUi(entry.id);
-  return chooseMachine(candidatesOf(entry, kind), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine });
+  return chooseMachine(candidatesOf(entry, kind), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine, main: mainMachine() });
 }
 
 function latestFor(entry, kind, match = () => true) {
@@ -671,7 +674,14 @@ function bodyOf(entry) {
   return bodyShown(held, ui.shownBody);
 }
 
-const answerSentFor = (entry) => (index, questions) => latestFor(entry, "item-answer", (sent) => answers(sent, questions, index));
+function latestAnswer(entry, match) {
+  const machines = new Set(entry.machines.map((one) => one.machine));
+  const sent = answerSents(state.kept.sent).filter((one) => one.kind === "item-answer" && one.address === entry.key && machines.has(one.machine) && match(one)).sort((a, b) => b.at - a.at)[0];
+  return sent ? shownOf(sent) : null;
+}
+
+const answerSentFor = (entry) => (index, questions) => latestAnswer(entry, (sent) => answers(sent, questions, index));
+const answerSentOf = (entry) => (key) => latestAnswer(entry, (sent) => sent.question !== undefined && sentKey(sent) === key);
 
 function itemCardHtml(entry) {
   const ui = backlogUi(entry.id);
@@ -682,7 +692,10 @@ function itemCardHtml(entry) {
   const idea = entry.idea ? { ...entry.idea, standing: shownOf(entry.idea.sent).standing } : null;
   const edits = entry.key ? { machine: chosenFor(entry, "item-edit"), editing: ui.editing, sentFor: (section) => editFor(entry, section) } : null;
   const write = entry.key && !isFound(entry) ? { chosen: chosenFor(entry, "item-write"), sent: latestFor(entry, "item-write") } : null;
-  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null, write });
+  const shown = bodyOf(entry);
+  if (shown.body && settleDrafts(ui, shown.body, answerSentOf(entry))) keepDrafts(deviceStorage(), entry.id, ui.answers);
+  const strays = shown.body ? strayDrafts(ui, shown.body, answerSentOf(entry)) : [];
+  return itemBody(idea ? { ...entry, idea } : entry, { ...shown, strays, main: mainMachine(), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null, write });
 }
 
 const FOUND_KINDS = ["found-start", "found-add", "found-dismiss"];
@@ -726,7 +739,7 @@ function ideaCandidates() {
   return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea")).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo) }));
 }
 
-const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine });
+const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine, main: mainMachine() });
 
 function backlogListHtml(entries, selected, composing = false, view = backlogView(entries, state.find, bodyTextOf)) {
   const action = listAction({ access: commandGate(), refusedUrl: state.refused?.url ?? null, ideaMachines: ideaCandidates(), composing });
@@ -761,7 +774,7 @@ function openComposer() {
 }
 
 function ideaRoute() {
-  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice() });
+  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine() });
   if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
 }
@@ -1029,13 +1042,19 @@ function storeWarning() {
   return state.storeFailed ? `<div class="center warn" role="alert">This browser can't remember which boards and machines it has seen, so an older board replayed by the hub is only caught during this visit.</div>` : "";
 }
 
+function toggleMain(machine) {
+  keepMain(deviceStorage(), state.session?.identity?.id, mainMachine() === machine ? null : machine);
+  render();
+}
+
 function machinesScreen() {
   const now = nowSeconds();
+  const main = mainMachine();
   const rows = awakeFirst(state.opened, now).map((opened) => {
     const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
     const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kebbie}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
     const policy = state.info?.commands && opened.board && !opened.problem ? [machinePolicy(opened.board.accepts)] : [];
-    return machineRow({ machine: opened.machine, name: opened.name, awake, facts: [...policy, ...facts] });
+    return machineRow({ machine: opened.machine, name: opened.name, awake, facts: [...policy, ...facts], main: state.opened.length > 1 || main === opened.machine ? main === opened.machine : null });
   });
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
   return `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}${rows.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
@@ -1573,21 +1592,39 @@ async function addIdea() {
   go(twoColumns() ? entryHref(`idea:${sent.id}`) : "#/backlog");
 }
 
-async function sendItemAnswers(entry) {
+async function sendItemAnswers(entry, key = null) {
   const ui = backlogUi(entry.id);
   const { body } = bodyOf(entry);
-  const chosen = chooseMachine(candidatesOf(entry, "item-answer"), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine });
-  const answers = answersToSend(body, ui, filledAnswers(ui, body, answerableQuestions(body, answerSentFor(entry))));
-  if (!chosen || answers.length === 0 || ui.answering.busy || ui.answering.batch) return;
-  ui.answering.batch = { done: 0, total: answers.length };
-  ui.answering.error = null;
+  if (!body) return;
+  const sentFor = answerSentFor(entry);
+  const open = answerableQuestions(body, sentFor);
+  const retrying = (index) => Boolean(sentFor(index, body.questions));
+  const indices = key === null ? filledAnswers(ui, body, open.filter((index) => !retrying(index))) : open.filter((index) => keyAt(body, index) === key);
+  const going = answersToSend(body, ui, indices);
+  const chosen = chooseMachine(entry.machines.filter((one) => takes(one.accepts, "item-answers") || takes(one.accepts, "item-answer")), { repo: entry.row.repo, lastUsed: state.lastMachine, chosen: ui.machine, main: mainMachine() });
+  if (!startAnswering(ui, { chosen, answers: going })) return render();
   render();
+  let problem = null;
+  const send = async ({ payload, meta }) => {
+    const sent = await sendBacklog({ machine: chosen, payload, meta, ui: ui.answering });
+    if (!sent) problem = ui.answering.error ?? problem;
+    return sent;
+  };
   try {
-    await sendAnswers(entry, answers, { send: ({ payload, meta }) => sendBacklog({ machine: chosen, payload, meta, ui: ui.answering }), sent: () => (ui.answering.batch.done += 1) });
+    const failed = await sendAnswers(entry, going, { batch: takesBatch(chosen, going), send });
+    if (failed.length) ui.answering.error = `Not sent: ${problem ?? "the hub did not take it."} ${failed.length === 1 ? "Your answer is still here." : "Your answers are still here."}`;
   } finally {
     ui.answering.batch = null;
     render();
   }
+}
+
+function dropAnswer(entry, key) {
+  const ui = backlogUi(entry.id);
+  ui.answers.delete(key);
+  ui.open.delete(key);
+  keepDrafts(deviceStorage(), entry.id, ui.answers);
+  render();
 }
 
 function focusAnswer(index) {
@@ -1653,7 +1690,7 @@ function openEditor(entry, section) {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
-const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answers", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
+const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answers", "drop-answer", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
 
 function backlogAction(action, target) {
   const id = target.closest("[data-item]")?.dataset.item ?? null;
@@ -1665,7 +1702,8 @@ function backlogAction(action, target) {
   if (action === "item-edit-save" && entry) return sendItemEdit(entry);
   if (action === "item-edit-cancel") ui.editing = null;
   if (action === "add-idea") return addIdea();
-  if (action === "send-item-answers" && entry) return sendItemAnswers(entry);
+  if (action === "send-item-answers" && entry) return sendItemAnswers(entry, target.dataset.key ?? null);
+  if (action === "drop-answer" && entry) return dropAnswer(entry, target.dataset.key);
   if (action === "pick-question" && entry) return pickQuestion(entry, Number(target.dataset.index));
   if (action === "start-item" && entry) return startItem(entry);
   if (action === "write-item" && entry) return writeItem(entry);
@@ -2160,6 +2198,7 @@ root.addEventListener("click", (event) => {
     render();
   }
   else if (action === "remove-machine") removeMachine(target.dataset.id, target.dataset.name);
+  else if (action === "main-machine") toggleMain(target.dataset.id);
   else if (action === "close-sections" || (action === "sections" && state.sheet)) closeSheet();
   else if (action === "sections") {
     state.sheet = true;
@@ -2213,6 +2252,7 @@ root.addEventListener("input", (event) => {
     const scope = event.target.closest("[data-item]");
     const ui = backlogUi(scope?.dataset.item);
     ui.answers.set(event.target.dataset.key, event.target.value);
+    keepDrafts(deviceStorage(), scope?.dataset.item, ui.answers);
     return patchAnswerButtons(scope, ui);
   }
   if (draft === "item-edit") {
@@ -2237,7 +2277,7 @@ root.addEventListener("input", (event) => {
 function patchAnswerButtons(scope, ui) {
   const all = scope.querySelector(".answers-send");
   if (!all || ui.answering.batch) return;
-  const filled = [...scope.querySelectorAll('textarea[data-draft="item-answer"]')].filter((field) => draftOf(ui, field.dataset.key).trim() !== "").length;
+  const filled = [...scope.querySelectorAll('textarea[data-draft="item-answer"]:not([data-again])')].filter((field) => draftOf(ui, field.dataset.key).trim() !== "").length;
   all.hidden = filled === 0;
   all.querySelector("button").textContent = sendAllLabel(filled);
 }
