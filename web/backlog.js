@@ -119,10 +119,10 @@ export function answersWithLead(entry, sentList, { shown, storedAt, body = null 
   const indexes = new Set();
   for (const sent of sentList) {
     if (sent.kind !== "item-answer" || sent.address !== entry.key || !machines.has(sent.machine)) continue;
-    const question = body?.questions[sent.index];
+    const question = body?.questions[body.questions.findIndex((_, index) => answers(sent, body.questions, index))];
     if (body && !(question?.blocks && (question.pending_answer ?? null) === null)) continue;
     const { state, live } = shown(sent);
-    if (live && !(state === "done" && storedAt(sent.machine) >= (sent.result?.at ?? 0))) indexes.add(sent.index);
+    if (live && !(state === "done" && storedAt(sent.machine) >= (sent.result?.at ?? 0))) indexes.add(sent.question === undefined ? `#${sent.index}` : keyOf(sent.question, sent.nth ?? 0));
   }
   return indexes.size;
 }
@@ -209,7 +209,7 @@ const HOME_TERMS = { vault: "note", local: "file", kept: "kept", found: "found" 
 
 export function questionsLeft(body, sentFor) {
   const questions = body?.questions ?? [];
-  const withLead = questions.filter((question, index) => question.blocks && (question.pending_answer !== null && question.pending_answer !== undefined || sentFor(index)?.live)).length;
+  const withLead = questions.filter((question, index) => question.blocks && (question.pending_answer !== null && question.pending_answer !== undefined || sentFor(index, questions)?.live)).length;
   const left = questions.filter((question) => question.blocks).length - withLead;
   return { left, withLead };
 }
@@ -327,9 +327,15 @@ const withLead = (text, meta) => block("wait", `With the lead: "${esc(text)}"`, 
 const pendingOf = (question) => question.pending_answer !== null && question.pending_answer !== undefined;
 const answerable = (question, sent) => !pendingOf(question) && !(sent && !settled(sent.state));
 
-export const answerableQuestions = (body, sentFor) => (body?.questions ?? []).flatMap((question, index) => (answerable(question, sentFor(index)) ? [index] : []));
-export const draftOf = (ui, index) => ui.answers?.get(index) ?? "";
-export const filledAnswers = (ui, indices) => indices.filter((index) => ui.open?.has(index) && draftOf(ui, index).trim() !== "");
+const nthOf = (questions, index) => questions.slice(0, index).filter((question) => question.text === questions[index].text).length;
+const keyOf = (text, nth) => (nth ? `${nth}\u0000${text}` : text);
+export const questionKey = (questions, index) => keyOf(questions[index].text, nthOf(questions, index));
+export const answers = (sent, questions, index) => (sent.question === undefined ? sent.index === index : sent.question === questions[index].text && (sent.nth ?? 0) === nthOf(questions, index));
+export const keyAt = (body, index) => (body?.questions[index] ? questionKey(body.questions, index) : null);
+
+export const answerableQuestions = (body, sentFor) => (body?.questions ?? []).flatMap((question, index, questions) => (answerable(question, sentFor(index, questions)) ? [index] : []));
+export const draftOf = (ui, key) => ui.answers?.get(key) ?? "";
+export const filledAnswers = (ui, body, indices) => indices.filter((index) => ui.open?.has(keyAt(body, index)) && draftOf(ui, keyAt(body, index)).trim() !== "");
 export const sendAllLabel = (count) => `Send ${count} answers`;
 
 export function bodyShown(held, shown) {
@@ -337,13 +343,13 @@ export function bodyShown(held, shown) {
   return held.body ? { body: held.body, bodyState: "ready" } : { body: null, bodyState: "failed" };
 }
 
-export const answersToSend = (body, ui, indices) => indices.map((index) => ({ index, question: body?.questions[index], answer: draftOf(ui, index).trim() })).filter((one) => one.question && one.answer);
-export const answerCommand = (entry, { index, question, answer }) => ({ payload: { type: "item-answer", item: entry.key, index, question: question.text, answer }, meta: { address: entry.key, index, text: answer, label: entry.row.title } });
+export const answersToSend = (body, ui, indices) => indices.filter((index) => body?.questions[index]).map((index) => ({ index, key: keyAt(body, index), nth: nthOf(body.questions, index), question: body.questions[index], answer: draftOf(ui, keyAt(body, index)).trim() })).filter((one) => one.answer);
+export const answerCommand = (entry, { index, nth, question, answer }) => ({ payload: { type: "item-answer", item: entry.key, index, question: question.text, answer }, meta: { address: entry.key, index, question: question.text, nth, text: answer, label: entry.row.title } });
 
 export async function sendAnswers(entry, answers, { send, sent }) {
   for (const one of answers) {
     if (!(await send(answerCommand(entry, one)))) return false;
-    sent(one.index);
+    sent(one.key);
   }
   return true;
 }
@@ -354,26 +360,26 @@ export function nextQuestion(indices, sending) {
   return left.find((index) => index > last) ?? left[0] ?? null;
 }
 
-function questionCard(question, index, { pickable, ui, sent, now, batch }) {
+function questionCard(question, index, { key, pickable, ui, sent, now, batch }) {
   const pending = pendingOf(question);
   const live = sent && !settled(sent.state);
   const answered = pending || (live && sent.state === "done");
-  const picked = Boolean(ui.open?.has(index)) && answerable(question, sent);
+  const picked = Boolean(ui.open?.has(key)) && answerable(question, sent);
   const mark = question.blocks ? `<span class="qmark${answered ? "" : " warn"}" aria-hidden="true">?</span>` : `<span class="qmark" aria-hidden="true">·</span>`;
   const press = pickable && !pending && !live;
   const classes = ["opt", "bq", question.blocks ? "" : "plain", press ? "pick" : "", picked ? "picked" : "", answered ? "answered" : ""].filter(Boolean).join(" ");
-  const attributes = press ? ` role="button" tabindex="0" data-action="pick-question" data-index="${index}" aria-pressed="${picked}"` : "";
+  const attributes = press ? ` role="button" tabindex="0" data-action="pick-question" data-index="${index}" data-key="${esc(key)}" aria-pressed="${picked}"` : "";
   const card = `<div class="${classes}"${attributes}><b>${mark}${esc(question.text)}</b>${question.blocks ? "" : "<small>the work can settle it</small>"}</div>`;
-  const row = picked && press ? answerRow(index, ui, batch) : "";
+  const row = picked && press ? answerRow(index, key, ui, batch) : "";
   if (sent && (live || !pending)) return card + answerStatus(sent.sent, sent.state, { standing: sent.standing, now }) + row;
   if (pending) return card + withLead(question.pending_answer, "with the lead on its machine");
   return card + row;
 }
 
-function answerRow(index, ui, batch) {
-  const text = draftOf(ui, index);
+function answerRow(index, key, ui, batch) {
+  const text = draftOf(ui, key);
   const ready = text.trim() !== "" && !ui.answering?.busy;
-  return `<div class="answer-row"><div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" data-index="${index}" rows="2" maxlength="2000">${esc(text)}</textarea></div><button type="button" class="btn primary" data-action="send-item-answer" data-index="${index}"${ready ? "" : " disabled"}${batch ? " hidden" : ""}>Send to the lead</button></div>`;
+  return `<div class="answer-row"><div class="note-field"><label for="answer-${index}">Your answer</label><textarea id="answer-${index}" data-draft="item-answer" data-index="${index}" data-key="${esc(key)}" rows="2" maxlength="2000">${esc(text)}</textarea></div><button type="button" class="btn primary" data-action="send-item-answer" data-index="${index}" data-key="${esc(key)}"${ready ? "" : " disabled"}${batch ? " hidden" : ""}>Send to the lead</button></div>`;
 }
 
 function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, now, counts, heading = `<h3 class="sec">Open questions</h3>` }) {
@@ -381,9 +387,9 @@ function questionsBlock(body, { access, takesAnswers, refusedUrl, ui, sentFor, n
   const head = counts.left > 0 ? `${counts.left === 1 ? "1 waits" : `${counts.left} wait`} on you before it starts` : "none blocks the start";
   const pickable = access === "ready" && takesAnswers;
   const indices = pickable ? answerableQuestions(body, sentFor) : [];
-  const filled = filledAnswers(ui, indices).length;
-  const cards = questions.map((question, index) => questionCard(question, index, { pickable, ui, sent: sentFor(index), now, batch: filled >= 2 })).join("");
-  const opened = indices.filter((index) => ui.open?.has(index)).length;
+  const filled = filledAnswers(ui, body, indices).length;
+  const cards = questions.map((question, index) => questionCard(question, index, { key: questionKey(questions, index), pickable, ui, sent: sentFor(index, questions), now, batch: filled >= 2 })).join("");
+  const opened = indices.filter((index) => ui.open?.has(keyAt(body, index))).length;
   const all = opened >= 2 ? `<div class="answers-send"${filled >= 2 ? "" : " hidden"}><button type="button" class="btn primary" data-action="send-item-answers"${ui.answering?.busy ? " disabled" : ""}>${sendAllLabel(filled)}</button></div>` : "";
   const failed = pickable && ui.answering?.error ? `<div class="center warn" role="alert">${esc(ui.answering.error)}</div>` : "";
   const gate = access === "refused" ? proLine("Answering its questions from this device comes with Hub Pro.", refusedUrl) : access === "view-only" && questions.length ? viewOnlyBlock() : "";

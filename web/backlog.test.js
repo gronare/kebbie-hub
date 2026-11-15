@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { answerableQuestions, answersToSend, answersWithLead, backlogList, bodyShown, nextQuestion, sendAnswers, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
+import { answerableQuestions, answerCommand, answers, answersToSend, answersWithLead, backlogList, bodyShown, nextQuestion, sendAnswers, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -35,6 +35,7 @@ const opened = [
   machine("mch_mac", "MacBook", [session, row("local:faster", { title: "Faster board", goal: "The board shows the push within a second." }), row("local:logs", { title: "Archive logs", state: "to-write", filed: NOW - 7200 })], { repos: ["kebbie"] }),
   machine("mch_work", "work-mac", [session, row("vault:Projects/round.md", { title: "Round invoices", priority: "high", repo: "billing" })], { repos: ["webapp", "billing"] }),
 ];
+const [Q0, Q1, Q2] = body.questions.map((question) => question.text);
 const ui = (fields = {}) => ({ answers: new Map(), open: new Set(), answering: { busy: false, error: null }, busy: false, error: null, choosing: false, machine: null, visit: NOW - 60, ...fields });
 const sentAt = (fields) => ({ id: "cmd_1", machine: "mch_work", machineName: "work-mac", device: "dev_1", deviceName: "iPhone 16", at: NOW - 120, exp: NOW - 120 + 3600, result: null, ...fields });
 
@@ -74,7 +75,7 @@ test("the card shows its facts, its sections and its questions, blocking ones ma
 test("an answer sent shows with the lead, and once the body carries it the question stops counting", () => {
   const shared = mergeBacklog(opened, NOW)[0];
   const chosen = chooseMachine(shared.machines, { repo: "webapp" });
-  const picked = itemBody(shared, { body, access: "ready", ui: ui({ open: new Set([0]), answers: new Map([[0, "Renew on every request"]]) }), candidates: shared.machines, chosen, now: NOW });
+  const picked = itemBody(shared, { body, access: "ready", ui: ui({ open: new Set([Q0]), answers: new Map([[Q0, "Renew on every request"]]) }), candidates: shared.machines, chosen, now: NOW });
   assert.match(text(picked), /Your answer Renew on every request Send to the lead/);
   const done = { sent: sentAt({ kind: "item-answer", index: 0, text: "Renew on every request", result: { outcome: "done", reason: null, text: "ok", at: NOW - 60 } }), state: "done", standing: null, live: true };
   const sentFor = (index) => (index === 0 ? done : null);
@@ -90,18 +91,18 @@ test("an answer sent shows with the lead, and once the body carries it the quest
 test("each open question keeps its own draft across a re-render, and two filled answers share one Send button", () => {
   const shared = mergeBacklog(opened, NOW)[0];
   const chosen = chooseMachine(shared.machines, { repo: "webapp" });
-  const drafts = ui({ open: new Set([0, 1, 2]), answers: new Map([[0, "Renew on every request"], [1, "Yes, every device"]]) });
+  const drafts = ui({ open: new Set([Q0, Q1, Q2]), answers: new Map([[Q0, "Renew on every request"], [Q1, "Yes, every device"]]) });
   const card = () => itemBody(shared, { body, access: "ready", ui: drafts, candidates: shared.machines, chosen, now: NOW });
   const values = (html) => [...html.matchAll(/<textarea id="answer-(\d)"[^>]*>([^<]*)<\/textarea>/g)].map(([, index, value]) => `${index}:${value}`);
   assert.deepEqual(values(card()), ["0:Renew on every request", "1:Yes, every device", "2:"]);
   assert.deepEqual(values(card()), values(card()), "a second render shows the same drafts");
   const two = card();
   assert.match(two, /<div class="answers-send"><button type="button" class="btn primary" data-action="send-item-answers">Send 2 answers<\/button><\/div>/);
-  assert.equal((two.match(/data-action="send-item-answer" data-index="\d" hidden|data-action="send-item-answer" data-index="\d" disabled hidden/g) ?? []).length, 3, "the per-question buttons step aside");
-  drafts.answers.delete(1);
+  assert.equal((two.match(/data-action="send-item-answer" data-index="\d" data-key="[^"]*"(?: disabled)? hidden/g) ?? []).length, 3, "the per-question buttons step aside");
+  drafts.answers.delete(Q1);
   const one = card();
   assert.match(one, /<div class="answers-send" hidden>/);
-  assert.match(one, /data-action="send-item-answer" data-index="0">Send to the lead/, "a single filled answer keeps its own button");
+  assert.match(one, /data-action="send-item-answer" data-index="0" data-key="[^"]*">Send to the lead/, "a single filled answer keeps its own button");
 });
 
 test("after a send the next unanswered question takes the focus, wrapping past the ones sent", () => {
@@ -115,7 +116,7 @@ test("after a send the next unanswered question takes the focus, wrapping past t
 
 test("Send N answers sends N item-answer commands in order, and stops at the first one refused", async () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const drafts = ui({ open: new Set([0, 1, 2]), answers: new Map([[2, "Yes"], [0, " Renew on every request "], [1, "Every device"]]) });
+  const drafts = ui({ open: new Set([Q0, Q1, Q2]), answers: new Map([[Q2, "Yes"], [Q0, " Renew on every request "], [Q1, "Every device"]]) });
   const answers = answersToSend(body, drafts, [0, 1, 2]);
   const commands = [];
   const cleared = [];
@@ -126,10 +127,31 @@ test("Send N answers sends N item-answer commands in order, and stops at the fir
     { type: "item-answer", item: "vault:Projects/session.md", index: 2, question: "Is 14 days right?", answer: "Yes" },
   ]);
   assert.deepEqual(commands.map((one) => one.meta.index), [0, 1, 2]);
-  assert.deepEqual(cleared, [0, 1, 2]);
+  assert.deepEqual(cleared, [Q0, Q1, Q2]);
+  assert.deepEqual(commands.map((one) => one.meta.question), [Q0, Q1, Q2], "each sent answer remembers its question");
   const stopped = [];
   assert.equal(await sendAnswers(shared, answers, { send: async (command) => command.payload.index !== 1, sent: (index) => stopped.push(index) }), false);
-  assert.deepEqual(stopped, [0], "the answers after a refused one stay as drafts");
+  assert.deepEqual(stopped, [Q0], "the answers after a refused one stay as drafts");
+});
+
+test("when the lead folds one answer in and its question leaves, every other draft and sent answer stays on its own question", () => {
+  const shared = mergeBacklog(opened, NOW)[0];
+  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const drafts = ui({ open: new Set([Q0, Q1, Q2]), answers: new Map([[Q0, "Renew on every request"], [Q1, "Every device"], [Q2, "Yes"]]) });
+  const [first, second] = answersToSend(body, drafts, [0, 1]).map((one) => answerCommand(shared, one).meta);
+  const kept = [sentAt({ kind: "item-answer", ...first, result: { outcome: "done", reason: null, text: "ok", at: NOW - 60 } }), sentAt({ kind: "item-answer", ...second, id: "cmd_2" })];
+  const sentFor = (index, questions) => {
+    const sent = kept.filter((one) => answers(one, questions, index)).at(-1);
+    return sent ? { sent, state: sent.result ? "done" : "sent", standing: null, live: true } : null;
+  };
+  const folded = { ...body, questions: body.questions.slice(1) };
+  const html = itemBody(shared, { body: folded, access: "ready", ui: drafts, sentFor, candidates: shared.machines, chosen, now: NOW });
+  const [upToThird, third] = text(html).split(Q2);
+  assert.match(upToThird, /Does a password change sign out every device\? Sent to work-mac Your answer "Every device" is on its way to the lead/);
+  assert.doesNotMatch(third, /Sent to|With the lead/, "the third question carries no one else's status");
+  assert.match(html, /<textarea id="answer-1" data-draft="item-answer" data-index="1" data-key="Is 14 days right\?" rows="2" maxlength="2000">Yes<\/textarea>/, "its draft moved with it");
+  assert.doesNotMatch(html, /Renew on every request/, "the folded answer left with its question");
+  assert.equal(answersWithLead({ ...shared, row: { ...shared.row, blocking: 1 } }, kept.map((one) => ({ ...one, machine: "mch_work", address: shared.key })), { shown: () => ({ state: "sent", live: true }), storedAt: () => 0, body: folded }), 1, "the answer on its way counts against the question it answers");
 });
 
 test("a body that changes keeps the one shown until the new one is read, so the page keeps its height and scroll", () => {

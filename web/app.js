@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { answerableQuestions, answersToSend, answersWithLead, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, nextQuestion, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answers, answersToSend, keyAt, answersWithLead, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, nextQuestion, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
@@ -628,7 +628,7 @@ function bodyOf(entry) {
   return bodyShown(held, ui.shownBody);
 }
 
-const answerSentFor = (entry) => (index) => latestFor(entry, "item-answer", (sent) => sent.index === index);
+const answerSentFor = (entry) => (index, questions) => latestFor(entry, "item-answer", (sent) => answers(sent, questions, index));
 
 function itemCardHtml(entry) {
   const ui = backlogUi(entry.id);
@@ -1539,7 +1539,7 @@ function sendItemAnswers(entry, indices) {
   const answers = answersToSend(body, ui, indices);
   if (!chosen || answers.length === 0 || ui.answering.busy) return;
   const next = nextQuestion(answerableQuestions(body, answerSentFor(entry)), answers.map((one) => one.index));
-  if (next !== null) ui.open.add(next);
+  if (next !== null) ui.open.add(keyAt(body, next));
   render();
   if (next !== null) focusAnswer(next);
   return sendInOrder(entry, chosen, answers);
@@ -1547,9 +1547,9 @@ function sendItemAnswers(entry, indices) {
 
 async function sendInOrder(entry, chosen, answers) {
   const ui = backlogUi(entry.id);
-  const sent = (index) => {
-    ui.answers.delete(index);
-    ui.open.delete(index);
+  const sent = (key) => {
+    ui.answers.delete(key);
+    ui.open.delete(key);
     render();
   };
   if (!(await sendAnswers(entry, answers, { send: ({ payload, meta }) => sendBacklog({ machine: chosen, payload, meta, ui: ui.answering }), sent }))) render();
@@ -1564,11 +1564,13 @@ function focusAnswer(index) {
 
 function pickQuestion(entry, index) {
   const ui = backlogUi(entry.id);
-  if (ui.open.has(index) && draftOf(ui, index).trim() === "") ui.open.delete(index);
-  else ui.open.add(index);
+  const key = keyAt(bodyOf(entry).body, index);
+  if (key === null) return;
+  if (ui.open.has(key) && draftOf(ui, key).trim() === "") ui.open.delete(key);
+  else ui.open.add(key);
   ui.answering.error = null;
   render();
-  if (ui.open.has(index)) focusAnswer(index);
+  if (ui.open.has(key)) focusAnswer(index);
 }
 
 async function writeItem(entry) {
@@ -1629,7 +1631,7 @@ function backlogAction(action, target) {
   if (action === "item-edit-cancel") ui.editing = null;
   if (action === "add-idea") return addIdea();
   if (action === "send-item-answer" && entry) return sendItemAnswers(entry, [Number(target.dataset.index)]);
-  if (action === "send-item-answers" && entry) return sendItemAnswers(entry, filledAnswers(ui, answerableQuestions(bodyOf(entry).body, answerSentFor(entry))));
+  if (action === "send-item-answers" && entry) return sendItemAnswers(entry, filledAnswers(ui, bodyOf(entry).body, answerableQuestions(bodyOf(entry).body, answerSentFor(entry))));
   if (action === "pick-question" && entry) return pickQuestion(entry, Number(target.dataset.index));
   if (action === "start-item" && entry) return startItem(entry);
   if (action === "write-item" && entry) return writeItem(entry);
@@ -2166,7 +2168,7 @@ root.addEventListener("input", (event) => {
   if (draft === "item-answer") {
     const scope = event.target.closest("[data-item]");
     const ui = backlogUi(scope?.dataset.item);
-    ui.answers.set(Number(event.target.dataset.index), event.target.value);
+    ui.answers.set(event.target.dataset.key, event.target.value);
     return patchAnswerButtons(scope, ui);
   }
   if (draft === "item-edit") {
@@ -2193,7 +2195,7 @@ function patchAnswerButtons(scope, ui) {
   const filled = fields.filter((field) => field.value.trim() !== "").length;
   for (const button of scope.querySelectorAll('[data-action="send-item-answer"]')) {
     button.hidden = filled >= 2;
-    button.disabled = ui.answering.busy || draftOf(ui, Number(button.dataset.index)).trim() === "";
+    button.disabled = ui.answering.busy || draftOf(ui, button.dataset.key).trim() === "";
   }
   const all = scope.querySelector(".answers-send");
   if (!all) return;
