@@ -9,6 +9,7 @@ const DESK = svg("src-i", `<rect x="4" y="5" width="16" height="11" rx="1.5"/><p
 const PHONE = svg("src-i", `<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>`);
 const CLOCK = svg("src-i", `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`);
 const CHECK = svg("chk", `<path d="M5 12.5l4.5 4.5L19 7.5"/>`);
+const DOWN = svg("jump-i", `<path d="M12 5v14M6 13l6 6 6-6"/>`);
 const WEEK = 7 * 86_400;
 
 export const leadHref = (machine) => `#/lead/${encodeURIComponent(machine)}`;
@@ -160,10 +161,12 @@ export function leadHead(machine, { now, away, picking, canPick }) {
 
 export const panelHead = (machine, now) => `<div class="lead-head"><h2>${esc(machine.name)}</h2>${statusLine(machine, now)}</div>`;
 
-export function composerHtml(machine, { draft, busy, error, takes }) {
-  if (!takes) return `<div class="composer off" role="note">${esc(machine.name)}'s kebbie can't take messages from the app yet.</div>`;
+export const jumpButton = (fresh) => `<button type="button" class="jump" data-action="lead-jump" aria-label="${fresh ? "New message: jump to the latest" : "Jump to the latest message"}" hidden>${DOWN}${fresh ? '<span class="dot-new"></span>' : ""}</button>`;
+
+export function composerHtml(machine, { draft, busy, error, takes, fresh = false }) {
+  if (!takes) return `<div class="composer off" role="note">${jumpButton(fresh)}${esc(machine.name)}'s kebbie can't take messages from the app yet.</div>`;
   const problem = error ? `<div class="composer-error" role="alert">${esc(error)}</div>` : "";
-  return `<div class="composer">${problem}<textarea id="lead-say" rows="1" placeholder="Message the lead" aria-label="Message the lead on ${esc(machine.name)}" enterkeyhint="send"${busy ? " disabled" : ""}>${esc(draft)}</textarea><button type="button" class="send" data-action="lead-send" aria-label="Send"${busy || draft.trim() === "" ? " disabled" : ""}>${SEND}</button></div>`;
+  return `<div class="composer">${jumpButton(fresh)}${problem}<textarea id="lead-say" rows="1" placeholder="Message the lead" aria-label="Message the lead on ${esc(machine.name)}" enterkeyhint="send"${busy ? " disabled" : ""}>${esc(draft)}</textarea><button type="button" class="send" data-action="lead-send" aria-label="Send"${busy || draft.trim() === "" ? " disabled" : ""}>${SEND}</button></div>`;
 }
 
 export const popHtml = (rows) => `<div class="pop-scrim" data-action="lead-pick"></div><div class="pop" role="menu">${rows.join("")}</div>`;

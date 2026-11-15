@@ -32,7 +32,7 @@ let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const PLAN_INACTIVE = "plan-inactive";
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
 const myPlan = () => currentPlan(state.me?.plan, nowSeconds());
 let reloading = false;
 const hub = { account, credentials: globalThis.navigator?.credentials };
@@ -811,8 +811,11 @@ function loadDeviceNames() {
 }
 
 function leadView(machine, now) {
-  const thread = threadOf(machine.board.lead, blobs.peek, state.lead.depth.get(machine.machine) ?? 0);
-  if (thread.missing) blobs.load(thread.missing).then((loaded) => loaded && route().name === "lead" && render());
+  const read = threadOf(machine.board.lead, blobs.peek, state.lead.depth.get(machine.machine) ?? 0);
+  if (read.missing) blobs.load(read.missing).then((loaded) => loaded && route().name === "lead" && render());
+  const kept = state.lead.shown.get(machine.machine);
+  const thread = read.missing && read.turns.length === 0 && kept ? kept : read;
+  if (!read.missing && !read.failed) state.lead.shown.set(machine.machine, read);
   const pending = pendingMessages(state.kept.sent, machine, new Set(thread.turns.map((turn) => turn.id)), now);
   return { thread, pending };
 }
@@ -823,13 +826,16 @@ function leadRoute(wanted) {
   const away = awayOn(state.kept.sent, state.opened, now);
   const machine = chosenLead(machines, wanted ?? state.lead.machine, now);
   if (!machine) return shell("lead", `<div class="narrow">${top("Lead", awaySwitch(away))}${away ? awayNote : ""}<div class="center">No machine's lead talks to the app yet. Update kebbie on a machine to write to its lead from here.</div></div>`);
-  if (state.lead.machine !== machine.machine) state.lead.draft = "";
+  if (state.lead.machine !== machine.machine) {
+    state.lead.draft = "";
+    state.lead.fresh = false;
+  }
   state.lead.machine = machine.machine;
   loadDeviceNames();
   markLeadSeen(machine.machine, machine.board.lead?.replied_at);
   const { thread, pending } = leadView(machine, now);
   const body = threadHtml({ machine, thread, pending, now, nameOf: deviceName });
-  const composer = composerHtml(machine, { draft: state.lead.draft, busy: state.lead.busy, error: state.lead.error, takes: (machine.board.accepts ?? []).includes("lead-message") });
+  const composer = composerHtml(machine, { draft: state.lead.draft, busy: state.lead.busy, error: state.lead.error, takes: (machine.board.accepts ?? []).includes("lead-message"), fresh: state.lead.fresh });
   const when = (one) => {
     const view = one === machine ? { thread, pending } : leadView(one, now);
     const last = Math.max(view.thread.turns.at(-1)?.at ?? 0, view.pending.at(-1)?.sent.at ?? 0);
@@ -865,16 +871,39 @@ async function switchAway(on) {
   render();
 }
 
+function threadPane() {
+  if (root.querySelector(".app > .panel .thread")) return root.querySelector(".app > .panel");
+  const thread = root.querySelector("main.screen .thread");
+  return thread && getComputedStyle(thread).overflowY === "auto" ? thread : null;
+}
+
 function atThreadEnd() {
-  const pane = root.querySelector(".app > .panel");
-  if (pane && root.querySelector(".panel .thread")) return pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80;
+  const pane = threadPane();
+  if (pane) return pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80;
   return innerHeight + scrollY >= document.documentElement.scrollHeight - 80 || !root.querySelector(".thread");
 }
 
 function scrollThreadToEnd() {
-  const pane = root.querySelector(".app > .panel");
-  if (pane && root.querySelector(".panel .thread")) pane.scrollTop = pane.scrollHeight;
+  const pane = threadPane();
+  if (pane) pane.scrollTop = pane.scrollHeight;
   else if (root.querySelector("main.screen .thread")) scrollTo(0, document.documentElement.scrollHeight);
+}
+
+let jumpShown = false;
+function syncJump() {
+  const button = root.querySelector(".jump");
+  if (!button) return;
+  const pane = threadPane();
+  const height = pane ? pane.clientHeight : (globalThis.visualViewport?.height ?? innerHeight);
+  const fromEnd = pane ? pane.scrollHeight - pane.scrollTop - pane.clientHeight : document.documentElement.scrollHeight - innerHeight - scrollY;
+  if (fromEnd < 80) jumpShown = false;
+  else if (fromEnd > height) jumpShown = true;
+  button.hidden = !jumpShown;
+  if (!jumpShown && state.lead.fresh) {
+    state.lead.fresh = false;
+    button.querySelector(".dot-new")?.remove();
+    button.setAttribute("aria-label", "Jump to the latest message");
+  }
 }
 
 function fitComposer(field = root.querySelector("#lead-say")) {
@@ -981,7 +1010,8 @@ function render() {
   const listTop = listPane()?.scrollTop ?? (twoColumns() ? scrollY : 0);
   const anchor = twoColumns() && !listPane() ? rowTop(location.hash) : null;
   const panelTop = rendered === location.hash ? (root.querySelector(".panel")?.scrollTop ?? 0) : 0;
-  const stick = name === "lead" && atThreadEnd();
+  const stick = name === "lead" && (rendered !== location.hash || atThreadEnd());
+  const turnsBefore = name === "lead" && rendered === location.hash ? threadTurns() : null;
   const pageTop = rendered === location.hash && !twoColumns() ? scrollY : null;
   const sheet = state.pro ? proCard({ plan: myPlan(), kind: state.pro.kind, busy: state.pro.busy, error: state.pro.error }) : "";
   root.innerHTML = (html.startsWith('<div class="app') ? html : `<main class="screen${auth ? " auth" : ""}">${html}</main>`) + sheet;
@@ -1009,7 +1039,14 @@ function render() {
   if (panelTop) root.querySelector(".panel")?.scrollTo(0, panelTop);
   if (stick) scrollThreadToEnd();
   else if (pageTop !== null && scrollY !== pageTop) scrollTo(0, pageTop);
+  if (!stick && turnsBefore !== null && threadTurns() > turnsBefore && !state.lead.fresh) {
+    state.lead.fresh = true;
+    return render();
+  }
+  syncJump();
 }
+
+const threadTurns = () => root.querySelectorAll(".thread > .msg").length;
 
 const rowTop = (hash) => root.querySelector(`.app > main.screen a[href="${CSS.escape(hash)}"]`)?.getBoundingClientRect().top ?? null;
 const listPane = () => (document.documentElement.classList.contains("panes") ? root.querySelector(".app > main.screen") : null);
@@ -1971,6 +2008,10 @@ root.addEventListener("click", (event) => {
   }
   if (action === "lead-send") return sendLead();
   if (action === "lead-away") return switchAway(target.checked);
+  if (action === "lead-jump") {
+    scrollThreadToEnd();
+    return syncJump();
+  }
   if (action === "lead-older") {
     state.lead.depth.set(state.lead.machine, (state.lead.depth.get(state.lead.machine) ?? 0) + 1);
     return render();
@@ -2038,7 +2079,9 @@ root.addEventListener("input", (event) => {
     state.lead.draft = event.target.value;
     const button = root.querySelector('[data-action="lead-send"]');
     if (button) button.disabled = state.lead.busy || state.lead.draft.trim() === "";
-    return fitComposer(event.target);
+    const stick = atThreadEnd();
+    fitComposer(event.target);
+    return stick && scrollThreadToEnd();
   }
   if (event.target.id === "email") state.draft.email = event.target.value;
   if (event.target.id === "code") state.draft.code = event.target.value;
@@ -2089,9 +2132,12 @@ function patchAnswerButtons(scope, ui) {
 
 const writingToLead = () => document.activeElement?.id === "lead-say";
 root.addEventListener("focusin", (event) => event.target.id === "lead-say" && requestAnimationFrame(scrollThreadToEnd));
+let typingPinned = false;
 globalThis.visualViewport?.addEventListener("resize", () => root.querySelector(".composer") && requestAnimationFrame(() => {
+  const pinned = document.documentElement.classList.contains("kb-open");
   fitComposer();
-  if (writingToLead()) scrollThreadToEnd();
+  if (writingToLead() || (typingPinned && !pinned)) scrollThreadToEnd();
+  typingPinned = pinned;
 }));
 
 root.addEventListener("keydown", (event) => {
@@ -2150,6 +2196,8 @@ function remarkStrip(settle = 1300) {
 for (const event of ["resize", "orientationchange"]) addEventListener(event, () => remarkStrip());
 addEventListener("pageshow", () => remarkStrip(3000));
 addEventListener("scroll", () => performance.now() < settleUntil && clampScroll(), { passive: true });
+addEventListener("scroll", syncJump, { passive: true });
+root.addEventListener("scroll", syncJump, { capture: true, passive: true });
 globalThis.screen?.orientation?.addEventListener?.("change", () => remarkStrip());
 
 addEventListener("keydown", (event) => {

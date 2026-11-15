@@ -114,3 +114,12 @@ test("the away switch follows the board once the phone's switch has its answer a
   const lapsed = { ...doneOn, at: NOW - 3600, exp: NOW - 1, result: null };
   assert.equal(awayOn([lapsed], [off], NOW), false, "a switch never delivered changed nothing");
 });
+
+test("the composer carries a hidden jump to the latest, with a dot when a reply came in below", () => {
+  const quiet = composerHtml(machine(), { draft: "", busy: false, error: null, takes: true });
+  assert.match(quiet, /<button type="button" class="jump" data-action="lead-jump" aria-label="Jump to the latest message" hidden>/);
+  assert.doesNotMatch(quiet, /dot-new/);
+  const fresh = composerHtml(machine(), { draft: "", busy: false, error: null, takes: true, fresh: true });
+  assert.match(fresh, /aria-label="New message: jump to the latest" hidden>.*<span class="dot-new"><\/span><\/button>/);
+  assert.match(composerHtml(machine(), { draft: "", busy: false, error: null, takes: false, fresh: true }), /class="jump"/);
+});

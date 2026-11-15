@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addEmailScreen, address, codeScreen, connectEmailScreen, createPasskeyScreen, emailSignInScreen, emailText, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
+import { addEmailScreen, address, codeScreen, connectEmailScreen, createPasskeyScreen, emailSignInScreen, emailText, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { HubError } from "./hub.js";
 
 const text = (html) => html.replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
@@ -113,4 +113,33 @@ test("codes and refusals read as people say them", () => {
   assert.match(emailText(new HubError(400, "wrong-code")), /doesn't match, or it has expired/);
   assert.match(emailText(new HubError(429, "rate-limited")), /Too many tries/);
   assert.equal(emailText(new HubError(500, "boom")), "The hub answered 500 (boom).");
+});
+
+function fakeKeyboard(innerHeight) {
+  const view = Object.assign(new EventTarget(), { height: innerHeight, offsetTop: 0 });
+  const vars = new Map();
+  const classes = new Set();
+  const page = { style: { setProperty: (name, value) => vars.set(name, value), removeProperty: (name) => vars.delete(name) }, classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)), remove: (name) => classes.delete(name) } };
+  const show = (keyboard, pan) => {
+    view.height = innerHeight - keyboard;
+    view.offsetTop = pan;
+    view.dispatchEvent(new Event("resize"));
+  };
+  return { view, page, vars, classes, show };
+}
+
+test("the keyboard stays open when iOS pans the visual viewport instead of scrolling the page", () => {
+  globalThis.innerHeight = 678;
+  const kb = fakeKeyboard(678);
+  keyboardLift(kb.view, kb.page)(true);
+  kb.show(300, 262);
+  assert.ok(kb.classes.has("kb-open"));
+  assert.equal(kb.vars.get("--kb"), "38px");
+  assert.equal(kb.vars.get("--vv-top"), "262px");
+  assert.equal(kb.vars.get("--vvh"), "378px");
+  kb.show(300, 300);
+  assert.ok(kb.classes.has("kb-open"));
+  assert.equal(kb.vars.get("--kb"), "0px");
+  kb.show(0, 0);
+  assert.ok(!kb.classes.has("kb-open"));
 });

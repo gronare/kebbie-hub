@@ -91,13 +91,14 @@ export function keylessUnlockScreen({ who = null, notice = null, busy = false })
   });
 }
 
-// iOS shrinks only the visual viewport for the keyboard, so the form is lifted to sit above it while an auth screen shows.
+// iOS shrinks only the visual viewport for the keyboard and may pan it down by offsetTop, so the keyboard is innerHeight - height while --kb lifts fixed boxes from the layout viewport's bottom.
 export function keyboardLift(view = globalThis.visualViewport, page = globalThis.document?.documentElement) {
   let on = false;
   const sync = () => {
-    const keyboard = innerHeight - view.height - view.offsetTop;
+    const keyboard = innerHeight - view.height;
     page.style.setProperty("--vvh", `${view.height}px`);
-    page.style.setProperty("--kb", `${Math.max(0, Math.round(keyboard))}px`);
+    page.style.setProperty("--vv-top", `${Math.round(view.offsetTop)}px`);
+    page.style.setProperty("--kb", `${Math.max(0, Math.round(keyboard - view.offsetTop))}px`);
     page.classList.toggle("kb-open", keyboard > 80);
   };
   return (shown) => {
@@ -111,6 +112,7 @@ export function keyboardLift(view = globalThis.visualViewport, page = globalThis
       view.removeEventListener("resize", sync);
       view.removeEventListener("scroll", sync);
       page.style.removeProperty("--vvh");
+      page.style.removeProperty("--vv-top");
       page.style.removeProperty("--kb");
       page.classList.remove("kb-open");
     }
