@@ -7,7 +7,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::{Parser, Subcommand, ValueEnum};
 use kebbie_hub_fakes::machine::{ApproveFrom, Backlog, Handled, Handling, LeadHold, MachineState, Posted, connect, every_command, join};
 use kebbie_hub_fakes::{load, save};
-use kebbie_hub_protocol::{Board, Card, Id, Item, ItemKey, Kind, Notice, NoticeCategory, Outcome, Review, Target, Urgency};
+use kebbie_hub_protocol::{Board, Card, Id, Item, ItemKey, Job, JobReport, Kind, Notice, NoticeCategory, Outcome, Payload, Review, Target, Urgency};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -136,6 +136,29 @@ enum Command {
     LeadHold { hold: Hold },
     #[command(about = "Deliver every held message to the lead, post their results and the thread")]
     LeadRelease,
+    #[command(about = "Take jobs from the account's other machines as a worker on this os, or stop with --off")]
+    Worker {
+        #[arg(required_unless_present = "off")]
+        os: Option<String>,
+        #[arg(long, conflicts_with = "os")]
+        off: bool,
+    },
+    #[command(about = "List the account's machines, which take jobs, and whether the account signed each one's keys")]
+    Machines,
+    #[command(about = "Send a job from a JSON file to another machine of the account, with a git bundle split into blobs")]
+    SendJob {
+        to: String,
+        file: PathBuf,
+        #[arg(long, help = "Git bundle to put as blobs; its parts replace the file's bundle")]
+        bundle: Option<PathBuf>,
+    },
+    #[command(about = "Send a job report from a JSON file to another machine of the account")]
+    SendReport { to: String, file: PathBuf },
+    #[command(about = "Long-poll once, apply commands and open each job or report other machines of the account sent here")]
+    Receive {
+        #[arg(long, default_value_t = 25)]
+        wait: u64,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -442,6 +465,56 @@ async fn run(cli: Cli) -> Result<(), String> {
             let released = state.release_lead().await.map_err(|e| text(&e))?;
             save(&cli.state, &state).map_err(|e| text(&e))?;
             println!("delivered {} held message(s) to the lead", released.len());
+        }
+        Command::Worker { os, off } => {
+            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            match os.filter(|_| !off) {
+                Some(os) => println!("takes jobs on {}", state.set_worker(&os).await.map_err(|e| text(&e))?),
+                None => {
+                    state.clear_worker().await.map_err(|e| text(&e))?;
+                    println!("takes no jobs");
+                }
+            }
+        }
+        Command::Machines => {
+            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let listed = state.machines().await.map_err(|e| text(&e))?;
+            for row in &listed.machines {
+                let signed = if state.peer_keys(&listed, &row.machine).is_ok() { "signed" } else { "not signed" };
+                println!("{} {} {} {signed}", row.machine, row.name, row.worker_os.as_deref().unwrap_or("not a worker"));
+            }
+        }
+        Command::SendJob { to, file, bundle } => {
+            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let mut job: Job = load(&file).map_err(|e| text(&e))?;
+            if let Some(path) = bundle {
+                let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                job.bundle = state.put_bundle(&bytes).await.map_err(|e| text(&e))?;
+            }
+            let to = Id::parse(&to).map_err(|e| text(&e))?;
+            let (envelope, queued) = state.send_job(&to, job).await.map_err(|e| text(&e))?;
+            println!("sent job {} to {to}, seq {}", envelope.header.id, queued.seq);
+        }
+        Command::SendReport { to, file } => {
+            let state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let report: JobReport = load(&file).map_err(|e| text(&e))?;
+            let to = Id::parse(&to).map_err(|e| text(&e))?;
+            let (envelope, queued) = state.send_report(&to, report).await.map_err(|e| text(&e))?;
+            println!("sent report {} to {to}, seq {}", envelope.header.id, queued.seq);
+        }
+        Command::Receive { wait } => {
+            let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;
+            let received = state.receive(wait).await.map_err(|e| text(&e))?;
+            save(&cli.state, &state).map_err(|e| text(&e))?;
+            for one in &received {
+                let header = &one.envelope.header;
+                match &one.opened {
+                    Ok(Payload::Job(job)) => println!("job {} from {}: {} at {} in {}", header.id, header.from, job.command, job.commit, job.repo),
+                    Ok(Payload::JobReport(report)) => println!("report {} on job {} from {}: {} bytes of output{}", report.seq, report.job, header.from, report.log.len(), if report.end.is_some() { ", ended" } else { "" }),
+                    Ok(other) => println!("{} {} from {}", other.kind().name(), header.id, header.from),
+                    Err(error) => println!("{} {} from {} refused: {}", header.kind.name(), header.id, header.from, error.key()),
+                }
+            }
         }
         Command::Takes { takes } => {
             let mut state: MachineState = load(&cli.state).map_err(|e| text(&e))?;

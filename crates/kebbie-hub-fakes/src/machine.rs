@@ -7,7 +7,7 @@ use kebbie_hub_api::{
     CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, Inbox,
     JoinRequest, Joined, MachineName, PairingFailure,
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
-    NoticePosted, NoticeUpload, NotifiedDevices,
+    NoticePosted, NoticeUpload, NotifiedDevices, AccountMachines, MessageQueued, MessageUpload, WorkerOs,
 };
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
@@ -18,6 +18,7 @@ use kebbie_hub_protocol::{
     Answer, KebbieQuestionKind, MAX_STAGE_NOTE_CHARS, StageState, unlock_stages,
     CARD_MEDIA_TYPE, Card, CardRef, FoundKeep, NoticedChoice, ReviewSend, Verdict,
     Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_PAGE_TURNS, NoticeCategory, Target, Turn,
+    BLOB_OVERHEAD, JOB_BUNDLE_MEDIA_TYPE, Job, JobReport, MAX_BLOB_BYTES, OpenError, open, open_blob,
 };
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
@@ -136,6 +137,12 @@ impl Handling {
 }
 
 #[derive(Clone, Debug)]
+pub struct Received {
+    pub envelope: Envelope,
+    pub opened: Result<Payload, OpenError>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Handled {
     pub seq: u64,
     pub command: Id,
@@ -189,6 +196,8 @@ pub struct MachineState {
     pub cards: BTreeMap<String, Card>,
     #[serde(default)]
     pub lead: Lead,
+    #[serde(default)]
+    pub messages: Vec<Envelope>,
     #[serde(skip)]
     lead_changed: bool,
     #[serde(skip)]
@@ -416,6 +425,7 @@ impl MachineState {
             backlog_changed: false,
             decided: false,
             lead: Lead::default(),
+            messages: Vec::new(),
             lead_changed: false,
         }
     }
@@ -700,6 +710,8 @@ impl MachineState {
                     self.handle(message.seq, &message.envelope, state_file)
                         .await?,
                 );
+            } else if message.envelope.header.kind.is_machine_message() {
+                self.messages.push(message.envelope.clone());
             }
         }
         self.inbox_seq = inbox.seq;
@@ -1496,6 +1508,100 @@ impl MachineState {
             .await?;
         self.last_rev = self.last_rev.max(stored.rev);
         Ok(stored.rev)
+    }
+
+    pub async fn set_worker(&self, os: &str) -> Result<String, Error> {
+        let set: WorkerOs = self.client().put("/v1/m/worker", &WorkerOs { os: os.to_string() }).await?;
+        Ok(set.os)
+    }
+
+    pub async fn clear_worker(&self) -> Result<(), Error> {
+        Ok(self.client().delete("/v1/m/worker").await?)
+    }
+
+    pub async fn machines(&self) -> Result<AccountMachines, Error> {
+        Ok(self.client().get("/v1/m/machines", &[] as &[(&str, String)]).await?)
+    }
+
+    pub fn peer_keys(&self, listed: &AccountMachines, peer: &Id) -> Result<PublicKeys, Error> {
+        let account = self.account.as_ref().ok_or_else(|| Error::Protocol("this machine pinned no account".into()))?;
+        let signed = listed.list.as_ref().filter(|signed| account.verifies_list(&signed.list, &signed.signature.0)).ok_or_else(|| Error::Protocol("the machine list is not the account's".into()))?;
+        signed.list.machines.iter().find(|listed| &listed.machine == peer).map(|listed| listed.keys).ok_or_else(|| Error::Protocol(format!("{peer} is not on the account's machine list")))
+    }
+
+    pub fn seal_message(&self, to: &Id, to_keys: &PublicKeys, payload: &Payload, at: u64) -> Result<Envelope, Error> {
+        let account = self.account.as_ref().ok_or_else(|| Error::Protocol("this machine pinned no account".into()))?;
+        let header = Header::new(Id::new(Prefix::Command).map_err(|error| Error::Protocol(error.to_string()))?, payload.kind(), self.machine.clone(), to.clone(), at);
+        let recipients = [(to.clone(), *to_keys), (self.machine.clone(), self.public()), account.recipient()];
+        seal(header, payload, &self.secret(), &recipients).map_err(|error| Error::Protocol(error.to_string()))
+    }
+
+    pub async fn post_message(&self, envelope: &Envelope) -> Result<MessageQueued, Error> {
+        Ok(self.client().post("/v1/m/messages", &MessageUpload { envelope: envelope.clone() }).await?)
+    }
+
+    pub async fn send(&self, to: &Id, payload: Payload) -> Result<(Envelope, MessageQueued), Error> {
+        payload.validate().map_err(|problem| Error::Protocol(problem.to_string()))?;
+        let keys = self.peer_keys(&self.machines().await?, to)?;
+        let envelope = self.seal_message(to, &keys, &payload, now())?;
+        let queued = self.post_message(&envelope).await?;
+        Ok((envelope, queued))
+    }
+
+    pub async fn send_job(&self, to: &Id, job: Job) -> Result<(Envelope, MessageQueued), Error> {
+        self.send(to, Payload::Job(job)).await
+    }
+
+    pub async fn send_report(&self, to: &Id, report: JobReport) -> Result<(Envelope, MessageQueued), Error> {
+        self.send(to, Payload::JobReport(report)).await
+    }
+
+    pub fn open_message(&self, envelope: &Envelope, listed: &AccountMachines, at: u64) -> Result<Payload, OpenError> {
+        let header = &envelope.header;
+        if !header.kind.is_machine_message() || header.machine != self.machine {
+            return Err(OpenError::Malformed);
+        }
+        let sender = self.peer_keys(listed, &header.from).map_err(|_| OpenError::WrongSender)?;
+        let payload = open(envelope, &self.machine, &self.secret(), &header.from, &sender, at)?;
+        payload.validate().map_err(|_| OpenError::Malformed)?;
+        Ok(payload)
+    }
+
+    pub async fn receive(&mut self, wait: u64) -> Result<Vec<Received>, Error> {
+        self.apply_once(wait, None).await?;
+        let envelopes = std::mem::take(&mut self.messages);
+        if envelopes.is_empty() {
+            return Ok(Vec::new());
+        }
+        let listed = self.machines().await?;
+        let at = now();
+        Ok(envelopes
+            .into_iter()
+            .map(|envelope| Received { opened: self.open_message(&envelope, &listed, at), envelope })
+            .collect())
+    }
+
+    pub async fn fetch_blob(&self, id: &Id) -> Result<Vec<u8>, Error> {
+        Ok(self.client().get_bytes(&format!("/v1/m/blobs/{id}")).await?)
+    }
+
+    pub async fn put_bundle(&self, bundle: &[u8]) -> Result<Vec<BlobRef>, Error> {
+        let mut parts = Vec::new();
+        for chunk in bundle.chunks(MAX_BLOB_BYTES - BLOB_OVERHEAD) {
+            let (blob, ciphertext) = seal_blob(chunk, JOB_BUNDLE_MEDIA_TYPE);
+            self.put_blob(&blob.id, ciphertext).await?;
+            parts.push(blob);
+        }
+        Ok(parts)
+    }
+
+    pub async fn fetch_bundle(&self, parts: &[BlobRef]) -> Result<Vec<u8>, Error> {
+        let mut bundle = Vec::new();
+        for part in parts {
+            let ciphertext = self.fetch_blob(&part.id).await?;
+            bundle.extend(open_blob(part, &ciphertext).map_err(|error| Error::Protocol(error.to_string()))?);
+        }
+        Ok(bundle)
     }
 
     pub async fn poll_once(&mut self, wait: u64) -> Result<Inbox, Error> {

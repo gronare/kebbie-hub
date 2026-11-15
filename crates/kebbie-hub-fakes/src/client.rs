@@ -184,6 +184,22 @@ impl HubClient {
         .await
     }
 
+    pub async fn get_bytes(&self, path: &str) -> Result<Vec<u8>, HubError> {
+        let response = self
+            .request(Method::GET, path)
+            .send()
+            .await
+            .map_err(|error| HubError::Transport(error.to_string()))?;
+        if !response.status().is_success() {
+            return Err(HubError::from_response(response).await);
+        }
+        response
+            .bytes()
+            .await
+            .map(|bytes| bytes.to_vec())
+            .map_err(|error| HubError::Transport(error.to_string()))
+    }
+
     async fn send_empty(request: RequestBuilder) -> Result<(), HubError> {
         let response = request
             .send()
