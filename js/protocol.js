@@ -35,6 +35,8 @@ export const START_ITEM_TTL = DAY;
 export const KEPT_ANSWER_TTL = 7 * DAY;
 export const MAX_IDEA_CHARS = 2000;
 export const MAX_ITEM_ANSWER_CHARS = 2000;
+export const MAX_ITEM_ANSWERS = 16;
+export const MAX_ITEM_ANSWERS_BYTES = 24 * 1024;
 export const MAX_QUESTION_CHARS = 4000;
 export const MAX_ITEM_TITLE_CHARS = 200;
 export const MAX_SECTION_CHARS = 8000;
@@ -89,6 +91,7 @@ export const KINDS = {
   "prompt-answer": { ...command, maxTtl: PROMPT_ANSWER_TTL, ttl: PROMPT_ANSWER_TTL },
   idea: { ...command, maxTtl: COMMAND_TTL },
   "item-answer": { ...command, maxTtl: COMMAND_TTL },
+  "item-answers": { ...command, maxTtl: COMMAND_TTL },
   "start-item": { ...command, ttl: START_ITEM_TTL },
   "item-edit": { ...command, maxTtl: COMMAND_TTL },
   "item-write": { ...command, maxTtl: COMMAND_TTL },
@@ -665,6 +668,11 @@ const itemEdit = (value) =>
   (absent(value.section) ? isLine(MAX_ITEM_TITLE_CHARS)(value.text) : [...value.text].length <= MAX_SECTION_CHARS && !/[^\P{Cc}\n\t]/u.test(value.text)) &&
   text.encode(JSON.stringify({ item: value.item, section: value.section ?? null, text: value.text, base: value.base })).length <= MAX_ITEM_EDIT_BYTES;
 
+const givenAnswer = shape({ question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) });
+const itemAnswers = (value) =>
+  typed({ item: isItemKey, answers: (answers) => Array.isArray(answers) && answers.length >= 1 && answers.length <= MAX_ITEM_ANSWERS && answers.every(givenAnswer) && new Set(answers.map((one) => one.question)).size === answers.length })(value) &&
+  text.encode(JSON.stringify({ item: value.item, answers: value.answers })).length <= MAX_ITEM_ANSWERS_BYTES;
+
 const nextRow = shape({ part: oneOf("stopped", "push", "read"), address: string, rank: u32v, line: string, since: optionalField(u64v), waits_behind: u32v });
 const later = shape({ address: string, title: optionalField(string), state: oneOf("queued", "parked"), line: string, until: optionalField(u64v), question: bool });
 const STANDINGS = {
@@ -743,6 +751,7 @@ const PAYLOADS = {
   "prompt-answer": typed({ address: string, prompt: string, key: string }),
   idea: typed({ text: isText(MAX_IDEA_CHARS), repo: optionalField(string) }),
   "item-answer": typed({ item: isItemKey, index: u32v, question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) }),
+  "item-answers": itemAnswers,
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
   "item-edit": itemEdit,
   "item-write": typed({ item: (key) => isItemKey(key) && homeOf(key) !== "found" }),

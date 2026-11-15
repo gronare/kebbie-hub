@@ -1877,6 +1877,119 @@
         "item-edit",
         "found-start",
         "found-add",
+        "found-dismiss",
+        "item-answers"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "XxyaGUkj-CT1gokaWwgduWNNb1nRnw9d4uwQzFSmuxDv5CLXYrmnm3ydQ2W2BQTSl54kbqwAG5to2DMEQHXRZuWnkLUUd54f_WhqhYPLJxxSEn35hZgcZ6_TC9YzQ2tEzqT2l30QqfN9XG0A42wx33bHazBYiKAwOup7Ki932mb_tI2w-fS4ZjZxdg1G23Ic_7p5XkwH__Z_yvC32rI6C8UokKmFVUHUWYrUSRm3u6o-IvdlB0RNQLha2vF80jygNLeE4xTKMvfLLVMNjxJUaE-wflnVLLGLYPZsjijP5_IF_NhPBk8R1xwvWsblD9BiH37YiVPndxTU0L0UVY0g43sE8IykuQGvGkSdoMVVVw5c0E92",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-783d-acdc-1069295be716",
+        "kc": "fuOxOutgv8TAu2tbiHFQoRsmBWDWEpPilDQFe4rMDd0",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "no-7n_fnYtcROFKZ9TMzG4bQ-fQ8yL1xAdIkBysLUjyDb8kUdibLsAmpOpSq2D-jMgMagy5c2GkgaqhOREBfrl_-y72P9Sm79AhVh9-E2Z0",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "Pf3dD5QVTwokXl-WcfXhcQsy784rmfdzbjWm9_ttvSzrjYU0iJ_uq06KK51Hs6IR-ktotbRtFvBmZk8JWtNQlWr-BThqUsJbQI59qZ727DY"
+        },
+        "kind": "item-answers",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "8PLN49yfrAO2zowBtAinAvNPGU__Yh98CLSVtfQBHIrdEUO3aWKfdXteqiyGfwvcpuvCRs4iOEQDEVcWmIFsDg",
+        "v": 1
+      },
+      "expect": {
+        "device": "dev_01K83YV380329ARS69J86ZB9PB",
+        "payload": {
+          "answers": [
+            {
+              "answer": "Half up, like invoices.",
+              "question": "Round half up, or to even like the ledger?"
+            },
+            {
+              "answer": "Only on refunds.",
+              "question": "Show the rounding on the receipt?"
+            }
+          ],
+          "item": "vault:Projects/refund-rounding.md",
+          "type": "item-answers"
+        }
+      },
+      "name": "device-answers-all-of-an-items-questions-at-once",
+      "trust": "account"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "prompt-answer",
+        "idea",
+        "item-answer",
+        "start-item",
+        "item-edit",
+        "found-start",
+        "found-add",
+        "found-dismiss"
+      ],
+      "applied": {
+        "applied": {}
+      },
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "j1coJr5CjB6KJd8-6jN0WJ0S1c8yenkQmqQnImkgwu-qGZpyMZqc5cmk1Vd7xXXTz8PWslzEkUYUDZWcsI0ZayPR4gHdrqn4HC3BIPa8JfO30yaVMx_TE_M3mY4nayEfZjwjSKfiUA-84a6EsQEXG799rmMUaLQfvsRHTmE9ZRGFqWdU5tTWiArmYIYKlFkLXKtLWHrvSZsh0Ihp4C12WQy20234PIh_UZHPuQ7PRoxP07-C4ZbocdDMSniGH2B04LslN_iiVO1R8JYL0W9sSevumiwPjg3NLz0mMAcXVhT1tILSuLpHvhVOEnoXw56xeAJZia4Rp-gZLbySIIaQW1qa0ieE_qFJbYeGE4iBKE6jsya8",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-703b-a6d5-99362299294a",
+        "kc": "hjbawj1AQcgae-b7PDO4XqNoQHkMKpUJW8sW6N8sVoI",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "u6DWTQ1w7VRY1zydlL3f1i9pbhI-3stNI15HJrk81AP4NxyQA1wMYZVkPk8_DDMeMxbU9DjNfSQm3_TJ4RQt6w3sJDi8UYjwvftIBLIuPX0",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "uK1fa8o3g-lG0hUb7uAQSqBPoLTxDXJ3Y37r_BzSE1QR3MZOrzrm2sLsjh6yMswvj1meFYYnLgVITVE1YbXRQ9BcPtJRtLApMQ4K-q1fO7c"
+        },
+        "kind": "item-answers",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "Dg1UcorkvXeolbfR8INtNo6TLSAhd_GgHksRAZGJXmMSU92wGfW2XFFY6atM3GzdgXEOtAHK48ib5n7fn74ABA",
+        "v": 1
+      },
+      "expect": {
+        "answer": "not-allowed"
+      },
+      "name": "item-answers-to-a-machine-that-takes-one-answer-at-a-time-is-refused",
+      "trust": "account"
+    },
+    {
+      "accepts": [
+        "answer",
+        "push",
+        "prompt-answer",
+        "idea",
+        "item-answer",
+        "start-item",
+        "item-edit",
+        "found-start",
+        "found-add",
         "found-dismiss"
       ],
       "applied": {

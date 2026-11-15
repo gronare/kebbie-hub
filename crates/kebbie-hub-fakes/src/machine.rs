@@ -11,7 +11,7 @@ use kebbie_hub_api::{
 };
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
-    Idea, ItemAnswer, ItemEdit, ItemWrite, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
+    Idea, ItemAnswer, ItemAnswers, ItemEdit, ItemWrite, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, AcceptSubtask, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
     FoundAdd, FoundDismiss, FoundStart, PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState, pushable_of,
@@ -37,6 +37,7 @@ pub fn every_command() -> Vec<Kind> {
         Kind::PromptAnswer,
         Kind::Idea,
         Kind::ItemAnswer,
+        Kind::ItemAnswers,
         Kind::StartItem,
         Kind::ItemEdit,
         Kind::ReviewOpen,
@@ -198,6 +199,8 @@ pub struct MachineState {
     pub lead: Lead,
     #[serde(default)]
     pub messages: Vec<Envelope>,
+    #[serde(default)]
+    pub asked_as: Vec<(ItemKey, String)>,
     #[serde(skip)]
     lead_changed: bool,
     #[serde(skip)]
@@ -426,6 +429,7 @@ impl MachineState {
             decided: false,
             lead: Lead::default(),
             messages: Vec::new(),
+            asked_as: Vec::new(),
             lead_changed: false,
         }
     }
@@ -1143,6 +1147,18 @@ impl MachineState {
         Ok("The lead has your answer.".to_string())
     }
 
+    fn answer_items(&mut self, answers: &ItemAnswers) -> Result<String, Reason> {
+        let body = self.backlog.bodies.get_mut(&answers.item).ok_or(Reason::UnknownItem)?;
+        for given in &answers.answers {
+            match body.questions.iter_mut().find(|question| question.text == given.question && question.pending_answer.is_none()) {
+                Some(question) => question.pending_answer = Some(given.answer.clone()),
+                None => self.asked_as.push((answers.item.clone(), format!("Asked as: {}\n{}", given.question, given.answer))),
+            }
+        }
+        self.backlog_changed = true;
+        Ok(format!("With the lead: it folds your {} answers into the item", answers.answers.len()))
+    }
+
     fn edit_item(&mut self, edit: &ItemEdit) -> Result<String, Reason> {
         let row = self.backlog.rows.iter_mut().find(|row| row.item == edit.item).ok_or(Reason::UnknownItem)?;
         let Some(key) = &edit.section else {
@@ -1359,6 +1375,10 @@ impl MachineState {
             Payload::ItemAnswer(answer) => (
                 format!("answer {} question {}: {}", answer.item, answer.index, answer.answer),
                 self.answer_item(answer).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::ItemAnswers(answers) => (
+                format!("answer {} questions on {}", answers.answers.len(), answers.item),
+                self.answer_items(answers).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::StartItem(start) => (
                 format!("start {}{}", start.item, if start.anyway { " anyway" } else { "" }),

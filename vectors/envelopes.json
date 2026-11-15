@@ -1938,6 +1938,64 @@
           "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
           "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
         },
+        "ct": "mQgMuKnhS07LsuyYla0lHzV1ijGI2o8cJQZ8r54D3cd3ZfZzivzDg_BW5vS6UkJvpQX2lzp1yT8G0XZYIwXYbrjfy-regB6G9QmcOPZ0qu8Uobh7DeGTtMeRqX7gYzkKycR35-0RbKtkvof4s8KmbjyVsv3hL693pOLs69D9nszXTnQx5INoqMzxOT6AfzSXPky5DTFcShySKC5XABH-p6PtoshJJ2MUDcLT844LUm2vqPmB9ZS04ep-meBRWQZTM-v4ykmUBRl4aRI4XgSX5Wzq6Y7wKX3B29CjPLZcPqzwzCeQRe8S1RK4CWJaP91rVnIzxYutflCM-v7DpAtJavalrXBTrqa17Q1ngqWCZ0VqRgqI",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-77af-a49a-877e901a2c28",
+        "kc": "Evudgicb6AHGa0pZyxfCsjpstB3qH1Uqnwn-n0JS0yM",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "wSFoFY8jIJQx9ESPe2R_TH2FKRgYqN83J9ra2NscnEvlYfh486QY1d84qCG82ltf2kyRyj-prazH7hF6m3dyv-WN7EPpefWQhKfZNyIuehE",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "1ze-QaVSNFKJ4GRZ7BaJWuafaGWGcCTZdKCctkL-2lM32fDwGYp1L-XmpvJQJK7XW-zWy4ZCOqw5W7lzWE_DJnm3HJ9YBohESatc5znD28A"
+        },
+        "kind": "item-answers",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "hMRghruWWt6qPGkWNlR7Z31-LPS4Y_KktcQxKu_ebjnYZ2ZddLYkkOSmoJm3ombrQApYq7LY3MtlH4vmuAGCAw",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "answers": [
+            {
+              "answer": "Half up, like invoices.",
+              "question": "Round half up, or to even like the ledger?"
+            },
+            {
+              "answer": "Only on refunds.",
+              "question": "Show the rounding on the receipt?"
+            }
+          ],
+          "item": "vault:Projects/refund-rounding.md",
+          "type": "item-answers"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzdhZi1hNDlhLTg3N2U5MDFhMmMyOAAMaXRlbS1hbnN3ZXJzAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArRXZ1ZGdpY2I2QUhHYTBwWnl4ZkNzanBzdEIzcUgxVXFud24tbjBKUzB5TQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
+      "name": "item-answers-opened-by-the-machine",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "OkXF15uJoFI3YBkE0QC_KvP228_eZOkPtWqjHGQRxP0",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "smxxUlwlc3cnA_fyMwcqWmTqs_Ialbcvi1lrSkuZNRg",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "LVyPJE1LQdEgn9DjUnYp8gs3oOxrRA60HuZb-kSH4xA"
+        },
+        "nonce": "mQgMuKnhS07LsuyY",
+        "plaintext": "eyJ0eXBlIjoiaXRlbS1hbnN3ZXJzIiwiaXRlbSI6InZhdWx0OlByb2plY3RzL3JlZnVuZC1yb3VuZGluZy5tZCIsImFuc3dlcnMiOlt7InF1ZXN0aW9uIjoiUm91bmQgaGFsZiB1cCwgb3IgdG8gZXZlbiBsaWtlIHRoZSBsZWRnZXI_IiwiYW5zd2VyIjoiSGFsZiB1cCwgbGlrZSBpbnZvaWNlcy4ifSx7InF1ZXN0aW9uIjoiU2hvdyB0aGUgcm91bmRpbmcgb24gdGhlIHJlY2VpcHQ_IiwiYW5zd2VyIjoiT25seSBvbiByZWZ1bmRzLiJ9XX0"
+      },
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
         "ct": "ilp66OD-nDZTZ02sPltT1ZkAU4ALVLaM2qRpCwd5u6mprkIgTyQU1yEFoqt9OLTOYN1H3NCo6gXVHZhEY0tesbP10MprC-AOFc8BQW6nnX3GeIaiUmOlnUiPOYVNEf6B49hahTVGEBG3evM",
         "exp": 1761156000,
         "from": "dev_01K83YV380329ARS69J86ZB9PB",
@@ -5090,6 +5148,7 @@
     "found-start": 86400,
     "idea": 3600,
     "item-answer": 3600,
+    "item-answers": 3600,
     "item-edit": 3600,
     "item-write": 3600,
     "job": 86400,

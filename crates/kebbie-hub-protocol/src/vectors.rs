@@ -46,7 +46,7 @@ use crate::review::{
     ReviewCommit, ReviewOpen, ReviewRead, ReviewSend, ReviewSubtask, Side,
 };
 use crate::message::{
-    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, ItemWrite, Notice, NoticeCategory, Outcome, Payload,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, GivenAnswer, Idea, ItemAnswer, ItemAnswers, ItemEdit, ItemWrite, Notice, NoticeCategory, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
 };
 
@@ -785,6 +785,17 @@ fn item_answer(answer: &str) -> Payload {
     })
 }
 
+fn item_answers(answers: &[(&str, &str)]) -> Payload {
+    Payload::ItemAnswers(ItemAnswers {
+        item: ItemKey::vault(VAULT_ITEM).unwrap(),
+        answers: answers.iter().map(|(question, answer)| GivenAnswer { question: (*question).into(), answer: (*answer).into() }).collect(),
+    })
+}
+
+fn both_answers() -> Payload {
+    item_answers(&[(BLOCKING_QUESTION, "Half up, like invoices."), ("Show the rounding on the receipt?", "Only on refunds.")])
+}
+
 const EDITED_GOAL: &str = "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds round per line, as today.";
 
 fn item_edit(section: Option<&str>, text: &str, base: &str) -> Payload {
@@ -1390,6 +1401,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     for (name, case, kind, payload) in [
         ("idea-opened-by-the-machine", "idea", Kind::Idea, idea(idea_text())),
         ("item-answer-opened-by-the-machine", "item-answer", Kind::ItemAnswer, item_answer("Half up, like invoices.")),
+        ("item-answers-opened-by-the-machine", "item-answers", Kind::ItemAnswers, both_answers()),
         ("start-item-opened-by-the-machine", "start-item", Kind::StartItem, start_item(false)),
         ("start-item-anyway-opened-by-the-machine", "start-item-anyway", Kind::StartItem, start_item(true)),
         ("item-edit-opened-by-the-machine", "item-edit", Kind::ItemEdit, goal_edit()),
@@ -2306,6 +2318,19 @@ fn authorize_json(parties: &Parties) -> Value {
             from_phone("authorize/item-answer", Kind::ItemAnswer, &item_answer("Half up, like invoices.")),
             applies(item_answer("Half up, like invoices.")),
         ),
+        AuthorizeCase {
+            name: "device-answers-all-of-an-items-questions-at-once",
+            accepts: backlog_kinds().into_iter().chain([Kind::ItemAnswers]).collect(),
+            trust: CaseTrust::Account,
+            applied: AppliedCommands::default(),
+            envelope: from_phone("authorize/item-answers", Kind::ItemAnswers, &both_answers()),
+            expect: applies(both_answers()),
+        },
+        backlog_case(
+            "item-answers-to-a-machine-that-takes-one-answer-at-a-time-is-refused",
+            from_phone("authorize/item-answers-old-machine", Kind::ItemAnswers, &both_answers()),
+            Err(Refusal::Answer(Reason::NotAllowed)),
+        ),
         backlog_case(
             "device-edits-an-items-section",
             from_phone("authorize/item-edit", Kind::ItemEdit, &goal_edit()),
@@ -2993,6 +3018,30 @@ fn backlog_json() -> Value {
         ("an edit without its base", json!({ "type": "item-edit", "item": edit["item"], "section": "goal", "text": "x" }), false),
         ("an edit of an item by a path on the machine", with("item", json!("vault:/Users/someone/vault/Projects/x.md")), false),
     ];
+    let answers = serde_json::to_value(both_answers()).unwrap();
+    let answered = |answers: Value| json!({ "type": "item-answers", "item": format!("vault:{VAULT_ITEM}"), "answers": answers });
+    let one = |question: &str, answer: &str| json!({ "question": question, "answer": answer });
+    let item_answer_cases = [
+        ("two answers", answers.clone(), true),
+        ("one answer", answered(json!([one(BLOCKING_QUESTION, "Half up.")])), true),
+        ("no answers", answered(json!([])), false),
+        ("a blank answer", answered(json!([one(BLOCKING_QUESTION, " ")])), false),
+        ("an answer past its length", answered(json!([one(BLOCKING_QUESTION, &"x".repeat(crate::MAX_ITEM_ANSWER_CHARS + 1))])), false),
+        ("a question answered twice", answered(json!([one(BLOCKING_QUESTION, "a"), one(BLOCKING_QUESTION, "b")])), false),
+        ("as many answers as it takes", answered(json!((0..crate::MAX_ITEM_ANSWERS).map(|n| one(&format!("Q{n}?"), "x")).collect::<Vec<_>>())), true),
+        ("one answer too many", answered(json!((0..=crate::MAX_ITEM_ANSWERS).map(|n| one(&format!("Q{n}?"), "x")).collect::<Vec<_>>())), false),
+        ("answers too large to send", answered(json!((0..4).map(|n| one(&format!("Q{n}?"), &"😀".repeat(crate::MAX_ITEM_ANSWER_CHARS))).collect::<Vec<_>>())), false),
+        ("an answer that names its question by index", answered(json!([{ "index": 0, "question": BLOCKING_QUESTION, "answer": "x" }])), false),
+        ("answers to an item by a path on the machine", { let mut changed = answers.clone(); changed["item"] = json!("vault:/Users/someone/vault/Projects/x.md"); changed }, false),
+    ];
+    let item_answer_cases: Vec<Value> = item_answer_cases
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
     let edits: Vec<Value> = edits
         .into_iter()
         .map(|(name, payload, valid)| {
@@ -3079,6 +3128,9 @@ fn backlog_json() -> Value {
         "max_label_bytes": crate::MAX_LABEL_BYTES,
         "max_idea_chars": crate::MAX_IDEA_CHARS,
         "max_item_answer_chars": crate::MAX_ITEM_ANSWER_CHARS,
+        "max_item_answers": crate::MAX_ITEM_ANSWERS,
+        "max_item_answers_bytes": crate::MAX_ITEM_ANSWERS_BYTES,
+        "item_answers": item_answer_cases,
         "max_item_title_chars": crate::MAX_ITEM_TITLE_CHARS,
         "max_section_chars": crate::MAX_SECTION_CHARS,
         "max_item_edit_bytes": crate::MAX_ITEM_EDIT_BYTES,

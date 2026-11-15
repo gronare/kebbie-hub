@@ -57,8 +57,8 @@ pub use ids::{Id, IdError, Prefix};
 pub use job::{JOB_BUNDLE_MEDIA_TYPE, Job, JobEnd, JobReport, MAX_JOB_ARTIFACTS, MAX_JOB_BUNDLE_PARTS, MAX_JOB_COMMAND_CHARS, MAX_JOB_LOG_BYTES, MAX_JOB_REASON_CHARS, MAX_MACHINE_MESSAGE_BYTES, is_commit};
 pub use lead::{Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, Turn};
 pub use message::{
-    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, ItemWrite, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
-    MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, GivenAnswer, Idea, ItemAnswer, ItemAnswers, ItemEdit, ItemWrite, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    MAX_ITEM_ANSWERS, MAX_ITEM_ANSWERS_BYTES, MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,
     MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
     MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,
     StartTask, Target,

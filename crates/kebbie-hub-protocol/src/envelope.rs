@@ -26,6 +26,7 @@ pub enum Kind {
     PromptAnswer,
     Idea,
     ItemAnswer,
+    ItemAnswers,
     StartItem,
     ItemEdit,
     DeviceDecision,
@@ -47,7 +48,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub const ALL: [Kind; 28] = [
+    pub const ALL: [Kind; 29] = [
         Kind::Board,
         Kind::Notice,
         Kind::Result,
@@ -58,6 +59,7 @@ impl Kind {
         Kind::PromptAnswer,
         Kind::Idea,
         Kind::ItemAnswer,
+        Kind::ItemAnswers,
         Kind::StartItem,
         Kind::ItemEdit,
         Kind::DeviceDecision,
@@ -90,6 +92,7 @@ impl Kind {
             Kind::PromptAnswer => "prompt-answer",
             Kind::Idea => "idea",
             Kind::ItemAnswer => "item-answer",
+            Kind::ItemAnswers => "item-answers",
             Kind::StartItem => "start-item",
             Kind::ItemEdit => "item-edit",
             Kind::DeviceDecision => "device-decision",
@@ -121,6 +124,7 @@ impl Kind {
                 | Kind::PromptAnswer
                 | Kind::Idea
                 | Kind::ItemAnswer
+                | Kind::ItemAnswers
                 | Kind::StartItem
                 | Kind::ItemEdit
                 | Kind::DeviceDecision
@@ -157,7 +161,7 @@ impl Kind {
             Kind::Board => 86_400,
             Kind::Notice => 86_400,
             Kind::Result => 7 * 86_400,
-            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
+            Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::ItemAnswers | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
             Kind::Job | Kind::JobReport => 3_600,
@@ -175,7 +179,7 @@ impl Kind {
             Kind::Answer | Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
             Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::Job | Kind::JobReport => 86_400,
-            Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
+            Kind::Idea | Kind::ItemAnswer | Kind::ItemAnswers | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
             Kind::PromptAnswer => 600,

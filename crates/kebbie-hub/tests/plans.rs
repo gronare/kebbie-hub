@@ -37,7 +37,7 @@ impl Plans for Shared {
             return Err(Refusal { url: Some(BILLING.to_string()), pro: false });
         }
         let free = match gated {
-            Gated::Command(kind) => matches!(kind, Kind::Answer | Kind::PromptAnswer | Kind::ItemAnswer | Kind::ReviewOpen | Kind::ReviewRead | Kind::DeviceDecision),
+            Gated::Command(kind) => matches!(kind, Kind::Answer | Kind::PromptAnswer | Kind::ItemAnswer | Kind::ItemAnswers | Kind::ReviewOpen | Kind::ReviewRead | Kind::DeviceDecision),
             Gated::Machine => machines(store, account) == 0,
             Gated::Device | Gated::Notifications => true,
         };

@@ -12,6 +12,8 @@ pub const MAX_PROMPT_CHARS: usize = 4_000;
 pub const MAX_OPTIONS: u8 = 4;
 pub const MAX_IDEA_CHARS: usize = 2_000;
 pub const MAX_ITEM_ANSWER_CHARS: usize = 2_000;
+pub const MAX_ITEM_ANSWERS: usize = 16;
+pub const MAX_ITEM_ANSWERS_BYTES: usize = 24 * 1024;
 pub const MAX_ITEM_TITLE_CHARS: usize = 200;
 pub const MAX_SECTION_CHARS: usize = 8_000;
 pub const MAX_ITEM_EDIT_BYTES: usize = 24 * 1024;
@@ -35,6 +37,7 @@ pub enum Payload {
     PromptAnswer(PromptAnswer),
     Idea(Idea),
     ItemAnswer(ItemAnswer),
+    ItemAnswers(ItemAnswers),
     StartItem(StartItem),
     ItemEdit(ItemEdit),
     DeviceDecision(DeviceDecision),
@@ -463,6 +466,35 @@ pub struct ItemAnswer {
     pub answer: String,
 }
 
+/// Every answer the user gave an item's questions, sent together so the lead takes them in one go.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ItemAnswers {
+    pub item: ItemKey,
+    pub answers: Vec<GivenAnswer>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GivenAnswer {
+    /// The question's text as the phone showed it; the machine matches on it.
+    pub question: String,
+    pub answer: String,
+}
+
+impl ItemAnswers {
+    pub fn check(&self) -> Result<(), &'static str> {
+        check((1..=MAX_ITEM_ANSWERS).contains(&self.answers.len()), "an item takes one to sixteen answers at once")?;
+        for given in &self.answers {
+            check(is_text(&given.question, MAX_PROMPT_CHARS), "a question is empty or too long")?;
+            check(is_text(&given.answer, MAX_ITEM_ANSWER_CHARS), "an answer is empty or too long")?;
+        }
+        let questions: std::collections::BTreeSet<&str> = self.answers.iter().map(|given| given.question.as_str()).collect();
+        check(questions.len() == self.answers.len(), "a question is answered twice")?;
+        check(serde_json::to_vec(self).expect("answers always serialize").len() <= MAX_ITEM_ANSWERS_BYTES, "the answers are too large to send")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StartItem {
@@ -517,6 +549,7 @@ impl Payload {
             Payload::PromptAnswer(_) => Kind::PromptAnswer,
             Payload::Idea(_) => Kind::Idea,
             Payload::ItemAnswer(_) => Kind::ItemAnswer,
+            Payload::ItemAnswers(_) => Kind::ItemAnswers,
             Payload::StartItem(_) => Kind::StartItem,
             Payload::ItemEdit(_) => Kind::ItemEdit,
             Payload::DeviceDecision(_) => Kind::DeviceDecision,
@@ -584,6 +617,7 @@ impl Payload {
                 check(is_text(&answer.question, MAX_PROMPT_CHARS), "the question is empty or too long")?;
                 check(is_text(&answer.answer, MAX_ITEM_ANSWER_CHARS), "the answer is empty or too long")
             }
+            Payload::ItemAnswers(answers) => answers.check(),
             Payload::Notice(notice) => {
                 check(is_line(&notice.title, MAX_NOTICE_TITLE_CHARS), "the title is empty, too long or not one line")?;
                 check(is_text(&notice.body, MAX_NOTICE_BODY_CHARS) && !notice.body.chars().any(|char| char.is_control() && char != '\n'), "the body is empty, too long or holds control characters")?;
@@ -808,6 +842,28 @@ mod tests {
             [Kind::Idea, Kind::ItemAnswer, Kind::StartItem].map(|kind| (kind.is_command(), kind.default_ttl(), kind.max_ttl())),
             [(true, 3_600, 3_600), (true, 3_600, 3_600), (true, 86_400, 86_400)]
         );
+    }
+
+    #[test]
+    fn item_answers_carry_every_answer_by_its_question_and_live_an_hour() {
+        let given = |question: &str, answer: &str| GivenAnswer { question: question.into(), answer: answer.into() };
+        let answers = |answers: Vec<GivenAnswer>| Payload::ItemAnswers(ItemAnswers { item: ItemKey::parse("vault:Projects/x.md").unwrap(), answers });
+        let two = answers(vec![given("Which?", "This one"), given("When?", "Today")]);
+        assert_eq!(two.validate(), Ok(()));
+        let json = serde_json::json!({ "type": "item-answers", "item": "vault:Projects/x.md", "answers": [{ "question": "Which?", "answer": "This one" }, { "question": "When?", "answer": "Today" }] });
+        assert_eq!(serde_json::to_value(&two).unwrap(), json);
+        assert_eq!(serde_json::from_value::<Payload>(json).unwrap(), two);
+        assert!(answers(vec![]).validate().is_err());
+        assert!(answers(vec![given("Which?", " ")]).validate().is_err());
+        assert!(answers(vec![given("", "x")]).validate().is_err());
+        assert!(answers(vec![given("Which?", &"x".repeat(MAX_ITEM_ANSWER_CHARS + 1))]).validate().is_err());
+        assert!(answers(vec![given("Which?", "a"), given("Which?", "b")]).validate().is_err(), "one question, two answers");
+        assert_eq!(answers((0..MAX_ITEM_ANSWERS).map(|n| given(&format!("Q{n}?"), "x")).collect()).validate(), Ok(()));
+        assert!(answers((0..=MAX_ITEM_ANSWERS).map(|n| given(&format!("Q{n}?"), "x")).collect()).validate().is_err());
+        assert!(answers((0..4).map(|n| given(&format!("Q{n}?"), &"😀".repeat(MAX_ITEM_ANSWER_CHARS))).collect()).validate().is_err(), "too large to send");
+        let indexed = serde_json::json!({ "type": "item-answers", "item": "vault:Projects/x.md", "answers": [{ "index": 0, "question": "Which?", "answer": "x" }] });
+        assert!(serde_json::from_value::<Payload>(indexed).is_err());
+        assert_eq!((Kind::ItemAnswers.name(), Kind::ItemAnswers.is_command(), Kind::ItemAnswers.default_ttl(), Kind::ItemAnswers.max_ttl()), ("item-answers", true, 3_600, 3_600));
     }
 
     #[test]

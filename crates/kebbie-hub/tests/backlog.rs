@@ -7,7 +7,7 @@ use common::*;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Backlog, MachineState};
 use kebbie_hub_protocol::{
-    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Found, FoundAdd, FoundDismiss, FoundStart, Home, HomeKind, Idea, ItemAnswer, ItemEdit, ItemKey, ItemWrite, OpenQuestion,
+    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Found, FoundAdd, FoundDismiss, FoundStart, GivenAnswer, Home, HomeKind, Idea, ItemAnswer, ItemAnswers, ItemEdit, ItemKey, ItemWrite, OpenQuestion,
     Outcome, Payload, Priority, Reason, StartItem, open_blob, text_hash,
 };
 
@@ -104,6 +104,28 @@ async fn an_idea_an_answer_and_a_start_travel_through_the_hub_and_the_board_show
     assert!(shown.backlog.unwrap().iter().all(|row| row.item.as_str() != ITEM), "a started item leaves the backlog");
     assert_eq!(shown.items[0].title.as_deref(), Some("Retry a flaky CI push"));
     assert_eq!(sent(&mut person, &mut machine, start(true)).await, Outcome::Refused { reason: Reason::AlreadyStarted });
+}
+
+#[tokio::test]
+async fn every_answer_to_an_item_travels_in_one_command_and_none_is_refused_for_a_changed_question() {
+    let test = start_hub(|_| {}).await;
+    let mut person = member(&test).await;
+    let mut machine = connected_with_board(&test, &mut person).await;
+    person.knows(&machine.machine, machine.public());
+    machine.post_board(board(MARKER)).await.unwrap();
+    machine.backlog = backlog();
+    machine.publish_backlog().await.unwrap();
+    assert!(board_of(&mut person, &machine).await.accepts.unwrap().contains(&kebbie_hub_protocol::Kind::ItemAnswers));
+    let answers = |item: &str, questions: &[&str]| Payload::ItemAnswers(ItemAnswers { item: ItemKey::parse(item).unwrap(), answers: questions.iter().map(|question| GivenAnswer { question: question.to_string(), answer: "Two".to_string() }).collect() });
+
+    assert_eq!(sent(&mut person, &mut machine, answers(ITEM, &["How many tries?", "How often to retry?"])).await, Outcome::Done);
+    let rows = board_of(&mut person, &machine).await.backlog.unwrap();
+    assert_eq!(rows.iter().find(|row| row.item.as_str() == ITEM).unwrap().blocking, 1, "the answer to a question as it stands is with the lead");
+    assert_eq!(machine.asked_as, vec![(ItemKey::parse(ITEM).unwrap(), "Asked as: How often to retry?\nTwo".to_string())], "the answer to a reworded question is kept with the words the user saw");
+
+    assert_eq!(sent(&mut person, &mut machine, answers(ITEM, &["Wait for the runner?"])).await, Outcome::Done);
+    assert_eq!(sent(&mut person, &mut machine, start(false)).await, Outcome::Done);
+    assert_eq!(sent(&mut person, &mut machine, answers("local:gone", &["How many tries?"])).await, Outcome::Refused { reason: Reason::UnknownItem });
 }
 
 #[tokio::test]
