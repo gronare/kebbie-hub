@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS } from "../js/protocol.js";
-import { againOf, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, keptTaskView, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
+import { againOf, besideLevel, cleanComment, foldCommitsOn, commentProblem, commentsProblem, commentWhere, commitPage, diffHref, fetchBlock, filesOf, freshReviewUi, keptTaskView, readKey, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskEnd, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -238,4 +238,12 @@ test("a named subtask's draft is kept under the subtask the page shows, on the r
   assert.deepEqual(reviewPage(["mch_a", "t@r", "gateway", "2"], true), { subtask: "gateway", kind: "commit", commit: 1 });
   assert.deepEqual(reviewPage(["mch_a", "t@r", "3"], false).subtask, "3", "a numbered step stays the string the page keys on");
   assert.deepEqual(reviewPage(["mch_a", "t@r"], false), { subtask: null, kind: "whole", commit: null });
+});
+
+test("two columns show the level above: the task beside a subtask and beside its whole diff, the subtask beside a commit", () => {
+  const beside = (params, diff) => besideLevel(reviewPage(["mch_a", "t@r", ...params], diff));
+  assert.equal(beside(["gateway"], false), "task", "the subtask page");
+  assert.equal(beside(["gateway", "all"], true), "task", "the whole subtask's diff never repeats the subtask beside it");
+  assert.equal(beside(["gateway", "2"], true), "subtask", "a commit");
+  assert.equal(beside([], true), "task", "the changes of a task without subtasks");
 });

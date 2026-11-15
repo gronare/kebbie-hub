@@ -17,6 +17,7 @@ export const keptTaskView = (kept, name, params) => (name === "task" || name ===
 export const taskViewOf = (kept, machine, address) => (kept?.machine === machine && kept?.address === address ? kept.view : "task");
 export const subtaskHref = (machine, address, subtask) => `#/review/${encoded(machine, address)}/${encodeURIComponent(subtask)}`;
 export const diffHref = (machine, address, subtask = null, commit = "all") => `#/diff/${encoded(machine, address)}${subtask === null ? "" : `/${encodeURIComponent(subtask)}/${commit}`}`;
+export const besideLevel = (page) => (page.kind === "commit" ? "subtask" : "task");
 export function reviewPage(params, diff) {
   const subtask = params[2] ?? null;
   if (!diff || subtask === null) return { subtask, kind: diff || subtask === null ? "whole" : "subtask", commit: null };

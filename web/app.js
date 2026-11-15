@@ -16,7 +16,7 @@ import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememb
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
-import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, keptTaskView, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
+import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, keptTaskView, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 import { hasTextField, keepFieldsAboveKeyboard } from "./keyboard.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
@@ -825,8 +825,7 @@ function reviewRoute(params, diff = false) {
   const underA = (title) => headA(found) + `<h3 class="sec page-sub">${esc(title)}</h3>`;
   const row = backRow(back, cardButton(cardHref(machine, address)));
   if (twoColumns()) {
-    const task = page.kind === "subtask" || page.subtask === null;
-    const left = task ? headA(found) + (view === "card" ? cardBlock(found, page.subtask) : taskBody(found, page.subtask)) : subtaskPage(v, { top: underA, left: true, selected: page.commit });
+    const left = besideLevel(page) === "task" ? headA(found) + (view === "card" ? cardBlock(found, page.subtask) : taskBody(found, page.subtask)) : subtaskPage(v, { top: underA, left: true, selected: page.commit });
     return shell("board", row + `<div class="narrow">${left}</div>`, here(v, { top, inPanel: true })) + sendControl(v);
   }
   return shell("board", row + `<div class="narrow">${here(v, { top: underA })}</div>`) + sendControl(v);
