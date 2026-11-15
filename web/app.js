@@ -307,9 +307,10 @@ function questionBlock(found) {
   if (item.question) {
     const question = item.question;
     const links = question.links ?? [];
-    const body = question.title && question.body ? withoutUrls(question.body, links.map((link) => link.url)) : "";
+    const urls = links.map((link) => link.url);
+    const body = withoutUrls(question.title ? question.body : question.text, urls);
     const said = body ? `<div class="md q-body" data-markdown>${esc(body)}</div>` : "";
-    return `<p class="q">${esc(question.title ?? question.text)}</p>${said}${linkRows(links)}<div class="meta pad">asked ${esc(when(question.at))}</div>${answerArea(found)}${planBox(found)}`;
+    return `${question.title ? `<p class="q">${esc(question.title)}</p>` : ""}${said}${linkRows(links)}<div class="meta pad">asked ${esc(when(question.at))}</div>${answerArea(found)}${planBox(found)}`;
   }
   if (item.prompt) return promptBlock(found, promptArea(found));
   const question = item.kebbie_questions[0];
@@ -498,8 +499,7 @@ function planArticle(plan) {
   return body ? `<article class="task md-read">${planRead(body)}</article>` : `<article class="task plan"><div>${esc(line)}</div></article>`;
 }
 
-// Back to the question shows only where no Back does: the Duo's unfolded landscape pane.
-function planParts([machine, address], { backButton = false } = {}) {
+function planParts([machine, address]) {
   const found = findTask(state.opened, machine, address);
   const question = found?.item.question;
   const plan = question?.plan;
@@ -508,7 +508,7 @@ function planParts([machine, address], { backButton = false } = {}) {
   const meta = vault ? ["Vault note", question.plan_note?.key.slice("vault:".length), question.plan_note ? `updated ${when(question.plan_note.updated)}` : null] : ["Plan", kb(plan.bytes), question.plan_at ? `written ${when(question.plan_at)}` : null];
   const back = `#/task/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
   const body = vault ? planArticle(plan) : slot(plan, { kind: "plan", tag: "article", look: "task md md-read", wait: "task plan" });
-  return { found, back, meta: `<div class="meta pad plan-meta">${esc(meta.filter(Boolean).join(" · "))}</div>`, body: body + (backButton ? `<a class="btn primary" href="${back}">Back to the question</a>` : "") };
+  return { found, back, meta: `<div class="meta pad plan-meta">${esc(meta.filter(Boolean).join(" · "))}</div>`, body };
 }
 
 function planScreen(params) {
@@ -520,9 +520,9 @@ function planScreen(params) {
 }
 
 function planPanel(params) {
-  const parts = planParts(params, { backButton: pose === "split" });
+  const parts = planParts(params);
   if (!parts) return `<h2>Plan</h2><div class="center left">This plan is no longer on the board.</div>`;
-  return `${panelHeadA(parts.found)}${parts.meta}${parts.body}`;
+  return `${backRow(backButton(parts.back), cardButton(cardHref(params[0], params[1])))}${panelHeadA(parts.found)}${parts.meta}${parts.body}`;
 }
 
 function wideTaskScreen(params, panel = taskPanel) {

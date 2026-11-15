@@ -807,6 +807,8 @@ test("a question's links show as rows with their label and a short address, and 
   assert.equal(linkAddress("https://www.example.com/"), "example.com");
   assert.equal(withoutUrls("drew the mockup of the native iOS app: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"), "drew the mockup of the native iOS app");
   assert.equal(withoutUrls("See https://a.example/x and https://b.example/y.", ["https://a.example/x"]), "See and https://b.example/y.", "only the addresses a link carries leave");
+  const asked = "Builds: a check after the push, and Push on a ready task. Leaves out: the Next order. Mock: https://claude.ai/artifact/25ESKWBrc4d33qwEVSCGrC. The hub half was already built.";
+  assert.equal(withoutUrls(asked, ["https://claude.ai/artifact/25ESKWBrc4d33qwEVSCGrC"]), "Builds: a check after the push, and Push on a ready task. Leaves out: the Next order. The hub half was already built.", "a link's address leaves the text with its label, so the mock is said once, as its link row");
 });
 
 test("the card's facts and links say what the task did, what it waits on, its plan and every address it names", () => {

@@ -58,6 +58,13 @@ test("Next opens beside it the first row of the first machine that has one, so a
   assert.equal(firstTaskOf({ ...view, next: [quiet] }, "next"), null);
 });
 
+test("the plan beside a question goes back by the strip's Back with the card button under it, never a big Back to the question button", () => {
+  const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  const panel = app.slice(app.indexOf("function planPanel("), app.indexOf("\n}\n", app.indexOf("function planPanel(")));
+  assert.match(panel, /backRow\(backButton\(parts\.back\), cardButton\(cardHref\(params\[0\], params\[1\]\)\)\)/);
+  assert.doesNotMatch(app, /Back to the question<\/a>/);
+});
+
 test("the Questions tab opens its first question beside the list in two columns, and the route uses it", () => {
   assert.deepEqual(firstQuestionOf({ questions: [{ machine: "mch_b", item: { address: "verify@hub" } }, { machine: "mch_a", item: { address: "x@y" } }] }), ["mch_b", "verify@hub"]);
   assert.equal(firstQuestionOf({ questions: [] }), null);

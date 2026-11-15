@@ -495,12 +495,12 @@ export function taskHead(item, repo) {
   return parts.length ? `<div class="meta pad task-head">${parts.join(" · ")}</div>` : "";
 }
 
-const URL_IN_TEXT = /\b(?:https?|obsidian):\/\/[^\s<>()"'`]+/g;
+const URL_IN_TEXT = /(\b[A-Z][\w ]{0,20}:[ \t]*)?\b(?:https?|obsidian):\/\/[^\s<>()"'`]+/g;
 
 // A line with its addresses taken out, and the colon or dash that led to them; the addresses live in the task's links.
 export const withoutUrls = (text, only = null) =>
   String(text ?? "")
-    .replace(URL_IN_TEXT, (url) => (only && !only.includes(url.replace(/[.,;:!?]+$/, "")) ? url : ""))
+    .replace(URL_IN_TEXT, (found, label = "") => (only && !only.includes(found.slice(label.length).replace(/[.,;:!?]+$/, "")) ? found : ""))
     .replace(/[ \t]*[:—–-]?[ \t]*$/gm, (tail, offset, whole) => (/[:—–-]/.test(tail) && whole.slice(0, offset).trim() ? "" : tail.replace(/[ \t]+$/, "")))
     .replace(/[ \t]{2,}/g, " ")
     .trim();
