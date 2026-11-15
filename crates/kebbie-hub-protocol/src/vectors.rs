@@ -25,6 +25,7 @@ use crate::board::{
     QuestionOption, Report, RoutineSummary, Rules, RulesState, SecondOpinion, Subtask, SubtaskState, Verdict, VerdictOutcome,
     CLOSE_OPTIONS, KebbieQuestion, KebbieQuestionKind, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS,
     MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, Requirement, RequirementKind, Stage, StageState, VERIFY_OPTIONS, pushable_of,
+    Link, LinkKind, PlanNote,
 };
 use crate::connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
 use crate::crypto::{
@@ -44,7 +45,7 @@ use crate::review::{
     ReviewCommit, ReviewOpen, ReviewRead, ReviewSend, ReviewSubtask, Side,
 };
 use crate::message::{
-    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, Notice, NoticeCategory, Outcome, Payload,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, ItemWrite, Notice, NoticeCategory, Outcome, Payload,
     PromptAnswer, PushApproval, Reason, RunRoutine, StartItem, StartTask, Target,
 };
 
@@ -249,6 +250,10 @@ fn board() -> Payload {
                 kept_for_user: false,
                 plan: None,
                 plan_at: None,
+                plan_note: None,
+                title: None,
+                body: None,
+                links: Vec::new(),
                 at: 1_761_069_540,
             }),
             prompt: None,
@@ -281,6 +286,7 @@ fn board() -> Payload {
             assessment: None,
             second_opinion: None,
             review: None,
+            links: Vec::new(),
         }],
         sessions_outside_tasks: 1,
         next: None,
@@ -374,6 +380,7 @@ fn planned_board() -> Payload {
         assessment: None,
         second_opinion: None,
         review: None,
+        links: Vec::new(),
     }];
     Payload::Board(board)
 }
@@ -635,6 +642,7 @@ fn backlog_board() -> Payload {
             goal: Some("A refund of a whole invoice returns exactly what the invoice charged.".into()),
             body: Some(backlog_blob().0),
             found: None,
+            writing: None,
         },
         BacklogRow {
             item: ItemKey::parse("local:01JB7Q2M3N8K").unwrap(),
@@ -652,6 +660,7 @@ fn backlog_board() -> Payload {
             goal: None,
             body: None,
             found: None,
+            writing: None,
         },
         BacklogRow {
             item: ItemKey::parse("kept:idea-4411").unwrap(),
@@ -669,6 +678,7 @@ fn backlog_board() -> Payload {
             goal: None,
             body: None,
             found: None,
+            writing: None,
         },
         BacklogRow {
             item: ItemKey::parse(FOUND_ITEM).unwrap(),
@@ -686,6 +696,7 @@ fn backlog_board() -> Payload {
             goal: None,
             body: None,
             found: Some(Found { sources: vec!["payments@api".into(), "refunds@shop".into()], count: 3 }),
+            writing: None,
         },
     ]);
     Payload::Board(board)
@@ -1352,6 +1363,7 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         ("start-item-anyway-opened-by-the-machine", "start-item-anyway", Kind::StartItem, start_item(true)),
         ("item-edit-opened-by-the-machine", "item-edit", Kind::ItemEdit, goal_edit()),
         ("title-edit-opened-by-the-machine", "title-edit", Kind::ItemEdit, title_edit()),
+        ("item-write-opened-by-the-machine", "item-write", Kind::ItemWrite, item_write("kept:idea-4411")),
     ] {
         let sealed = seal_case(case, command_header(case, kind, &phone_cert, machine), &payload, phone, &[account, machine]);
         cases.push(opens(name, &sealed, machine, phone, payload));
@@ -3797,6 +3809,121 @@ fn lead_json() -> Value {
     })
 }
 
+const QUESTION_MOCK: &str = "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3";
+const PLAN_NOTE: &str = "Projects/kebbie-ios.md";
+
+fn item_write(item: &str) -> Payload {
+    Payload::ItemWrite(ItemWrite { item: ItemKey::parse(item).unwrap() })
+}
+
+fn titled_board() -> Payload {
+    let Payload::Board(mut board) = board() else { unreachable!() };
+    let item = &mut board.items[0];
+    let question = item.question.as_mut().unwrap();
+    question.text = format!("Keep the old endpoint for a release? Clients on the old app still call it. Mock: {QUESTION_MOCK}");
+    question.title = Some("Keep the old endpoint for a release?".into());
+    question.body = Some(format!("Clients on the old app still call it.\n\nMock: {QUESTION_MOCK}"));
+    question.links = vec![Link { kind: LinkKind::Mock, label: "Mockup".into(), url: QUESTION_MOCK.into() }];
+    question.plan = Some(backlog_blob().0);
+    question.plan_note = Some(PlanNote { key: ItemKey::vault(PLAN_NOTE).unwrap(), updated: AT - 600 });
+    item.links = vec![
+        Link { kind: LinkKind::Mock, label: "Mockup".into(), url: QUESTION_MOCK.into() },
+        Link { kind: LinkKind::Pr, label: "Pull request".into(), url: "https://github.com/acme/shop/pull/42".into() },
+        Link { kind: LinkKind::Ci, label: "CI run".into(), url: "https://github.com/acme/shop/actions/runs/1".into() },
+        Link { kind: LinkKind::Note, label: "Vault note".into(), url: "obsidian://open?file=Projects%2Fkebbie-ios.md".into() },
+    ];
+    let Payload::Board(backlog) = backlog_board() else { unreachable!() };
+    let mut rows = backlog.backlog.unwrap();
+    rows[2].state = BacklogState::Drafting;
+    rows[2].writing = Some(AT - 25 * 3_600);
+    board.backlog = Some(rows);
+    board.accepts = Some(vec![Kind::Answer, Kind::ItemWrite]);
+    Payload::Board(board)
+}
+
+fn questions_json() -> Value {
+    let board = serde_json::to_value(titled_board()).unwrap();
+    let item = board["items"][0].clone();
+    let change = |pointer: &str, value: Value| {
+        let mut changed = item.clone();
+        *changed.pointer_mut(pointer).unwrap() = value;
+        changed
+    };
+    let without = |pointer: &str, key: &str| {
+        let mut changed = item.clone();
+        changed.pointer_mut(pointer).unwrap().as_object_mut().unwrap().remove(key);
+        changed
+    };
+    let mut before = item.clone();
+    for key in ["title", "body", "links", "plan_note"] {
+        before["question"].as_object_mut().unwrap().remove(key);
+    }
+    before.as_object_mut().unwrap().remove("links");
+    let many: Vec<Value> = (0..=crate::MAX_LINKS).map(|n| json!({ "kind": "other", "label": format!("Link {n}"), "url": format!("https://example.com/{n}") })).collect();
+    let cases = [
+        ("a question with its title, body, links and plan note", item.clone(), true),
+        ("a question from a machine that sends none of them", before, true),
+        ("a title without a body", without("/question", "body"), true),
+        ("a body without its title", without("/question", "title"), false),
+        ("a title on two lines", change("/question/title", json!("Keep the old\nendpoint?")), false),
+        ("an empty title", change("/question/title", json!(" ")), false),
+        ("a title past its length", change("/question/title", json!("x".repeat(crate::MAX_QUESTION_TITLE_CHARS + 1))), false),
+        ("a body past its length", change("/question/body", json!("x".repeat(crate::MAX_QUESTION_BODY_CHARS + 1))), false),
+        ("a body with a control character", change("/question/body", json!("a\u{7}b")), false),
+        ("a link to a page on the web", change("/question/links/0/url", json!("http://example.com/mock")), true),
+        ("a link that runs script", change("/question/links/0/url", json!("javascript:alert(1)")), false),
+        ("a link to a file on the machine", change("/question/links/0/url", json!("file:///Users/someone/plan.md")), false),
+        ("a link with a space", change("/question/links/0/url", json!("https://example.com/a b")), false),
+        ("a link of a kind the protocol does not know", change("/question/links/0/kind", json!("design")), false),
+        ("a link without its label", change("/question/links/0/label", json!(" ")), false),
+        ("a task's link named twice", change("/links/1/url", json!(QUESTION_MOCK)), false),
+        ("a task with more links than it may name", change("/links", json!(many)), false),
+        ("a plan note that is a local file", change("/question/plan_note/key", json!("local:plan-1")), false),
+        ("a plan note named by a path on the machine", change("/question/plan_note/key", json!("vault:/Users/someone/vault/Projects/x.md")), false),
+        ("a plan note without its time", without("/question/plan_note", "updated"), false),
+    ];
+    let cases: Vec<Value> = cases
+        .into_iter()
+        .map(|(name, candidate, valid)| {
+            let mut whole = board.clone();
+            whole["items"] = json!([candidate.clone()]);
+            let parsed = serde_json::from_value::<Payload>(whole);
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "item": candidate, "valid": valid })
+        })
+        .collect();
+    let writes = [
+        ("a vault item written out", serde_json::to_value(item_write(&format!("vault:{VAULT_ITEM}"))).unwrap(), true),
+        ("a local item written out", serde_json::to_value(item_write("local:01JB7Q2M3N8K")).unwrap(), true),
+        ("a kept idea written out", serde_json::to_value(item_write("kept:idea-4411")).unwrap(), true),
+        ("a found item written out", json!({ "type": "item-write", "item": FOUND_ITEM }), false),
+        ("an item named by a path on the machine", json!({ "type": "item-write", "item": "vault:/Users/someone/vault/Projects/x.md" }), false),
+        ("a write with words of its own", json!({ "type": "item-write", "item": "kept:idea-4411", "text": "now" }), false),
+    ];
+    let writes: Vec<Value> = writes
+        .into_iter()
+        .map(|(name, payload, valid)| {
+            let parsed = serde_json::from_value::<Payload>(payload.clone());
+            assert_eq!(parsed.is_ok_and(|payload| payload.validate().is_ok()), valid, "{name}");
+            json!({ "name": name, "payload": payload, "valid": valid })
+        })
+        .collect();
+    let (_, ciphertext) = backlog_blob();
+    json!({
+        "max_links": crate::MAX_LINKS,
+        "max_link_label_chars": crate::MAX_LINK_LABEL_CHARS,
+        "max_link_url_chars": crate::MAX_LINK_URL_CHARS,
+        "max_question_title_chars": crate::MAX_QUESTION_TITLE_CHARS,
+        "max_question_body_chars": crate::MAX_QUESTION_BODY_CHARS,
+        "item_write_ttl": [Kind::ItemWrite.default_ttl(), Kind::ItemWrite.max_ttl()],
+        "board": board,
+        "plan_body": backlog_body(),
+        "plan_ciphertext": b64(&ciphertext),
+        "cases": cases,
+        "writes": writes,
+    })
+}
+
 fn refusal(case: &str, reason: Reason) -> Payload {
     Payload::Result(CommandResult { command: command_id(case), device: Party::new("phone", Prefix::Device).id, outcome: Outcome::Refused { reason }, text: format!("Not delivered: {}.", reason.key()), blob: None })
 }
@@ -3873,6 +4000,7 @@ pub fn render() -> Vec<(&'static str, String)> {
         ("stages.json", stages_json()),
         ("cards.json", cards_json()),
         ("lead.json", lead_json()),
+        ("questions.json", questions_json()),
     ]
     .into_iter()
     .map(|(name, value)| (name, serde_json::to_string_pretty(&value).unwrap() + "\n"))

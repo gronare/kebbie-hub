@@ -21,6 +21,7 @@ const ACTIONS = {
   "found-start": { title: "Starting a task", goes: "The task starts", back: "start it", started: "this task" },
   idea: { title: "Filing an idea", goes: "Your idea goes ahead", back: "file it", started: "this idea" },
   "item-edit": { title: "Editing an item", goes: "Your edit goes ahead", back: "save it", started: "this edit" },
+  "item-write": { title: "Writing an item out", goes: "The lead writes it out", back: "ask again", started: "this write-out" },
   "found-add": { title: "Adding a finding to a task", goes: "It goes ahead", back: "add it", started: "this finding" },
   "found-keep": { title: "Keeping a finding", goes: "It goes ahead", back: "keep it", started: "this finding" },
   "found-dismiss": { title: "Dismissing a finding", goes: "It goes ahead", back: "dismiss it", started: "this finding" },

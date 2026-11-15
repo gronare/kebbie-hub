@@ -107,6 +107,9 @@ pub struct BacklogRow {
     pub body: Option<BlobRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub found: Option<Found>,
+    /// When the user asked the lead to write it out, while that ask is open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub writing: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

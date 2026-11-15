@@ -49,6 +49,7 @@ pub enum Payload {
     ReviewSend(ReviewSend),
     LeadMessage(LeadMessage),
     Away(Away),
+    ItemWrite(ItemWrite),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -478,6 +479,13 @@ pub struct ItemEdit {
     pub base: String,
 }
 
+/// Asks the machine's lead to write out an item marked to write; a found item is the tasks' own words and is not written out.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ItemWrite {
+    pub item: ItemKey,
+}
+
 impl ItemEdit {
     pub fn check(&self) -> Result<(), &'static str> {
         check(is_text_hash(&self.base), "base is not a hex SHA-256")?;
@@ -518,6 +526,7 @@ impl Payload {
             Payload::FoundAdd(_) => Kind::FoundAdd,
             Payload::FoundDismiss(_) => Kind::FoundDismiss,
             Payload::FoundKeep(_) => Kind::FoundKeep,
+            Payload::ItemWrite(_) => Kind::ItemWrite,
             Payload::ReviewSend(_) => Kind::ReviewSend,
             Payload::LeadMessage(_) => Kind::LeadMessage,
             Payload::Away(_) => Kind::Away,
@@ -605,6 +614,7 @@ impl Payload {
             }
             Payload::FoundDismiss(dismiss) => check(dismiss.item.home() == HomeKind::Found, "the item is not one tasks found"),
             Payload::FoundKeep(keep) => check(keep.item.home() == HomeKind::Found, "the item is not one tasks found"),
+            Payload::ItemWrite(write) => check(write.item.home() != HomeKind::Found, "a found item is not written out"),
             Payload::ReviewSend(send) => send.check(),
             Payload::LeadMessage(message) => message.check(),
             Payload::Board(board) => board.check(),
@@ -809,6 +819,16 @@ mod tests {
         assert!(Payload::ItemEdit(short).validate().is_err());
         assert_eq!((Kind::ItemEdit.name(), Kind::ItemEdit.is_command(), Kind::ItemEdit.default_ttl(), Kind::ItemEdit.max_ttl()), ("item-edit", true, 3_600, 3_600));
         assert_eq!(Reason::SectionChanged.key(), "section-changed");
+    }
+
+    #[test]
+    fn an_item_write_names_an_item_to_write_out_and_lives_an_hour() {
+        let write = |item: &str| Payload::ItemWrite(ItemWrite { item: ItemKey::parse(item).unwrap() });
+        assert_eq!(write("vault:Projects/x.md").validate(), Ok(()));
+        assert_eq!(write("kept:idea-1").validate(), Ok(()));
+        assert!(write("found:f3").validate().is_err(), "a found item is the tasks' own words");
+        assert_eq!(serde_json::to_value(write("local:fix")).unwrap(), serde_json::json!({ "type": "item-write", "item": "local:fix" }));
+        assert_eq!((Kind::ItemWrite.name(), Kind::ItemWrite.is_command(), Kind::ItemWrite.default_ttl(), Kind::ItemWrite.max_ttl()), ("item-write", true, 3_600, 3_600));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { answerableQuestions, answersToSend, answersWithLead, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, nextQuestion, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answersToSend, answersWithLead, bodyShown, sendAnswers, backlogList, draftOf, filledAnswers, nextQuestion, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
@@ -8,7 +8,7 @@ import { autofillAvailable, signInText, signInWith } from "./signin.js";
 import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
-import { CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
+import { BACKLOG_BODY_MEDIA_TYPE, CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
 import { assessmentBlock, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea } from "./card.js";
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
@@ -25,7 +25,7 @@ import { awayOn, chosenLead, composerHtml, leadHead, leadHref, leadMachines, pan
 import { watchShell, watchUpdate } from "./shell.js";
 import { choosePose, overviewPose, POSES, railSide } from "./pose.js";
 import { backHref, boardSections, firstTaskOf, sectionPills, sectionSheet, sectionsButton, sectionView } from "./sections.js";
-import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, orderOpens, pushSection, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskFacts, taskKey, taskName, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, connectDone, githubErrorText, machineAnswerNote, installHint, lastSeenText, laterGroups, machineDots, machineRow, nav, needsFirstPasskey, nextList, optionCards, promptBlock, promptCards, backButton, cardAge, backRow, cardButton, cardHref, obstacleBlock, OPENABLE_STEPS, questionButton, questionHref, questionWaits, youLine, orderOpens, pushSection, stageList, reviewLines, routinesBlock, rulesLines, signInScreen, sleepingRow, subtaskList, taskAbout, taskFacts, taskHead, taskKey, taskName, taskRow, unlockingScreen, unlockScreen, linkRows, planPeek, planRead, withoutUrls } from "./screens.js";
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
@@ -268,19 +268,47 @@ function fillBlobs(id = null) {
   for (const element of root.querySelectorAll("[data-blob]")) if (id === null || element.dataset.blob === id) fillSlot(element);
 }
 
+const headA = (found) => top(taskName(found.item, found.task), `<span class="machine">${esc(found.name)}</span>`) + taskHead(found.item, found.repo);
+const panelHeadA = (found) => `<span class="machine">${esc(found.name)}</span><h2>${esc(taskName(found.item, found.task))}</h2>${taskHead(found.item, found.repo)}`;
+
+// A vault plan is the note's body as the backlog card reads it; it is drawn once its blob is held.
+function planBodyOf(plan) {
+  const held = blobs.peek(plan.id);
+  if (!held) {
+    blobs.load(plan).then((loaded) => loaded && render());
+    return { body: null, line: loadingLine("plan", plan) };
+  }
+  return held.body ? { body: held.body, line: null } : { body: null, line: failedLine("plan") };
+}
+
+const vaultPlan = (plan) => plan.media_type === BACKLOG_BODY_MEDIA_TYPE;
+const noteMeta = (question) => (question.plan_note ? `Vault note · updated ${when(question.plan_note.updated)}` : "Vault note");
+
+function planBox(found) {
+  const { item } = found;
+  const question = item.question;
+  const plan = question.plan;
+  if (!plan) return "";
+  const read = `<a class="btn" href="${planHref(found.machine, item.address)}">Read the whole plan</a>`;
+  if (!vaultPlan(plan)) return `<section class="task"><h3 class="sec">Plan</h3>${slot(plan, { kind: "plan", look: "md md-peek" })}${read}</section>`;
+  const { body, line } = planBodyOf(plan);
+  const shown = body ? planPeek(body) : `<div class="plan"><div>${esc(line)}</div></div>`;
+  return `<section class="task plan-box"><h3 class="sec">Plan</h3><div class="meta">${esc(noteMeta(question))}</div>${shown}${read}</section>`;
+}
+
 function questionBlock(found) {
   const { item } = found;
   if (item.question) {
     const question = item.question;
-    const plan = question.plan ? `<section class="task"><h3 class="sec">Plan</h3>${slot(question.plan, { kind: "plan", look: "md md-peek" })}<a class="btn" href="${planHref(found.machine, item.address)}">Read the whole plan</a></section>` : "";
-    const context = [found.repo, item.summary].filter(Boolean).join(" · ");
-    return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${plan}${answerArea(found)}`;
+    const links = question.links ?? [];
+    const body = question.title && question.body ? withoutUrls(question.body, links.map((link) => link.url)) : "";
+    const said = body ? `<div class="md q-body" data-markdown>${esc(body)}</div>` : "";
+    return `<p class="q">${esc(question.title ?? question.text)}</p>${said}${linkRows(links)}<div class="meta pad">asked ${esc(when(question.at))}</div>${answerArea(found)}${planBox(found)}`;
   }
   if (item.prompt) return promptBlock(found, promptArea(found));
   const question = item.kebbie_questions[0];
-  const context = [found.repo, item.summary].filter(Boolean).join(" · ");
   const card = [taskFacts(item), stageList(item, nowSeconds())].filter(Boolean).join("");
-  return `<p class="q">${esc(question.text)}</p><div class="meta pad">${esc(context)} · asked ${esc(when(question.at))}</div>${card ? `<section class="task">${card}</section>` : ""}${answerArea(found)}`;
+  return `<p class="q">${esc(question.text)}</p><div class="meta pad">asked ${esc(when(question.at))}</div>${card ? `<section class="task">${card}</section>` : ""}${answerArea(found)}`;
 }
 
 const seenKey = (machine, address) => `kebbie-card-seen:${machine}|${address}`;
@@ -347,7 +375,7 @@ function cardBlock(found, selected = null) {
   const subtasks = subtaskList(item, { expandable: true, href: (id) => subtaskHref(found.machine, item.address, id), selected, more: uiOf(found.machine, item.address).moreSteps });
   if (subtasks) lines.push(`<h3 class="sec">Subtasks · ${item.subtasks.length}</h3>${subtasks}`);
   lines.push(reviewLines(item));
-  const progress = [item.summary, item.report?.summary].filter(Boolean);
+  const progress = [item.summary, withoutUrls(item.report?.summary)].filter(Boolean);
   if (progress.length) lines.push(`<h3 class="sec">Progress</h3><div class="plan">${progress.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`);
   if (item.git) {
     const git = item.git;
@@ -364,7 +392,7 @@ function cardBlock(found, selected = null) {
   const structured = item.card?.blob.media_type === CARD_MEDIA_TYPE;
   const assess = assessArea(found);
   const waits = asksYou(item) ? questionWaits(item, questionHref(found.machine, item.address)) : "";
-  return waits + reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + (pushed ? "" : pushArea(found));
+  return waits + reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + taskAbout(item, when) + (pushed ? "" : pushArea(found));
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
@@ -447,26 +475,34 @@ function taskScreen([machine, address], card = false) {
   const asks = asksYou(found.item);
   const button = switchButton(found, card);
   const body = card ? cardBlock(found) : taskBody(found);
-  return shell(asks ? "questions" : "board", (button ? backRow(back, button) : back) + top(taskName(found.item, found.task), esc(found.name)) + body);
+  return shell(asks ? "questions" : "board", (button ? backRow(back, button) : back) + headA(found) + body);
 }
 
 function taskPanel([machine, address], card = false) {
   const found = findTask(state.opened, machine, address);
   if (!found) return `<h2>Task</h2><div class="center left">This task is no longer on the board.</div>`;
   const button = switchButton(found, card);
-  return `${button ? backRow("", button) : ""}<span class="machine">${esc(found.name)}</span><h2>${esc(taskName(found.item, found.task))}</h2>${card ? cardBlock(found) : taskBody(found)}`;
+  return `${button ? backRow("", button) : ""}${panelHeadA(found)}${card ? cardBlock(found) : taskBody(found)}`;
 }
 
 const cardPanel = (params) => taskPanel(params, true);
 
-function planParts([machine, address]) {
+function planArticle(plan) {
+  const { body, line } = planBodyOf(plan);
+  return body ? `<article class="task md-read">${planRead(body)}</article>` : `<article class="task plan"><div>${esc(line)}</div></article>`;
+}
+
+// Back to the question shows only where no Back does: the Duo's unfolded landscape pane.
+function planParts([machine, address], { backButton = false } = {}) {
   const found = findTask(state.opened, machine, address);
   const question = found?.item.question;
   const plan = question?.plan;
   if (!plan) return null;
-  const meta = ["Plan", kb(plan.bytes), question.plan_at ? `written ${when(question.plan_at)}` : null].filter(Boolean).join(" · ");
+  const vault = vaultPlan(plan);
+  const meta = vault ? ["Vault note", question.plan_note?.key.slice("vault:".length), question.plan_note ? `updated ${when(question.plan_note.updated)}` : null] : ["Plan", kb(plan.bytes), question.plan_at ? `written ${when(question.plan_at)}` : null];
   const back = `#/task/${encodeURIComponent(machine)}/${encodeURIComponent(address)}`;
-  return { found, back, meta: `<div class="meta pad">${esc(meta)}</div>`, body: `${slot(plan, { kind: "plan", tag: "article", look: "task md md-read", wait: "task plan" })}<a class="btn primary" href="${back}">Back to the question</a>` };
+  const body = vault ? planArticle(plan) : slot(plan, { kind: "plan", tag: "article", look: "task md md-read", wait: "task plan" });
+  return { found, back, meta: `<div class="meta pad plan-meta">${esc(meta.filter(Boolean).join(" · "))}</div>`, body: body + (backButton ? `<a class="btn primary" href="${back}">Back to the question</a>` : "") };
 }
 
 function planScreen(params) {
@@ -474,13 +510,13 @@ function planScreen(params) {
   const back = parts?.back ?? `#/task/${params.map(encodeURIComponent).join("/")}`;
   const round = overview() ? backButton(back) : "";
   if (!parts) return shell("questions", round + top("Plan") + `<div class="center">This plan is no longer on the board.</div>`);
-  return shell("questions", round + top(taskName(parts.found.item, parts.found.task), esc(parts.found.name)) + parts.meta + parts.body);
+  return shell("questions", round + headA(parts.found) + parts.meta + parts.body);
 }
 
 function planPanel(params) {
-  const parts = planParts(params);
+  const parts = planParts(params, { backButton: pose === "split" });
   if (!parts) return `<h2>Plan</h2><div class="center left">This plan is no longer on the board.</div>`;
-  return `<span class="machine">${esc(parts.found.name)}</span><h2>${esc(taskName(parts.found.item, parts.found.task))}</h2>${parts.meta}${parts.body}`;
+  return `${panelHeadA(parts.found)}${parts.meta}${parts.body}`;
 }
 
 function wideTaskScreen(params, panel = taskPanel) {
@@ -500,7 +536,22 @@ function shownOf(sent) {
 function backlogEntries() {
   const now = nowSeconds();
   const merged = mergeBacklog(state.opened, now).map((entry) => ({ ...entry, waiting: Math.max(0, entry.row.blocking - answersInFlight(entry)) }));
+  const ids = new Set(merged.map((entry) => entry.id));
+  for (const entry of merged) {
+    const note = mergedInto(entry.row);
+    if (note) entry.opens = ids.has(note) ? entryHref(note) : (noteTaskHref(note) ?? undefined);
+  }
   return [...ideaEntries(state.kept.sent, state.opened, now, (sent) => shownOf(sent).state), ...merged];
+}
+
+// The task whose plan or links name the note, for a merged row whose note is no longer in the backlog.
+function noteTaskHref(note) {
+  const path = note.slice("vault:".length);
+  for (const opened of state.opened) {
+    const item = opened.board?.items.find((one) => one.question?.plan_note?.key === note || (one.links ?? []).some((link) => link.kind === "note" && link.url.includes(encodeURIComponent(path))));
+    if (item) return cardHref(opened.machine, item.address);
+  }
+  return null;
 }
 
 function answersInFlight(entry) {
@@ -587,7 +638,8 @@ function itemCardHtml(entry) {
   const sentFor = answerSentFor(entry);
   const idea = entry.idea ? { ...entry.idea, standing: shownOf(entry.idea.sent).standing } : null;
   const edits = entry.key ? { machine: chosenFor(entry, "item-edit"), editing: ui.editing, sentFor: (section) => editFor(entry, section) } : null;
-  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null });
+  const write = entry.key && !isFound(entry) ? { chosen: chosenFor(entry, "item-write"), sent: latestFor(entry, "item-write") } : null;
+  return itemBody(idea ? { ...entry, idea } : entry, { ...bodyOf(entry), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null, write });
 }
 
 const FOUND_KINDS = ["found-start", "found-add", "found-dismiss"];
@@ -769,12 +821,14 @@ function reviewRoute(params, diff = false) {
   if (!found) return shell("board", back + top("Review") + `<div class="center">This task is no longer on the board.</div>`);
   const v = reviewView(found, page);
   const here = page.kind === "subtask" ? subtaskPage : page.kind === "commit" ? commitPage : wholePage;
+  const underA = (title) => headA(found) + `<h3 class="sec page-sub">${esc(title)}</h3>`;
+  const row = backRow(back, cardButton(cardHref(machine, address)));
   if (twoColumns()) {
     const task = page.kind === "subtask" || page.subtask === null;
-    const left = task ? top(taskName(found.item, found.task), esc(found.name)) + (view === "card" ? cardBlock(found, page.subtask) : taskBody(found, page.subtask)) : subtaskPage(v, { top, left: true, selected: page.commit });
-    return shell("board", back + `<div class="narrow">${left}</div>`, here(v, { top, inPanel: true })) + sendControl(v);
+    const left = task ? headA(found) + (view === "card" ? cardBlock(found, page.subtask) : taskBody(found, page.subtask)) : subtaskPage(v, { top: underA, left: true, selected: page.commit });
+    return shell("board", row + `<div class="narrow">${left}</div>`, here(v, { top, inPanel: true })) + sendControl(v);
   }
-  return shell("board", back + `<div class="narrow">${here(v, { top })}</div>`) + sendControl(v);
+  return shell("board", row + `<div class="narrow">${here(v, { top: underA })}</div>`) + sendControl(v);
 }
 
 const leadSeenKey = (machine) => `kebbie-lead-seen:${machine}`;
@@ -1517,6 +1571,14 @@ function pickQuestion(entry, index) {
   if (ui.open.has(index)) focusAnswer(index);
 }
 
+async function writeItem(entry) {
+  const ui = backlogUi(entry.id);
+  const chosen = chosenFor(entry, "item-write");
+  if (!chosen || ui.busy) return;
+  await sendBacklog({ machine: chosen, payload: { type: "item-write", item: entry.key }, meta: { address: entry.key, label: entry.row.title }, ui });
+  render();
+}
+
 async function startItem(entry) {
   const ui = backlogUi(entry.id);
   const chosen = chosenFor(entry, "start-item");
@@ -1554,7 +1616,7 @@ function openEditor(entry, section) {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
-const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "send-item-answers", "start-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
+const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answer", "send-item-answers", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
 
 function backlogAction(action, target) {
   const id = target.closest("[data-item]")?.dataset.item ?? null;
@@ -1570,6 +1632,7 @@ function backlogAction(action, target) {
   if (action === "send-item-answers" && entry) return sendItemAnswers(entry, filledAnswers(ui, answerableQuestions(bodyOf(entry).body, answerSentFor(entry))));
   if (action === "pick-question" && entry) return pickQuestion(entry, Number(target.dataset.index));
   if (action === "start-item" && entry) return startItem(entry);
+  if (action === "write-item" && entry) return writeItem(entry);
   if (FOUND_KINDS.includes(action) && entry) return foundAction(entry, action, target);
   if (action === "backlog-choose") ui.choosing = !ui.choosing;
   else if (action === "backlog-machine") Object.assign(ui, { machine: target.dataset.machine, choosing: false });

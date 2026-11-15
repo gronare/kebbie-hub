@@ -7,7 +7,7 @@ use common::*;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Backlog, MachineState};
 use kebbie_hub_protocol::{
-    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Found, FoundAdd, FoundDismiss, FoundStart, Home, HomeKind, Idea, ItemAnswer, ItemEdit, ItemKey, OpenQuestion,
+    BacklogBody, BacklogRow, BacklogState, Board, BodySection, Found, FoundAdd, FoundDismiss, FoundStart, Home, HomeKind, Idea, ItemAnswer, ItemEdit, ItemKey, ItemWrite, OpenQuestion,
     Outcome, Payload, Priority, Reason, StartItem, open_blob, text_hash,
 };
 
@@ -35,6 +35,7 @@ fn backlog() -> Backlog {
             goal: None,
             body: None,
             found: None,
+            writing: None,
         }],
         bodies: [(item, BacklogBody {
             sections: vec![
@@ -105,6 +106,27 @@ async fn an_idea_an_answer_and_a_start_travel_through_the_hub_and_the_board_show
     assert_eq!(sent(&mut person, &mut machine, start(true)).await, Outcome::Refused { reason: Reason::AlreadyStarted });
 }
 
+#[tokio::test]
+async fn a_write_out_travels_through_the_hub_and_the_item_reads_writing_from_the_ask() {
+    let test = start_hub(|_| {}).await;
+    let mut person = member(&test).await;
+    let mut machine = connected_with_board(&test, &mut person).await;
+    person.knows(&machine.machine, machine.public());
+    machine.post_board(board(MARKER)).await.unwrap();
+    let mut shelf = backlog();
+    shelf.rows[0].state = BacklogState::ToWrite;
+    machine.backlog = shelf;
+    machine.publish_backlog().await.unwrap();
+    let write = || Payload::ItemWrite(ItemWrite { item: ItemKey::parse(ITEM).unwrap() });
+
+    assert_eq!(sent(&mut person, &mut machine, write()).await, Outcome::Done);
+    let rows = board_of(&mut person, &machine).await.backlog.unwrap();
+    let row = rows.iter().find(|row| row.item.as_str() == ITEM).unwrap();
+    assert_eq!(row.state, BacklogState::Drafting);
+    assert!(row.writing.is_some(), "the row says when the ask went out");
+    assert_eq!(sent(&mut person, &mut machine, write()).await, Outcome::Refused { reason: Reason::BadRequest }, "an item being written is not asked again within the day");
+}
+
 fn found(number: u32, title: &str) -> BacklogRow {
     BacklogRow {
         item: ItemKey::parse(&format!("found:f{number}")).unwrap(),
@@ -119,6 +141,7 @@ fn found(number: u32, title: &str) -> BacklogRow {
         goal: None,
         body: None,
         found: Some(Found { sources: vec!["refunds@shop".to_string()], count: 2 }),
+        writing: None,
     }
 }
 

@@ -2128,6 +2128,54 @@
     {
       "envelope": {
         "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "xc1Jy1F165iqjudvwsOa_7vLLC7G5NyK1desL2D8B8iucR1F4dNvjnLq8yfTtUToyQGfF92phb3IPXGz539389lq4RTVdvr2Lg",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7ff9-bc9c-935ac8bfd212",
+        "kc": "V6iZyXdCYjCdwXMI3DPT3VV0T6bhV6RzIQsIrVdq6wQ",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "8Hpfn79dL8x5QiVKZQ-eqorz5v9BbnxOwLlQnSw8dmpcZTLJM7oTfcRqKZzNv3Gb_JYKe1y3SSlJyHuNNAvt8vkkV-N-0CqWqxYEv1GXdzs",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "QcQRAW2JSE9jfcvy1crDl4CfGC3p58hvANrQjKoQczake8Omuw60nx-HE7UkwWsm0RoVB881d2zC72pXF20Mfxmh4tkf6w4NXZbumNY_P6w"
+        },
+        "kind": "item-write",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "A1IDnr7UhaLZnOT3_4s0xqw1RyVF2EICbm86imLCmXogY_EtQVek870NE41AZ40OindojGNqqdj7lZzqziOiCA",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "item": "kept:idea-4411",
+          "type": "item-write"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2ZmOS1iYzljLTkzNWFjOGJmZDIxMgAKaXRlbS13cml0ZQAeZGV2XzAxSzgzWVYzODAzMjlBUlM2OUo4NlpCOVBCAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo99gwAAEAK1Y2aVp5WGRDWWpDZHdYTUkzRFBUM1ZWMFQ2YmhWNlJ6SVFzSXJWZHE2d1EAAAEAGmFjY196LUJpSklrYmVvWGNMQTUyNl8wUHJRAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIACWlQaG9uZSAxNgADd2Vi4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0bJwsPAPveecBUe6nEY9MKMkEM8JkxrRQgBzg_XF9WHZAAAAABo9nigLmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+      "name": "item-write-opened-by-the-machine",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "v3ReY5SKPJyQb7ZK1Mo9NMLYNgFOpoFWXUSnwvWaA6M",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "IPbaOTX3j0RJJBIbl-kL_AzNnLNx39eRVt_Z-yWsmdE",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "BrXKPUkELvsCetQu0SELuAHIgZdsQ_rpIYSuaR4GqDE"
+        },
+        "nonce": "xc1Jy1F165iqjudv",
+        "plaintext": "eyJ0eXBlIjoiaXRlbS13cml0ZSIsIml0ZW0iOiJrZXB0OmlkZWEtNDQxMSJ9"
+      },
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
         "ct": "gS2RURjdfm-9rshqoZdhrBa5ZLKFp1HJtqIbxMCR7K2anIWToEtk6etXad9w4LegLyxCOLeAoNe09nYgvhSAYNJkZyOsAbUZlb-CEQbihmyNkqmfsIRYpVg21SaRL38kj6HHNl0mckif2ygHvev2hVl9wfwa1Bq3sME2BsDqVNKIqg8AddMzDGyOy7PZuEsrjZbYnWIFEIT8upVwwhaet-xWc9hgKCgZc9RkfAihewi2fN8nCAEjck78hLgAeNqki5YVRMVf7ku5K7x173lLHAhgzaYeztoWthAGMnslO0o3jIxOqwpCUkvvV8czkWulh-lSmF-P",
         "exp": 1761674400,
         "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
@@ -4747,6 +4795,7 @@
     "idea": 3600,
     "item-answer": 3600,
     "item-edit": 3600,
+    "item-write": 3600,
     "lead-message": 604800,
     "notice": 86400,
     "prompt-answer": 600,

@@ -41,6 +41,7 @@ fn found(number: u32, title: &str) -> BacklogRow {
         goal: None,
         body: None,
         found: Some(Found { sources: vec![CARDED.to_string(), "refunds@api".to_string()], count: 2 }),
+        writing: None,
     }
 }
 

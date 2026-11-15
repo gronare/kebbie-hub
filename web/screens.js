@@ -97,7 +97,7 @@ export function nextList(lists, now, selected = null) {
   const blocks = lists.map((list) => {
     const name = many ? `<div class="nmachine">${esc(list.name)}</div>` : "";
     const body = list.rows.length ? nextRows(list, now, selected) : `<div class="meta">Nothing needs you.</div>`;
-    const foot = [countsLine(list.counts), list.rows.length ? "same order as N on the board" : ""].filter(Boolean).join(" · ");
+    const foot = countsLine(list.counts);
     return `${name}${body}${foot ? `<div class="meta nfoot">${esc(foot)}</div>` : ""}`;
   });
   return `<section class="next" aria-label="Next">${blocks.join("")}</section>`;
@@ -142,9 +142,8 @@ export function assessmentText(assessment) {
 }
 
 export function taskFacts(item) {
-  const agent = agentChip(item.agent, true);
   const profile = item.profile ? `profile ${esc(item.profile)}` : "";
-  const parts = [agent, profile, esc(recipeText(item))].filter(Boolean);
+  const parts = [profile, esc(recipeText(item))].filter(Boolean);
   return parts.length ? `<div class="meta">${parts.join(" · ")}</div>` : "";
 }
 
@@ -478,11 +477,102 @@ export function questionButton(href, waiting = 0) {
 }
 
 export function questionLine(item) {
+  if (item.question?.title) return item.question.title;
   const text = item.question?.text ?? (item.prompt ? promptParts(item.prompt.question).question : (item.kebbie_questions?.[0]?.text ?? ""));
   return text.split("\n").map((line) => line.trim()).find(Boolean) ?? "";
 }
 
 export const questionWaits = (item, href) => `<div class="sent wait qwait" role="status"><span class="eyebrow">A question waits for you</span><span class="first">${esc(questionLine(item))}</span><a class="btn fit primary" href="${esc(href)}">Answer</a></div>`;
+
+const STATE_WORDS = { "NEEDS YOU": ["needs you", "yellow"], WORKING: ["working", "blue"], "TO REVIEW": ["in review", "teal"], "READY TO PUSH": ["ready to push", "green"], "CI RUNNING": ["CI running", "yellow"], "WAITING FOR WORK": ["waiting for work", "muted"] };
+
+// The second line of a task view's header: where it lives, how it stands and who works on it.
+export function taskHead(item, repo) {
+  const [word, tone] = STATE_WORDS[item.group] ?? [null, null];
+  const parts = [repo ? esc(repo) : "", word ? `<span class="g-${tone}">${esc(word)}</span>` : "", agentChip(item.agent, true)].filter(Boolean);
+  return parts.length ? `<div class="meta pad task-head">${parts.join(" · ")}</div>` : "";
+}
+
+const URL_IN_TEXT = /\b(?:https?|obsidian):\/\/[^\s<>()"'`]+/g;
+
+// A line with its addresses taken out, and the colon or dash that led to them; the addresses live in the task's links.
+export const withoutUrls = (text, only = null) =>
+  String(text ?? "")
+    .replace(URL_IN_TEXT, (url) => (only && !only.includes(url.replace(/[.,;:!?]+$/, "")) ? url : ""))
+    .replace(/[ \t]*[:—–-]?[ \t]*$/gm, (tail, offset, whole) => (/[:—–-]/.test(tail) && whole.slice(0, offset).trim() ? "" : tail.replace(/[ \t]+$/, "")))
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+
+export function linkAddress(url) {
+  if (url.startsWith("obsidian://")) {
+    const file = new URLSearchParams(url.slice(url.indexOf("?") + 1)).get("file");
+    if (file) return file;
+  }
+  return url.replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+}
+
+export function linkRows(links) {
+  if (!links?.length) return "";
+  return `<div class="steps go links">${links.map((link) => `<a class="step" href="${esc(link.url)}" target="_blank" rel="noopener" data-link="${esc(link.kind)}"><span class="what"><span class="mark" aria-hidden="true">↗</span><span class="tt"><span class="step-title">${esc(link.label)}</span><span class="label">${esc(linkAddress(link.url))}</span></span></span>${CHEV_RIGHT}</a>`).join("")}</div>`;
+}
+
+function waitsOn(item) {
+  if (asksYou(item) || item.next_for_you) return "you";
+  return { WORKING: "the agent", "TO REVIEW": "the review", "READY TO PUSH": "your push", "CI RUNNING": "CI" }[item.group] ?? "nothing";
+}
+
+function subtasksText(item) {
+  const subtasks = item.subtasks ?? [];
+  if (!subtasks.length) return item.question?.plan && asksYou(item) ? "none yet · the plan comes after the yes" : "none yet";
+  const counts = ["pushed", "accepted", "ready", "in-progress", "planned"].map((state) => [state, subtasks.filter((one) => one.state === state).length]).filter(([, count]) => count > 0);
+  return [String(subtasks.length), ...counts.map(([state, count]) => `${count} ${state === "in-progress" ? "in progress" : state}`)].join(" · ");
+}
+
+export function planFact(question, when) {
+  if (!question?.plan) return "";
+  if (question.plan_note) return `vault note · updated ${when(question.plan_note.updated)}`;
+  return question.plan_at ? `file · written ${when(question.plan_at)}` : "file";
+}
+
+// The task's facts and every link it names: on its card only, after the card itself.
+export function taskAbout(item, when) {
+  const plan = planFact(item.question, when);
+  const facts = [["work", item.summary], ["subtasks", subtasksText(item)], ["waits on", waitsOn(item)], plan ? ["plan", plan] : null].filter((row) => row && row[1]);
+  const links = item.links?.length ? `<h3 class="sec">Links · ${item.links.length}</h3>${linkRows(item.links)}` : "";
+  return `<section class="task task-about"><h3 class="sec">Task</h3><dl class="facts">${facts.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join("")}</dl>${links}</section>`;
+}
+
+const SHOWN_PLAN_QUESTIONS = 3;
+const secBlock = (heading, inner) => `<section class="sec-block"><div class="sec-head"><h3 class="sec">${esc(heading)}</h3></div>${inner}</section>`;
+const goalOf = (body) => body.sections.find((part) => part.key === "goal") ?? body.sections.find((part) => /goal/i.test(part.heading)) ?? body.sections.find((part) => part.text.trim());
+
+// The plan beside its question: the goal's first paragraph and the first open questions.
+export function planPeek(body) {
+  const goal = goalOf(body);
+  const first = goal?.text.trim().split(/\n\s*\n/)[0] ?? "";
+  const parts = first ? [secBlock(goal.heading, `<div class="md" data-markdown>${esc(first)}</div>`)] : [];
+  const { questions } = body;
+  if (questions.length) {
+    const shown = questions.slice(0, SHOWN_PLAN_QUESTIONS).map((question) => `- ${question.text.replace(/\s+/g, " ")}`).join("\n");
+    const more = questions.length > SHOWN_PLAN_QUESTIONS ? `<div class="meta pad">${questions.length - SHOWN_PLAN_QUESTIONS} more in the plan</div>` : "";
+    parts.push(secBlock(`Open questions · ${questions.length}`, `<div class="md" data-markdown>${esc(shown)}</div>${more}`));
+  }
+  return parts.join("");
+}
+
+const planQuestion = (question) => `<div class="opt bq${question.blocks ? "" : " plain"}"><b><span class="qmark${question.blocks ? " warn" : ""}" aria-hidden="true">${question.blocks ? "?" : "·"}</span>${esc(question.text)}</b></div>`;
+
+// The whole plan as the backlog card reads a note: its sections in order and the open questions as cards under theirs.
+export function planRead(body) {
+  const cards = body.questions.length ? `<div class="options qlist">${body.questions.map(planQuestion).join("")}</div>` : "";
+  const parts = body.sections.map((part) => {
+    const text = part.text.trim() ? `<div class="md" data-markdown>${esc(part.text)}</div>` : "";
+    const after = part.key === body.questions_key ? cards : "";
+    return text || after ? secBlock(part.heading, text + after) : "";
+  });
+  const trailing = !body.questions_key && cards ? secBlock("Open questions", cards) : "";
+  return parts.join("") + trailing;
+}
 
 export const youLine = (item) => (item.next_for_you && !asksYou(item) ? `<div class="you"><b>you:</b> ${esc(item.next_for_you)}</div>` : "");
 
@@ -776,7 +866,7 @@ export function devicesSection(devices, now) {
   return `<h2 class="group g-muted">Devices · ${kept.length}</h2>${kept.map((device) => deviceRow(device, now)).join("")}<div class="meta pad">Each machine decides which devices make changes on it. Approve or deny a device in kebbie on that machine, or open it here from a device that machine approved.</div>${gone}`;
 }
 
-const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of", "found-keep": "Keeping of", "review-send": "Full review of" };
+const NOUNS = { answer: "Answer to", push: "Push of", "prompt-answer": "Choice on", start: "Start in", routine: "Routine", idea: "Idea for", "item-answer": "Answer on", "start-item": "Start of", "item-edit": "Edit of", "item-write": "Write-out of", "device-decision": "Decision on", "review-open": "Review of", "review-comments": "Review comments on", "review-read": "Read mark on", "accept-step": "Accept on", "accept-subtask": "Accept on", "found-start": "Start from", "found-add": "Adding of", "found-dismiss": "Dismissal of", "found-keep": "Keeping of", "review-send": "Full review of" };
 const clip = (text, length = 60) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 const itemName = (entry) => entry.label ?? entry.payload.item.split("/").at(-1).replace(/^(vault|local|kept|found):/, "").replace(/\.md$/, "");
 
@@ -792,7 +882,7 @@ function subject(entry) {
   if (payload.type === "routine") return payload.id;
   if (payload.type === "start") return `${payload.name}@${payload.repo}`;
   if (payload.type === "idea") return `${entry.machineName}: ${clip(payload.text)}`;
-  if (["item-answer", "start-item", "item-edit", "found-start", "found-add", "found-dismiss", "found-keep"].includes(payload.type)) return itemName(entry);
+  if (["item-answer", "start-item", "item-edit", "item-write", "found-start", "found-add", "found-dismiss", "found-keep"].includes(payload.type)) return itemName(entry);
   if (payload.type === "device-decision") return entry.targetName ?? payload.device.slice(-6);
   return payload.address;
 }
@@ -813,6 +903,7 @@ export function historyEntry(entry, now) {
     if (kind === "device-decision") return { icon: "✓", what: `${entry.payload.approve ? "Approved" : "Denied"} ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "item-answer") return { icon: "✓", what: `Answered a question on ${what}`, said: `"${clip(entry.payload.answer)}" · on ${machine}`, at: entry.at };
     if (kind === "item-edit") return { icon: "✓", what: `Edited ${entry.payload.section === null || entry.payload.section === undefined ? "the title" : `“${entry.heading ?? entry.payload.section}”`} of ${what}`, said: `on ${machine}`, at: entry.at };
+    if (kind === "item-write") return { icon: "✓", what: `Asked the lead to write out ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-open") return { icon: "✓", what: `Opened the review of ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-comments") return { icon: "✓", what: `Sent ${plural(entry.payload.comments.length, "review comment", "review comments")} on ${what}`, said: `on ${machine}`, at: entry.at };
     if (kind === "review-read") return { icon: "✓", what: `Marked ${entry.payload.path} ${entry.payload.read ? "read" : "unread"} on ${what}`, said: `on ${machine}`, at: entry.at };

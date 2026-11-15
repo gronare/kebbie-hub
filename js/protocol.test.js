@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { LEAD_THREAD_MEDIA_TYPE, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, readLeadThread, CARD_MEDIA_TYPE, MAX_ASSESSMENT_REASON_CHARS, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, readCard, CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
+import { LINK_KINDS, MAX_LINKS, MAX_LINK_LABEL_CHARS, MAX_LINK_URL_CHARS, MAX_QUESTION_BODY_CHARS, MAX_QUESTION_TITLE_CHARS, isLinkUrl, LEAD_THREAD_MEDIA_TYPE, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, readLeadThread, CARD_MEDIA_TYPE, MAX_ASSESSMENT_REASON_CHARS, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, readCard, CLOSE_OPTIONS, KEPT_ANSWER_TTL, MAX_KEBBIE_QUESTION_CHARS, MAX_KEBBIE_QUESTION_ID_CHARS, MAX_KEBBIE_QUESTIONS, MAX_MEANING_CHARS, MAX_STAGE_DETAIL_CHARS, MAX_STAGE_NOTE_CHARS, MAX_STAGE_TITLE_CHARS, MAX_STAGES, VERIFY_OPTIONS, MAX_SUBTASK_ID_CHARS, MAX_ADDED_REASON_CHARS, MAX_OBSTACLE_CHARS, MAX_MOVED_REASON_CHARS, pushableOf, MAX_FOUND_SOURCES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS, MAX_ITEM_EDIT_BYTES, MAX_HEADING_CHARS, textHash, REVIEW_MEDIA_TYPE, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS_BYTES, MAX_RULE_NAMES, MAX_RULE_NAME_CHARS, checkReview, readReview, payloadOf, subtaskHead, subtaskOf, DEFAULT_NOTICE_CATEGORIES, MAX_NOTICE_BODY_CHARS, MAX_NOTICE_TITLE_CHARS, NOTICE_CATEGORIES, NOTICE_COLLAPSE_PREFIXES, noticeCategoryOf, fitsCollapse, openNotice, BACKLOG_BODY_MEDIA_TYPE, checkBacklogBody, isItemKey, KINDS, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS, START_ITEM_TTL, commandId, COMMAND_TTL, PROMPT_ANSWER_TTL, sealCommand, deviceCertStatement, deviceFingerprint, deviceId, newDeviceKey, openCommand, signDeviceCert, verifyCommand, verifyDeviceCert, accountCommitment, accountFingerprints, accountIdentity, accountWrapKey, checkPayload, checkShape, machineListStatement, machineListTrusts, machineListWith, machineListWithout, emptyMachineList, newAccountSecrets, signMachineList, signStatement, unwrapAccountSecrets, verifyMachineList, wrapAccountSecrets, wrapAssociatedData, wrapperStatement, decryptEnvelope, fromB64, headerBytes, importIdentity, importSender, machineFingerprint, openBlob, openEnvelope, handoffNonce, parseConnectFragment, ProtocolError, sealEnvelope, toB64 } from "./protocol.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -978,4 +978,36 @@ test("the lead's thread opens page by page from its blobs, and its commands hold
   for (const kind of ["lead-message", "away"]) assert.deepEqual([KINDS[kind].ttl, KINDS[kind].maxTtl, KINDS[kind].command], [...lead.ttl[kind], true]);
   assert.equal(noticeCategoryOf(lead.collapse), "lead-answered");
   assert.ok(holds(checkPayload)(lead.board_from_a_machine_not_yet_updated), "a board without a lead still opens");
+});
+
+test("a question's title, body, links and plan note, a task's links and a write-out pass or fail as Rust's validation says, and a machine that sends none of them still opens", async () => {
+  const questions = load("questions.json");
+  assert.deepEqual(
+    [questions.max_links, questions.max_link_label_chars, questions.max_link_url_chars, questions.max_question_title_chars, questions.max_question_body_chars],
+    [MAX_LINKS, MAX_LINK_LABEL_CHARS, MAX_LINK_URL_CHARS, MAX_QUESTION_TITLE_CHARS, MAX_QUESTION_BODY_CHARS],
+  );
+  checkPayload(questions.board);
+  const passes = (payload) => {
+    try {
+      checkPayload(payload);
+      return true;
+    } catch (error) {
+      if (error.code !== "malformed") throw error;
+      return false;
+    }
+  };
+  assert.ok(questions.cases.length > 15);
+  for (const { name, item, valid } of questions.cases) assert.equal(passes({ ...questions.board, items: [item] }), valid, name);
+  for (const { name, payload, valid } of questions.writes) assert.equal(passes(payload), valid, name);
+  assert.deepEqual(questions.board.items[0].links.map((one) => one.kind), ["mock", "pr", "ci", "note"]);
+  assert.ok(questions.board.items[0].links.every((one) => LINK_KINDS.includes(one.kind) && isLinkUrl(one.url)));
+  assert.deepEqual([questions.board.backlog[2].state, typeof questions.board.backlog[2].writing], ["drafting", "number"], "a row being written says when its write-out was asked");
+  assert.equal(questions.board.items[0].question.plan.media_type, BACKLOG_BODY_MEDIA_TYPE, "a vault plan goes as the note's body");
+  checkBacklogBody(questions.plan_body);
+  assert.deepEqual(questions.item_write_ttl, [KINDS["item-write"].ttl, KINDS["item-write"].maxTtl]);
+  const vector = envelopes.cases.find((candidate) => candidate.name === "item-write-opened-by-the-machine");
+  const device = await certifiedPhone();
+  const machine = { id: parties.machine.id, keys: parties.machine.public };
+  const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
+  assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload);
 });

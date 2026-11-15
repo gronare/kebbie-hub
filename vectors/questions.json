@@ -1,0 +1,2250 @@
+{
+  "board": {
+    "accepts": [
+      "answer",
+      "item-write"
+    ],
+    "away_since": null,
+    "backlog": [
+      {
+        "blocking": 1,
+        "body": {
+          "bytes": 1095,
+          "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+          "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+          "media_type": "application/vnd.kebbie.backlog-item+json"
+        },
+        "filed": 1760810400,
+        "goal": "A refund of a whole invoice returns exactly what the invoice charged.",
+        "home": {
+          "kind": "vault",
+          "label": "Projects/refund-rounding.md"
+        },
+        "item": "vault:Projects/refund-rounding.md",
+        "priority": "high",
+        "questions": 3,
+        "repo": "shop",
+        "state": "ready",
+        "title": "Refunds round like their invoice"
+      },
+      {
+        "blocking": 0,
+        "body": null,
+        "filed": 1760983200,
+        "goal": null,
+        "home": {
+          "kind": "local",
+          "label": ".kebbie/backlog/dark-mode.md"
+        },
+        "item": "local:01JB7Q2M3N8K",
+        "priority": "low",
+        "questions": 0,
+        "repo": "app",
+        "state": "drafting",
+        "title": "Dark mode for the editor"
+      },
+      {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761069000,
+        "goal": null,
+        "home": {
+          "kind": "kept",
+          "label": "kept by kebbie"
+        },
+        "item": "kept:idea-4411",
+        "priority": "none",
+        "questions": 0,
+        "repo": null,
+        "state": "drafting",
+        "title": "Mail the weekly summary",
+        "writing": 1760979600
+      },
+      {
+        "blocking": 0,
+        "body": null,
+        "filed": 1761062400,
+        "found": {
+          "count": 3,
+          "sources": [
+            "payments@api",
+            "refunds@shop"
+          ]
+        },
+        "goal": null,
+        "home": {
+          "kind": "found",
+          "label": "found by tasks"
+        },
+        "item": "found:f3",
+        "priority": "none",
+        "questions": 0,
+        "repo": "api",
+        "state": "ready",
+        "title": "The refund client can't tell a missing receipt from an outage"
+      }
+    ],
+    "checkouts": [
+      {
+        "busy_worktrees": 4,
+        "free_worktrees": 2,
+        "repo": "shop"
+      }
+    ],
+    "items": [
+      {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      }
+    ],
+    "kebbie": "0.24.0",
+    "rev": 1842,
+    "routines": [
+      {
+        "id": "nightly-deps",
+        "last_outcome": "ok",
+        "mode": "fix",
+        "next_run": 1761100200,
+        "repo": "shop",
+        "title": "Nightly deps"
+      }
+    ],
+    "sessions_outside_tasks": 1,
+    "type": "board"
+  },
+  "cases": [
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a question with its title, body, links and plan note",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a question from a machine that sends none of them",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a title without a body",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a body without its title",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old\nendpoint?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a title on two lines",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": " "
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "an empty title",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a title past its length",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a body past its length",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "a\u0007b",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a body with a control character",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "http://example.com/mock"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a link to a page on the web",
+      "valid": true
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "javascript:alert(1)"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a link that runs script",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "file:///Users/someone/plan.md"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a link to a file on the machine",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://example.com/a b"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a link with a space",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "design",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a link of a kind the protocol does not know",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": " ",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a link without its label",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a task's link named twice",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "other",
+            "label": "Link 0",
+            "url": "https://example.com/0"
+          },
+          {
+            "kind": "other",
+            "label": "Link 1",
+            "url": "https://example.com/1"
+          },
+          {
+            "kind": "other",
+            "label": "Link 2",
+            "url": "https://example.com/2"
+          },
+          {
+            "kind": "other",
+            "label": "Link 3",
+            "url": "https://example.com/3"
+          },
+          {
+            "kind": "other",
+            "label": "Link 4",
+            "url": "https://example.com/4"
+          },
+          {
+            "kind": "other",
+            "label": "Link 5",
+            "url": "https://example.com/5"
+          },
+          {
+            "kind": "other",
+            "label": "Link 6",
+            "url": "https://example.com/6"
+          },
+          {
+            "kind": "other",
+            "label": "Link 7",
+            "url": "https://example.com/7"
+          },
+          {
+            "kind": "other",
+            "label": "Link 8",
+            "url": "https://example.com/8"
+          },
+          {
+            "kind": "other",
+            "label": "Link 9",
+            "url": "https://example.com/9"
+          },
+          {
+            "kind": "other",
+            "label": "Link 10",
+            "url": "https://example.com/10"
+          },
+          {
+            "kind": "other",
+            "label": "Link 11",
+            "url": "https://example.com/11"
+          },
+          {
+            "kind": "other",
+            "label": "Link 12",
+            "url": "https://example.com/12"
+          },
+          {
+            "kind": "other",
+            "label": "Link 13",
+            "url": "https://example.com/13"
+          },
+          {
+            "kind": "other",
+            "label": "Link 14",
+            "url": "https://example.com/14"
+          },
+          {
+            "kind": "other",
+            "label": "Link 15",
+            "url": "https://example.com/15"
+          },
+          {
+            "kind": "other",
+            "label": "Link 16",
+            "url": "https://example.com/16"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a task with more links than it may name",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "local:plan-1",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a plan note that is a local file",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:/Users/someone/vault/Projects/x.md",
+            "updated": 1761069000
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a plan note named by a path on the machine",
+      "valid": false
+    },
+    {
+      "item": {
+        "address": "refunds@shop",
+        "agent": {
+          "status": "idle"
+        },
+        "card": null,
+        "ci": null,
+        "follows_main": false,
+        "git": {
+          "ahead": 2,
+          "behind": 1,
+          "uncommitted": 0,
+          "upstream": "main"
+        },
+        "group": "NEEDS YOU",
+        "head": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+        "links": [
+          {
+            "kind": "mock",
+            "label": "Mockup",
+            "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+          },
+          {
+            "kind": "pr",
+            "label": "Pull request",
+            "url": "https://github.com/acme/shop/pull/42"
+          },
+          {
+            "kind": "ci",
+            "label": "CI run",
+            "url": "https://github.com/acme/shop/actions/runs/1"
+          },
+          {
+            "kind": "note",
+            "label": "Vault note",
+            "url": "obsidian://open?file=Projects%2Fkebbie-ios.md"
+          }
+        ],
+        "next_for_you": "answer: Keep the old endpoint for a release?",
+        "prompt": null,
+        "push_permission": null,
+        "push_waits": null,
+        "question": {
+          "at": 1761069540,
+          "body": "Clients on the old app still call it.\n\nMock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "id": "1761069540-4411-0-question",
+          "kept_for_user": false,
+          "links": [
+            {
+              "kind": "mock",
+              "label": "Mockup",
+              "url": "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"
+            }
+          ],
+          "options": [
+            {
+              "label": "Keep it",
+              "meaning": "deprecate now, remove in the next release"
+            },
+            {
+              "comment": true,
+              "label": "Remove it",
+              "meaning": "drop it in this task"
+            }
+          ],
+          "plan": {
+            "bytes": 1095,
+            "id": "blb_7ee690e80a9dc4a073b3cafb500b25e2de54496df97ff6ee4349e70c7b36d5ae",
+            "key": "uggW9rnSGwRKU88VbNW_vYUynWitJrBXtLfOxccOLbo",
+            "media_type": "application/vnd.kebbie.backlog-item+json"
+          },
+          "plan_note": {
+            "key": "vault:Projects/kebbie-ios.md"
+          },
+          "recommend": 1,
+          "text": "Keep the old endpoint for a release? Clients on the old app still call it. Mock: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3",
+          "title": "Keep the old endpoint for a release?"
+        },
+        "recover": null,
+        "report": {
+          "at": 1761069540,
+          "next": "answer: Keep the old endpoint for a release?",
+          "state": "needs-you",
+          "summary": "asked the user: Keep the old endpoint for a release?"
+        },
+        "routine": null,
+        "summary": "2 commits · 1 behind main",
+        "urgency": 1,
+        "verdict": null
+      },
+      "name": "a plan note without its time",
+      "valid": false
+    }
+  ],
+  "item_write_ttl": [
+    3600,
+    3600
+  ],
+  "max_link_label_chars": 120,
+  "max_link_url_chars": 2048,
+  "max_links": 16,
+  "max_question_body_chars": 4000,
+  "max_question_title_chars": 300,
+  "plan_body": {
+    "questions": [
+      {
+        "blocks": true,
+        "pending_answer": null,
+        "text": "Round half up, or to even like the ledger?"
+      },
+      {
+        "blocks": true,
+        "pending_answer": "No, only new ones.",
+        "text": "Should old refunds be recomputed?"
+      },
+      {
+        "blocks": false,
+        "pending_answer": null,
+        "text": "Show the rounding on the receipt?"
+      }
+    ],
+    "questions_key": "questions",
+    "sections": [
+      {
+        "heading": "Background",
+        "key": "background",
+        "required": true,
+        "text": "Refunds are rounded per line, invoices on the total, so a refund can differ from its invoice by a cent."
+      },
+      {
+        "heading": "Goal",
+        "key": "goal",
+        "required": true,
+        "text": "A refund of a whole invoice returns exactly what the invoice charged.\nPartial refunds keep rounding per line."
+      },
+      {
+        "heading": "What we know",
+        "key": "what-we-know",
+        "required": false,
+        "text": "- Invoices round the total since 2.12.\n- `Refund#amount` sums rounded lines."
+      },
+      {
+        "heading": "Open questions",
+        "key": "questions",
+        "required": false,
+        "text": ""
+      },
+      {
+        "heading": "Out of scope",
+        "key": "out-of-scope",
+        "required": false,
+        "text": "Currency conversion."
+      },
+      {
+        "heading": "Source",
+        "key": "source",
+        "required": false,
+        "text": "Support thread about a refund one cent short."
+      }
+    ]
+  },
+  "plan_ciphertext": "F344pQ7UomS0VByb0HPTS7RQFkoRPQh_sNe4ugXE9EM32-1uG51uNSPApP4_MFQwLFaXZdQ2b3iLT0C-rFKGIaLWI0WqdN3pj7hLzvMCmhwOI0M9vI9Ee0Mn7tljEmRsk6tq2P-Cfd4aRiK-0G6b6SavOCymGRQwxA_W2FjNbyssDYtyy17lj_fMf-uzn_I6fJ6WiA85gNj9ZjKJ0gRsZ3qNisuJZQlR4htQ2b264LeEXH3_96JOtR6NodJd3z5zd2sKMYnnuseGJCpJMM5zlcPSLBnT89IuK7x1JWhCW3F6IZUM8ApHKxwt7DKEIdjFh2seMCnnCWjoIw1ohnm-UKdD7qg__U3T9GiqBFqCIdQJm4iQ7qF-8lK6452Pc9l9V0vudGoUJd7bA2pUkf9gjWPFuvsmHyJ6SSzXYE9-oQ2r_IbUbfBd5smN2e_waBj04iGrJs833klDN_OcTa20xITNjDmypu1o8hS10hk6tgTWzKj7xkRk17qxKki22OibmpMB4DnrBicyBwAGdtmzn5D_1L6WUfTAnYhTgWkZLp9LHeC14hQdQmb5W5c-gj21Y5GFvHNkV6jkD6ge0XD4-vM4hKUVqTavmFSqqVf7er3u2Kb-tSsI1jc7EfGw1hpNplrlv8-c3FApsJrugUUaCBpFFJi9eeM5E0GcyEWjx9Q8ZDFfm0fSOp4nUaYe7Q8TVxs40UqmmTPLr4du_Q5LvWaA6UUMmhUfK94uTvZ7viep0KK1hU66nhKzp8g4qvlGgeUOpXPBvkYE-qMqfCmqzXwjK1IJYowdDJi_LxcKMHXNxVW-7hn91F9Jj2lOcW543BGLqIg0Z9vlESyk_DuN5GiNO_io28QfX8QMgavoiMBBy1DnfsELLfbIAd6Zfdg1h1_NycYGpswM5u_fpZQ8atogL_sWOkFea1489dcvM-6vntOikXDU6KMpI9kSOrpb92qKWA4tuvJhb0Qn7ImUwv2MEyKf-5zHtAMrtUNBP7g_AOQCgddAzeUKN7hcWTrZaWiVFu-zL2Uw-JqjWwVT5GID6fIEexoZ0ZWLZBRoA8Md9GSl_LSP06-7l9ZJcZYzx0vnIbHvYxFFZ1PqcDokDOhoFrJrB8Jc-Im0BqPGF8qtE7KUj9k0_Ikq5UZiXEnaLMgT3fi1OtN-MDte8d6p2-nkVqBtJpZjNGfIw-AvUOGn0J0scdxStMns6kkGorzStPVVfEJu3a9sOHt0a56-_Oe_sFLSiVxJ4089xLq3aWcWfPV2n0Rb0Gn-Kc36SheFzAtEiNXRazPaoPh7xQLbnC0xaWbVX8XPl1RMcjopR1d1Ka6122XE6uWetGLEgED7IVpdb1yot8WcqlyVrw2FeEfdb5InOCqrOhTbU5lIbqeOdqMbPWBlrpCqlG775rvsXxvfFLk7wKH6qYMSuaRRcqPc13WYWdbHUUlCDhJ_fhtDRRq7Oy_giEbGxkErHVtRYUKV4RFoeyl0Od95NO7AOBU1Cw",
+  "writes": [
+    {
+      "name": "a vault item written out",
+      "payload": {
+        "item": "vault:Projects/refund-rounding.md",
+        "type": "item-write"
+      },
+      "valid": true
+    },
+    {
+      "name": "a local item written out",
+      "payload": {
+        "item": "local:01JB7Q2M3N8K",
+        "type": "item-write"
+      },
+      "valid": true
+    },
+    {
+      "name": "a kept idea written out",
+      "payload": {
+        "item": "kept:idea-4411",
+        "type": "item-write"
+      },
+      "valid": true
+    },
+    {
+      "name": "a found item written out",
+      "payload": {
+        "item": "found:f3",
+        "type": "item-write"
+      },
+      "valid": false
+    },
+    {
+      "name": "an item named by a path on the machine",
+      "payload": {
+        "item": "vault:/Users/someone/vault/Projects/x.md",
+        "type": "item-write"
+      },
+      "valid": false
+    },
+    {
+      "name": "a write with words of its own",
+      "payload": {
+        "item": "kept:idea-4411",
+        "text": "now",
+        "type": "item-write"
+      },
+      "valid": false
+    }
+  ]
+}

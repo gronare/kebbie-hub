@@ -39,6 +39,7 @@ pub use board::{
     Moved, Obstacle, ObstacleDecision, ObstacleState, OrderRow, OverrideBy, Prompt, PromptOption, PushPermission, Pushable,
     Question, QuestionOption, Recover, Report, RoutineSummary, Rules, RulesOverride, RulesState, SecondOpinion, Subtask, SubtaskState,
     TestsState, Verdict, VerdictOutcome, is_subtask_id, pushable_of, unlock_stages,
+    Link, LinkKind, MAX_LINK_LABEL_CHARS, MAX_LINK_URL_CHARS, MAX_LINKS, MAX_QUESTION_BODY_CHARS, MAX_QUESTION_TITLE_CHARS, PlanNote, is_link_url,
 };
 pub use card::{CARD_MEDIA_TYPE, Card, CardDecision, DecisionSource, MAX_BUILT_LINES, MAX_CARD_LINE_CHARS, MAX_DECISION_CHARS, MAX_DECISIONS, MAX_NOTICED, Noticed, NoticedChoice};
 pub use connect::{CONNECT_FINGERPRINT_DOMAIN, ConnectSecret, machine_fingerprint};
@@ -54,7 +55,7 @@ pub use envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, ShapeError, Urgency}
 pub use ids::{Id, IdError, Prefix};
 pub use lead::{Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, Turn};
 pub use message::{
-    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
+    Answer, CommandResult, DeviceDecision, FoundAdd, FoundDismiss, FoundKeep, FoundStart, Idea, ItemAnswer, ItemEdit, ItemWrite, MAX_IDEA_CHARS, MAX_ITEM_ANSWER_CHARS,
     MAX_ITEM_EDIT_BYTES, MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS,
     MAX_NOTICE_BODY_CHARS, MAX_NOTICE_BYTES, MAX_NOTICE_TITLE_CHARS, MAX_OPTIONS, MAX_PROMPT_CHARS,
     MAX_RETRACTS, Notice, NoticeCategory, Outcome, Payload, PromptAnswer, PushApproval, Reason, RunRoutine, StartItem,

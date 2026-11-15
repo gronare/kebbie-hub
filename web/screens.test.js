@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isAuthScreen } from "./email.js";
-import { backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, orderOpens, pushSection, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
+import { linkAddress, linkRows, planPeek, planRead, taskAbout, taskHead, withoutUrls, backRow, cardButton, cardHref, questionButton, questionHref, questionLine, questionWaits, youLine, cardAge, notificationsScreen, notifySection, rulesLines, acceptCount, accountScreen, deviceScreen, historyEntry, connectWelcome, EMAIL_LABEL, agentChip, awayLine, laterGroups, nextList, promptBlock, promptParts, reviewLines, routinesBlock, taskFacts, waited, addPasskeyScreen, cantUnlockScreen, connectDone, connectScreen, githubErrorText, machineAnswerNote, installHint, lastSeenText, machineDots, machineRow, nav, optionCards, signInScreen, signupScreen, setupScreen, sleepingRow, subtaskList, pushOrder, orderOpens, pushSection, obstacleBlock, stepSummary, taskKey, taskRow, unlockingScreen, unlockScreen } from "./screens.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const buttons = (html) => [...html.matchAll(/<(button|a)\b([^>]*)>([^<]*)</g)].map(([, , attributes, label]) => ({ label: label.trim(), disabled: /\sdisabled\b/.test(attributes) }));
@@ -441,7 +441,7 @@ const codexTask = { ...payments, address: "hub@kebbie", group: "NEEDS YOU", titl
 test("Next lists what needs you in kebbie's order under its parts, with each task's title, agent, line and wait, and the counts below", () => {
   const rows = [nextRow(1, "stopped", "hub@kebbie", "answer Codex's prompt", NOW - 12 * 60, codexTask), nextRow(2, "push", "card@web", "2 commits · 2 tasks wait on it", NOW - 3600, { ...payments, title: "Card component" }, 2), nextRow(3, "read", "research@kebbie", "result ready · stay on the TUI", null)];
   const html = nextList([{ machine: "mch_a", name: "mac", rows, counts: { working: 4, queued: 1, parked: 1 } }], NOW);
-  assert.equal(text(html), "Stopped on you 1 Clarify machine removal codex answer Codex's prompt 12 min Push, in this order 2 Card component 2 commits · 2 tasks wait on it 1 h To read 3 research result ready · stay on the TUI 4 working · 1 queued · 1 parked · same order as N on the board");
+  assert.equal(text(html), "Stopped on you 1 Clarify machine removal codex answer Codex's prompt 12 min Push, in this order 2 Card component 2 commits · 2 tasks wait on it 1 h To read 3 research result ready · stay on the TUI 4 working · 1 queued · 1 parked");
   assert.match(html, /<a class="nrow" href="#\/task\/mch_a\/hub%40kebbie">/);
   assert.match(html, /<span class="chip codex">codex<\/span>/);
 });
@@ -449,7 +449,7 @@ test("Next lists what needs you in kebbie's order under its parts, with each tas
 test("an empty Next says nothing needs you, several machines get a list each under their name, and a board without Next shows none", () => {
   assert.equal(text(nextList([{ machine: "mch_a", name: "mac", rows: [], counts: { working: 2, queued: 0, parked: 0 } }], NOW)), "Nothing needs you. 2 working");
   const two = nextList([{ machine: "mch_a", name: "mac", rows: [nextRow(1, "push", "a@web", "1 commit", NOW)], counts: null }, { machine: "mch_b", name: "studio", rows: [], counts: null }], NOW);
-  assert.equal(text(two), "mac Push, in this order 1 a 1 commit now same order as N on the board studio Nothing needs you.");
+  assert.equal(text(two), "mac Push, in this order 1 a 1 commit now studio Nothing needs you.");
   assert.equal(nextList([], NOW), "");
   assert.deepEqual([waited(30), waited(42 * 60), waited(3600), waited(3 * 86_400)], ["now", "42 min", "1 h", "3 d"]);
 });
@@ -461,9 +461,9 @@ test("a row shows the task's title, its agent and model, its recipe and the revi
   assert.equal(agentChip({ status: "idle" }), "", "an agent without its kind shows no chip");
 });
 
-test("the task card names its agent, profile and recipe, and its review section says what holds the push", () => {
+test("the task card names its profile and recipe, its agent sitting in the header, and its review section says what holds the push", () => {
   const item = { ...payments, agent: { status: "working", kind: "claude", model: "opus" }, profile: "task", recipe: "small fix", assessment: "review suggested: touches money and its tests", verdict: { verdict: "ok", findings: 0, sha: "abc", stale: false, running: false, held: true }, second_opinion: { by: "codex-review", points: 2, running: false } };
-  assert.equal(text(taskFacts(item)), "claude · opus · profile task · recipe: small fix");
+  assert.equal(text(taskFacts(item)), "profile task · recipe: small fix");
   assert.equal(text(reviewLines(item)), "Review review suggested: touches money and its tests reviewer ✓ ok · second opinion codex-review: 2 points the push waits for the reviewer's pass; the second opinion never holds it");
   const changes = { ...item, second_opinion: undefined, verdict: { ...item.verdict, verdict: "changes", findings: 1, held: false } };
   assert.equal(text(reviewLines(changes)), "Review review suggested: touches money and its tests reviewer: 1 finding the push does not wait for the reviewer");
@@ -785,4 +785,43 @@ test("the card drops its you: line while a question waits, since the box above a
   assert.equal(youLine(asked), "");
   assert.equal(text(youLine({ next_for_you: "push 3 commits" })), "you: push 3 commits");
   assert.equal(youLine({}), "");
+});
+
+const pinnedWhen = (seconds) => new Date(seconds * 1000).toISOString().slice(11, 16);
+
+test("a task view's header names where the task lives, how it stands and its agent", () => {
+  const item = { group: "NEEDS YOU", agent: { status: "idle", kind: "claude", model: "fable" } };
+  assert.equal(text(taskHead(item, "kebbie-ios")), "kebbie-ios · needs you · claude · fable");
+  assert.match(taskHead(item, "kebbie-ios"), /<span class="g-yellow">needs you<\/span>/);
+  assert.equal(text(taskHead({ group: "WORKING" }, null)), "working");
+});
+
+test("a question's links show as rows with their label and a short address, and the text loses the addresses its links carry", () => {
+  const links = [{ kind: "mock", label: "Mockup", url: "https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3" }, { kind: "note", label: "Vault note", url: "obsidian://open?file=Projects%2Fkebbie-ios.md" }];
+  assert.equal(text(linkRows(links)), "Mockup claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3 Vault note Projects/kebbie-ios.md");
+  assert.match(linkRows(links), /<a class="step" href="https:\/\/claude\.ai\/artifact\/PtjPD12V3DKH1RV5e1dfn3" target="_blank" rel="noopener" data-link="mock">/);
+  assert.equal(linkRows([]), "");
+  assert.equal(linkAddress("https://www.example.com/"), "example.com");
+  assert.equal(withoutUrls("drew the mockup of the native iOS app: https://claude.ai/artifact/PtjPD12V3DKH1RV5e1dfn3"), "drew the mockup of the native iOS app");
+  assert.equal(withoutUrls("See https://a.example/x and https://b.example/y.", ["https://a.example/x"]), "See and https://b.example/y.", "only the addresses a link carries leave");
+});
+
+test("the card's facts and links say what the task did, what it waits on, its plan and every address it names", () => {
+  const item = { group: "NEEDS YOU", summary: "0 commits", question: { plan: { id: "blb_1" }, plan_note: { key: "vault:Projects/kebbie-ios.md", updated: 1_794_733_080 } }, next_for_you: "answer: Is this the app to build?", links: [{ kind: "mock", label: "Mockup", url: "https://claude.ai/artifact/X" }] };
+  assert.equal(text(taskAbout(item, pinnedWhen)), "Task work 0 commits subtasks none yet · the plan comes after the yes waits on you plan vault note · updated 08:58 Links · 1 Mockup claude.ai/artifact/X");
+  const working = { group: "WORKING", summary: "3 commits", subtasks: [{ state: "pushed" }, { state: "ready" }, { state: "planned" }] };
+  assert.equal(text(taskAbout(working, pinnedWhen)), "Task work 3 commits subtasks 3 · 1 pushed · 1 ready · 1 planned waits on the agent");
+});
+
+test("a vault plan shows its goal and first open questions beside the question, and whole as the backlog card reads a note", () => {
+  const body = { sections: [{ key: "background", heading: "Background", text: "Why.", required: true }, { key: "goal", heading: "Goal", text: "Ship the app.\n\nThen more.", required: true }, { key: "questions", heading: "Open questions", text: "", required: false }], questions: ["One?", "Two?", "Three?", "Four?"].map((question, index) => ({ text: question, blocks: index === 0, pending_answer: null })), questions_key: "questions" };
+  assert.equal(text(planPeek(body)), "Goal Ship the app. Open questions · 4 - One? - Two? - Three? 1 more in the plan");
+  const whole = planRead(body);
+  assert.equal(text(whole), "Background Why. Goal Ship the app. Then more. Open questions One? Two? Three? Four?");
+  assert.match(whole, /<div class="opt bq"><b><span class="qmark warn" aria-hidden="true">\?<\/span>One\?<\/b><\/div>/);
+  assert.match(whole, /<div class="opt bq plain"><b><span class="qmark" aria-hidden="true">·<\/span>Two\?/);
+});
+
+test("the card's waiting line shows the question's title when the machine sends one", () => {
+  assert.equal(questionLine({ question: { text: "Is this the app to build? The mockup of the native iOS app.", title: "Is this the app to build?" } }), "Is this the app to build?");
 });

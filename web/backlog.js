@@ -74,7 +74,7 @@ function rowLines(entry, now, { q = "", sort = "priority" } = {}) {
   if (entry.idea) return `<div class="meta">${repo}to write · ${age}</div><div class="meta">${ideaLine(entry)}</div>`;
   if (waiting > 0) return `<div class="meta">${repo}${esc(row.state === "to-write" ? "to write" : row.state)} · <span class="g-yellow">${plural(waiting, "question", "questions")}</span> · ${age}</div><div class="you"><b>you:</b> answer ${waiting === 1 ? "it" : "them"} on its card</div>`;
   if (row.state === "to-write") return `<div class="meta">${repo}to write · ${age}</div><div class="meta">the lead writes it out</div>`;
-  if (row.state === "drafting") return `<div class="meta">${repo}drafting · ${age}</div><div class="meta">the lead is writing it out from the code, the notes and your chat</div>`;
+  if (row.state === "drafting") return `<div class="meta">${repo}${esc(writingWord(row, now))} · ${age}</div><div class="meta">the lead is writing it out from the code, the notes and your chat</div>`;
   if (row.found) return `<div class="meta">${repo}${esc(foundBy(row.found))} · ${age}</div>`;
   return `<div class="meta">${repo}${age}</div>${row.goal ? `<div>${marked(row.goal, q)}</div>` : ""}`;
 }
@@ -82,6 +82,9 @@ function rowLines(entry, now, { q = "", sort = "priority" } = {}) {
 const taskOf = (address) => address.slice(0, address.indexOf("@"));
 export const foundBy = (found) => `${found.count > 1 ? `found ${found.count}× · ` : ""}by ${found.sources.map(taskOf).join(", ")}`;
 export const isFound = (entry) => entry.row.home?.kind === "found";
+
+// A row kept after its idea was merged into a vault note: its label is the note's path.
+export const mergedInto = (row) => (row.home?.kind === "kept" && / · merged into /.test(row.title) && /\.md$/.test(row.home.label) ? `vault:${row.home.label}` : null);
 export const FOUND = { key: "found", title: "Found by tasks", tone: "muted" };
 
 export function backlogRow(entry, selected, now, look = {}) {
@@ -90,7 +93,7 @@ export function backlogRow(entry, selected, now, look = {}) {
   const titled = q && marked(entry.row.title, q) !== esc(entry.row.title);
   const texts = q && !titled && look.textOf ? look.textOf(entry).filter((text) => !(showsGoal(entry) && text === entry.row.goal)) : [];
   const hit = texts.length ? snippet(texts, q) : null;
-  return `<a class="task${on ? " sel" : ""}" href="${entryHref(entry.id)}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${marked(entry.row.title, q)}</span> <span class="machine">${esc(chip(entry))}</span></div>${rowLines(entry, now, look)}${hit ? `<div class="hit">${hit}</div>` : ""}</a>`;
+  return `<a class="task${on ? " sel" : ""}" href="${esc(entry.opens ?? entryHref(entry.id))}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${marked(entry.row.title, q)}</span> <span class="machine">${esc(chip(entry))}</span></div>${rowLines(entry, now, look)}${hit ? `<div class="hit">${hit}</div>` : ""}</a>`;
 }
 
 export const proLine = (what, url) => `<div class="pro"><b>Hub Pro</b>${what}${url ? ` <a class="link inline" href="${esc(url)}">Details</a>` : ""}</div>`;
@@ -211,19 +214,29 @@ export function questionsLeft(body, sentFor) {
   return { left, withLead };
 }
 
-function stateText(row, { left, withLead }) {
+export const WRITE_AGAIN_AFTER = 86_400;
+
+export function writingWord(row, now) {
+  if (!row.writing) return "writing…";
+  const age = waited(Math.max(0, now - row.writing));
+  return age === "now" ? "writing…" : `writing… ${age}`;
+}
+
+export const writesAgain = (row, now) => row.state === "drafting" && Boolean(row.writing) && now - row.writing >= WRITE_AGAIN_AFTER;
+
+function stateText(row, { left, withLead }, now) {
   if (row.state === "ready") return "ready";
   if (row.state === "to-write") return "to write: the lead writes it out";
   const lead = withLead ? `${plural(withLead, "answer", "answers")} with the lead` : "";
   if (left > 0) return `drafting: <span class="g-yellow">${waits(left)}</span> on you${lead ? ` · ${lead}` : ""}`;
-  return `drafting: ${lead || "the lead writes it out"}`;
+  return `${esc(writingWord(row, now))}${lead ? ` · ${lead}` : ""}`;
 }
 
 export function itemFacts(entry, counts, now, title = "") {
   const { row } = entry;
   const names = entry.machines.map((one) => one.name);
   const seen = names.length > 1 ? `seen on ${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : `on ${names[0]}`;
-  const rows = [["priority", esc(row.priority)], ["repo", esc(row.repo ?? "none")], ["state", stateText(row, counts)], ["filed", esc(dayOf(row.filed, now))], [HOME_TERMS[row.home.kind], `${esc(row.home.label)}<span class="meta"> · ${esc(seen)}</span>`]];
+  const rows = [["priority", esc(row.priority)], ["repo", esc(row.repo ?? "none")], ["state", stateText(row, counts, now)], ["filed", esc(dayOf(row.filed, now))], [HOME_TERMS[row.home.kind], `${esc(row.home.label)}<span class="meta"> · ${esc(seen)}</span>`]];
   return `<section class="task"><dl class="facts">${rows.map(([label, value]) => `<dt>${label}</dt><dd>${value}</dd>`).join("")}</dl>${title}</section>`;
 }
 
@@ -402,6 +415,28 @@ function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, n
   return `${status}${picker}<div class="pair-answer"><a class="btn" href="#/backlog">Save to backlog</a><button type="button" class="btn primary" data-action="start-item"${ui.busy ? " disabled" : ""}>Start</button></div><div class="meta pad">The lead on ${esc(chosen.name)} picks the recipe and queues it.</div>${failed}`;
 }
 
+export function writeStatus(sent, state, { standing = null, now }) {
+  const machine = esc(sent.machineName);
+  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing, now, what: { goes: "The lead writes it out", again: "ask again" } });
+  if (state === "refused") return `<div class="center warn" role="alert">${esc(String(sent.result?.text ?? "Not sent").split("\n")[0].trim())}</div>`;
+  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep past the hour`, `Ask again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`);
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `The lead writes it out when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+  if (state === "done") return "";
+  return block("wait", `Sent to ${machine}`, "The lead writes it out in place.", `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+}
+
+// Write it out: on an item to write, or one whose ask the lead left a day; while it is being written the card reads writing….
+export function writeArea(entry, { access, write, ui, now }) {
+  const { row } = entry;
+  if (!write?.chosen || !["to-write", "drafting"].includes(row.state) || access !== "ready") return "";
+  const again = writesAgain(row, now);
+  const status = write.sent ? writeStatus(write.sent.sent, write.sent.state, { standing: write.sent.standing, now }) : "";
+  if (write.sent && !settled(write.sent.state)) return status;
+  if (row.state === "drafting" && !again) return status;
+  const failed = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
+  return `${status}<div class="row-btns"><button type="button" class="btn${row.state === "to-write" ? " primary" : ""}" data-action="write-item"${ui.busy ? " disabled" : ""}>${again ? "Write it out again" : "Write it out"}</button></div>${failed}`;
+}
+
 function ideaCard(entry, now) {
   const { sent, state } = entry.idea;
   const machine = sent.machineName;
@@ -444,14 +479,15 @@ function foundBody(entry, facts, options) {
   return facts + sources + `<div class="decide found-area thumb-end" data-item="${esc(entry.id)}">${foundArea(entry, options)}</div>`;
 }
 
-export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null }) {
+export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null, write = null }) {
   if (entry.idea) return ideaCard(entry, now);
   if (entry.gone) return `<div class="decide start-area">${start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : ""}</div><div class="meta pad">It left the backlog when it started.</div>`;
   const counts = body ? questionsLeft(body, sentFor) : { left: entry.row.blocking, withLead: 0 };
   const edit = { can: access === "ready" && Boolean(edits?.machine), ui: edits?.editing ?? null, sentFor: edits?.sentFor ?? (() => null), now };
   const facts = itemFacts(entry, counts, now, entry.key && !isFound(entry) ? titleArea(entry, edit) : "");
   if (isFound(entry) && found) return foundBody(entry, facts, { access, refusedUrl, found, ui, now });
-  const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref })}</div>`;
+  const writing = writeArea(entry, { access, write, ui, now });
+  const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${writing}${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref })}</div>`;
   if (!entry.row.body && entry.row.state === "ready") return facts + (entry.row.goal ? section("Goal", entry.row.goal) : "") + area;
   if (!entry.row.body) {
     const said = entry.row.state === "drafting" ? "The lead is writing it out from the code, the notes and your chat. Its sections show here when it is saved." : `The lead on ${entry.machines[0].name} writes it out from the code, the notes and your chats. Its sections show here when it is saved.`;

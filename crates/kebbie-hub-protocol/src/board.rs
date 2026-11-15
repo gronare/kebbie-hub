@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::backlog::BacklogRow;
+use crate::backlog::{BacklogRow, HomeKind, ItemKey};
 use crate::envelope::Kind;
 use crate::ids::{Id, Prefix};
 use crate::lead::LeadRef;
@@ -169,6 +169,8 @@ pub struct Item {
     pub second_opinion: Option<SecondOpinion>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review: Option<ReviewOffer>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub links: Vec<Link>,
 }
 
 #[derive(Deserialize)]
@@ -221,6 +223,8 @@ struct ItemWire {
     second_opinion: Option<SecondOpinion>,
     #[serde(default)]
     review: Option<ReviewOffer>,
+    #[serde(default)]
+    links: Vec<Link>,
 }
 
 impl TryFrom<ItemWire> for Item {
@@ -271,6 +275,7 @@ impl TryFrom<ItemWire> for Item {
             assessment: wire.assessment,
             second_opinion: wire.second_opinion,
             review: wire.review,
+            links: wire.links,
         })
     }
 }
@@ -925,7 +930,76 @@ pub struct Question {
     pub plan: Option<BlobRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan_at: Option<u64>,
+    /// The vault note the plan is, when it is one: its body goes as the backlog body blob in `plan`, put again whenever the note changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_note: Option<PlanNote>,
     pub at: u64,
+    /// What is asked, on one line; `text` stays the whole question for a phone that reads no title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The question past its title, as markdown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub links: Vec<Link>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanNote {
+    pub key: ItemKey,
+    pub updated: u64,
+}
+
+pub const MAX_LINKS: usize = 16;
+pub const MAX_LINK_LABEL_CHARS: usize = 120;
+pub const MAX_LINK_URL_CHARS: usize = 2_048;
+pub const MAX_QUESTION_TITLE_CHARS: usize = 300;
+pub const MAX_QUESTION_BODY_CHARS: usize = 4_000;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LinkKind {
+    Mock,
+    Pr,
+    Ci,
+    Dev,
+    Note,
+    Other,
+}
+
+/// An address the task names, by what it is: the phone opens it outside the hub.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Link {
+    pub kind: LinkKind,
+    pub label: String,
+    pub url: String,
+}
+
+/// A web address or an Obsidian one, whole and without spaces; anything else would open something on the phone the machine did not mean.
+pub fn is_link_url(url: &str) -> bool {
+    let scheme = ["https://", "http://", "obsidian://"].into_iter().find(|scheme| url.starts_with(scheme));
+    scheme.is_some_and(|scheme| url.len() > scheme.len()) && url.chars().count() <= MAX_LINK_URL_CHARS && !url.chars().any(|char| char.is_whitespace() || char.is_control())
+}
+
+fn check_links(links: &[Link]) -> Result<(), &'static str> {
+    check(links.len() <= MAX_LINKS, "a task names sixteen links at most")?;
+    for link in links {
+        check(is_line(&link.label, MAX_LINK_LABEL_CHARS), "a link's label is empty, too long or not one line")?;
+        check(is_link_url(&link.url), "a link is not a whole web or Obsidian address")?;
+    }
+    check(links.iter().map(|link| &link.url).collect::<BTreeSet<_>>().len() == links.len(), "a link is named once")
+}
+
+impl Question {
+    fn check(&self) -> Result<(), &'static str> {
+        check(self.title.as_deref().is_none_or(|title| is_line(title, MAX_QUESTION_TITLE_CHARS)), "a question's title is empty, too long or not one line")?;
+        check(self.body.as_deref().is_none_or(|body| body.chars().count() <= MAX_QUESTION_BODY_CHARS && !body.chars().any(|char| char.is_control() && char != '\n')), "a question's body is too long or holds control characters")?;
+        check(self.body.is_none() || self.title.is_some(), "a question's body follows its title")?;
+        check_links(&self.links)?;
+        check(self.plan_note.as_ref().is_none_or(|note| note.key.home() == HomeKind::Vault), "a plan note is a vault note")
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1044,6 +1118,8 @@ impl Board {
             item.obstacle.as_ref().map_or(Ok(()), Obstacle::check)?;
             item.assessment.as_ref().map_or(Ok(()), Assessment::check)?;
             item.review.as_ref().map_or(Ok(()), |offer| check(offer.subtask.as_deref().is_none_or(is_subtask_id), "a review offer names a subtask by its id"))?;
+            item.question.as_ref().map_or(Ok(()), Question::check)?;
+            check_links(&item.links)?;
             item.check_plan()?;
             item.check_stages()?;
             item.check_questions()

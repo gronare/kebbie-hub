@@ -40,6 +40,12 @@ export const MAX_ITEM_TITLE_CHARS = 200;
 export const MAX_SECTION_CHARS = 8000;
 export const MAX_ITEM_EDIT_BYTES = 24 * 1024;
 export const MAX_HEADING_CHARS = 120;
+export const MAX_LINKS = 16;
+export const MAX_LINK_LABEL_CHARS = 120;
+export const MAX_LINK_URL_CHARS = 2048;
+export const MAX_QUESTION_TITLE_CHARS = 300;
+export const MAX_QUESTION_BODY_CHARS = 4000;
+export const LINK_KINDS = ["mock", "pr", "ci", "dev", "note", "other"];
 export const MAX_NOTICE_TITLE_CHARS = 120;
 export const MAX_NOTICE_BODY_CHARS = 600;
 export const MAX_NOTICE_BYTES = 2048;
@@ -84,6 +90,7 @@ export const KINDS = {
   "item-answer": { ...command, maxTtl: COMMAND_TTL },
   "start-item": { ...command, ttl: START_ITEM_TTL },
   "item-edit": { ...command, maxTtl: COMMAND_TTL },
+  "item-write": { ...command, maxTtl: COMMAND_TTL },
   "device-decision": { ...command, maxTtl: COMMAND_TTL },
   "review-open": { ...command, maxTtl: COMMAND_TTL },
   "review-comments": { ...command, maxTtl: COMMAND_TTL },
@@ -399,7 +406,13 @@ function questionsHold(item) {
   const waits = (id) => (item.stages ?? []).some((one) => one.id === id && one.requirement.kind === "verified" && one.state === "waiting");
   return questions.length <= MAX_KEBBIE_QUESTIONS && new Set(ids).size === ids.length && questions.every((one) => absent(one.stage) || waits(one.stage));
 }
-const itemHolds = (raw) => (absent(raw.steps) || PLAN_KEYS.every((key) => absent(raw[key]))) && planHolds(itemOf(raw)) && stagesHold(raw) && questionsHold(raw);
+export const isLinkUrl = (url) => typeof url === "string" && /^(?:https?|obsidian):\/\/\S/.test(url) && [...url].length <= MAX_LINK_URL_CHARS && !/[\s\p{Cc}]/u.test(url);
+const link = (value) => shape({ kind: oneOf(...LINK_KINDS), label: (label) => isLine(MAX_LINK_LABEL_CHARS)(label), url: isLinkUrl })(value);
+const links = (value) => list(link)(value) && value.length <= MAX_LINKS && new Set(value.map((one) => one.url)).size === value.length;
+const questionBody = (body) => typeof body === "string" && [...body].length <= MAX_QUESTION_BODY_CHARS && !/[^\P{Cc}\n]/u.test(body);
+const planNote = shape({ key: (key) => isItemKey(key) && homeOf(key) === "vault", updated: u64v });
+const titledHolds = (question) => absent(question) || absent(question.body) || !absent(question.title);
+const itemHolds = (raw) => (absent(raw.steps) || PLAN_KEYS.every((key) => absent(raw[key]))) && planHolds(itemOf(raw)) && stagesHold(raw) && questionsHold(raw) && titledHolds(raw.question);
 const item = shape({
   address: string,
   group: oneOf("NEEDS YOU", "WORKING", "TO REVIEW", "READY TO PUSH", "CI RUNNING", "WAITING FOR WORK"),
@@ -417,7 +430,11 @@ const item = shape({
       kept_for_user: bool,
       plan: optionalField(blobRef),
       plan_at: optionalField(u64v),
+      plan_note: optionalField(planNote),
       at: u64v,
+      title: optionalField((title) => isLine(MAX_QUESTION_TITLE_CHARS)(title)),
+      body: optionalField(questionBody),
+      links: optionalField(links),
     }),
   ),
   prompt: optionalField(shape({ id: string, question: string, options: list(shape({ label: string, takes_text: bool, key: optionalField(string) })) })),
@@ -445,6 +462,7 @@ const item = shape({
   assessment: optionalField((value) => string(value) || judgement(value)),
   second_opinion: optionalField(shape({ by: string, points: optionalField(u32v), running: bool })),
   review: optionalField(reviewOffer),
+  links: optionalField(links),
 });
 const judgement = (value) =>
   shape({ word: oneOf("recommended", "not-needed", "assessing"), reason: optionalField(isLine(MAX_ASSESSMENT_REASON_CHARS)), at: optionalField(u64v) })(value) &&
@@ -482,6 +500,7 @@ const backlogRow = (row) =>
     goal: optionalField(string),
     body: optionalField(blobRef),
     found: optionalField(shape({ sources: list(isAddress), count: u32v })),
+    writing: optionalField(u64v),
   })(row) &&
   homeOf(row.item) === row.home.kind &&
   row.blocking <= row.questions &&
@@ -701,6 +720,7 @@ const PAYLOADS = {
   "item-answer": typed({ item: isItemKey, index: u32v, question: isText(MAX_QUESTION_CHARS), answer: isText(MAX_ITEM_ANSWER_CHARS) }),
   "start-item": typed({ item: isItemKey, anyway: optionalField(bool) }),
   "item-edit": itemEdit,
+  "item-write": typed({ item: (key) => isItemKey(key) && homeOf(key) !== "found" }),
   "device-decision": typed({ device: (value) => prefixOf(value) === "dev", fingerprint: (value) => typeof value === "string" && FINGERPRINT.test(value), approve: bool }),
   "review-open": (value) => namesOne(value) && typed({ address: isAddress, subtask: optionalField(isSubtaskId), step: optionalField(stepNumber) })(value),
   "review-comments": reviewComments,

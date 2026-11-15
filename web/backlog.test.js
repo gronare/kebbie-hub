@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { answerableQuestions, answersToSend, answersWithLead, backlogList, bodyShown, nextQuestion, sendAnswers, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answersToSend, answersWithLead, backlogList, bodyShown, nextQuestion, sendAnswers, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -313,7 +313,7 @@ test("items whose questions wait on you sit once, newest first, in Needs you abo
   assert.match(filtered, /1 of 5 .*Needs you · 1 Lock screen notice/);
   assert.doesNotMatch(filtered, /Session drops/);
   const answered = listed.map((one) => (one.key === "vault:Projects/asked.md" ? { ...one, waiting: 0 } : one));
-  assert.match(list(answered), /^Backlog 5 items · 2 questions wait .*Needs you · 1 Session drops on reload .* Low · 2 Archive logs .* Lock screen notice vault hub · drafting · 2 d the lead is writing it out/);
+  assert.match(list(answered), /^Backlog 5 items · 2 questions wait .*Needs you · 1 Session drops on reload .* Low · 2 Archive logs .* Lock screen notice vault hub · writing… · 2 d the lead is writing it out/);
   assert.equal(needsYouCount(listed), 2);
   assert.equal(needsYouCount(answered), 1);
 });
@@ -353,4 +353,33 @@ test("an answer sent from this device takes its question out of the count until 
   assert.equal(answersWithLead(entry, [sent(0)], { shown: () => ({ state: "refused", live: false }), storedAt }), 0);
   assert.equal(answersWithLead(entry, [sent(2)], { shown: live, storedAt, body }), 0, "a question that does not block never counted");
   assert.equal(answersWithLead(entry, [sent(1)], { shown: live, storedAt, body }), 1);
+});
+
+test("an item to write offers Write it out where its machine takes it, reads writing… while the lead writes it, and offers it again after a day", () => {
+  const toWrite = mergeBacklog([machine("mch_mac", "MacBook", [row("local:logs", { title: "Archive logs", state: "to-write" })], { accepts: [...ALL, "item-write"] })], NOW)[0];
+  const write = { chosen: toWrite.machines[0], sent: null };
+  const shown = (entry, fields = {}) => itemBody(entry, { access: "ready", ui: ui(), candidates: entry.machines, chosen: entry.machines[0], now: NOW, write, ...fields });
+  assert.match(shown(toWrite), /<button type="button" class="btn primary" data-action="write-item">Write it out<\/button>/);
+  assert.doesNotMatch(shown(toWrite, { write: { chosen: null, sent: null } }), /write-item/, "a machine on an older kebbie takes no write-out, so none is offered");
+  assert.doesNotMatch(shown(toWrite, { access: "view-only" }), /write-item/);
+  const asked = { ...toWrite, row: { ...toWrite.row, state: "drafting", writing: NOW - 2 * 3600 } };
+  assert.doesNotMatch(shown(asked), /write-item/, "an item being written is not asked again");
+  assert.match(text(shown(asked)), /state writing… 2 h/);
+  const left = { ...toWrite, row: { ...toWrite.row, state: "drafting", writing: NOW - DAY } };
+  assert.match(shown(left), /data-action="write-item">Write it out again</);
+  assert.match(text(backlogRow(asked, null, NOW)), /writing… 2 h · /);
+  const refused = { sent: sentAt({ kind: "item-write", machine: "mch_mac", machineName: "MacBook", result: { outcome: "refused", reason: "bad-request", text: "Not sent: it is being written out already (writing… 2 h)\nThe lead has it.", at: NOW } }), state: "refused", standing: null, live: false };
+  const said = writeArea(toWrite, { access: "ready", write: { ...write, sent: refused }, ui: ui(), now: NOW });
+  assert.match(said, /<div class="center warn" role="alert">Not sent: it is being written out already \(writing… 2 h\)<\/div>/, "a refusal reads as its one line");
+  const going = { ...refused, sent: { ...refused.sent, result: null }, state: "sending", live: true };
+  assert.match(text(writeArea(toWrite, { access: "ready", write: { ...write, sent: going }, ui: ui(), now: NOW })), /^Sent to MacBook The lead writes it out in place\./);
+});
+
+test("a row kept after its idea was merged into a note opens that note's card", () => {
+  const merged = row("kept:a1b2c3", { title: "Native app · merged into kebbie-ios", home: { kind: "kept", label: "Projects/kebbie-ios.md" } });
+  assert.equal(mergedInto(merged), "vault:Projects/kebbie-ios.md");
+  assert.equal(mergedInto(row("kept:idea-1", { home: { kind: "kept", label: "kept by kebbie" } })), null);
+  assert.equal(mergedInto(row("vault:Projects/x.md")), null);
+  const entry = { ...mergeBacklog([machine("mch_mac", "MacBook", [merged])], NOW)[0], opens: "#/item/vault%3AProjects%2Fkebbie-ios.md" };
+  assert.match(backlogRow(entry, null, NOW), /href="#\/item\/vault%3AProjects%2Fkebbie-ios\.md"/);
 });

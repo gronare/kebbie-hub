@@ -11,7 +11,7 @@ use kebbie_hub_api::{
 };
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
-    Idea, ItemAnswer, ItemEdit, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
+    Idea, ItemAnswer, ItemEdit, ItemWrite, Kind, Machine, Outcome, Payload, Prefix, StartItem, PublicKeys, Reason, Refusal,
     DeviceStanding, SecretKeys, Trust, VerifiedDevice, authorize, device_fingerprint, pin_account, seal, seal_blob, text_hash,
     DeviceCert, DeviceDecision, MAX_RETRACTS, Notice, Urgency, AcceptStep, AcceptSubtask, BlobRef, REVIEW_MEDIA_TYPE, Review, ReviewComments,
     FoundAdd, FoundDismiss, FoundStart, PushApproval, ReviewFile, ReviewOffer, ReviewOpen, ReviewRead, Side, SubtaskState, pushable_of,
@@ -24,6 +24,8 @@ use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
 use crate::{Error, HubClient, HubError, KeyFile, PairError, now, save};
+
+const WRITE_AGAIN_AFTER: u64 = 86_400;
 
 pub fn every_command() -> Vec<Kind> {
     vec![
@@ -48,6 +50,7 @@ pub fn every_command() -> Vec<Kind> {
         Kind::ReviewSend,
         Kind::LeadMessage,
         Kind::Away,
+        Kind::ItemWrite,
     ]
 }
 
@@ -1111,6 +1114,7 @@ impl MachineState {
             goal: None,
             body: None,
             found: None,
+            writing: None,
         });
         self.backlog_changed = true;
         "Filed the idea; the lead writes it out.".to_string()
@@ -1149,6 +1153,18 @@ impl MachineState {
         let heading = section.heading.clone();
         self.backlog_changed = true;
         Ok(format!("Saved {heading}."))
+    }
+
+    fn write_item(&mut self, write: &ItemWrite, now: u64) -> Result<String, Reason> {
+        let row = self.backlog.rows.iter_mut().find(|row| row.item == write.item).ok_or(Reason::UnknownItem)?;
+        let again = row.state == BacklogState::Drafting && row.writing.is_some_and(|at| now.saturating_sub(at) >= WRITE_AGAIN_AFTER);
+        if row.state != BacklogState::ToWrite && !again {
+            return Err(Reason::BadRequest);
+        }
+        row.state = BacklogState::Drafting;
+        row.writing = Some(now);
+        self.backlog_changed = true;
+        Ok(format!("Sent to the lead: it writes \"{}\" out in place.", row.title))
     }
 
     fn start_item(&mut self, start: &StartItem) -> Result<String, Reason> {
@@ -1335,6 +1351,10 @@ impl MachineState {
             Payload::StartItem(start) => (
                 format!("start {}{}", start.item, if start.anyway { " anyway" } else { "" }),
                 self.start_item(start).map_or_else(|reason| refusal(command, device, reason), done),
+            ),
+            Payload::ItemWrite(write) => (
+                format!("write {} out", write.item),
+                self.write_item(write, now()).map_or_else(|reason| refusal(command, device, reason), done),
             ),
             Payload::ItemEdit(edit) => (
                 format!("edit {} {}:\n{}", edit.item, edit.section.as_deref().unwrap_or("title"), edit.text),
@@ -1590,6 +1610,7 @@ fn started_task(address: &str, title: &str) -> Item {
         assessment: None,
         second_opinion: None,
         review: None,
+        links: Vec::new(),
     }
 }
 
