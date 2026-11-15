@@ -17,6 +17,7 @@ import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
 import { cleanComment, commentProblem, commentsProblem, commitPage, diffHref, filesOf, foldCommitsOn, freshReviewUi, hangLines, openOf, readKey, keptTaskView, readOf, reviewEntry, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
+import { hasTextField, keepFieldsAboveKeyboard } from "./keyboard.js";
 import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
@@ -1062,7 +1063,7 @@ function render() {
   else html = boardRoute();
   const focused = document.activeElement?.id && root.contains(document.activeElement) ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
   const auth = isAuthScreen(html);
-  liftKeyboard((auth && html.includes("<input")) || html.includes('id="lead-say"'));
+  liftKeyboard(hasTextField(html));
   const reviewing = name === "review" || name === "diff";
   const listTop = listPane()?.scrollTop ?? (twoColumns() ? scrollY : 0);
   const anchor = twoColumns() && !listPane() ? rowTop(location.hash) : null;
@@ -2190,6 +2191,7 @@ function patchAnswerButtons(scope, ui) {
   all.querySelector("button").textContent = sendAllLabel(filled);
 }
 
+keepFieldsAboveKeyboard(root);
 const writingToLead = () => document.activeElement?.id === "lead-say";
 root.addEventListener("focusin", (event) => event.target.id === "lead-say" && requestAnimationFrame(scrollThreadToEnd));
 let typingPinned = false;

@@ -890,6 +890,8 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 :root.pose-land.rail-right .composer { padding-right: calc(var(--rail) + 16px); }
 :root.has-composer:is(.pose-split, .pose-land) .panel { padding-bottom: calc(var(--composer-h, 95px) + 16px); }
 :root.has-composer .tabbar { z-index: 5; }
+:root.kb-open:not(.has-composer) :is(main.screen.in-app, .panel) { padding-bottom: calc(var(--kb, 0px) + 24px); }
+:root.kb-open .idea-add { bottom: calc(var(--kb, 0px) + 12px); }
 :root.has-composer.kb-open .composer { bottom: var(--kb, 0px); padding-bottom: 8px; }
 :root.has-composer.kb-open .tabbar:not(.desk-nav) { visibility: hidden; }
 :root.has-composer.kb-open:not(.panes) main.screen.in-app { position: fixed; top: var(--vv-top, 0px); left: 0; right: 0; height: var(--vvh, 100dvh); min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding-bottom: calc(var(--composer-h, 61px) + 16px); }
