@@ -92,25 +92,31 @@ export function keylessUnlockScreen({ who = null, notice = null, busy = false })
 }
 
 // iOS shrinks only the visual viewport for the keyboard and may pan it down by offsetTop, so the keyboard is innerHeight - height while --kb lifts fixed boxes from the layout viewport's bottom.
-export function keyboardLift(view = globalThis.visualViewport, page = globalThis.document?.documentElement) {
+// A keyboard counts only while a field has focus, since a short visual viewport without one is the Duo's status strip or a viewport iOS left short after the app was hidden; window and page events sync it too, as iOS can drop the keyboard while no visual viewport event reaches the page.
+export function keyboardLift(view = globalThis.visualViewport, page = globalThis.document?.documentElement, win = globalThis.window, focused = () => globalThis.document?.activeElement) {
   let on = false;
   const sync = () => {
-    const keyboard = innerHeight - view.height;
-    page.style.setProperty("--vvh", `${view.height}px`);
-    page.style.setProperty("--vv-top", `${Math.round(view.offsetTop)}px`);
-    page.style.setProperty("--kb", `${Math.max(0, Math.round(keyboard - view.offsetTop))}px`);
+    const typing = Boolean(focused()?.matches?.("input, textarea, [contenteditable]"));
+    const keyboard = typing ? innerHeight - view.height : 0;
+    page.style.setProperty("--vvh", `${typing ? view.height : innerHeight}px`);
+    page.style.setProperty("--vv-top", `${typing ? Math.round(view.offsetTop) : 0}px`);
+    page.style.setProperty("--kb", `${Math.max(0, Math.round(keyboard - (typing ? view.offsetTop : 0)))}px`);
     page.classList.toggle("kb-open", keyboard > 80);
   };
+  const later = () => setTimeout(sync, 0);
+  const pageEvents = [["resize", sync], ["pageshow", sync], ["visibilitychange", sync], ["focusin", sync], ["focusout", later]];
   return (shown) => {
     if (!view || !page || shown === on) return;
     on = shown;
     if (shown) {
       view.addEventListener("resize", sync);
       view.addEventListener("scroll", sync);
+      for (const [name, run] of pageEvents) win?.addEventListener(name, run);
       sync();
     } else {
       view.removeEventListener("resize", sync);
       view.removeEventListener("scroll", sync);
+      for (const [name, run] of pageEvents) win?.removeEventListener(name, run);
       page.style.removeProperty("--vvh");
       page.style.removeProperty("--vv-top");
       page.style.removeProperty("--kb");

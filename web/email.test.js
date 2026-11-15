@@ -117,6 +117,9 @@ test("codes and refusals read as people say them", () => {
 
 function fakeKeyboard(innerHeight) {
   const view = Object.assign(new EventTarget(), { height: innerHeight, offsetTop: 0 });
+  const win = new EventTarget();
+  const field = { matches: (selector) => selector.includes("textarea") };
+  let active = field;
   const vars = new Map();
   const classes = new Set();
   const page = { style: { setProperty: (name, value) => vars.set(name, value), removeProperty: (name) => vars.delete(name) }, classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)), remove: (name) => classes.delete(name) } };
@@ -125,13 +128,17 @@ function fakeKeyboard(innerHeight) {
     view.offsetTop = pan;
     view.dispatchEvent(new Event("resize"));
   };
-  return { view, page, vars, classes, show };
+  const lift = () => keyboardLift(view, page, win, () => active);
+  const focus = (element) => {
+    active = element;
+  };
+  return { view, page, vars, classes, show, win, focus, field, lift };
 }
 
 test("the keyboard stays open when iOS pans the visual viewport instead of scrolling the page", () => {
   globalThis.innerHeight = 678;
   const kb = fakeKeyboard(678);
-  keyboardLift(kb.view, kb.page)(true);
+  kb.lift()(true);
   kb.show(300, 262);
   assert.ok(kb.classes.has("kb-open"));
   assert.equal(kb.vars.get("--kb"), "38px");
@@ -142,4 +149,30 @@ test("the keyboard stays open when iOS pans the visual viewport instead of scrol
   assert.equal(kb.vars.get("--kb"), "0px");
   kb.show(0, 0);
   assert.ok(!kb.classes.has("kb-open"));
+});
+
+test("a short visual viewport with no field focused is no keyboard, and a keyboard iOS dropped unseen comes off when the app returns", () => {
+  globalThis.innerHeight = 669;
+  const kb = fakeKeyboard(669);
+  kb.focus(null);
+  kb.lift()(true);
+  kb.show(82, 0);
+  assert.ok(!kb.classes.has("kb-open"), "the Duo's 82 pt status strip read against the layout viewport is not a keyboard");
+  assert.equal(kb.vars.get("--vvh"), "669px");
+  assert.equal(kb.vars.get("--kb"), "0px");
+  kb.focus(kb.field);
+  kb.show(495, 0);
+  assert.ok(kb.classes.has("kb-open"));
+  assert.equal(kb.vars.get("--vvh"), "174px");
+  kb.view.height = 669;
+  kb.focus(null);
+  kb.win.dispatchEvent(new Event("pageshow"));
+  assert.ok(!kb.classes.has("kb-open"), "back from the background with no visual viewport event, the pinned 174 px screen is gone");
+  assert.equal(kb.vars.get("--vvh"), "669px");
+  kb.focus(kb.field);
+  kb.show(300, 0);
+  assert.ok(kb.classes.has("kb-open"));
+  kb.focus(null);
+  kb.win.dispatchEvent(new Event("visibilitychange"));
+  assert.ok(!kb.classes.has("kb-open"), "a field that lost focus while hidden lets the screen go, whatever the viewport still says");
 });
