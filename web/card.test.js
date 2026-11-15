@@ -167,3 +167,23 @@ test("under review, or with changes asked by the review, a ready card says so in
   assert.equal(reviewHold({ ...item, verdict: undefined }), null);
   assert.match(readyPush({ ...item, push_waits: "Waits for main's CI" }, control), /<div class="meta ready-hold">Waits for main&#39;s CI<\/div><button/);
 });
+
+const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+const body = (name) => app.slice(app.indexOf(`function ${name}(`), app.indexOf("\n}\n", app.indexOf(`function ${name}(`)));
+
+test("a ready-to-push task opens as the ready card wherever its card shows, and a task not ready keeps today's card", () => {
+  const block = body("cardBlock");
+  assert.match(block, /^function cardBlock\(found, selected = null\) \{\n  const \{ item \} = found;\n  if \(item\.group === "READY TO PUSH"\) return readyBlock\(found, selected\);/);
+  assert.match(block, /assessArea\(found\)/, "a task not ready still shows a recommended review");
+  assert.match(block, /push: pushArea\(found\)/);
+  assert.equal([...app.matchAll(/\bcardBlock\(found(?:, [a-z.]+)?\)/g)].length >= 4, true, "the panel, the task page and the review's left pane all draw the card through cardBlock");
+});
+
+test("the ready card has a plain Push and no review prompt: red if Send to review returns to it", () => {
+  const ready = body("readyBlock");
+  assert.doesNotMatch(ready, /assessArea|assessmentBlock|review-send/);
+  assert.match(ready, /readyPush\(item, pushControl\(found\)\)/);
+  assert.match(app, /const pushControl = \(found\) => pushGated\(found, true\) \?\? pushOpen\(found, true\);/);
+  assert.match(ready, /push: "", ready: true/, "Push shows once, above Details, not again in the push order");
+  assert.match(ready, /open: uiOf\(found\.machine, item\.address\)\.details/);
+});

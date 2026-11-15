@@ -813,6 +813,15 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 :root.panes .app > main.screen.in-app, :root.panes .app > .panel { position: relative; top: auto; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .card-built p { margin: 0 0 6px; }
 .card-built p:last-child { margin: 0; }
+.ready { display: grid; gap: 12px; min-width: 0; }
+.ready-sum { margin: 0; padding: 0 2px; font: 600 18px/1.4 var(--sans); overflow-wrap: anywhere; }
+.ready-proof { margin: 0; padding: 0 2px; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.ready-proof::before { content: "✓ "; color: var(--green); font-weight: 700; }
+.ready-push { display: grid; gap: 8px; min-width: 0; }
+.ready-push > .decide { margin: 0; }
+.details-toggle { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 44px; padding: 0 2px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--muted); font: 600 14px var(--sans); text-align: left; cursor: pointer; }
+.details-toggle .chev { width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ready-details { display: grid; gap: 12px; min-width: 0; }
 .decs { display: grid; }
 .dec, .noticed { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14.5px; overflow-wrap: anywhere; }
 .decs > :first-child { border-top: 0; padding-top: 4px; }

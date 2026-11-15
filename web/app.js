@@ -9,7 +9,7 @@ import { account, connectCalls, follow, HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
 import { BACKLOG_BODY_MEDIA_TYPE, CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
-import { assessmentBlock, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea } from "./card.js";
+import { assessmentBlock, cardLead, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea, readyCard, readyPush } from "./card.js";
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { forgetDeviceKeys, get, put } from "./store.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
@@ -337,18 +337,29 @@ function noticedSent(found, key) {
   return shown ? { sent: shown.sent, state: shown.state, standing: shown.standing } : null;
 }
 
-function structuredCard(found) {
-  const { item } = found;
-  const held = blobs.peek(item.card.blob.id);
+function heldCard(found) {
+  const ref = found.item.card.blob;
+  const held = blobs.peek(ref.id);
   if (!held) {
-    blobs.load(item.card.blob).then((loaded) => loaded && render());
-    return `<div class="plan"><div>${esc(loadingLine("card", item.card.blob))}</div></div>`;
+    blobs.load(ref).then((loaded) => loaded && render());
+    return { card: null, note: loadingLine("card", ref) };
   }
-  if (!held.card) return `<div class="plan"><div>${esc(failedLine("card"))}</div></div>`;
+  return held.card ? { card: held.card, note: "" } : { card: null, note: failedLine("card") };
+}
+
+const noteBox = (note) => `<div class="plan"><div>${esc(note)}</div></div>`;
+
+function cardSections(found, card, shown = card) {
+  const { item } = found;
   const ui = uiOf(found.machine, item.address);
   const backlog = state.opened.find((machine) => machine.machine === found.machine)?.board?.backlog ?? [];
   const noticed = (line) => noticedArea(line, { access: commandGate(), accepts: found.accepts, sent: line.found ? noticedSent(found, line.found) : null, busy: ui.busy, error: ui.error, now: nowSeconds(), recurring: backlog.find((row) => row.item === line.found)?.found?.sources.length ?? 0 });
-  return changedNotice(held.card, seenVersion(found.machine, item.address)) + cardParts(held.card, { noticed });
+  return changedNotice(card, seenVersion(found.machine, item.address)) + cardParts(shown, { noticed });
+}
+
+function structuredCard(found) {
+  const { card, note } = heldCard(found);
+  return card ? cardSections(found, card) : noteBox(note);
 }
 
 function assessArea(found) {
@@ -359,14 +370,16 @@ function assessArea(found) {
   return assessmentBlock(item, { access: commandGate(), accepts: found.accepts, sent, busy: ui.busy, error: ui.error, status: (one) => foundStatus(one.sent, one.state, { standing: one.standing, now: nowSeconds() }) });
 }
 
-function cardBlock(found, selected = null) {
+const structuredOf = (item) => item.card?.blob.media_type === CARD_MEDIA_TYPE;
+
+function cardLines(found, selected, { card, push, ready = false }) {
   const { item } = found;
   const lines = [];
   let pushed = false;
-  if (item.card?.blob.media_type === CARD_MEDIA_TYPE) {
+  if (structuredOf(item)) {
     lines.push(taskFacts(item));
     lines.push(cardAge(item.card));
-    lines.push(structuredCard(found));
+    lines.push(card);
   } else {
     if (item.card) {
       lines.push(cardAge(item.card));
@@ -386,22 +399,39 @@ function cardBlock(found, selected = null) {
     const git = item.git;
     const facts = [`${git.ahead} ahead of ${git.upstream}`, git.behind ? `${git.behind} behind` : null, git.uncommitted ? `${git.uncommitted} uncommitted changes` : null].filter(Boolean);
     const ui = uiOf(found.machine, item.address);
-    const order = pushSection(item, { open: ui.pushOrder ?? orderOpens(item), push: pushArea(found), foot: `<div class="order-foot">${esc(facts.join(" · "))}${rulesLines(git.rules, { expandable: true })}</div>` });
+    const order = pushSection(item, { open: ui.pushOrder ?? orderOpens(item), push, foot: `<div class="order-foot">${esc(facts.join(" · "))}${rulesLines(git.rules, { expandable: true })}</div>` });
     pushed = Boolean(order);
     if (order) lines.push(order);
     else lines.push(`<h3 class="sec">Commits · ${git.ahead}</h3><div class="plan"><div>${esc(facts.join(" · "))}</div>${item.head ? `<div class="mono">HEAD ${esc(short(item.head))}</div>` : ""}${rulesLines(git.rules, { expandable: true })}</div>`);
   }
   if (item.ci) lines.push(`<h3 class="sec">CI</h3><div class="plan"><div>${item.ci.state === "running" ? "CI running" : `CI failed${item.ci.failure ? `: ${esc(item.ci.failure)}` : ""}`}</div></div>`);
-  if (item.push_waits) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
-  const card = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
-  const structured = item.card?.blob.media_type === CARD_MEDIA_TYPE;
+  if (item.push_waits && !ready) lines.push(`<div class="meta">${esc(item.push_waits)}</div>`);
+  const shown = lines.some(Boolean) ? `<section class="task">${lines.join("")}</section>` : "";
+  return { card: shown && structuredOf(item) ? decide(found, shown) : shown, pushed };
+}
+
+function readyBlock(found, selected) {
+  const { item } = found;
+  const { card, note } = structuredOf(item) ? heldCard(found) : { card: null, note: "" };
+  const lead = card ? cardLead(card) : { summary: "", tested: null, rest: [] };
+  const sections = card ? cardSections(found, card, { ...card, built: lead.rest }) : "";
+  const details = reviewEntry(found) + cardLines(found, selected, { card: sections, push: "", ready: true }).card + taskAbout(item, when);
+  const push = readyPush(item, pushControl(found));
+  const waits = asksYou(item) ? questionWaits(item, questionHref(found.machine, item.address)) : "";
+  return waits + readyCard({ summary: lead.summary, tested: lead.tested, note, push, details, open: uiOf(found.machine, item.address).details });
+}
+
+function cardBlock(found, selected = null) {
+  const { item } = found;
+  if (item.group === "READY TO PUSH") return readyBlock(found, selected);
+  const { card, pushed } = cardLines(found, selected, { card: structuredOf(item) ? structuredCard(found) : "", push: pushArea(found) });
   const assess = assessArea(found);
   const waits = asksYou(item) ? questionWaits(item, questionHref(found.machine, item.address)) : "";
-  return waits + reviewEntry(found) + (structured && card ? decide(found, card) : card) + (assess ? decide(found, assess) : "") + taskAbout(item, when) + (pushed ? "" : pushArea(found));
+  return waits + reviewEntry(found) + card + (assess ? decide(found, assess) : "") + taskAbout(item, when) + (pushed ? "" : pushArea(found));
 }
 
 const uiKey = (machine, address) => `${machine}|${address}`;
-const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null, moreSteps: false, pushOrder: null });
+const freshUi = () => ({ picked: null, free: false, note: "", confirming: false, busy: false, error: null, prompt: null, moreSteps: false, pushOrder: null, details: false });
 
 function uiOf(machine, address) {
   const key = uiKey(machine, address);
@@ -449,19 +479,28 @@ function promptArea(found) {
   return decide(found, promptAnswerBlock({ prompt, ui, sent, state: shown, standing }));
 }
 
-function pushArea(found) {
+function pushGated(found, plain = false) {
   const { item } = found;
   const pushable = item.group === "READY TO PUSH" || item.card || item.pushable;
   if (!pushable || !item.head) return "";
   const access = commandGate();
-  if (access === "off" || !pushReady(item)) return `<button type="button" class="btn primary off" disabled>Push ${esc(short(item.head))} · coming in a later version</button>`;
+  const what = plain ? `${pushCount(item)} ${pushCount(item) === 1 ? "commit" : "commits"}` : short(item.head);
+  if (access === "off" || !pushReady(item)) return `<button type="button" class="btn primary off" disabled>Push ${esc(what)} · coming in a later version</button>`;
   if (access === "refused") return refusedBlock(state.refused.url);
   if (access === "view-only") return viewOnlyBlock();
   if (!takes(found.accepts, "push")) return notTakenBlock("push", found.name, found.accepts);
+  return null;
+}
+
+function pushOpen(found, plain = false) {
+  const { item } = found;
   const { sent, state: shown, standing } = sentFor(found, "push");
   const current = speaksFor(sent, shown, (one) => one.head === pushHead(item));
-  return `<div class="rv-end thumb-end"><div class="row-btns">${decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing }))}</div></div>`;
+  return decide(found, pushBlock({ item, machineName: found.name, ui: uiOf(found.machine, item.address), sent: current, state: current ? shown : null, standing, plain }));
 }
+
+const pushControl = (found) => pushGated(found, true) ?? pushOpen(found, true);
+const pushArea = (found) => pushGated(found) ?? `<div class="rv-end thumb-end"><div class="row-btns">${pushOpen(found)}</div></div>`;
 
 function taskBody(found, selected = null) {
   return asksYou(found.item) ? questionBlock(found) : cardBlock(found, selected);
@@ -2050,6 +2089,11 @@ root.addEventListener("click", (event) => {
   if (action === "steps-more") {
     const ui = uiOf(route().params[0], route().params[1]);
     ui.moreSteps = !ui.moreSteps;
+    return render();
+  }
+  if (action === "card-details") {
+    const ui = uiOf(route().params[0], route().params[1]);
+    ui.details = target.getAttribute("aria-expanded") !== "true";
     return render();
   }
   if (action === "order-more") {
