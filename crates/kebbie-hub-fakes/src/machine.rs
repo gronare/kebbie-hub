@@ -1415,7 +1415,7 @@ impl MachineState {
                 format!("turn away mode {}", if away.on { "on" } else { "off" }),
                 done(self.switch_away(command, device, *away)),
             ),
-            Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) => (
+            Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) | Payload::Job(_) | Payload::JobReport(_) => (
                 "nothing: not a command".to_string(),
                 refusal(command, device, Reason::BadRequest),
             ),

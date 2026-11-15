@@ -3760,6 +3760,302 @@
     {
       "envelope": {
         "at": 1761069600,
+        "ct": "7X5wxbscCv-L3862s1b4qi8WAUjMVS2n31TpBEbPaqtZc_hOvsO7nSJtXGIvnsrYT1vUGLcxRfAV34Rl9NutCYATY8OEdRhL34v76bwqy-eOy3sznFKvZ52e6oI2g_1Up7oogkY0PBvCrJeVaetLCEgBa7Qytug_teLcAFPBrzVKVgmvwdhEvNSmTw8_2ngPQWR7WpFO2Bs8TvXXWujBQJvwPQpFX5H1nixg8DTIL3u4K_TTQ1tTmK5BQsClRBKXLrmDHh8woUSnsjg7zdCtWELTKFqjMyyMfvNRur-2r6zTHxcEytOkS10xvOymF_NcrFZhBBX5T7T3f5ZYjMXkQl_72d_J8-cgpw9m-cSLuLofNWM5s774ssEtAgDLlhhMoSpqEyk-mNzxv-9TR5x0MlIcOCKo8-u2PYTs6jsK6y79Ol9jxB-FouzUYHTCFMgibG2pqs7Q-Qx9j0XXJH77XdgKN4X770qUD21mfqbEaoVBnqK_yALEDBHvnI3cFY-avu92m4zNrQg990KEN0mKpQgyJ4Uk-m9NoXGYvDKuP_b90QW6ovDTUnzWpdynRfOASEXPVNzeiHILstGEb9CLWY1xKs3EgrtU5W3jMxQI81Ot1xWrZfVgqU_CatKm2b2YQc08CaCHHHKBY1gBl-Z3VVpjmPgEPbGqdSqEUXv95A",
+        "exp": 1761073200,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "cmd_019a07ed-8d00-7585-80ba-2a9a941f47c7",
+        "kc": "DbOmsW8xRMRUzsbO4ubOlNiriKDWcSSp70J-agnxubY",
+        "keys": {
+          "mch_01K83YV3806W105VXP4AF1F8RM": "sRp1Hu447GRKEqex6lXYzRoKpSk93EJRehLFJ4rLx13pRgC4CKJpXfMrSG1ekCOsPQTwYDt-LOUrmd1RyJrL5tpKxAmbgkx8sD0aXXkkHUg"
+        },
+        "kind": "job",
+        "machine": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "schema": 1,
+        "sig": "K-kIKx6myFGL0ZvOOUchmNz9ZL_I0OAmIjRD32Q_kraVJVDDeYPbJs7RwNdF2USUJEFgBfAZeQ8keKA0LkcUDg",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "base": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "bundle": [
+            {
+              "bytes": 15,
+              "id": "blb_5da8fd0f7bdba84fe3b5e03f4d2f78d94509b6475645f8e9937854fb1178c550",
+              "key": "nErfkAurF-HijurQGvSl8Raq2jwB0JSYKpUFJ_0u1ZE",
+              "media_type": "application/vnd.kebbie.git-bundle"
+            }
+          ],
+          "command": "xcodebuild test -scheme Kebbie -destination 'platform=iOS Simulator,name=iPhone 16'",
+          "commit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "name": "ios-tests",
+          "on": "macos",
+          "repo": "kebbie",
+          "task": "email-column",
+          "type": "job"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzU4NS04MGJhLTJhOWE5NDFmNDdjNwADam9iAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAHm1jaF8wMUs4M1lWMzgwNlcxMDVWWFA0QUYxRjhSTQAAAABo98ogAAAAAGj32DAAAQArRGJPbXNXOHhSTVJVenNiTzR1Yk9sTmlyaUtEV2NTU3A3MEotYWdueHViWQAAAA",
+      "name": "job-opened-by-the-worker",
+      "recipient": "other-machine",
+      "seal": {
+        "content_key": "z11zy5d1fMnruRhb0Rt04zgQED8zR8UILh7GpZ2bBfU",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "C5j2Ts1uJJeRkAFDbhHuBgVXQ0mR416qly5bt2FTLfA",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "TgABTFiZi4-z1u5ipauLvBLk0hjy1eg6ZTgzcpi887I",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "EBrDYU4dg6Z4hx84seDmQ56uxRqt_LJrnHSxXjAz2RQ"
+        },
+        "nonce": "7X5wxbscCv-L3862",
+        "plaintext": "eyJ0eXBlIjoiam9iIiwicmVwbyI6ImtlYmJpZSIsIm5hbWUiOiJpb3MtdGVzdHMiLCJjb21tYW5kIjoieGNvZGVidWlsZCB0ZXN0IC1zY2hlbWUgS2ViYmllIC1kZXN0aW5hdGlvbiAncGxhdGZvcm09aU9TIFNpbXVsYXRvcixuYW1lPWlQaG9uZSAxNiciLCJ0YXNrIjoiZW1haWwtY29sdW1uIiwiY29tbWl0IjoiNGI4MjVkYzY0MmNiNmViOWEwNjBlNTRiZjhkNjkyODhmYmVlNDkwNCIsImJhc2UiOiI5ZjNjMmExZTViN2Q0YzZhOGIwZTJmNGQ2YzhhMGIyZTRmNmQ4YzBhIiwiYnVuZGxlIjpbeyJpZCI6ImJsYl81ZGE4ZmQwZjdiZGJhODRmZTNiNWUwM2Y0ZDJmNzhkOTQ1MDliNjQ3NTY0NWY4ZTk5Mzc4NTRmYjExNzhjNTUwIiwia2V5IjoibkVyZmtBdXJGLUhpanVyUUd2U2w4UmFxMmp3QjBKU1lLcFVGSl8wdTFaRSIsIm1lZGlhX3R5cGUiOiJhcHBsaWNhdGlvbi92bmQua2ViYmllLmdpdC1idW5kbGUiLCJieXRlcyI6MTV9XSwib24iOiJtYWNvcyJ9"
+      },
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "ct": "7X5wxbscCv-L3862s1b4qi8WAUjMVS2n31TpBEbPaqtZc_hOvsO7nSJtXGIvnsrYT1vUGLcxRfAV34Rl9NutCYATY8OEdRhL34v76bwqy-eOy3sznFKvZ52e6oI2g_1Up7oogkY0PBvCrJeVaetLCEgBa7Qytug_teLcAFPBrzVKVgmvwdhEvNSmTw8_2ngPQWR7WpFO2Bs8TvXXWujBQJvwPQpFX5H1nixg8DTIL3u4K_TTQ1tTmK5BQsClRBKXLrmDHh8woUSnsjg7zdCtWELTKFqjMyyMfvNRur-2r6zTHxcEytOkS10xvOymF_NcrFZhBBX5T7T3f5ZYjMXkQl_72d_J8-cgpw9m-cSLuLofNWM5s774ssEtAgDLlhhMoSpqEyk-mNzxv-9TR5x0MlIcOCKo8-u2PYTs6jsK6y79Ol9jxB-FouzUYHTCFMgibG2pqs7Q-Qx9j0XXJH77XdgKN4X770qUD21mfqbEaoVBnqK_yALEDBHvnI3cFY-avu92m4zNrQg990KEN0mKpQgyJ4Uk-m9NoXGYvDKuP_b90QW6ovDTUnzWpdynRfOASEXPVNzeiHILstGEb9CLWY1xKs3EgrtU5W3jMxQI81Ot1xWrZfVgqU_CatKm2b2YQc08CaCHHHKBY1gBl-Z3VVpjmPgEPbGqdSqEUXv95A",
+        "exp": 1761073200,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "cmd_019a07ed-8d00-7585-80ba-2a9a941f47c7",
+        "kc": "DbOmsW8xRMRUzsbO4ubOlNiriKDWcSSp70J-agnxubY",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "DTr_uPhhgV0f2nZEhQuFmuU7HtqEv7szNrPyk5JDSx27YTtmo74_hY9Am50JVM6dqA4LKh8Mg70SMq5VnjIEZ_rDpewOrPIwCxd_04iR7iY",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "sRp1Hu447GRKEqex6lXYzRoKpSk93EJRehLFJ4rLx13pRgC4CKJpXfMrSG1ekCOsPQTwYDt-LOUrmd1RyJrL5tpKxAmbgkx8sD0aXXkkHUg",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "f-4X6n9Pjbj1orHdKrIeiQy9QOiNmfXNvRjtla3ICCNrLKvUE8JP5kqZFjq-A3D3pYiYwe98h7TMa9JmHtdrQrqPWj2DsjUEpr2XfjWNa9Q"
+        },
+        "kind": "job",
+        "machine": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "schema": 1,
+        "sig": "K-kIKx6myFGL0ZvOOUchmNz9ZL_I0OAmIjRD32Q_kraVJVDDeYPbJs7RwNdF2USUJEFgBfAZeQ8keKA0LkcUDg",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "base": "9f3c2a1e5b7d4c6a8b0e2f4d6c8a0b2e4f6d8c0a",
+          "bundle": [
+            {
+              "bytes": 15,
+              "id": "blb_5da8fd0f7bdba84fe3b5e03f4d2f78d94509b6475645f8e9937854fb1178c550",
+              "key": "nErfkAurF-HijurQGvSl8Raq2jwB0JSYKpUFJ_0u1ZE",
+              "media_type": "application/vnd.kebbie.git-bundle"
+            }
+          ],
+          "command": "xcodebuild test -scheme Kebbie -destination 'platform=iOS Simulator,name=iPhone 16'",
+          "commit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "name": "ios-tests",
+          "on": "macos",
+          "repo": "kebbie",
+          "task": "email-column",
+          "type": "job"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzU4NS04MGJhLTJhOWE5NDFmNDdjNwADam9iAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAHm1jaF8wMUs4M1lWMzgwNlcxMDVWWFA0QUYxRjhSTQAAAABo98ogAAAAAGj32DAAAQArRGJPbXNXOHhSTVJVenNiTzR1Yk9sTmlyaUtEV2NTU3A3MEotYWdueHViWQAAAA",
+      "name": "job-opened-by-the-account",
+      "recipient": "account",
+      "seal": {
+        "content_key": "z11zy5d1fMnruRhb0Rt04zgQED8zR8UILh7GpZ2bBfU",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "C5j2Ts1uJJeRkAFDbhHuBgVXQ0mR416qly5bt2FTLfA",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "TgABTFiZi4-z1u5ipauLvBLk0hjy1eg6ZTgzcpi887I",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "EBrDYU4dg6Z4hx84seDmQ56uxRqt_LJrnHSxXjAz2RQ"
+        },
+        "nonce": "7X5wxbscCv-L3862",
+        "plaintext": "eyJ0eXBlIjoiam9iIiwicmVwbyI6ImtlYmJpZSIsIm5hbWUiOiJpb3MtdGVzdHMiLCJjb21tYW5kIjoieGNvZGVidWlsZCB0ZXN0IC1zY2hlbWUgS2ViYmllIC1kZXN0aW5hdGlvbiAncGxhdGZvcm09aU9TIFNpbXVsYXRvcixuYW1lPWlQaG9uZSAxNiciLCJ0YXNrIjoiZW1haWwtY29sdW1uIiwiY29tbWl0IjoiNGI4MjVkYzY0MmNiNmViOWEwNjBlNTRiZjhkNjkyODhmYmVlNDkwNCIsImJhc2UiOiI5ZjNjMmExZTViN2Q0YzZhOGIwZTJmNGQ2YzhhMGIyZTRmNmQ4YzBhIiwiYnVuZGxlIjpbeyJpZCI6ImJsYl81ZGE4ZmQwZjdiZGJhODRmZTNiNWUwM2Y0ZDJmNzhkOTQ1MDliNjQ3NTY0NWY4ZTk5Mzc4NTRmYjExNzhjNTUwIiwia2V5IjoibkVyZmtBdXJGLUhpanVyUUd2U2w4UmFxMmp3QjBKU1lLcFVGSl8wdTFaRSIsIm1lZGlhX3R5cGUiOiJhcHBsaWNhdGlvbi92bmQua2ViYmllLmdpdC1idW5kbGUiLCJieXRlcyI6MTV9XSwib24iOiJtYWNvcyJ9"
+      },
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "ct": "V7CZXcI3k9Ly3PAlmq1mf7qB6Xm3xgkFRlcvN68O6gCWZqZz7v3sPX_3tbphh69N35z94vaOkuae1wSot9pM86LOKRoLlNH5OVZMk3nEXDVLoxtKJ67FTSS1u7G_7lqNEhE4R0iDGkR8JSdt188fkdvyWOkbr0_3ou983GZ_6oLFicbefKG_Nv0GVG1E746n8hIe5kr85DLcAF47tGjWTCGGpRThwc-64B9McsD2AqxyRb92pVERYShMtmigabHxXnQ06sCpqH3FIPfNVANmUyHreyzKcRg9cKhg4AlPF2bL_7dAYoJ22jXzC8zGvCQkoeGxkykGS5OaNUHnqdi3YeTrcMH-SQRz-6-9iV_ey5IOm42GuaVyt8kn-1-pPn40CPQcPce0h5p_IDTVlsQ7NhiDf_4XQ8Tef63XOqzT6daoQODauzKlZ_k3cWsVHZFr2TWE8yvDQ2tXRIweCocTK6ec8dT1fM1MZHv8JxFV7T0trDzycqROqMn--9KQFuCs-h_WlvVYb4T-ZIGb5UPUJbQVHvs",
+        "exp": 1761073200,
+        "from": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "id": "cmd_019a07ed-8d00-7e16-ac39-2c78b983fb93",
+        "kc": "XstExoB4TsZMKPJOShu53IiQHegHoJKT2K-W5O3YB9E",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "bkCR6pufib0wgs2-JCQg4pCoX_tdlqTTauEqrTebkHtgQC6vjmy0Dw2k3aFax1zRX31oniibOEjvN-XtrQgR8yLzsG5B4oX_oaNmv14CC4E",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "AIkw9e9XtP4nHBbzOYqDtxVF2gkV3Y6CUOOqeS3VniELb-Ypb2ILKLwJ4YsY_XDnOXXxAr197mvYBW3Jdkde_UUVpI-dipM0B3P6ica2YJ8",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "DwaJmSbRO1sHkV3YKFWCPyMUuLYkHAqAtboj2S2sugZ-WcALh3Ncb_SjxqkobVlDIF6rX7nSU5yIn7CK0N8su_UYlU0O_vsZ0MowtZXLgbQ"
+        },
+        "kind": "job-report",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "4fkf5P3Rk1QuFtrGdr3j5lsmJKELth7UyLAKakmBMmV_BdQYB4Epze5xUZ89XyObSxvEJ1KlyfJCtAYJzbJnCg",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "end": {
+            "artifacts": [
+              {
+                "bytes": 29,
+                "id": "blb_d29d434a0cd596a98a3d185672c37fed37c20a48190859f427a7c740052a21f8",
+                "key": "HFD7wctWofBdNfPqcGiPkQsSQp8ZRWIud5_n90Oom4Y",
+                "media_type": "text/plain"
+              }
+            ],
+            "code": 0,
+            "outcome": "exited"
+          },
+          "job": "cmd_019a07ed-8d00-7585-80ba-2a9a941f47c7",
+          "log": "Test Suite 'All tests' passed.\n\t Executed 214 tests, with 0 failures\n",
+          "seq": 3,
+          "type": "job-report"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2UxNi1hYzM5LTJjNzhiOTgzZmI5MwAKam9iLXJlcG9ydAAebWNoXzAxSzgzWVYzODA2VzEwNVZYUDRBRjFGOFJNAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAAAAAaPfKIAAAAABo99gwAAEAK1hzdEV4b0I0VHNaTUtQSk9TaHU1M0lpUUhlZ0hvSktUMkstVzVPM1lCOUUAAAA",
+      "name": "job-report-opened-by-the-machine-that-sent-the-job",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "zZcupN95_0j1TLmuKA_AVIofLtdX4brB8czg2zac2P0",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "sWu8jpA8_30Chd2N5HjcgPB9WRMn0oYYSFsNfrRHysc",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "ajbOSCZRQDQhLmmQ57-c4E-4FCTphT0U14eR7TxKRAs",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "pk8iYtajd3OCTVNFxx241Uea6Y3KKi2bzqUgSoymeu4"
+        },
+        "nonce": "V7CZXcI3k9Ly3PAl",
+        "plaintext": "eyJ0eXBlIjoiam9iLXJlcG9ydCIsImpvYiI6ImNtZF8wMTlhMDdlZC04ZDAwLTc1ODUtODBiYS0yYTlhOTQxZjQ3YzciLCJzZXEiOjMsImxvZyI6IlRlc3QgU3VpdGUgJ0FsbCB0ZXN0cycgcGFzc2VkLlxuXHQgRXhlY3V0ZWQgMjE0IHRlc3RzLCB3aXRoIDAgZmFpbHVyZXNcbiIsImVuZCI6eyJvdXRjb21lIjoiZXhpdGVkIiwiY29kZSI6MCwiYXJ0aWZhY3RzIjpbeyJpZCI6ImJsYl9kMjlkNDM0YTBjZDU5NmE5OGEzZDE4NTY3MmMzN2ZlZDM3YzIwYTQ4MTkwODU5ZjQyN2E3Yzc0MDA1MmEyMWY4Iiwia2V5IjoiSEZEN3djdFdvZkJkTmZQcWNHaVBrUXNTUXA4WlJXSXVkNV9uOTBPb200WSIsIm1lZGlhX3R5cGUiOiJ0ZXh0L3BsYWluIiwiYnl0ZXMiOjI5fV19fQ"
+      },
+      "sender": "other-machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "ZYKA5KH9_qK3njc7EoLcdY_CDRh6y29aYYSSvKf_F1Kn9xbTDXe8gr80NjNtVFJnmIEb9D_QCp0ADVV9gE5sR-uJ5TWSchkggr1fzNPMvC6y-XL-RUIoebyfC_YVw62lOhtftmvENqCAd0CMmp8Mu2emRLWNpkFg2KMFuP8xXrjQu6OJF6x13uXNVMEwm9yKAJnA8qXc1S99DDzyFrmxd4xk1un1U83-0hJ_Ps6qiTeM3RixA1Uxy-UC-sJ9onm7xDwQWNw9uxIqUUH3K-N6w0o0Cur00MuO35NKHSxwYkYqno5DXc0bCvB3MywBKy4tE8e9O_44ywcVSRClyTNWe00IPpjmT9ct26yzCOP5qnObQUAb8_PT-GmVKnSf5TbLk3V-vkTM2IDDA615MgYOqnMTydVdy3hfowdvPVaIGGYAmnKRoaj0gnQ75UnoeYZIbS1xr3T1fbflFHelCUYCoD2mYZGpNGxGZhgFUiqCknW-uhpGTs6HbZB1Bw9IAVij5pxDjG9jSHVBZWw8KL227cozQOgq3pCvI45f-9N0PlvmYlSR3KurX5WNB75wsBODHNVYFUiJk7X2MQ3fbtR30Ob1Oiwr1SVzfG_z65_uXoqmoTB-Jqr5oUfvU1i7TKHEC3KGZ9ZUwepVpSNUdmbo4joRJ1X1VE6vI6FDcnd-Tw",
+        "exp": 1761073200,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "cmd_019a07ed-8d00-73ac-b8d2-63004967244a",
+        "kc": "PvzygyYoOgq0ThR4eEad2gGHhubGAsaedfO-KwjjQMQ",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "FEMzGKkZVwPypODTdg4K5k_N5kHivDfL05mRgGCeAw7xBD3Hip25lblRZSdZpvMPGMaKNLlIrxy4QwVvqSsjdSfBh-LVKOyRbpZ3s7FP17Q",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "RAWiDCSYL_ChNtRwmZe3k-GS1IniFaJ3gA6KW8UTKzpjAuUtsxI3G2jq2Ffma9kjU_aNtMQ-8262FkPiem7ifuilplEidqtFnDIHCNlmh4s",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "uyPXh4XeLD-IQlozwaaOvr7IletKpypEXlyfQWjsagHXl8Vd93RP5ls0g19wEoGOdvGeDpgzeLkGWfw_5JBSX_35hZ3QyKHj583hLA6EE7g"
+        },
+        "kind": "job",
+        "machine": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "schema": 1,
+        "sig": "wABEGp2Al5J_mQ2BIJdVNEuNbgVQUiZ_gUfhtPiNTNfMx8ZuoN4AqP9KCUE_YVaSX3_WqzEDSeAFhgT63Ld_Ag",
+        "v": 1
+      },
+      "expect": {
+        "decrypt_error": null,
+        "error": "malformed"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzNhYy1iOGQyLTYzMDA0OTY3MjQ0YQADam9iAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAHm1jaF8wMUs4M1lWMzgwNlcxMDVWWFA0QUYxRjhSTQAAAABo98ogAAAAAGj32DAAAQArUHZ6eWd5WW9PZ3EwVGhSNGVFYWQyZ0dIaHViR0FzYWVkZk8tS3dqalFNUQAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
+      "name": "job-carrying-a-certificate",
+      "recipient": "other-machine",
+      "seal": null,
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "cert": {
+          "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
+          "created_at": 1760983200,
+          "device": "dev_01K83YV380329ARS69J86ZB9PB",
+          "encryption": "ycLDwD73nnAVHupxGPTCjJBDPCZMa0UIAc4P1xfVh2Q",
+          "kind": "web",
+          "name": "iPhone 16",
+          "sig": "LmwRuUUP2QATl41NyJEdJ_a9bjUjsb7g_mAh2x8ZMPi0Aw148NpWrr0FT-t6lpnKiFhvwHqrAfbrxhxiIVnFCQ",
+          "signing": "4wP6ffoFDJbnj1UrL237O8TeEjKrsFcBbBdNayd1P0Y"
+        },
+        "ct": "9xtafj8R71ZY7E6h7P28Vamlo_mA-J5NFs8XDlOKny4jyDQ4ksIRZZYCgDdUuNYdODCqHKV9b7Jt4vnsXPvh-EXANAep9yMtlcCrl3xjvVbVkrXBCgPpcrr28E-zDFGRzVY1IeFX4QVa52B3GUyIkzPx3Xw7-n6H9iFBTht5ctSu3_4LtiObldOs8FJ7mTk7YS1m2vtlcPzuw6dpk24ofGVLlrKOwbobsBkwyQ60e1Vxg6ze9zEMoP5ieYcdzp4PeXanNADJrI0m-IzkkB5cLHhji0bVHjMpEXIPm-hovBwOwL2KhvJzXI5qvlfYC1GnsndDMOM1o9uNBJHiOoo-o5pfiT7tXdUHtJOG0tePWUQgUcoIlCzff7DEKaqs6AtQTp6CTrm1Lpm-jbd0ZAequ4fxsutahqUtoC6J7B5_IWVJpTt0oGz6VdPguqnolitE9tYhOG4yPsLMTUNVXo6sRwTx2JXVJyUknthWwipigq_6na92HbyCv3SQAvqKuXPoJ2dPmwij7KyLauqn0VHI-Bns5n1EpqtUwJ5ZKH3TUmL8w3qEij5sKuXHx-ATv5D1pW21o5t9UVWv0qIJnNMw5B_KEwcwUd-rewlZ9jafbaCJE3QKdubQiheTaCS8jBOu16EGTpu-K5gNyJ1SQyVH09AX3-tITBnQiUT0qt056Q",
+        "exp": 1761073200,
+        "from": "dev_01K83YV380329ARS69J86ZB9PB",
+        "id": "cmd_019a07ed-8d00-7a21-a17b-307f776a3f70",
+        "kc": "tJUonTnL9RipWHRbD4o2yFlODqA2G1qFhO6rbyxESPc",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "XA2-oSErgTh_tOAlUMXxq1lPOAI9-nGM-xLA2Kb_tR771wCaN2Oc2Fm49rZUt2EMY9bE8ZkZZmAQLnpw7T2kkM2FO00_Qc1-VA7_ZBVcDBE",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "C4xeg2RPVhpxp2_970dfDYU8NqnzZfsoZBQKXMm3NzZWD2DBijv7c07UwQng7bK2kuq8xJbJt_S3MIS3G_tFv94QaITrny7sC0WfLkZXxd4",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "aiKL7ZRiWPcQjdUfPeRcK6jatNDwrTUCL5BvAvIBaThtCwcMpzYGKjWyf4wYy7cOYvd8teMnVZteMpiRKMYDgTutxOwv4P3tmLx0FzAJcc8"
+        },
+        "kind": "job",
+        "machine": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "schema": 1,
+        "sig": "jt29Rt6bE5gEkoEi38dSuNbleBejMUmyR-FohR9BK_oNbfQl1mnG4zv_Geq1ZaE0RlunwOMkmDqfj4sPs74ZDw",
+        "v": 1
+      },
+      "expect": {
+        "decrypt_error": null,
+        "error": "malformed"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2EyMS1hMTdiLTMwN2Y3NzZhM2Y3MAADam9iAB5kZXZfMDFLODNZVjM4MDMyOUFSUzY5Sjg2WkI5UEIAHm1jaF8wMUs4M1lWMzgwNlcxMDVWWFA0QUYxRjhSTQAAAABo98ogAAAAAGj32DAAAQArdEpVb25Ubkw5UmlwV0hSYkQ0bzJ5RmxPRHFBMkcxcUZoTzZyYnl4RVNQYwAAAQAaYWNjX3otQmlKSWtiZW9YY0xBNTI2XzBQclEAHmRldl8wMUs4M1lWMzgwMzI5QVJTNjlKODZaQjlQQgAJaVBob25lIDE2AAN3ZWLjA_p9-gUMluePVSsvbfs7xN4SMquwVwFsF01rJ3U_RsnCw8A-955wFR7qcRj0woyQQzwmTGtFCAHOD9cX1YdkAAAAAGj2eKAubBG5RQ_ZABOXjU3IkR0n9r1uNSOxvuD-YCHbHxkw-LQDDXjw2lauvQVP63qWmcqIWG_AeqsB9uvGHGIhWcUJ",
+      "name": "job-from-a-device",
+      "recipient": "other-machine",
+      "seal": null,
+      "sender": "phone"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "ct": "Yw8Jv_VlXihCoNt-nVTF439uClp8gbN23i3U8aO7RZxKPZI50VDwJvdOfpU6PqgxoSGwVkcUMJHPOmnXuJJXWQBDzwsEcn2SGX95Mxv2C8nMoZBulT6M09BTblDnOptO4E-pB40LIwPCNNKmMm4JpGw_CZSxj84Efb7g_9871u3HANh78bKm81CzF7TNaTig7r3f7LQcbtxlVzBLdsXPJCrLVNed68rRWclcrJaNbOrINnFz1ZMEUIROKAkOc_t4IgR9lPaSMorb2pspwZQ-ooPgiCQxACuMJSdQbVSocgH1PXZAIxEk1sxMwEYjk1_0tjIX5JP5qLmWNFqrPWDItOevo_hdSDyh2x7_YGQzpwTFQZ1kswfM5GIxhglXh_nZ5_PdGeyKZYtOLn_XlP5tACDdtrQT7r8qRZWV_rjkqKnOkd29Ya9QV0T4Oys0jKAh_v7cLSfXMjg5B6zHX9N3yam1JQO5dbqvGWznldyw8oXIcX-c2FDEUmZWf8cVXnrGipUtONCK1w7bu3JTAK2heXFQ2pToTYLjPk8uTiKSwwIjl7k5V4WaJmcF90ViUmsbtoWvkPzlg5XcE0qIKR8U-SGCDjWYwyG7bZDLQb1jZkBjo9jKzXbJbN5Fw0rpQGmhehZs6xOJITzf2ReBGBRco9epCE_zy4s4SpgqaknP-g",
+        "exp": 1761073200,
+        "from": "acc_z-BiJIkbeoXcLA526_0PrQ",
+        "id": "cmd_019a07ed-8d00-7fa8-af5d-0cab134ac569",
+        "kc": "BB0kLy7ijyfmqU5MjlAYgbE-kGnUiR355hxwb276tsU",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "GNtVj2Bs1zYi04ZxwHVzlxtdqBRrf4pakhFxDw8WJRIvKnZdfgwZcaCcmX7H6epnMSc9nqFPQd1SjDrTu15VHIMG54XaRU7_IPbLPFknLyo",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "bsNB8-TtO9k8kbpnrWJnsCLaPMYX-WG0_3yoowfuqGZJSU04NjPpCGFfPxjumWZLfIp2guYXXd6R86nsDv7NJFgMbeJ5pE-ew2r4vDeozK8",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "N6MU-ynIbeQUDIeeswPonz5Y4-aDgNK-r_mJuov_Ow8VuOPy9hgpEbXN02S1gk2JAPv9W6YlQnonSxyqj1yG6XrL9IV3ubjxR-xTItYwEI8"
+        },
+        "kind": "job",
+        "machine": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "schema": 1,
+        "sig": "rNqE29I89mV7j8seT3203d8u3VKxmLSC9RbccXTie22JcfkLhXpiZjZL8nFAy8jzQmtY8VyHdJdiM69tMValBg",
+        "v": 1
+      },
+      "expect": {
+        "decrypt_error": null,
+        "error": "malformed"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtN2ZhOC1hZjVkLTBjYWIxMzRhYzU2OQADam9iABphY2Nfei1CaUpJa2Jlb1hjTEE1MjZfMFByUQAebWNoXzAxSzgzWVYzODA2VzEwNVZYUDRBRjFGOFJNAAAAAGj3yiAAAAAAaPfYMAABACtCQjBrTHk3aWp5Zm1xVTVNamxBWWdiRS1rR25VaVIzNTVoeHdiMjc2dHNVAAAA",
+      "name": "job-from-the-account",
+      "recipient": "other-machine",
+      "seal": null,
+      "sender": "account"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
+        "ct": "k0XDbPYg-S-i9Ja-smQOaFTWmqs0ORWavEoxjRsv2jKntNSjLI0eujFcZk6oF5e5YvHj93LbMSmtewm3IkwlOQbkn6n9Z7OC0y8zU8TZ48kTMi4i8Mkduz3dYQNjaVtvFO_nhKwA_RubcUVsTIiSA54Ct-Ir0ssXRjKKppdCJWVCDMI6PKLmBdAIotTa-njTWsuq-WEyZe2I0aMUoIUTGo63vKHMmYjqB0IGmBKPTthmw9xwNx6N-LP6KUptKRJ9hnzImN9leUmle1kbDHs2GqFTaAvqM2Zp20WPmLAW9uy8jv8xvanqPpxntlPT8LeMvwmgaf_wihxDhiuC6NsyzLuNbQk42__IcvmahboLqHVDLL4zchjg_5rBU2xO3PadQWe29b9_aaRWnREaNoWKVxqPjwj35oxL3hTBuDsvBeKVrzoJWBXKBJ8RjChIPKJ1ExFm5TDxUGv7pBC7ugrVV6RmjpETG4-aNGPMKknxWQAxo1IUa12U9mCdUl-4ApV-X2ZnUcEcJhn4Y6yz3PhmzT6nmBSlUa_O9PbRZ_1pRFHkJ5cC5xQRnIXupQ3m2AMy-oPUFaZFkoyALw9jkcY8NOdPhSd7gTNw4t2jzfiN_C4F_5uk-Y57MS0jSOeAsRBQdeCBVIvTJt0BE-HFw1iFWF_dBW3HpxHnO4ErMbQJPw",
+        "exp": 1761073200,
+        "from": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "id": "cmd_019a07ed-8d00-73b8-850f-1f73059ffd10",
+        "kc": "8dKO2SbT0fdfahY3OJopFB7SI3M5TuVQsDiYbO9cikI",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "WdisLQfa1bYiUeyMgimxRatUWkfm-o5_IXGdPIQf5AlgS03Pa04sShTx78AdZgQB7ZzcBXoUl3tvYjhYn62oKmzMuLoUXoyh9ENBtI103H8",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "mHklW_XlNEmRql14GlpmO-7NH4F_ao-2Q9RPYzQhNHWENGlJrKi7pmlFbiunjYRFgORRCxq26o2u0VENQvc6DHqWyFb63H4v57UeMU5wZ-E",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "aRvm-V-fKxuoDdwpCFFUJPm1suT8FGym3p0ofBCQthHo8BW6Wy6-iZyhSeJrZETfXF097pHJ0enIftfhbu1hjhSAxcUAybBVRVjS6yEnJRc"
+        },
+        "kind": "job",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "VSGreRF9G22F0PvKa5QM2f8ZeHhunUEYdkD6Nn65VZfHhptdSY4xpumGvxLPiYyncIvsRGbobBZUmoq1oOimDA",
+        "v": 1
+      },
+      "expect": {
+        "decrypt_error": null,
+        "error": "malformed"
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzNiOC04NTBmLTFmNzMwNTlmZmQxMAADam9iAB5tY2hfMDFLODNZVjM4MERZSkhRQUQ5S1RZNDhNWjQAHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj32DAAAQArOGRLTzJTYlQwZmRmYWhZM09Kb3BGQjdTSTNNNVR1VlFzRGlZYk85Y2lrSQAAAA",
+      "name": "job-to-its-own-machine",
+      "recipient": "machine",
+      "seal": null,
+      "sender": "machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
         "cert": {
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
@@ -4796,6 +5092,8 @@
     "item-answer": 3600,
     "item-edit": 3600,
     "item-write": 3600,
+    "job": 86400,
+    "job-report": 86400,
     "lead-message": 604800,
     "notice": 86400,
     "prompt-answer": 600,

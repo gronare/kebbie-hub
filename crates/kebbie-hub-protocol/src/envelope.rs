@@ -42,10 +42,12 @@ pub enum Kind {
     LeadMessage,
     Away,
     ItemWrite,
+    Job,
+    JobReport,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 26] = [
+    pub const ALL: [Kind; 28] = [
         Kind::Board,
         Kind::Notice,
         Kind::Result,
@@ -72,6 +74,8 @@ impl Kind {
         Kind::LeadMessage,
         Kind::Away,
         Kind::ItemWrite,
+        Kind::Job,
+        Kind::JobReport,
     ];
 
     pub fn name(self) -> &'static str {
@@ -102,6 +106,8 @@ impl Kind {
             Kind::LeadMessage => "lead-message",
             Kind::Away => "away",
             Kind::ItemWrite => "item-write",
+            Kind::Job => "job",
+            Kind::JobReport => "job-report",
         }
     }
 
@@ -134,6 +140,10 @@ impl Kind {
         )
     }
 
+    pub fn is_machine_message(self) -> bool {
+        matches!(self, Kind::Job | Kind::JobReport)
+    }
+
     pub fn id_prefix(self) -> Prefix {
         match self {
             Kind::Board => Prefix::Board,
@@ -150,6 +160,7 @@ impl Kind {
             Kind::Answer | Kind::Push | Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
+            Kind::Job | Kind::JobReport => 3_600,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
@@ -163,6 +174,7 @@ impl Kind {
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
             Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
+            Kind::Job | Kind::JobReport => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
@@ -286,30 +298,44 @@ impl Header {
         if self.machine.prefix() != Prefix::Machine {
             return Err(ShapeError::Malformed("machine is not a machine id"));
         }
-        match (self.kind.is_command(), &self.cert) {
-            (true, Some(cert)) => {
-                cert.check()
-                    .map_err(|_| ShapeError::Malformed("the device certificate is malformed"))?;
-                if self.from != cert.device {
-                    return Err(ShapeError::Malformed(
-                        "the sender is not the certified device",
-                    ));
-                }
-            }
-            (true, None) => {
-                return Err(ShapeError::Malformed(
-                    "a command carries its device certificate",
-                ));
-            }
-            (false, Some(_)) => {
+        if self.kind.is_machine_message() {
+            if self.cert.is_some() {
                 return Err(ShapeError::Malformed(
                     "only a command carries a device certificate",
                 ));
             }
-            (false, None) if self.from != self.machine => {
-                return Err(ShapeError::Malformed("the sender cannot send this kind"));
+            if self.from.prefix() != Prefix::Machine {
+                return Err(ShapeError::Malformed("a machine message comes from a machine"));
             }
-            (false, None) => {}
+            if self.from == self.machine {
+                return Err(ShapeError::Malformed("a machine message goes to another machine"));
+            }
+        } else {
+            match (self.kind.is_command(), &self.cert) {
+                (true, Some(cert)) => {
+                    cert.check()
+                        .map_err(|_| ShapeError::Malformed("the device certificate is malformed"))?;
+                    if self.from != cert.device {
+                        return Err(ShapeError::Malformed(
+                            "the sender is not the certified device",
+                        ));
+                    }
+                }
+                (true, None) => {
+                    return Err(ShapeError::Malformed(
+                        "a command carries its device certificate",
+                    ));
+                }
+                (false, Some(_)) => {
+                    return Err(ShapeError::Malformed(
+                        "only a command carries a device certificate",
+                    ));
+                }
+                (false, None) if self.from != self.machine => {
+                    return Err(ShapeError::Malformed("the sender cannot send this kind"));
+                }
+                (false, None) => {}
+            }
         }
         if self.exp <= self.at {
             return Err(ShapeError::Malformed("exp is not after at"));

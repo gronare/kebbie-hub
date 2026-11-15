@@ -77,6 +77,7 @@ export const MAX_REVIEW_COMMENT_CHARS = 2000;
 export const MAX_REVIEW_COMMENTS_BYTES = 24 * 1024;
 const MAX_SINCE_CHARS = 256;
 const command = { prefix: "cmd", maxTtl: DAY, ttl: COMMAND_TTL, command: true };
+const machineMessage = { prefix: "cmd", maxTtl: DAY, ttl: COMMAND_TTL, command: false, machineMessage: true };
 export const KINDS = {
   board: { prefix: "brd", maxTtl: DAY, command: false },
   notice: { prefix: "ntc", maxTtl: DAY, command: false },
@@ -104,6 +105,8 @@ export const KINDS = {
   "review-send": { ...command, maxTtl: COMMAND_TTL },
   "lead-message": { ...command, maxTtl: KEPT_ANSWER_TTL, ttl: KEPT_ANSWER_TTL },
   away: { ...command, maxTtl: KEPT_ANSWER_TTL, ttl: KEPT_ANSWER_TTL },
+  job: machineMessage,
+  "job-report": machineMessage,
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -196,7 +199,11 @@ export function checkShape(envelope) {
     kind !== null &&
     prefixOf(envelope.id) === kind.prefix &&
     prefixOf(envelope.machine) === "mch" &&
-    (kind.command ? isCert(envelope.cert) && prefixOf(envelope.from) === "dev" && envelope.cert.device === envelope.from : absent(envelope.cert) && envelope.from === envelope.machine) &&
+    (kind.machineMessage
+      ? absent(envelope.cert) && prefixOf(envelope.from) === "mch" && envelope.from !== envelope.machine
+      : kind.command
+        ? isCert(envelope.cert) && prefixOf(envelope.from) === "dev" && envelope.cert.device === envelope.from
+        : absent(envelope.cert) && envelope.from === envelope.machine) &&
     isTime(envelope.at) &&
     isTime(envelope.exp) &&
     envelope.exp > envelope.at &&
@@ -686,6 +693,24 @@ const notice = (value) =>
     retract: optionalField((tags) => Array.isArray(tags) && tags.length <= MAX_RETRACTS && tags.every((tag) => typeof tag === "string" && COLLAPSE.test(tag))),
   })(value) && text.encode(JSON.stringify(value)).length <= MAX_NOTICE_BYTES;
 const typed = (fields) => shape({ type: string, ...fields });
+export const MAX_JOB_COMMAND_CHARS = 8000;
+export const MAX_JOB_BUNDLE_PARTS = 128;
+export const MAX_JOB_LOG_BYTES = 12 * 1024;
+export const MAX_JOB_ARTIFACTS = 16;
+export const MAX_JOB_REASON_CHARS = 500;
+export const MAX_MACHINE_MESSAGE_BYTES = 32 * 1024;
+const isCommit = (value) => typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value);
+const isJobCommand = (value) => isText(MAX_JOB_COMMAND_CHARS)(value) && !/[^\P{Cc}\n\t]/u.test(value);
+const blobsUpTo = (max) => (value) => Array.isArray(value) && value.length <= max && value.every((one) => blobRef(one) && prefixOf(one.id) === "blb" && one.bytes <= 256 * 1024 - BLOB_OVERHEAD);
+const jobReason = (value) => isText(MAX_JOB_REASON_CHARS)(value) && !/[^\P{Cc}\n]/u.test(value);
+const JOB_ENDS = {
+  exited: shape({ outcome: string, code: (code) => Number.isInteger(code) && code >= -(2 ** 31) && code < 2 ** 31, artifacts: optionalField(blobsUpTo(MAX_JOB_ARTIFACTS)) }),
+  "needs-full": shape({ outcome: string }),
+  refused: shape({ outcome: string, reason: jobReason }),
+  failed: shape({ outcome: string, reason: jobReason }),
+};
+const jobEnd = (value) => isPlainObject(value) && string(value.outcome) && Object.hasOwn(JOB_ENDS, value.outcome) && JOB_ENDS[value.outcome](value);
+const fitsMachineMessage = ({ type, ...value }) => text.encode(JSON.stringify(value)).length <= MAX_MACHINE_MESSAGE_BYTES;
 const isToken = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
 const isFoundKey = (value) => isItemKey(value) && homeOf(value) === "found";
 const PAYLOADS = {
@@ -734,6 +759,11 @@ const PAYLOADS = {
   "review-send": typed({ address: isAddress, subtask: optionalField(isSubtaskId) }),
   "lead-message": typed({ text: isTurnText(MAX_LEAD_MESSAGE_CHARS) }),
   away: typed({ on: bool }),
+  job: (value) =>
+    typed({ repo: isToken, name: isToken, command: isJobCommand, task: isToken, commit: isCommit, base: optionalField(isCommit), bundle: optionalField(blobsUpTo(MAX_JOB_BUNDLE_PARTS)), on: optionalField(isToken) })(value) &&
+    fitsMachineMessage(value),
+  "job-report": (value) =>
+    typed({ job: (one) => prefixOf(one) === "cmd", seq: u32v, log: (log) => string(log) && text.encode(log).length <= MAX_JOB_LOG_BYTES, end: optionalField(jobEnd) })(value) && fitsMachineMessage(value),
 };
 
 export function checkPayload(payload) {

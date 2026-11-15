@@ -38,6 +38,7 @@ use crate::device::{
 };
 use crate::envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, Urgency};
 use crate::ids::{Id, Prefix};
+use crate::job::{JOB_BUNDLE_MEDIA_TYPE, Job, JobEnd, JobReport};
 use crate::lead::{Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, Turn};
 use crate::review::{
     AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
@@ -1133,6 +1134,36 @@ fn machine_header(case: &str, kind: Kind, machine: &Party) -> Header {
     Header::new(id, kind, machine.id.clone(), machine.id.clone(), AT)
 }
 
+fn job_header(case: &str, kind: Kind, from: &Party, to: &Party) -> Header {
+    Header::new(command_id(case), kind, from.id.clone(), to.id.clone(), AT)
+}
+
+const JOB_COMMIT: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+fn job() -> Payload {
+    let (part, _) = seal_blob_with(b"# v2 git bundle", JOB_BUNDLE_MEDIA_TYPE, seed("job/bundle-key"), seed("job/bundle-nonce")[..12].try_into().unwrap());
+    Payload::Job(Job {
+        repo: "kebbie".into(),
+        name: "ios-tests".into(),
+        command: "xcodebuild test -scheme Kebbie -destination 'platform=iOS Simulator,name=iPhone 16'".into(),
+        task: "email-column".into(),
+        commit: JOB_COMMIT.into(),
+        base: Some(HEAD.into()),
+        bundle: vec![part],
+        on: Some("macos".into()),
+    })
+}
+
+fn job_report() -> Payload {
+    let (log, _) = seal_blob_with(b"Test Suite 'All tests' passed", "text/plain", seed("job/artifact-key"), seed("job/artifact-nonce")[..12].try_into().unwrap());
+    Payload::JobReport(JobReport {
+        job: command_id("job"),
+        seq: 3,
+        log: "Test Suite 'All tests' passed.\n\t Executed 214 tests, with 0 failures\n".into(),
+        end: Some(JobEnd::Exited { code: 0, artifacts: vec![log] }),
+    })
+}
+
 fn stale(mut header: Header) -> Header {
     header.at = NOW - 7_200;
     header.exp = NOW - 3_600;
@@ -1521,6 +1552,27 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
         machine,
         result(),
     ));
+
+    let job_sealed = seal_case("job", job_header("job", Kind::Job, machine, other_machine), &job(), machine, &[other_machine, machine, account]);
+    cases.push(opens("job-opened-by-the-worker", &Sealed { envelope: job_sealed.envelope.for_recipient(&other_machine.id).unwrap(), randomness: job_sealed.randomness.clone() }, other_machine, machine, job()));
+    cases.push(opens("job-opened-by-the-account", &job_sealed, account, machine, job()));
+    let report_sealed = seal_case("job-report", job_header("job-report", Kind::JobReport, other_machine, machine), &job_report(), other_machine, &[machine, other_machine, account]);
+    cases.push(opens("job-report-opened-by-the-machine-that-sent-the-job", &report_sealed, machine, other_machine, job_report()));
+    let job_bytes = serde_json::to_vec(&job()).unwrap();
+    let mut certified_job = job_header("certified-job", Kind::Job, phone, other_machine);
+    certified_job.cert = Some(phone_cert.clone());
+    let mut machine_job_with_cert = job_header("job-with-a-cert", Kind::Job, machine, other_machine);
+    machine_job_with_cert.cert = Some(phone_cert.clone());
+    for (name, case, header, sender) in [
+        ("job-carrying-a-certificate", "job-with-a-cert", machine_job_with_cert, machine),
+        ("job-from-a-device", "certified-job", certified_job, phone),
+        ("job-from-the-account", "account-job", job_header("account-job", Kind::Job, account, other_machine), account),
+        ("job-to-its-own-machine", "job-to-itself", job_header("job-to-itself", Kind::Job, machine, machine), machine),
+    ] {
+        let envelope = seal_bypassing_checks(case, header, &job_bytes, sender, &[other_machine, machine, account]);
+        let recipient = if name == "job-to-its-own-machine" { machine } else { other_machine };
+        cases.push(fails(name, envelope, recipient, sender, OpenError::Malformed, None));
+    }
 
     let tampered = |name: &'static str, change: &dyn Fn(&mut Envelope)| {
         let mut envelope = answer_sealed.envelope.clone();

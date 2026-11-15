@@ -4,6 +4,7 @@ use crate::backlog::{HomeKind, ItemKey, is_section_key, is_text_hash};
 use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
+use crate::job::{Job, JobReport};
 use crate::lead::{Away, LeadMessage};
 use crate::review::{AcceptStep, AcceptSubtask, ReviewComments, ReviewOpen, ReviewRead, ReviewSend};
 
@@ -50,6 +51,8 @@ pub enum Payload {
     LeadMessage(LeadMessage),
     Away(Away),
     ItemWrite(ItemWrite),
+    Job(Job),
+    JobReport(JobReport),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -530,6 +533,8 @@ impl Payload {
             Payload::ReviewSend(_) => Kind::ReviewSend,
             Payload::LeadMessage(_) => Kind::LeadMessage,
             Payload::Away(_) => Kind::Away,
+            Payload::Job(_) => Kind::Job,
+            Payload::JobReport(_) => Kind::JobReport,
         }
     }
 
@@ -618,6 +623,8 @@ impl Payload {
             Payload::ReviewSend(send) => send.check(),
             Payload::LeadMessage(message) => message.check(),
             Payload::Board(board) => board.check(),
+            Payload::Job(job) => job.check(),
+            Payload::JobReport(report) => report.check(),
             Payload::StartItem(_) | Payload::Result(_) | Payload::Away(_) => Ok(()),
         }
     }
@@ -627,7 +634,7 @@ pub(crate) fn check(holds: bool, problem: &'static str) -> Result<(), &'static s
     if holds { Ok(()) } else { Err(problem) }
 }
 
-fn is_token(text: &str) -> bool {
+pub(crate) fn is_token(text: &str) -> bool {
     let bytes = text.as_bytes();
     (1..=64).contains(&bytes.len())
         && bytes[0].is_ascii_alphanumeric()

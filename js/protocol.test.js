@@ -1011,3 +1011,25 @@ test("a question's title, body, links and plan note, a task's links and a write-
   const envelope = await sealCommand({ device, account: devices.key, machine, payload: vector.expect.payload, at: envelopes.now });
   assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload);
 });
+
+test("a job and its report go from one machine to another of the account with no certificate, as Rust's shape rule says", () => {
+  for (const kind of ["job", "job-report"]) assert.deepEqual([KINDS[kind].command, KINDS[kind].ttl, KINDS[kind].maxTtl], [false, COMMAND_TTL, envelopes.max_ttl[kind]], kind);
+  const job = envelopes.cases.find((vector) => vector.name === "job-opened-by-the-worker");
+  checkShape(job.envelope);
+  checkPayload(job.expect.payload);
+  checkPayload(envelopes.cases.find((vector) => vector.name === "job-report-opened-by-the-machine-that-sent-the-job").expect.payload);
+  for (const name of ["job-carrying-a-certificate", "job-from-a-device", "job-from-the-account", "job-to-its-own-machine"]) {
+    const refused = envelopes.cases.find((vector) => vector.name === name);
+    assert.throws(() => checkShape(refused.envelope), (error) => error.code === "malformed", name);
+  }
+  assert.throws(() => checkShape({ ...job.envelope, exp: job.envelope.at + envelopes.max_ttl.job + 1 }), (error) => error.code === "malformed");
+  const refuses = (payload) => assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", JSON.stringify(payload).slice(0, 80));
+  refuses({ ...job.expect.payload, commit: "4b825dc" });
+  refuses({ ...job.expect.payload, command: "ls\u001b[2J" });
+  refuses({ ...job.expect.payload, env: {} });
+  const report = { type: "job-report", job: job.envelope.id, seq: 0, log: "" };
+  checkPayload(report);
+  checkPayload({ ...report, end: { outcome: "needs-full" } });
+  refuses({ ...report, end: { outcome: "needs-full", code: 0 } });
+  refuses({ ...report, log: "x".repeat(12 * 1024 + 1) });
+});
