@@ -87,8 +87,8 @@ export const acceptRequired = (item) => item.require_accept === true;
 export const asksYou = (item) => Boolean(item?.question || item?.prompt || item?.kebbie_questions?.length);
 export const shownQuestion = (item) => item.question ?? (item.prompt ? null : (item.kebbie_questions?.[0] ?? null));
 
-// Accepting a ready subtask means something when the board requires it before a push, or when the task is still building a later subtask so the push can take this one ahead; a task reported ready is pushed whole.
-const PUSHED_WHOLE = ["READY TO PUSH", "IN REVIEW"];
+// Accepting a ready subtask means something when the board requires it before a push, or when the task is still building a later subtask so the push can take this one ahead; a task in review or reported ready is pushed whole.
+const PUSHED_WHOLE = ["READY TO PUSH", "TO REVIEW"];
 export const acceptMatters = (item, subtask) => {
   const subtasks = item?.subtasks ?? [];
   const at = subtasks.findIndex((one) => one.id === subtask?.id);
