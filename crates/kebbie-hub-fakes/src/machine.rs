@@ -1699,6 +1699,7 @@ fn empty_board() -> Board {
         devices: None,
         backlog: None,
         lead: None,
+        idea_machine: false,
     }
 }
 

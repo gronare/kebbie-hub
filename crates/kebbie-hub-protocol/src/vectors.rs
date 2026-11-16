@@ -297,6 +297,7 @@ fn board() -> Payload {
         devices: None,
         backlog: None,
         lead: None,
+        idea_machine: false,
     })
 }
 
@@ -626,6 +627,7 @@ fn backlog_board() -> Payload {
         unreachable!()
     };
     board.accepts = Some(backlog_kinds());
+    board.idea_machine = true;
     board.backlog = Some(vec![
         BacklogRow {
             item: ItemKey::vault(VAULT_ITEM).unwrap(),

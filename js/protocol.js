@@ -737,6 +737,7 @@ const PAYLOADS = {
     devices: optionalField(devices),
     backlog: optionalField(backlog),
     lead: optionalField(leadRef),
+    idea_machine: optionalField(bool),
   }),
   notice,
   result: (value) =>

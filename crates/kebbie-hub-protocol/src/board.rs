@@ -33,6 +33,8 @@ pub struct Board {
     pub backlog: Option<Vec<BacklogRow>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lead: Option<Box<LeadRef>>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub idea_machine: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1769,6 +1771,16 @@ mod tests {
         assert_eq!((board.next.as_ref(), board.counts.as_ref(), board.later.as_ref(), board.accepts.as_ref(), board.devices.as_ref(), board.backlog.as_ref()), (None, None, None, None, None, None));
         assert_eq!((board.items[0].title.as_ref(), board.items[0].second_opinion.as_ref()), (None, None));
         assert_eq!(serde_json::to_value(&board).unwrap(), plain_board());
+        assert!(!board.idea_machine, "a board from a kebbie without ideas.machine names no ideas machine");
+    }
+
+    #[test]
+    fn a_board_says_its_machine_is_where_new_ideas_go_only_when_it_is() {
+        let mut named = plain_board();
+        named["idea_machine"] = serde_json::json!(true);
+        let board: Board = serde_json::from_value(named.clone()).unwrap();
+        assert!(board.idea_machine);
+        assert_eq!(serde_json::to_value(&board).unwrap(), named);
     }
 
     #[test]
