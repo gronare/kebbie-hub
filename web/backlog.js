@@ -178,10 +178,18 @@ export function backlogList({ entries, selected = null, now, top, action = "", f
   return `<div class="narrow">${top("Backlog", esc(entries.length ? aside : ""))}${tools}${backlogResults(view, { entries, selected, now, find, textOf })}</div>${action}`;
 }
 
-export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen = null, main = null } = {}) {
+export const ideaMachine = (candidates) => (candidates.find((one) => one.ideas && !one.asleep) ?? candidates.find((one) => one.ideas))?.machine ?? null;
+
+export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen = null, main = null, ideas = null } = {}) {
   if (candidates.length === 0) return null;
   const picked = candidates.find((one) => one.machine === chosen);
   if (picked) return { ...picked, why: "you chose it" };
+  const home = candidates.find((one) => one.machine === ideas);
+  if (home && !home.asleep) return { ...home, why: "ideas machine" };
+  if (home) {
+    const other = chooseMachine(candidates.filter((one) => one !== home && !one.asleep), { repo, lastUsed, main });
+    return other ? { ...other, why: `ideas machine is asleep, sent to ${other.name}` } : { ...home, why: "ideas machine, asleep now" };
+  }
   const head = candidates.find((one) => one.machine === main);
   if (head && !head.asleep) return { ...head, why: "main machine" };
   const others = head ? candidates.filter((one) => one !== head && !one.asleep) : candidates;
@@ -195,18 +203,18 @@ export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen
   return fallback(awake, awake.asleep ? "asleep now" : "awake now");
 }
 
-export function machinePicker(candidates, chosen, { label, choosing, main = null }) {
+export function machinePicker(candidates, chosen, { label, choosing, main = null, ideas = null }) {
   const change = candidates.length > 1 ? `<button type="button" class="btn small" data-action="backlog-choose">${choosing ? "Done" : "Change"}</button>` : "";
-  const list = choosing ? `<div class="options">${candidates.map((one) => `<div class="opt pick${one.machine === chosen.machine ? " picked" : ""}" role="button" tabindex="0" data-action="backlog-machine" data-machine="${esc(one.machine)}" aria-pressed="${one.machine === chosen.machine}"><b>${esc(one.name)}</b><small>${one.asleep ? "asleep" : "awake"}${one.machine === main ? " · main machine" : ""}</small></div>`).join("")}</div>` : "";
+  const list = choosing ? `<div class="options">${candidates.map((one) => `<div class="opt pick${one.machine === chosen.machine ? " picked" : ""}" role="button" tabindex="0" data-action="backlog-machine" data-machine="${esc(one.machine)}" aria-pressed="${one.machine === chosen.machine}"><b>${esc(one.name)}</b><small>${one.asleep ? "asleep" : "awake"}${one.machine === ideas ? " · ideas machine" : one.machine === main ? " · main machine" : ""}</small></div>`).join("")}</div>` : "";
   return `<section class="task"><div class="row"><div><div class="meta">${esc(label)}</div><div class="name">${esc(chosen.name)}</div><div class="meta">${esc(chosen.why)}</div></div>${change}</div></section>${list}`;
 }
 
-export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null }) {
+export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null, ideas = null }) {
   const field = `<div class="note-field"><label for="idea">Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
   if (!chosen) return field + `<div class="pro">No machine takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
   const ready = text.trim() !== "" && !busy;
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
-  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing, main }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
+  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing, main, ideas }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));

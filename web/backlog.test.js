@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { answerableQuestions, answerCommand, answers, answerSents, answersToSend, answersWithLead, backlogList, bodyShown, keepDrafts, keepMain, readDrafts, readMain, sendAllLabel, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, chooseMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
+import { answerableQuestions, answerCommand, answers, answerSents, answersToSend, answersWithLead, backlogList, bodyShown, keepDrafts, keepMain, readDrafts, readMain, sendAllLabel, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, chooseMachine, ideaMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -237,6 +237,24 @@ test("the main machine gets the work while it is awake, and while it is asleep a
   const allAsleep = candidates.map((one) => ({ ...one, asleep: true }));
   assert.deepEqual(Object.values((({ name, why }) => ({ name, why }))(chooseMachine(allAsleep, { main: "mch_box" }))), ["devbox", "main machine, asleep now"]);
   assert.equal(chooseMachine(candidates, { repo: "webapp", main: "mch_gone" }).why, "it has webapp", "a main machine that does not take this action changes nothing");
+});
+
+test("a new idea goes to the ideas machine while it is awake, and while it is asleep to an awake machine, with the line saying so", () => {
+  const candidates = [
+    { machine: "mch_mac", name: "MacBook", asleep: false, repos: ["kebbie"] },
+    { machine: "mch_box", name: "devbox", asleep: false, repos: [], ideas: true },
+  ];
+  const ideas = ideaMachine(candidates);
+  assert.equal(ideas, "mch_box");
+  assert.deepEqual(Object.values((({ name, why }) => ({ name, why }))(chooseMachine(candidates, { lastUsed: "mch_mac", main: "mch_mac", ideas }))), ["devbox", "ideas machine"], "the ideas machine wins over the main and the last used");
+  assert.equal(chooseMachine(candidates, { chosen: "mch_mac", ideas }).why, "you chose it", "your pick wins over the ideas machine");
+  const asleep = candidates.map((one) => (one.ideas ? { ...one, asleep: true } : one));
+  assert.equal(ideaMachine(asleep), "mch_box", "an asleep ideas machine is still the one named");
+  assert.deepEqual(Object.values((({ name, why }) => ({ name, why }))(chooseMachine(asleep, { ideas: "mch_box" }))), ["MacBook", "ideas machine is asleep, sent to MacBook"]);
+  assert.equal(chooseMachine(asleep.map((one) => ({ ...one, asleep: true })), { ideas: "mch_box" }).why, "ideas machine, asleep now");
+  assert.equal(ideaMachine([{ machine: "mch_old", name: "old", asleep: false, repos: [] }]), null, "a kebbie without ideas.machine names none");
+  const form = ideaForm({ text: "x", candidates, chosen: chooseMachine(candidates, { ideas }), choosing: true, ideas });
+  assert.match(text(form), /Goes to the lead on devbox ideas machine Done .*devbox awake · ideas machine/);
 });
 
 test("the main machine is kept on the phone per account, and a storage that throws keeps none", () => {

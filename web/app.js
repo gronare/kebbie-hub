@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { answerableQuestions, answers, answerSents, answersToSend, answersWithLead, keepDrafts, keepMain, keyAt, bodyShown, readDrafts, readMain, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answers, answerSents, answersToSend, answersWithLead, keepDrafts, keepMain, keyAt, bodyShown, readDrafts, readMain, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, ideaMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
@@ -736,10 +736,10 @@ function findEntry(id) {
 
 function ideaCandidates() {
   const now = nowSeconds();
-  return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea")).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo) }));
+  return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea")).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo), ideas: opened.board.idea_machine === true }));
 }
 
-const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine, main: mainMachine() });
+const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine, main: mainMachine(), ideas: ideaMachine(ideaCandidates()) });
 
 function backlogListHtml(entries, selected, composing = false, view = backlogView(entries, state.find, bodyTextOf)) {
   const action = listAction({ access: commandGate(), refusedUrl: state.refused?.url ?? null, ideaMachines: ideaCandidates(), composing });
@@ -774,7 +774,7 @@ function openComposer() {
 }
 
 function ideaRoute() {
-  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine() });
+  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()) });
   if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
 }
