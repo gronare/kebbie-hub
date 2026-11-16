@@ -79,7 +79,9 @@ test("a board with subtasks opens with them, and the board counts the subtasks w
   assert.equal(opened.problem, null);
   const [task] = opened.board.items;
   assert.deepEqual(task.subtasks.map((one) => [one.id, one.state]), [["docs", "pushed"], ["currency", "accepted"], ["gateway", "ready"], ["tests", "accepted"], ["new-gateway", "in-progress"], ["remove-old", "planned"]]);
-  assert.equal(toAccept(task), 0, "a board that does not say accepting is required counts nothing to accept");
+  assert.equal(toAccept(task), 1, "without require_accept a ready subtask counts while a later one is still being built: accepting lets it go out first");
+  assert.equal(toAccept({ subtasks: task.subtasks.map((one) => (one.state === "in-progress" || one.state === "planned" ? { ...one, state: "ready" } : one)) }), 0, "every subtask ready: the push takes them all, so nothing counts");
+  assert.equal(toAccept({ ...task, group: "READY TO PUSH" }), 0, "a task reported ready is pushed whole");
   task.require_accept = true;
   assert.equal(toAccept(task), 1);
   const two = { require_accept: true, subtasks: [...task.subtasks.map((one) => (one.id === "new-gateway" ? { ...one, state: "ready", commits: ["3".repeat(40)] } : one))] };

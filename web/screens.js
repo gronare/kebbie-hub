@@ -437,7 +437,7 @@ export function stepsWanted(item, machineName) {
   return asks.length ? `${asks.join(" or ")} on ${machineName}` : null;
 }
 
-export const acceptCount = (count) => (count ? `<span class="accept">◆ ${esc(count)} to accept</span>` : "");
+export const acceptCount = (count) => (count ? `<span class="accept">◆ ${esc(count)} ${count === 1 ? "subtask" : "subtasks"} to accept</span>` : "");
 
 export const taskKey = (machine, address) => `${machine}|${address}`;
 

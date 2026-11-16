@@ -825,11 +825,6 @@ button.link { border: 0; background: transparent; font: inherit; font-size: 14px
 .decs { display: grid; }
 .dec, .noticed { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14.5px; overflow-wrap: anywhere; }
 .decs > :first-child { border-top: 0; padding-top: 4px; }
-.dec-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
-.who { font: 500 11.5px/1.5 var(--mono); border-radius: 6px; padding: 0 6px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
-.who-investigator { color: var(--blue); }
-.who-you { color: var(--yellow); }
-.who-task { color: var(--teal); }
 .dec.replaced .dec-text { color: var(--muted); text-decoration: line-through; }
 .noticed-acts { margin-top: 2px; }
 .assess { display: grid; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14px; box-shadow: inset 3px 0 0 var(--accent); overflow-wrap: anywhere; }

@@ -12,14 +12,13 @@ const ALL = ["found-add", "found-start", "found-keep", "review-send"];
 const NOW = card.changed_at + 60;
 const options = (more = {}) => ({ access: "ready", accepts: ALL, now: NOW, ...more });
 
-test("the card shows what was built, each decision with who took it, and what was noticed", () => {
+test("the card shows what was built, each decision in the task's own words, and what was noticed", () => {
   const html = cardParts(card, { noticed: (line) => noticedArea(line, options()) });
   assert.match(html, /<h3 class="sec">Built<\/h3>/);
   assert.match(html, /See it: <code>pay refund --dry-run 1042<\/code> prints the rounded amount\./);
   assert.match(html, /<h3 class="sec">Decisions · 5<\/h3>/);
-  assert.deepEqual([...html.matchAll(/<span class="who who-([a-z]+)">([a-z]+)<\/span>/g)].map((match) => match[2]), ["lead", "you", "investigator", "you", "task"]);
-  assert.match(html, /<span class="who who-investigator">investigator<\/span> <span class="meta">obstacle · /);
-  assert.match(html, /<span class="who who-you">you<\/span> <span class="meta">approved with the plan · /);
+  assert.equal([...html.matchAll(/<div class="dec[ "]/g)].length, 5);
+  assert.doesNotMatch(html, /class="who|investigator|approved with the plan|question of method/, "who decided and where it came from stay data, not text");
   assert.match(html, /<div class="dec replaced"><div class="dec-text">Round VAT per line<\/div>.*replaced by: Round VAT per invoice, as the accountant books it/s);
   assert.match(html, /<h3 class="sec">Also noticed · 2<\/h3>/);
   assert.doesNotMatch(html, /confirm/i);

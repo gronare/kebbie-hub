@@ -1,5 +1,6 @@
 import { MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENTS_BYTES, subtaskHead } from "../js/protocol.js";
 import { failedLine } from "./blobs.js";
+import { acceptMatters } from "./board.js";
 import { commitBody } from "./commit.js";
 import { APPROVAL_STATES, approvalStatus, block, clock, from, pushBlock, pushReady, refusal, settled, takes, until, viewOnlyBlock } from "./decide.js";
 import { blockerOf, esc, inRun, lastSeenText } from "./screens.js";
@@ -270,7 +271,10 @@ function acceptButton(v) {
   if (v.access !== "ready") return status;
   if (!takesAccepts(v.accepts)) return status + `<div class="pro">${esc(v.name)} takes accepts only at the machine. Accept ${esc(subtaskTitle(v))} in kebbie there.</div>`;
   const error = v.ui.error ? `<div class="center warn" role="alert">${esc(v.ui.error)}</div>` : "";
-  return status + `<button type="button" class="btn primary" data-action="rv-accept"${v.ui.busy ? " disabled" : ""}>Accept subtask</button>` + error;
+  const matters = acceptMatters(v.item, v.boardSubtask ?? { id: v.subtask });
+  const title = subtaskTitle(v);
+  const optional = matters ? "" : `<div class="meta">Optional: the push takes it as committed.</div>`;
+  return status + optional + `<button type="button" class="btn${matters ? " primary" : ""}" data-action="rv-accept"${v.ui.busy ? " disabled" : ""}>Accept ${title ? `“${esc(title)}”` : "subtask"}</button>` + error;
 }
 
 const decideOn = (v, html) => `<div class="decide" data-machine="${esc(v.machine)}" data-address="${esc(v.address)}">${html}</div>`;

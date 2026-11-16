@@ -87,7 +87,15 @@ export const acceptRequired = (item) => item.require_accept === true;
 export const asksYou = (item) => Boolean(item?.question || item?.prompt || item?.kebbie_questions?.length);
 export const shownQuestion = (item) => item.question ?? (item.prompt ? null : (item.kebbie_questions?.[0] ?? null));
 
-export const toAccept = (item) => (acceptRequired(item) ? (item.subtasks ?? []).filter((subtask) => subtask.state === "ready").length : 0);
+// Accepting a ready subtask means something when the board requires it before a push, or when the task is still building a later subtask so the push can take this one ahead; a task reported ready is pushed whole.
+const PUSHED_WHOLE = ["READY TO PUSH", "IN REVIEW"];
+export const acceptMatters = (item, subtask) => {
+  const subtasks = item?.subtasks ?? [];
+  const at = subtasks.findIndex((one) => one.id === subtask?.id);
+  return acceptRequired(item) || (!PUSHED_WHOLE.includes(item?.group) && at >= 0 && subtasks.slice(at + 1).some((later) => later.state === "planned" || later.state === "in-progress"));
+};
+
+export const toAccept = (item) => (item.subtasks ?? []).filter((subtask) => subtask.state === "ready" && acceptMatters(item, subtask)).length;
 
 const byUrgency = (a, b) => a.item.urgency - b.item.urgency || a.item.address.localeCompare(b.item.address) || a.name.localeCompare(b.name);
 

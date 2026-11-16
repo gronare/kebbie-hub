@@ -123,7 +123,7 @@ test("the whole step reads every file on one page and ends on the step's next ac
   assert.match(text(html), /^Subtask MacBook Charge through a PaymentGateway · 2 commits · 3 files · \+4 −1 · 1 of 3 read/);
   assert.match(html, /<header class="rv-fh is-read">.*aria-pressed="true" aria-label="Mark unread"/);
   assert.match(text(html), /End of the subtask\.$/, "nothing follows the end while a file is unread");
-  assert.match(text(wholePage(allRead({ page: page("whole") }), { top })), /End of the subtask\. Accept subtask$/);
+  assert.match(text(wholePage(allRead({ page: page("whole") }), { top })), /End of the subtask\. Accept “Charge through a PaymentGateway”$/);
   const branch = view({ subtask: null, page: { subtask: null, kind: "whole", commit: null }, review: { ...review, subtask: null, files: review.subtask.files }, boardSubtask: null });
   assert.match(text(wholePage(branch, { top })), /^Diff MacBook Since main · 3 files · \+4 −1 · 1 of 3 read Guide from Claude/);
 });
@@ -144,10 +144,14 @@ test("side by side, the left column holds the step with the open commit marked a
 });
 
 test("a fully read step offers Accept in the thumb zone, and a comment waiting on Claude holds it", () => {
-  assert.equal(text(subtaskEnd(allRead())), "Accept subtask");
-  assert.match(subtaskPage(allRead(), { top }), /<div class="rv-end"><button type="button" class="btn primary" data-action="rv-accept">Accept subtask<\/button><\/div>$/);
+  assert.equal(text(subtaskEnd(allRead())), "Accept “Charge through a PaymentGateway”");
+  assert.match(subtaskPage(allRead(), { top }), /<div class="rv-end"><button type="button" class="btn primary" data-action="rv-accept">Accept “Charge through a PaymentGateway”<\/button><\/div>$/, "a later subtask is still being built, so accepting lets this one go out first");
+  const allReady = { ...item, subtasks: item.subtasks.map((one) => (one.state === "pushed" || one.state === "accepted" ? one : { ...one, state: "ready" })) };
+  const optional = subtaskEnd(allRead({ item: allReady }));
+  assert.equal(text(optional), "Optional: the push takes it as committed. Accept “Charge through a PaymentGateway”", "nothing waits on it: a plain button, said to be optional");
+  assert.match(optional, /<button type="button" class="btn" data-action="rv-accept">/);
   assert.equal(text(subtaskEnd(allRead({ sentComments: [{ path: "src/orders.rs", state: "done" }] }))), "Waiting for Claude's changes");
-  assert.equal(text(subtaskEnd(allRead({ sentComments: [{ path: "src/orders.rs", state: "refused" }] }))), "Accept subtask", "a comment that never arrived waits on nothing");
+  assert.equal(text(subtaskEnd(allRead({ sentComments: [{ path: "src/orders.rs", state: "refused" }] }))), "Accept “Charge through a PaymentGateway”", "a comment that never arrived waits on nothing");
   assert.match(text(subtaskEnd(allRead({ accepts: ["review-open"] }))), /MacBook takes accepts only at the machine\. Accept Charge through a PaymentGateway in kebbie there\./);
   assert.equal(subtaskEnd(allRead({ access: "view-only" })), "");
 });

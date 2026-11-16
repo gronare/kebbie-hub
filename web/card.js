@@ -3,7 +3,6 @@ import { clock, pushCount, settled, speaksFor, takes } from "./decide.js";
 import { CHEV_DOWN, CHEV_UP, esc } from "./screens.js";
 
 export const DECIDERS = { you: "you", lead: "lead", investigator: "investigator", task: "task" };
-const SOURCES = { question: "question", method: "question of method", obstacle: "obstacle", plan: "approved with the plan", message: "message", "through-lead": "through the lead" };
 const CHOSEN = { subtask: "Added as a subtask", task: "Started as a task", kept: "Kept in the backlog" };
 export const NOTICED_ACTIONS = [
   { action: "card-subtask", kind: "found-add", label: "Add as a subtask" },
@@ -42,9 +41,8 @@ export function changedNotice(card, seen) {
 
 function decisionRow(decision, card) {
   const replacement = decision.replaced_by === undefined || decision.replaced_by === null ? null : card.decisions[decision.replaced_by];
-  const meta = [decision.source ? SOURCES[decision.source] : "", decision.at ? clock(decision.at) : ""].filter(Boolean).map(esc).join(" · ");
   const replaced = replacement ? `<div class="meta">replaced by: ${inline(replacement.text)}</div>` : "";
-  return `<div class="dec${replacement ? " replaced" : ""}"><div class="dec-text">${inline(decision.text)}</div><div class="dec-meta"><span class="who who-${esc(decision.by)}">${esc(DECIDERS[decision.by])}</span>${meta ? ` <span class="meta">${meta}</span>` : ""}</div>${replaced}</div>`;
+  return `<div class="dec${replacement ? " replaced" : ""}"><div class="dec-text">${inline(decision.text)}</div>${replaced}</div>`;
 }
 
 export function noticedArea(line, { access, accepts, sent = null, busy = false, error = null, now, recurring = 0 }) {

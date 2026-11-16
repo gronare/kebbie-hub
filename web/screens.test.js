@@ -384,7 +384,8 @@ test("a task without subtasks shows its row as before, and the board's count onl
   assert.equal(subtaskList(plain), "");
   assert.equal(stepSummary(plain), "");
   assert.equal(subtaskList({ ...payments, subtasks: [] }), "");
-  assert.equal(text(acceptCount(3)), "◆ 3 to accept");
+  assert.equal(text(acceptCount(3)), "◆ 3 subtasks to accept");
+  assert.equal(text(acceptCount(1)), "◆ 1 subtask to accept");
   assert.equal(acceptCount(0), "");
   assert.match(text(subtaskList(payments)), /accepting each subtask is optional: push takes what is committed$/);
   assert.doesNotMatch(text(subtaskList(required)), /optional/);
