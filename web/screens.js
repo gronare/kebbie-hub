@@ -1,4 +1,4 @@
-import { acceptRequired, asksYou } from "./board.js";
+import { acceptMatters, asksYou } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
 import { planGroup } from "./pro.js";
@@ -260,7 +260,7 @@ export function subtaskList(item, { href = null, selected = null, more = false, 
   }
   const extra = Math.max(0, planned - SHOWN_PLANNED);
   const fold = folded ? `<button type="button" class="more" data-action="steps-more" aria-expanded="false">${esc(folded)} more planned${CHEV_DOWN}</button>` : more && extra ? `<button type="button" class="more" data-action="steps-more" aria-expanded="true">Fewer planned${CHEV_UP}</button>` : "";
-  const optional = acceptRequired(item) ? "" : `<div class="meta">accepting each subtask is optional: push takes what is committed</div>`;
+  const optional = subtasks.some((subtask) => acceptMatters(item, subtask)) ? "" : `<div class="meta">accepting each subtask is optional: push takes what is committed</div>`;
   return `<div class="steps go">${rows.join("")}${fold}${optional}</div>`;
 }
 
