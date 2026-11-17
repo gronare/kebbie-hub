@@ -236,6 +236,14 @@ a.task:active { background: var(--sel); }
 .swatch:has(input:checked) { outline: 2px solid var(--ink, currentColor); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .acct-tag { display: inline-flex; align-items: center; gap: 6px; }
+.acct-chips .pill[aria-pressed="true"] { background: var(--sel); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.acct-head { display: flex; align-items: baseline; gap: 8px; }
+.acct-head .dot { align-self: center; }
+.acct-head small { font-weight: 400; color: var(--muted); }
+.nmachine .dot.acct { margin-right: 6px; }
+.acct-locked { display: flex; align-items: center; gap: 12px; }
+.acct-locked .about { display: grid; flex: 1; min-width: 0; }
+.note-field .label { font-size: 13px; color: var(--muted); }
 .dmach { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 16px; font-size: 13px; color: var(--muted); }
 .dmach > span { display: inline-flex; gap: 6px; align-items: center; }
 .dmach .dot { width: 8px; height: 8px; }

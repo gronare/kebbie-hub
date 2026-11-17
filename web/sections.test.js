@@ -77,7 +77,7 @@ test("the Questions tab opens its first question beside the list in two columns,
   assert.equal(firstQuestionOf({ questions: [] }), null);
   const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
   assert.match(app, /else if \(name === "questions"\) html = questionsRoute\(\);/);
-  assert.match(app, /const first = twoColumns\(\) \? firstQuestionOf\(arrange\(state\.opened, nowSeconds\(\)\)\) : null;\n  return first \? wideTaskScreen\(first\) : shell\("questions", questionsScreen\(\)\);/);
+  assert.match(app, /const first = twoColumns\(\) \? firstQuestionOf\(arranged\(nowSeconds\(\)\)\) : null;\n  return first \? wideTaskScreen\(first\) : shell\("questions", questionsScreen\(\)\);/);
 });
 
 test("back from a task card returns to where it was opened, and back from a section to the board", () => {

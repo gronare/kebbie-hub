@@ -852,3 +852,17 @@ test("with two accounts on the phone Account lists both with their dot, plan and
   const alone = accountScreen({ me, github: true, accounts: [accounts[0]] });
   assert.doesNotMatch(alone, /Accounts on this phone|class="dot acct|account-colour/, "one account shows no list, dot or colour");
 });
+
+test("with two accounts Next heads each machine with its account's dot and name, and with one it is as before", async () => {
+  const { accountChips, accountPicker, lockedAccounts } = await import("./screens.js");
+  const rows = [nextRow(1, "push", "a@web", "1 commit", NOW)];
+  const one = nextList([{ machine: "mch_a", name: "devbox", rows, counts: null }], NOW);
+  assert.doesNotMatch(one, /nmachine|dot acct/);
+  const tagged = nextList([{ machine: "mch_a", name: "devbox", rows, counts: null, tag: { name: "Home", colour: "blue" } }], NOW);
+  assert.match(tagged, /<div class="nmachine"><span class="dot acct c-blue" aria-hidden="true"><\/span>Home · devbox<\/div>/);
+  const held = [{ account: "acc_home", name: "Home", colour: "blue" }, { account: "acc_work", name: "Work", colour: "peach" }];
+  assert.equal(text(accountChips(held, "acc_work")), "All Home Work");
+  assert.match(accountChips(held, "acc_work"), /data-account="acc_work" aria-pressed="true"/);
+  assert.match(accountPicker(held, "acc_home"), /data-action="idea-account" data-account="acc_home" aria-pressed="true"/);
+  assert.match(text(lockedAccounts([held[1]])), /^Work is locked .* Unlock$/);
+});

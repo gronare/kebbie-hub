@@ -95,9 +95,9 @@ export function nextList(all, now, selected = null) {
   if (all.length === 0) return "";
   const busy = all.filter((list) => list.rows.length);
   const lists = busy.length ? busy : all.length === 1 ? all : [{ ...all[0], counts: null }];
-  const many = lists.length > 1;
+  const many = lists.length > 1 || lists.some((list) => list.tag);
   const blocks = lists.map((list) => {
-    const name = many ? `<div class="nmachine">${esc(list.name)}</div>` : "";
+    const name = many ? `<div class="nmachine">${list.tag ? `${accountDot(list.tag.colour)}${esc(list.tag.name)} · ` : ""}${esc(list.name)}</div>` : "";
     const body = list.rows.length ? nextRows(list, now, selected) : `<div class="meta">Nothing needs you.</div>`;
     const foot = countsLine(list.counts);
     return `${name}${body}${foot ? `<div class="meta nfoot">${esc(foot)}</div>` : ""}`;
@@ -974,3 +974,19 @@ export function deviceScreen({ device, history, loading = false, older = false, 
   return `${brand}<h1 class="title">${esc(device.name)}</h1>${standing}<h2 class="group g-muted">Sent from ${esc(device.name)}${count}</h2>${sent}${removeArea(device, { removing, busy })}${warn(notice)}<a class="btn back-link" href="/account" data-action="devices-back">Back to Account</a><a class="back-btn round" href="/account" data-action="devices-back" aria-label="Back">${icon("back")}</a>`;
 }
 
+
+export function accountChips(accounts, filter) {
+  const chip = (value, label) => `<button type="button" class="pill" data-action="account-filter" data-account="${esc(value)}" aria-pressed="${filter === value}">${value === "all" ? "" : accountDot(accounts.find((one) => one.account === value)?.colour)}${esc(label)}</button>`;
+  return `<div class="pills acct-chips" role="group" aria-label="Accounts">${chip("all", "All")}${accounts.map((one) => chip(one.account, one.name)).join("")}</div>`;
+}
+
+export const accountHeading = (one) => `<h2 class="group g-muted acct-head">${accountDot(one.colour)}<span>${esc(one.name)}</span><small>${esc(accountSummary(one))}</small></h2>`;
+
+export function accountPicker(accounts, chosen) {
+  const options = accounts.map((one) => `<button type="button" class="pill" data-action="idea-account" data-account="${esc(one.account)}" aria-pressed="${one.account === chosen}">${accountDot(one.colour)}${esc(one.name)}</button>`);
+  return `<div class="note-field"><span class="label">Account</span><div class="pills acct-chips" role="radiogroup" aria-label="Account">${options.join("")}</div></div>`;
+}
+
+export function lockedAccounts(locked) {
+  return locked.map((one) => `<div class="task acct-locked">${accountDot(one.colour)}<span class="about"><span class="name">${esc(one.name)} is locked</span><span class="meta">Its boards and commands wait for its passkey.</span></span><button type="button" class="btn small" data-action="unlock-account" data-account="${esc(one.account)}">Unlock</button></div>`).join("");
+}

@@ -213,12 +213,12 @@ export function machinePicker(candidates, chosen, { label, choosing, main = null
   return `<section class="task"><div class="row"><div><div class="meta">${esc(label)}</div><div class="name">${esc(chosen.name)}</div><div class="meta">${esc(chosen.why)}</div></div>${change}</div></section>${list}`;
 }
 
-export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null, ideas = null }) {
-  const field = `<div class="note-field"><label for="idea">Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
-  if (!chosen) return field + `<div class="pro">No machine takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
+export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null, ideas = null, picker = "", account = null }) {
+  const field = `<div class="note-field"><label for="idea">${account ? "What do you want done? " : ""}Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
+  if (!chosen) return picker + field + `<div class="pro">No machine${account ? ` on ${esc(account)}` : ""} takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
   const ready = text.trim() !== "" && !busy;
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
-  return field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing, main, ideas }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>Add to the backlog</button></div>`;
+  return picker + field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing, main, ideas }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>${account ? `Add to ${esc(account)}'s backlog` : "Add to the backlog"}</button></div>`;
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));

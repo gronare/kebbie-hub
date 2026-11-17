@@ -550,3 +550,12 @@ test("the same vault note in two accounts stays two rows, and each row's machine
   ]);
   assert.equal(entries[1].key, "vault:Projects/round.md", "the command still names the note itself");
 });
+
+test("with two accounts New names the account in its question and its button, with one it reads as before", () => {
+  const candidates = [{ machine: "mch_devbox", name: "devbox", accepts: ["idea"], asleep: false, repos: [], ideas: true }];
+  const chosen = chooseMachine(candidates, {});
+  const plain = ideaForm({ text: "Mail a summary", candidates, chosen });
+  assert.match(text(plain), /Add to the backlog$/);
+  const work = ideaForm({ text: "Mail a summary", candidates, chosen, picker: "<div>PICKER</div>", account: "Work" });
+  assert.match(text(work), /^PICKER What do you want done\? .* Add to Work's backlog$/);
+});

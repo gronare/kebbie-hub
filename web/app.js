@@ -13,6 +13,7 @@ import { assessmentBlock, cardLead, cardParts, changedNotice, NOTICED_ACTIONS, N
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { del, forgetDeviceKeys, get, put } from "./store.js";
 import { freshSlot, holderOf, merged, unlockedOf } from "./slots.js";
+import { accountChips, accountHeading, accountPicker, accountSummary, lockedAccounts } from "./screens.js";
 import { heldAccounts, keepAccount, listingKey, marksKey, migrate } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
@@ -36,7 +37,7 @@ const adding = !pageMode && new URLSearchParams(location.search).has("add");
 const onward = adding ? "/" : safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const PLAN_INACTIVE = "plan-inactive";
-const state = { info: null, me: null, session: null, held: [], opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const state = { info: null, me: null, session: null, held: [], machinesFilter: "all", cameFrom: null, opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
 const slots = new Map();
 function slotFor(id) {
   if (!slots.has(id)) slots.set(id, freshSlot(id, scoped(id)));
@@ -53,6 +54,16 @@ const listsOf = (slot) => ({ boards: slot.calls.account.boards, putMachines: slo
 function mergeSlots() {
   Object.assign(state, merged(unlockedSlots()));
 }
+
+const heldOf = (id) => state.held.find((one) => one.account === id) ?? null;
+const tagOf = (machine) => (multi() ? heldOf(slotOfMachine(machine)?.id) : null);
+
+function arranged(now) {
+  const view = arrange(state.opened, now);
+  return multi() ? { ...view, next: view.next.map((list) => ({ ...list, tag: tagOf(list.machine) })) } : view;
+}
+
+const lockedHeld = () => (multi() ? state.held.filter((one) => one.account !== state.me?.account && slots.get(one.account)?.session?.state === "locked") : []);
 
 const accountName = (id) => state.held.find((one) => one.account === id)?.name ?? "Another account";
 const multi = () => state.held.length > 1;
@@ -171,7 +182,7 @@ const go = (hash) => {
 };
 
 function shell(active, main, panel = "", { said = "Selected task", bare = false } = {}) {
-  const questions = arrange(state.opened, nowSeconds()).questions.length;
+  const questions = arranged(nowSeconds()).questions.length;
   const backlog = needsYouCount(backlogEntries());
   const replies = unseenReplies(leadMachines(state.opened), leadSeen);
   const side = panel ? `<aside class="panel" aria-label="${esc(said)}">${panel}</aside>` : "";
@@ -245,19 +256,19 @@ function problemsBlock(view) {
 }
 
 function boardScreen(selected = null) {
-  const view = arrange(state.opened, nowSeconds());
+  const view = arranged(nowSeconds());
   const now = nowSeconds();
-  return boardHeader(view) + boardNotices(view, now) + nextList(view.next, now) + boardColumns(view, selected, now) + problemsBlock(view) + installHint(state.hint);
+  return boardHeader(view) + lockedAccounts(lockedHeld()) + boardNotices(view, now) + nextList(view.next, now) + boardColumns(view, selected, now) + problemsBlock(view) + installHint(state.hint);
 }
 
 function boardOverview() {
   const now = nowSeconds();
-  const view = arrange(state.opened, now);
+  const view = arranged(now);
   const sections = boardSections(view);
   if (sections.length === 0) return boardScreen();
   const body = view.next.length ? nextList(view.next, now) : boardColumns(view, null, now);
   const ending = endingChip(myPlan(), now);
-  return `<h1 class="big-title">Board</h1><p class="lead">${boardCounts(view)}${ending ? ` ${ending}` : ""}</p>` + boardNotices(view, now) + sectionPills(sections) + body + problemsBlock(view) + installHint(state.hint);
+  return `<h1 class="big-title">Board</h1><p class="lead">${boardCounts(view)}${ending ? ` ${ending}` : ""}</p>` + lockedAccounts(lockedHeld()) + boardNotices(view, now) + sectionPills(sections) + body + problemsBlock(view) + installHint(state.hint);
 }
 
 function sectionList(view, key, selected) {
@@ -265,7 +276,7 @@ function sectionList(view, key, selected) {
 }
 
 function splitScreen(key, params = null, panel = taskPanel) {
-  const view = arrange(state.opened, nowSeconds());
+  const view = arranged(nowSeconds());
   const sections = boardSections(view);
   if (sections.length === 0) return shell("board", boardScreen());
   const current = sections.some((section) => section.key === key) ? key : sections[0].key;
@@ -278,13 +289,13 @@ function splitScreen(key, params = null, panel = taskPanel) {
 const sectionOf = (from) => (from.startsWith("section/") ? from.slice("section/".length) : "next");
 
 function questionsScreen(selected = null) {
-  const { questions } = arrange(state.opened, nowSeconds());
+  const { questions } = arranged(nowSeconds());
   const list = questions.length ? questions.map((row) => taskRow(row, selected)).join("") : `<div class="center">No questions wait for you.</div>`;
   return `<div class="narrow">${top("Questions", questions.length ? `${questions.length} waiting` : "")}${list}</div>`;
 }
 
 function questionsRoute() {
-  const first = twoColumns() ? firstQuestionOf(arrange(state.opened, nowSeconds())) : null;
+  const first = twoColumns() ? firstQuestionOf(arranged(nowSeconds())) : null;
   return first ? wideTaskScreen(first) : shell("questions", questionsScreen());
 }
 
@@ -548,7 +559,7 @@ function taskBody(found, selected = null) {
 function switchButton(found, card) {
   if (!asksYou(found.item)) return "";
   const { machine, item } = found;
-  return card ? questionButton(questionHref(machine, item.address), arrange(state.opened, nowSeconds()).questions.length) : cardButton(cardHref(machine, item.address));
+  return card ? questionButton(questionHref(machine, item.address), arranged(nowSeconds()).questions.length) : cardButton(cardHref(machine, item.address));
 }
 
 function taskScreen([machine, address], card = false) {
@@ -604,7 +615,7 @@ function planPanel(params) {
 function wideTaskScreen(params, panel = taskPanel) {
   if (splitLike() && state.from !== "questions") return splitScreen(sectionOf(state.from), params, panel);
   const selected = taskKey(params[0], params[1]);
-  const list = state.from === "questions" ? questionsScreen(selected) : state.from.startsWith("section/") ? sectionList(arrange(state.opened, nowSeconds()), sectionOf(state.from), selected) : boardScreen(selected);
+  const list = state.from === "questions" ? questionsScreen(selected) : state.from.startsWith("section/") ? sectionList(arranged(nowSeconds()), sectionOf(state.from), selected) : boardScreen(selected);
   return shell(state.from === "questions" ? "questions" : "board", list, panel(params));
 }
 
@@ -775,7 +786,9 @@ function findEntry(id, machine = null) {
   return { entries, entry: started ? startedEntry(id, started) : null };
 }
 
-function ideaCandidates(account = null) {
+const ideaAccount = () => (multi() ? (heldOf(state.idea.account)?.account ?? heldOf(state.cameFrom)?.account ?? state.me?.account ?? null) : null);
+
+function ideaCandidates(account = ideaAccount()) {
   const now = nowSeconds();
   return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea") && (!account || opened.account === account)).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo), ideas: opened.board.idea_machine === true }));
 }
@@ -783,7 +796,7 @@ function ideaCandidates(account = null) {
 const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine, main: mainMachine(), ideas: ideaMachine(ideaCandidates()) });
 
 function backlogListHtml(entries, selected, composing = false, view = backlogView(entries, state.find, bodyTextOf)) {
-  const action = listAction({ access: commandGate(), refusedUrl: state.refused?.url ?? null, ideaMachines: ideaCandidates(), composing });
+  const action = listAction({ access: commandGate(), refusedUrl: state.refused?.url ?? null, ideaMachines: ideaCandidates(null), composing });
   wantBodies(entries);
   return backlogList({ entries, selected, now: nowSeconds(), top, action, find: state.find, textOf: bodyTextOf, view });
 }
@@ -815,7 +828,9 @@ function openComposer() {
 }
 
 function ideaRoute() {
-  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()) });
+  const account = ideaAccount();
+  const picker = account ? accountPicker(state.held, account) : "";
+  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()), picker, account: account ? heldOf(account).name : null });
   if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
 }
@@ -1077,7 +1092,7 @@ function boardRoute() {
 
 function sectionRoute(key) {
   if (splitLike()) return splitScreen(key);
-  const view = arrange(state.opened, nowSeconds());
+  const view = arranged(nowSeconds());
   const list = sectionList(view, key, null);
   return list ? shell("board", backButton(backHref("section", state.from)) + list) : boardRoute();
 }
@@ -1094,14 +1109,25 @@ function toggleMain(machine) {
 function machinesScreen() {
   const now = nowSeconds();
   const main = mainMachine();
-  const rows = awakeFirst(state.opened, now).map((opened) => {
+  const rowOf = (opened) => {
     const awake = !opened.expired && !isAsleep({ lastSeen: opened.lastSeen }, now);
     const facts = opened.problem ? [problemText(opened.problem)] : awake && opened.board ? [`last heard ${when(opened.lastSeen)}`, `kebbie ${opened.board.kebbie}`] : opened.board || opened.expired ? [`last seen ${lastSeenText(opened.lastSeen ?? opened.storedAt, now)}`] : ["no board yet"];
     const policy = state.info?.commands && opened.board && !opened.problem ? [machinePolicy(opened.board.accepts)] : [];
     return machineRow({ machine: opened.machine, name: opened.name, awake, facts: [...policy, ...facts], main: state.opened.length > 1 || main === opened.machine ? main === opened.machine : null });
-  });
+  };
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
-  return `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}${rows.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
+  const head = `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}`;
+  if (!multi()) return `${head}${awakeFirst(state.opened, now).map(rowOf).join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
+  const filter = state.held.some((one) => one.account === state.machinesFilter) ? state.machinesFilter : "all";
+  const groups = state.held
+    .filter((one) => filter === "all" || one.account === filter)
+    .map((one) => {
+      const own = state.opened.filter((opened) => opened.account === one.account);
+      const slot = slots.get(one.account);
+      const summary = { ...one, plan: slot ? (meOf(slot)?.plan ?? null) : null, machines: own.length };
+      return accountHeading(summary) + awakeFirst(own, now).map(rowOf).join("");
+    });
+  return `${head}${accountChips(state.held, filter)}${lockedAccounts(lockedHeld())}${groups.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
 }
 
 function lockedScreen() {
@@ -1330,6 +1356,21 @@ async function removeMachine(machine, name) {
     state.notice = error instanceof PairingFailed ? connectText(error.reason) : hubMessage(error);
   }
   await refresh();
+}
+
+async function unlockAccount(id) {
+  const slot = slots.get(id);
+  if (!slot) return;
+  state.notice = null;
+  try {
+    await reauthenticate(slot);
+    watchSlot(slot);
+    await refresh();
+    startFeed();
+  } catch (error) {
+    state.notice = signInText(error) ?? hubMessage(error);
+    render();
+  }
 }
 
 async function reauthenticate(slot) {
@@ -2260,6 +2301,16 @@ root.addEventListener("click", (event) => {
     return render();
   }
   if (BACKLOG_ACTIONS.has(action)) return backlogAction(action, target);
+  if (action === "account-filter") {
+    state.machinesFilter = target.dataset.account;
+    state.cameFrom = target.dataset.account === "all" ? null : target.dataset.account;
+    return render();
+  }
+  if (action === "idea-account") {
+    Object.assign(state.idea, { account: target.dataset.account, machine: null, choosing: false, error: null });
+    return render();
+  }
+  if (action === "unlock-account") return unlockAccount(target.dataset.account);
   if (action === "find-chip") return setFind(toggled(state.find, target.dataset.kind, target.dataset.value));
   if (action === "find-clear") return setFind(cleared(state.find));
   if (action === "find-sort") return setFind({ ...state.find, sort: target.dataset.sort });
@@ -2436,6 +2487,8 @@ addEventListener("hashchange", () => {
   if (name === "board" || name === "questions") state.from = name;
   if (name === "section") state.from = `section/${route().params[0]}`;
   if (name === "item") backlogUi(route().params[0]).visit = nowSeconds();
+  if (["task", "card", "plan", "lead", "review", "diff"].includes(name)) state.cameFrom = slotOfMachine(route().params[0])?.id ?? state.cameFrom;
+  if (name === "item") state.cameFrom = findEntry(route().params[0], route().params[1] ?? null).entry?.account ?? state.cameFrom;
   state.sheet = false;
   state.lead.picking = false;
   if (rendered === location.hash && !revealAfter) return;
