@@ -853,6 +853,18 @@ test("with two accounts on the phone Account lists both with their dot, plan and
   assert.doesNotMatch(alone, /Accounts on this phone|class="dot acct|account-colour/, "one account shows no list, dot or colour");
 });
 
+test("an account whose session is gone shows under Account as signed out, with Sign in and Remove from this phone, and no plan or Open", () => {
+  const accounts = [
+    { account: "acc_gone", colour: "blue", email: "carl@work.example", signedOut: true, plan: null, machines: null },
+    { account: "acc_work", colour: "peach", email: "carl@work.example", plan: { state: "trial", until: 9e9 }, machines: 1 },
+  ];
+  const html = accountScreen({ me: { ...me, account: "acc_work" }, github: false, accounts });
+  assert.match(text(html), /^kebbie hub Account Accounts on this phone carl@work\.example Signed out Sign in Remove from this phone carl@work\.example Trial · 1 machine This one carl@work\.example Name and colour/);
+  assert.match(html, /<a class="btn small" href="\/\?add=1">Sign in<\/a><button type="button" class="btn small" data-action="forget-account" data-account="acc_gone">/);
+  assert.doesNotMatch(html, /href="\/account\?account=acc_gone"/);
+  assert.match(html, /id="account-name" type="text" maxlength="24" value="" placeholder="carl@work\.example"/, "an unnamed account shows its email as the name to replace");
+});
+
 test("with two accounts Next heads each machine with its account's dot and name, and with one it is as before", async () => {
   const { accountChips, accountPicker, lockedAccounts } = await import("./screens.js");
   const rows = [nextRow(1, "push", "a@web", "1 commit", NOW)];

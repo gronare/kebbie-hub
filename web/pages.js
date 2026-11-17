@@ -771,22 +771,37 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     draw();
   }
 
+  const removeAsked = (id) => {
+    const one = state.held.find((held) => held.account === id);
+    return confirm(`Remove ${one ? nameOf(one) : "this account"} from this phone? Its boards, keys and notifications leave this phone; the account and its machines stay on the hub.`);
+  };
+
+  async function forgetHere(id) {
+    await dropAccount({ get, put, del }, id).catch(() => undefined);
+    await forgetDevice({ del }, id);
+    for (const key of [`allow-changes:${id}`, `hub-sent:${id}`, `backlog-machine:${id}`, marksOf(id)]) await del(key).catch(() => undefined);
+    forgetCredential(id);
+  }
+
   async function removeFromPhone() {
     const id = state.me?.account;
-    const one = state.held.find((held) => held.account === id);
-    if (!id || !confirm(`Remove ${one ? nameOf(one) : "this account"} from this phone? Its boards, keys and notifications leave this phone; the account and its machines stay on the hub.`)) return;
+    if (!id || !removeAsked(id)) return;
     state.busy = true;
     draw();
     try {
       if (state.device) await account.removeDevice(state.device.id).catch(() => undefined);
       await signOut(account, { get, put, del }, undefined, id).catch(() => undefined);
     } finally {
-      await dropAccount({ get, put, del }, id).catch(() => undefined);
-      await forgetDevice({ del }, id);
-      for (const key of [`allow-changes:${id}`, `hub-sent:${id}`, `backlog-machine:${id}`, marksOf(id)]) await del(key).catch(() => undefined);
-      forgetCredential(id);
+      await forgetHere(id);
     }
     location.assign("/");
+  }
+
+  async function removeSignedOut(id) {
+    if (!id || id === state.me?.account || !removeAsked(id)) return;
+    await forgetHere(id);
+    state.held = state.held.filter((one) => one.account !== id);
+    draw();
   }
 
   async function remember(me) {
@@ -869,6 +884,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       if (action === "sign-out") return await signOutClicked();
       if (action === "save-account") return await saveAccount();
       if (action === "remove-account") return await removeFromPhone();
+      if (action === "forget-account") return await removeSignedOut(target.dataset.account);
       if (action === "not-now") {
         state.session = { state: "github", me: state.me };
         return draw();

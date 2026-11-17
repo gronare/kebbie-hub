@@ -242,6 +242,7 @@ a.task:active { background: var(--sel); }
 .acct-head .dot { align-self: center; }
 .acct-head small { font-weight: 400; color: var(--muted); }
 .nmachine .dot.acct { margin-right: 6px; }
+.acct-out .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .acct-locked { display: flex; align-items: center; gap: 12px; }
 .acct-locked .about { display: grid; flex: 1; min-width: 0; }
 .note-field .label { font-size: 13px; color: var(--muted); }

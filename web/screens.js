@@ -786,11 +786,14 @@ export function accountSummary({ plan = null, machines = null, ideas = null }) {
 
 export function accountsGroup(accounts, current) {
   const rows = accounts.map((one) => {
+    if (one.signedOut === true) return signedOutRow(one);
     const open = one.account === current ? `<span class="meta ok">This one</span>` : `<span class="meta">Open</span>${CHEV_RIGHT}`;
     return `<a class="task row-link acct-row" href="/account?account=${encodeURIComponent(one.account)}">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))}</span><span class="meta">${esc(accountSummary(one))}</span></span>${open}</a>`;
   });
   return `<h2 class="group g-muted">Accounts on this phone</h2>${rows.join("")}`;
 }
+
+const signedOutRow = (one) => `<div class="task acct-out"><div class="acct-row">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))}</span><span class="meta">Signed out</span></span></div><div class="row2"><a class="btn small" href="/?add=1">Sign in</a><button type="button" class="btn small" data-action="forget-account" data-account="${esc(one.account)}">Remove from this phone</button></div></div>`;
 
 export const addAccountRow = `<a class="task row-link" href="/?add=1" data-action="add-account"><span class="name">+ Add an account<span class="meta under">Sign in to another account on this hub</span></span>${CHEV_RIGHT}</a>`;
 
