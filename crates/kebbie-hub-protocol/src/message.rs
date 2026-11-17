@@ -431,6 +431,7 @@ pub struct FoundKeep {
 #[serde(deny_unknown_fields)]
 pub struct StartTask {
     pub repo: String,
+    // Empty asks the machine to name the task from the prompt's first words.
     pub name: String,
     pub prompt: String,
 }
@@ -594,7 +595,7 @@ impl Payload {
             }
             Payload::Start(start) => {
                 check(is_token(&start.repo), "repo is not a plain name")?;
-                check(is_token(&start.name), "name is not a plain name")?;
+                check(start.name.is_empty() || is_token(&start.name), "name is not a plain name")?;
                 check(!start.prompt.trim().is_empty(), "the prompt is empty")?;
                 check(
                     start.prompt.chars().count() <= MAX_PROMPT_CHARS,
@@ -772,6 +773,9 @@ mod tests {
         };
         assert_eq!(start("x".repeat(MAX_PROMPT_CHARS)).validate(), Ok(()));
         assert!(start("x".repeat(MAX_PROMPT_CHARS + 1)).validate().is_err());
+        let named = |name: &str| Payload::Start(StartTask { repo: "shop".into(), name: name.into(), prompt: "Fix the rounding in invoices.".into() });
+        assert_eq!(named("").validate(), Ok(()), "an empty name asks the machine to name the task from the prompt");
+        assert!(named("Fix rounding").validate().is_err());
         let push = |head: &str| Payload::Push(PushApproval { address: "refunds@shop".into(), head: head.into(), card_sha: None });
         assert!(push("9f3c2a1").validate().is_err());
         assert_eq!(push(&"a".repeat(40)).validate(), Ok(()));

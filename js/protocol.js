@@ -34,6 +34,7 @@ export const PROMPT_ANSWER_TTL = 600;
 export const START_ITEM_TTL = DAY;
 export const KEPT_ANSWER_TTL = 7 * DAY;
 export const MAX_IDEA_CHARS = 2000;
+export const MAX_PROMPT_CHARS = 4000;
 export const MAX_ITEM_ANSWER_CHARS = 2000;
 export const MAX_ITEM_ANSWERS = 16;
 export const MAX_ITEM_ANSWERS_BYTES = 24 * 1024;
@@ -747,7 +748,7 @@ const PAYLOADS = {
     (value.reason === "questions-open") === (!absent(value.blocking) && value.blocking > 0),
   answer: typed({ address: string, question: string, choice: optionalField(u8), comment: string }),
   push: typed({ address: isAddress, head: isFullSha, card_sha: optionalField(isFullSha), through_step: optionalField(stepNumber) }),
-  start: typed({ repo: string, name: string, prompt: string }),
+  start: typed({ repo: isToken, name: (name) => name === "" || isToken(name), prompt: isText(MAX_PROMPT_CHARS) }),
   routine: typed({ id: string }),
   "prompt-answer": typed({ address: string, prompt: string, key: string }),
   idea: typed({ text: isText(MAX_IDEA_CHARS), repo: optionalField(string) }),
