@@ -2,6 +2,7 @@ import { acceptMatters, asksYou } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
 import { planGroup } from "./pro.js";
+import { nameOf } from "./accounts.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
@@ -97,7 +98,7 @@ export function nextList(all, now, selected = null) {
   const lists = busy.length ? busy : all.length === 1 ? all : [{ ...all[0], counts: null }];
   const many = lists.length > 1 || lists.some((list) => list.tag);
   const blocks = lists.map((list) => {
-    const name = many ? `<div class="nmachine">${list.tag ? `${accountDot(list.tag.colour)}${esc(list.tag.name)} · ` : ""}${esc(list.name)}</div>` : "";
+    const name = many ? `<div class="nmachine">${list.tag ? `${accountDot(list.tag.colour)}${esc(nameOf(list.tag))} · ` : ""}${esc(list.name)}</div>` : "";
     const body = list.rows.length ? nextRows(list, now, selected) : `<div class="meta">Nothing needs you.</div>`;
     const foot = countsLine(list.counts);
     return `${name}${body}${foot ? `<div class="meta nfoot">${esc(foot)}</div>` : ""}`;
@@ -786,16 +787,16 @@ export function accountSummary({ plan = null, machines = null, ideas = null }) {
 export function accountsGroup(accounts, current) {
   const rows = accounts.map((one) => {
     const open = one.account === current ? `<span class="meta ok">This one</span>` : `<span class="meta">Open</span>${CHEV_RIGHT}`;
-    return `<a class="task row-link acct-row" href="/account?account=${encodeURIComponent(one.account)}">${accountDot(one.colour)}<span class="about"><span class="name">${esc(one.name)}</span><span class="meta">${esc(accountSummary(one))}</span></span>${open}</a>`;
+    return `<a class="task row-link acct-row" href="/account?account=${encodeURIComponent(one.account)}">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))}</span><span class="meta">${esc(accountSummary(one))}</span></span>${open}</a>`;
   });
   return `<h2 class="group g-muted">Accounts on this phone</h2>${rows.join("")}`;
 }
 
 export const addAccountRow = `<a class="task row-link" href="/?add=1" data-action="add-account"><span class="name">+ Add an account<span class="meta under">Sign in to another account on this hub</span></span>${CHEV_RIGHT}</a>`;
 
-export function nameAndColour({ name, colour }) {
+export function nameAndColour({ name, colour, ...one }) {
   const swatches = COLOUR_NAMES.map((one) => `<label class="swatch"><input type="radio" name="account-colour" value="${one}"${one === colour ? " checked" : ""}>${accountDot(one)}<span class="sr">${one}</span></label>`).join("");
-  return `<h2 class="group g-muted">Name and colour</h2><section class="task"><div class="note-field"><label for="account-name">Name</label><input id="account-name" type="text" maxlength="24" value="${esc(name)}" autocomplete="off"></div><div class="swatches" role="radiogroup" aria-label="Colour">${swatches}</div><button type="button" class="btn small" data-action="save-account">Save</button></section>`;
+  return `<h2 class="group g-muted">Name and colour</h2><section class="task"><div class="note-field"><label for="account-name">Name</label><input id="account-name" type="text" maxlength="24" value="${esc(name ?? "")}" placeholder="${esc(nameOf(one))}" autocomplete="off"></div><div class="swatches" role="radiogroup" aria-label="Colour">${swatches}</div><button type="button" class="btn small" data-action="save-account">Save</button></section>`;
 }
 
 const COLOUR_NAMES = ["blue", "peach", "teal", "green", "yellow"];
@@ -808,7 +809,7 @@ export function accountScreen({ me, github, email = false, codes = false, changi
     : github
       ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account", account: multi ? me.account : null }))}">Connect GitHub</a></div></section>`
       : "";
-  const head = multi ? accountsGroup(accounts, me.account) + `<h2 class="title acct-title">${accountDot(own?.colour)}${esc(own?.name ?? "This account")}</h2>` + nameAndColour(own ?? { name: "", colour: "blue" }) : "";
+  const head = multi ? accountsGroup(accounts, me.account) + `<h2 class="title acct-title">${accountDot(own?.colour)}${esc(own ? nameOf(own) : "This account")}</h2>` + nameAndColour(own ?? { colour: "blue" }) : "";
   const leave = multi ? `<button type="button" class="btn" data-action="remove-account"${disabled(busy)}>Remove from this phone</button>` : `<button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>`;
   return brand + `<h1 class="title">Account</h1>` + head + planGroup(me.plan, now) + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifyRow(notify) : "")) + (devices ? devicesSection(devices, now) : "") + addAccountRow + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a>${leave}` + backButton("/");
 }
@@ -977,21 +978,21 @@ export function deviceScreen({ device, history, loading = false, older = false, 
 
 export function accountChips(accounts, filter) {
   const chip = (value, label) => `<button type="button" class="pill" data-action="account-filter" data-account="${esc(value)}" aria-pressed="${filter === value}">${value === "all" ? "" : accountDot(accounts.find((one) => one.account === value)?.colour)}${esc(label)}</button>`;
-  return `<div class="pills acct-chips" role="group" aria-label="Accounts">${chip("all", "All")}${accounts.map((one) => chip(one.account, one.name)).join("")}</div>`;
+  return `<div class="pills acct-chips" role="group" aria-label="Accounts">${chip("all", "All")}${accounts.map((one) => chip(one.account, nameOf(one))).join("")}</div>`;
 }
 
-export const accountHeading = (one) => `<h2 class="group g-muted acct-head">${accountDot(one.colour)}<span>${esc(one.name)}</span><small>${esc(accountSummary(one))}</small></h2>`;
+export const accountHeading = (one) => `<h2 class="group g-muted acct-head">${accountDot(one.colour)}<span>${esc(nameOf(one))}</span><small>${esc(accountSummary(one))}</small></h2>`;
 
 export function accountPicker(accounts, chosen) {
-  const options = accounts.map((one) => `<button type="button" class="pill" data-action="idea-account" data-account="${esc(one.account)}" aria-pressed="${one.account === chosen}">${accountDot(one.colour)}${esc(one.name)}</button>`);
+  const options = accounts.map((one) => `<button type="button" class="pill" data-action="idea-account" data-account="${esc(one.account)}" aria-pressed="${one.account === chosen}">${accountDot(one.colour)}${esc(nameOf(one))}</button>`);
   return `<div class="note-field"><span class="label">Account</span><div class="pills acct-chips" role="radiogroup" aria-label="Account">${options.join("")}</div></div>`;
 }
 
 export function lockedAccounts(locked) {
-  return locked.map((one) => `<div class="task acct-locked">${accountDot(one.colour)}<span class="about"><span class="name">${esc(one.name)} is locked</span><span class="meta">Its boards and commands wait for its passkey.</span></span><button type="button" class="btn small" data-action="unlock-account" data-account="${esc(one.account)}">Unlock</button></div>`).join("");
+  return locked.map((one) => `<div class="task acct-locked">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))} is locked</span><span class="meta">Its boards and commands wait for its passkey.</span></span><button type="button" class="btn small" data-action="unlock-account" data-account="${esc(one.account)}">Unlock</button></div>`).join("");
 }
 
 export function connectAccountPicker(accounts, current, code) {
-  const options = accounts.map((one) => `<a class="pill" href="/connect?code=${encodeURIComponent(code)}&account=${encodeURIComponent(one.account)}" aria-pressed="${one.account === current}"${one.account === current ? ' aria-current="true"' : ""}>${accountDot(one.colour)}${esc(one.name)}</a>`);
+  const options = accounts.map((one) => `<a class="pill" href="/connect?code=${encodeURIComponent(code)}&account=${encodeURIComponent(one.account)}" aria-pressed="${one.account === current}"${one.account === current ? ' aria-current="true"' : ""}>${accountDot(one.colour)}${esc(nameOf(one))}</a>`);
   return `<div class="note-field connect-account"><span class="label">Connect it to</span><div class="pills acct-chips" role="group" aria-label="Account">${options.join("")}</div></div>`;
 }

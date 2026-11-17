@@ -14,7 +14,7 @@ import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosabl
 import { del, forgetDeviceKeys, get, put } from "./store.js";
 import { freshSlot, holderOf, merged, unlockedOf } from "./slots.js";
 import { accountChips, accountHeading, accountPicker, accountSummary, lockedAccounts } from "./screens.js";
-import { heldAccounts, keepAccount, listingKey, marksKey, migrate } from "./accounts.js";
+import { heldAccounts, keepAccount, labelsOf, listingKey, marksKey, migrate, nameOf } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
@@ -65,7 +65,10 @@ function arranged(now) {
 
 const lockedHeld = () => (multi() ? state.held.filter((one) => one.account !== state.me?.account && slots.get(one.account)?.session?.state === "locked") : []);
 
-const accountName = (id) => state.held.find((one) => one.account === id)?.name ?? "Another account";
+const accountName = (id) => {
+  const one = state.held.find((held) => held.account === id);
+  return one ? nameOf(one) : "Another account";
+};
 const multi = () => state.held.length > 1;
 
 const planOf = (machine) => {
@@ -831,7 +834,7 @@ function openComposer() {
 function ideaRoute() {
   const account = ideaAccount();
   const picker = account ? accountPicker(state.held, account) : "";
-  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()), picker, account: account ? heldOf(account).name : null });
+  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()), picker, account: account ? nameOf(heldOf(account)) : null });
   if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
 }
@@ -2015,12 +2018,11 @@ async function entered(unlock) {
     state.unlocking = false;
   }
   state.me = state.session.me;
-  if (adding) state.held = await keepAccount(deviceStore, state.me.account).catch(() => state.held);
+  const address = await remember(state.me);
   if (onward) return location.assign(onward);
   if (previous && previous !== state.me.account && slots.has(previous)) dropSlot(slots.get(previous));
   slotFor(state.me.account);
-  state.held = await keepAccount(deviceStore, state.me.account).catch(() => state.held);
-  if (emailSignIn()) state.address = await primary().email().catch(() => null);
+  if (emailSignIn()) state.address = address;
   state.notice = null;
   if (state.session.state !== "unlocked") return render();
   state.unlocking = true;
@@ -2569,11 +2571,18 @@ async function signedInHeld(list) {
   return list.length ? null : signedInAccount(account);
 }
 
+async function remember(me) {
+  const address = state.info?.email ? await scoped(me.account).account.email().catch(() => null) : null;
+  state.held = await keepAccount(deviceStore, me.account, labelsOf(me, address)).catch(() => state.held);
+  return address;
+}
+
 async function resumeOthers() {
   for (const held of state.held) {
     if (held.account === state.me?.account) continue;
     const me = await signedInAccount(scoped(held.account).account, deviceStore, held.account);
     if (!me) continue;
+    await remember(me);
     const slot = slotFor(held.account);
     slot.me = me;
     slot.session = (await keptUnlock(me)) ?? { state: "locked", me };
@@ -2610,7 +2619,8 @@ async function start() {
   if (state.me && onward) return location.assign(onward);
   if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => held);
   if (state.me) slotFor(state.me.account);
-  if (state.me && emailSignIn()) state.address = await primary().email().catch(() => null);
+  const address = state.me ? await remember(state.me) : null;
+  if (state.me && emailSignIn()) state.address = address;
   const kept = await keptUnlock(state.me);
   state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
   if (state.me) await resumeOthers();

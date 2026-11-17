@@ -11,22 +11,30 @@ export const COLOURS = ["blue", "peach", "teal", "green", "yellow"];
 
 const LEGACY = { unlock: "unlock", listing: "listing", notify: "notify", failure: "notice-failure" };
 
+const GIVEN_NAME = /^(Home|Work|Account \d+)$/;
+
+// The app once named accounts Home, Work and Account N by their place in the list; such a name the person never chose gives way to the email.
+const chosenName = ({ name, ...one }) => (typeof name === "string" && name && (one.named || !GIVEN_NAME.test(name)) ? { ...one, name } : one);
+
 export async function heldAccounts(store) {
   try {
     const list = await store.get(ACCOUNTS);
-    return Array.isArray(list) ? list.filter((one) => typeof one?.account === "string") : [];
+    if (!Array.isArray(list)) return [];
+    return list.filter((one) => typeof one?.account === "string").map(chosenName);
   } catch {
     return [];
   }
 }
 
-export const defaultName = (index) => (index === 0 ? "Home" : index === 1 ? "Work" : `Account ${index + 1}`);
+export const nameOf = (one) => one?.name || one?.email || one?.github || one?.handle || "Account";
+
+export const labelsOf = (me, address = null) => ({ ...(address?.email ? { email: address.email } : {}), ...(me?.github ? { github: me.github } : {}), ...(me?.handle ? { handle: me.handle } : {}) });
 
 export function withAccount(list, account, change = {}) {
   const at = list.findIndex((one) => one.account === account);
   if (at >= 0) return list.map((one, index) => (index === at ? { ...one, ...change } : one));
   const used = new Set(list.map((one) => one.colour));
-  return [...list, { account, name: defaultName(list.length), colour: COLOURS.find((colour) => !used.has(colour)) ?? COLOURS[list.length % COLOURS.length], ...change }];
+  return [...list, { account, colour: COLOURS.find((colour) => !used.has(colour)) ?? COLOURS[list.length % COLOURS.length], ...change }];
 }
 
 export async function keepAccount(store, account, change = {}) {
@@ -94,6 +102,6 @@ export async function othersNotified(store, account) {
 
 export async function titled(store, account, title) {
   const list = await heldAccounts(store);
-  const name = list.length > 1 ? list.find((one) => one.account === account)?.name : null;
+  const name = list.length > 1 && list.some((one) => one.account === account) ? nameOf(list.find((one) => one.account === account)) : null;
   return name ? `${name} · ${title}` : title;
 }

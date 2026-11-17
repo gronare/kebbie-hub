@@ -8,7 +8,7 @@ import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevi
 import { fromB64, toB64 } from "../js/protocol.js";
 import { COMMAND_TEXT, decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, notifyPhase, notifyText, withCategory } from "./notify.js";
-import { dropAccount, failureKey, forgetNotifyRecord, keepAccount, keepNotifyRecord as recordNotify, marksKey as marksOf, migrate, notifyRecord, othersNotified } from "./accounts.js";
+import { dropAccount, failureKey, forgetNotifyRecord, keepAccount, keepNotifyRecord as recordNotify, labelsOf, marksKey as marksOf, migrate, nameOf, notifyRecord, othersNotified } from "./accounts.js";
 import { addFirstPasskey, forgetCredential, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectAccountPicker, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
@@ -122,6 +122,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
   async function signIn() {
     state.session = await settle(await signingIn.withPasskey(rememberedCredential(undefined, account.id ?? undefined)));
     signedInto(state.session.me);
+    await remember(state.me);
     state.notice = null;
   }
 
@@ -615,6 +616,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     try {
       await signUp(ticket());
       if (email) await account.setEmail(email).catch(() => null);
+      await remember(state.me);
       state.busy = false;
       if (path === "/setup") {
         state.phase = "done";
@@ -675,6 +677,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       signedInto(signed.account);
       state.session = { state: "locked", me: state.me };
       state.address = await account.email().catch(() => null);
+      await remember(state.me);
       state.codeFor = null;
       await loadView();
     });
@@ -746,7 +749,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       state.notice = "Give the account a name.";
       return draw();
     }
-    const kept = await keepAccount({ get, put }, state.me.account, { name, ...(colour ? { colour } : {}) });
+    const kept = await keepAccount({ get, put }, state.me.account, { name, named: true, ...(colour ? { colour } : {}) });
     state.held = state.held.map((one) => ({ ...one, ...(kept.find((held) => held.account === one.account) ?? {}) }));
     state.notice = null;
     draw();
@@ -754,8 +757,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
 
   async function removeFromPhone() {
     const id = state.me?.account;
-    const name = state.held.find((one) => one.account === id)?.name ?? "this account";
-    if (!id || !confirm(`Remove ${name} from this phone? Its boards, keys and notifications leave this phone; the account and its machines stay on the hub.`)) return;
+    const one = state.held.find((held) => held.account === id);
+    if (!id || !confirm(`Remove ${one ? nameOf(one) : "this account"} from this phone? Its boards, keys and notifications leave this phone; the account and its machines stay on the hub.`)) return;
     state.busy = true;
     draw();
     try {
@@ -768,6 +771,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       forgetCredential(id);
     }
     location.assign("/");
+  }
+
+  async function remember(me) {
+    const address = keepsEmail() ? await account.email().catch(() => null) : null;
+    const kept = await keepAccount({ get, put }, me.account, labelsOf(me, address)).catch(() => null);
+    if (kept) state.held = kept.map((one) => ({ ...(state.held.find((held) => held.account === one.account) ?? {}), ...one }));
   }
 
   async function signOutClicked() {
@@ -926,6 +935,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       const onward = state.me ? signedInDestination(path, params) : null;
       if (onward) return location.assign(onward);
       if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => state.held);
+      if (state.me) await remember(state.me);
       const kept = await keptUnlock(state.me);
       state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
     }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { accountOfDevice, dropAccount, heldAccounts, keepAccount, keepNotifyRecord, migrate, withAccount } from "./accounts.js";
+import { accountOfDevice, dropAccount, heldAccounts, keepAccount, keepNotifyRecord, labelsOf, migrate, nameOf, withAccount } from "./accounts.js";
 
 function memory(entries = []) {
   const values = new Map(entries);
@@ -20,7 +20,7 @@ const before = () => [
 test("today's single-account store becomes account one with its unlock, listing, notify record and failure, and nothing else moves", async () => {
   const store = memory(before());
   const list = await migrate(store);
-  assert.deepEqual(list, [{ account: "acc_home", name: "Home", colour: "blue" }]);
+  assert.deepEqual(list, [{ account: "acc_home", colour: "blue" }]);
   assert.deepEqual(Object.fromEntries(store.values), {
     accounts: list,
     "unlock:acc_home": { identity: { id: "acc_home" }, until: 5 },
@@ -47,12 +47,12 @@ test("a listing kept alone waits for the signed-in account to say whose it is, a
   assert.deepEqual((await heldAccounts(store)).map((one) => one.account), ["acc_home"]);
 });
 
-test("accounts get a name and an unused colour, keep what they were given, and drop everything of theirs", async () => {
+test("accounts get an unused colour, keep what they were given, and drop everything of theirs", async () => {
   const store = memory();
   await keepAccount(store, "acc_home");
   await keepAccount(store, "acc_work");
-  await keepAccount(store, "acc_home", { name: "Hemma" });
-  assert.deepEqual(await heldAccounts(store), [{ account: "acc_home", name: "Hemma", colour: "blue" }, { account: "acc_work", name: "Work", colour: "peach" }]);
+  await keepAccount(store, "acc_home", { name: "Hemma", named: true });
+  assert.deepEqual(await heldAccounts(store), [{ account: "acc_home", name: "Hemma", named: true, colour: "blue" }, { account: "acc_work", colour: "peach" }]);
   await keepNotifyRecord(store, "acc_home", { device: "dev_a" });
   await keepNotifyRecord(store, "acc_work", { device: "dev_b" });
   assert.equal(await accountOfDevice(store, "dev_b"), "acc_work");
@@ -60,5 +60,17 @@ test("accounts get a name and an unused colour, keep what they were given, and d
   await dropAccount(store, "acc_work");
   assert.equal(store.values.has("notify:acc_work"), false);
   assert.equal(await accountOfDevice(store, "dev_b"), "acc_home", "with one account left an unknown device is that account's");
-  assert.deepEqual(withAccount([], "acc_x", { colour: "teal" }), [{ account: "acc_x", name: "Home", colour: "teal" }]);
+  assert.deepEqual(withAccount([], "acc_x", { colour: "teal" }), [{ account: "acc_x", colour: "teal" }]);
+});
+
+test("an account is called by its email until the person names it, and the Home and Work the app once gave give way to it", async () => {
+  const me = { account: "acc_work", handle: "k0123456789ab", github: null };
+  const store = memory();
+  await keepAccount(store, "acc_work", labelsOf(me, { email: "carl@work.example", verified: true }));
+  assert.equal(nameOf((await heldAccounts(store))[0]), "carl@work.example");
+  await keepAccount(store, "acc_work", { name: "Work", named: true });
+  assert.equal(nameOf((await heldAccounts(store))[0]), "Work", "a name the person saved stays, even one the app once gave");
+  const old = memory([["accounts", [{ account: "acc_a", name: "Home", colour: "blue", email: "carl@work.example" }, { account: "acc_b", name: "Work", colour: "peach" }, { account: "acc_c", name: "Kebbie", colour: "teal" }]]]);
+  assert.deepEqual((await heldAccounts(old)).map(nameOf), ["carl@work.example", "Account", "Kebbie"]);
+  assert.equal(nameOf({ account: "acc_d", handle: "k0123456789ab" }), "k0123456789ab", "a hub without email names it by its handle");
 });
