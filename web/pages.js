@@ -85,6 +85,10 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     ({ account, connectCalls } = scoped(id));
     hub.account = account;
   };
+  const signedInto = (me) => {
+    state.me = me;
+    if (me?.account && me.account !== account.id) retarget(me.account);
+  };
   const path = location.pathname;
   const code = params.get("code") ?? "";
   const unlockEnds = lockWhenDue(() => {
@@ -117,13 +121,13 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
 
   async function signIn() {
     state.session = await settle(await signingIn.withPasskey(rememberedCredential(undefined, account.id ?? undefined)));
-    state.me = state.session.me;
+    signedInto(state.session.me);
     state.notice = null;
   }
 
   async function signUp(ticket) {
     state.session = await unlockAfter(hub, await signUpWith(hub, ticket, deviceName()));
-    state.me = state.session.me;
+    signedInto(state.session.me);
     state.notice = null;
   }
 
@@ -552,7 +556,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
           const unlocked = await unlock();
           unlocking = false;
           state.session = unlocked;
-          state.me = unlocked.me;
+          signedInto(unlocked.me);
           return unlocked;
         },
         approve: (commitment) => {
@@ -668,7 +672,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     }
     return emailStep(async () => {
       const signed = await account.enterCode(state.codeFor, typed, code);
-      state.me = signed.account;
+      signedInto(signed.account);
       state.session = { state: "locked", me: state.me };
       state.address = await account.email().catch(() => null);
       state.codeFor = null;
@@ -913,8 +917,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       render(top("kebbie hub"));
       state.info = await account.hub().catch(() => null);
       state.held = await migrate({ get, put, del }).catch(() => []);
-      if (!wanted && state.held.length) retarget(state.held[0].account);
-      state.me = await signedInAccount(account);
+      for (const one of wanted ? [wanted] : [...state.held.map((held) => held.account), null]) {
+        retarget(one);
+        state.me = await signedInAccount(account);
+        if (state.me) break;
+      }
+      signedInto(state.me);
       const onward = state.me ? signedInDestination(path, params) : null;
       if (onward) return location.assign(onward);
       if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => state.held);
