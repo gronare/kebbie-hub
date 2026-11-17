@@ -64,10 +64,6 @@ pub fn session_tokens<'a>(hub: &Hub, headers: &'a HeaderMap) -> Vec<&'a str> {
         .collect()
 }
 
-pub fn session_cookie<'a>(hub: &Hub, headers: &'a HeaderMap) -> Option<&'a str> {
-    session_tokens(hub, headers).into_iter().next()
-}
-
 pub fn query_account(query: Option<&str>) -> Option<&str> {
     query?
         .split('&')

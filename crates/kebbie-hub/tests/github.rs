@@ -711,3 +711,23 @@ async fn an_embedder_that_keeps_email_gets_the_verified_primary_address_from_git
     assert_eq!(kept.lock().unwrap().len(), 2, "an unverified address is not handed over");
     assert_eq!(github.email_reads(), 3);
 }
+
+#[tokio::test]
+async fn linking_github_from_a_browser_with_two_accounts_links_only_the_account_it_names() {
+    let github = fake_github().await;
+    let test = github_hub(&github, |_| {}).await;
+    let mut home = member(&test).await;
+    let mut work = member(&test).await;
+    let work_id = work.account().await.unwrap().account;
+    let token = |person: &Browser| person.cookie.clone().unwrap().split_once('=').unwrap().1.to_string();
+    let mut both = GitHubBrowser::new(&test);
+    both.session = Some(format!("kebbie_session={}.{}", token(&home), token(&work)));
+
+    let unnamed = both.start("?link=1&next=/account").await;
+    assert_eq!(unnamed.location, "/account?github_error=signed-out");
+
+    let named = both.through_github(&github, &format!("?link=1&account={work_id}&next=/account"), 78, "at-work").await;
+    assert_eq!(named.location, "/account");
+    assert_eq!(work.account().await.unwrap().github.as_deref(), Some("at-work"));
+    assert_eq!(home.account().await.unwrap().github, None);
+}

@@ -165,3 +165,17 @@ async fn an_embedder_sign_in_beside_a_held_session_keeps_both_accounts() {
         assert_eq!(&seen.account, account);
     }
 }
+
+#[tokio::test]
+async fn a_first_passkey_lifts_the_session_of_the_account_it_was_added_to_when_two_are_held() {
+    let test = embedding_hub(true).await;
+    let home = member(&test).await;
+    let pending = connect(&test.url, "mac").await.unwrap();
+    let mut arriving = browser(&test);
+    let work: AccountView = arriving.post("/test/proven", &json!({ "connect": pending.started.user_code })).await.unwrap();
+    let token = |cookie: &Option<String>| cookie.clone().unwrap().split_once('=').unwrap().1.to_string();
+    arriving.cookie = Some(format!("kebbie_session={}.{}", token(&home.cookie), token(&arriving.cookie)));
+    arriving.account_header = Some(work.account.clone());
+    arriving.add_passkey().await.unwrap();
+    assert!(arriving.account().await.unwrap().key_access);
+}

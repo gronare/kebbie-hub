@@ -18,7 +18,7 @@ use webauthn_rs::prelude::{Url, Uuid};
 use crate::account::{
     ACCOUNT_PREFIX, checked_ticket, connect_ticket, generated_handle, new_id, session_set_cookie_beside,
 };
-use crate::auth::{Anonymous, SESSION_TOKEN_PREFIX, digest, new_token, random, session_cookie};
+use crate::auth::{Anonymous, SESSION_TOKEN_PREFIX, digest, new_token, random, selected_session, wanted_account};
 use crate::error::ApiError;
 use crate::store::{Access, Ceremony, KeylessSignUp, Purpose, SignUpOutcome, Ticket};
 use crate::{Hub, clean_name, now};
@@ -223,6 +223,7 @@ pub struct Start {
     invite: Option<String>,
     setup: Option<String>,
     link: Option<String>,
+    account: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -328,9 +329,11 @@ pub async fn start(
     let next = safe_next(start.next.as_deref());
     let at = now();
     let (purpose, account, invite_hash, refused) = if start.link.is_some() {
-        let account = match session_cookie(&hub, &headers) {
-            Some(token) => hub.store().session_account(&digest(token), at)?,
-            None => None,
+        let wanted = wanted_account(&headers, None).or(start.account.as_deref());
+        let account = match selected_session(&hub, &headers, wanted) {
+            Ok(held) => held.map(|held| held.session.account),
+            Err(refused) if refused.code() == "account-required" => None,
+            Err(refused) => return Err(refused),
         };
         let Some(account) = account else {
             return Ok(redirect(&with_error(&next, "signed-out"), &[]));

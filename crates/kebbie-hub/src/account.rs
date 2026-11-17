@@ -29,7 +29,7 @@ use webauthn_rs_proto::{
 use crate::auth::{
     AccountAuth, Anonymous, FreshAccount, KeyAccount, SESSION_TOKEN_PREFIX,
     Held, SETUP_TOKEN_PREFIX, SameOrigin, SessionAuth, digest, held_sessions, joined_tokens, new_token,
-    passkey_required, random, session_cookie, wanted_account,
+    passkey_required, random, wanted_account,
 };
 use crate::error::ApiError;
 use crate::store::{
@@ -670,8 +670,11 @@ pub async fn passkey_finish(
         .map_err(refused)?;
     let credential_id: &[u8] = passkey.cred_id().as_ref();
     let at = now();
+    let token = held_sessions(&hub, &headers)?
+        .into_iter()
+        .find(|held| held.session.account == account)
+        .map(|held| digest(held.token));
     let store = hub.store();
-    let token = session_cookie(&hub, &headers).map(digest);
     if session.access == Access::AccountOnly {
         let first = store.account_key(&account)?.is_none() && token.is_some();
         if !first {
