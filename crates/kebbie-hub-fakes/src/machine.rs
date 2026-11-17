@@ -565,6 +565,10 @@ impl MachineState {
         self.secret().public()
     }
 
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+
     pub fn client(&self) -> HubClient {
         HubClient::new(&self.hub, Some(&self.token))
     }

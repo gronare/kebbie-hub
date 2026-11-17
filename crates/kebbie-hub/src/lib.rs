@@ -11,6 +11,7 @@ mod error;
 mod events;
 mod github;
 mod limit;
+mod link;
 mod machine;
 mod pairing;
 mod peers;
@@ -164,6 +165,10 @@ pub struct Config {
     pub push_retries: u32,
     pub push_backoff: Duration,
     pub push_timeout: Duration,
+    pub relay_max_links: usize,
+    pub relay_max_bytes: u64,
+    pub relay_idle: Duration,
+    pub relay_answer_wait: Duration,
 }
 
 impl Config {
@@ -231,6 +236,10 @@ impl Config {
             push_retries: 3,
             push_backoff: Duration::from_secs(1),
             push_timeout: Duration::from_secs(30),
+            relay_max_links: 8,
+            relay_max_bytes: 4 * 1024 * 1024 * 1024,
+            relay_idle: Duration::from_secs(3_600),
+            relay_answer_wait: Duration::from_secs(10),
         }
     }
 
@@ -349,6 +358,7 @@ pub struct Hub {
     github: Option<GitHub>,
     origin: String,
     feeds: Mutex<HashMap<String, usize>>,
+    relay: link::Relay,
     plans: Option<Box<dyn Plans>>,
     account_email: Option<AccountEmailHook>,
     email_sign_in: bool,
@@ -435,6 +445,7 @@ impl Hub {
             github,
             origin,
             feeds: Mutex::new(HashMap::new()),
+            relay: link::Relay::default(),
             plans: hooks.plans,
             account_email: hooks.account_email,
             email_sign_in: hooks.email_sign_in,
@@ -453,6 +464,10 @@ impl Hub {
             hub: Arc::clone(self),
             key: key.to_string(),
         })
+    }
+
+    pub fn open_links(&self, account: &str) -> usize {
+        self.relay.open_links(account)
     }
 
     pub fn open_feeds(&self, account: &str) -> usize {
@@ -704,6 +719,7 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         )
         .route("/v1/m/worker", put(peers::set_worker).delete(peers::clear_worker))
         .route("/v1/m/machines", get(peers::machines))
+        .route("/v1/m/link", get(link::link))
         .route(
             "/v1/m/addresses",
             get(peers::addresses).put(peers::put_addresses).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
