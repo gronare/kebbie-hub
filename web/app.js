@@ -124,7 +124,8 @@ const splitLike = () => pose === "split" || pose === "land";
 const twoColumns = () => splitLike() || pose === "desk";
 const overview = () => overviewPose(pose, innerHeight > innerWidth);
 const unlockEnds = lockWhenDue(lockBoards);
-const unlockPrompt = unlockOnShow(() => signInWithPasskey(rememberedCredential()), () => passkeyLocked());
+const ownCredential = () => rememberedCredential(undefined, state.me?.account ?? undefined);
+const unlockPrompt = unlockOnShow(() => signInWithPasskey(ownCredential()), () => passkeyLocked());
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
@@ -2360,7 +2361,7 @@ root.addEventListener("click", (event) => {
   else if (action === "confirm-email") confirmEmail();
   else if (action === "sign-in") {
     unlockPrompt.disarm();
-    signInWithPasskey(adding ? null : rememberedCredential());
+    signInWithPasskey(adding ? null : ownCredential());
   }
   else if (action === "other-passkey") signInWithPasskey(null);
   else if (action === "add-passkey") addPasskey();

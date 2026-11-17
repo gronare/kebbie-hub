@@ -116,7 +116,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
   const settle = (ceremony) => unlockAfter(hub, ceremony);
 
   async function signIn() {
-    state.session = await settle(await signingIn.withPasskey(rememberedCredential(undefined, wanted ?? undefined)));
+    state.session = await settle(await signingIn.withPasskey(rememberedCredential(undefined, account.id ?? undefined)));
     state.me = state.session.me;
     state.notice = null;
   }
@@ -543,7 +543,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     state.busy = true;
     state.notice = null;
     draw();
-    const unlock = async () => settle(await signingIn.withPasskey(rememberedCredential(), { connect: code }));
+    const unlock = async () => settle(await signingIn.withPasskey(rememberedCredential(undefined, account.id ?? undefined), { connect: code }));
     let unlocking = true;
     try {
       const result = await approveFromLink({
@@ -577,6 +577,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       await keepCounter(machine.counter);
       state.left = true;
       unlockEnds.watch(null);
+      if (state.held.length > 1) return location.assign("/#/board");
       showBoard(state.session, approved.name);
     } catch (error) {
       const said = unlocking ? unlockFailedText(error, state.view?.name ?? "this machine") : null;
