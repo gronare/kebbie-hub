@@ -619,9 +619,10 @@ export function machineDots(machines) {
   return `<span class="dmach desk-only">${dots.join("")}</span>`;
 }
 
-export function githubHref({ next = null, connect = null, invite = null, setup = null, link = false } = {}) {
+export function githubHref({ next = null, connect = null, invite = null, setup = null, link = false, account = null } = {}) {
   const query = new URLSearchParams();
   if (link) query.set("link", "1");
+  if (account) query.set("account", account);
   if (connect) query.set("connect", connect);
   if (invite) query.set("invite", invite);
   if (setup) query.set("setup", setup);
@@ -773,13 +774,43 @@ export function notificationsScreen({ notify, notice = null }) {
   return `${brand}<h1 class="title">Notifications</h1>${notifySection(notify)}${warn(notice)}<a class="btn back-link" href="/account" data-action="notifications-back">Back to Account</a><a class="back-btn round" href="/account" data-action="notifications-back" aria-label="Back">${icon("back")}</a>`;
 }
 
-export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null, devices = null, notify = null, now = Date.now() / 1000 }) {
+export const accountDot = (colour) => `<span class="dot acct c-${esc(colour ?? "blue")}" aria-hidden="true"></span>`;
+
+const machineCount = (count) => `${count} ${count === 1 ? "machine" : "machines"}`;
+
+export function accountSummary({ plan = null, machines = null, ideas = null }) {
+  const planned = plan ? ({ pro: "Pro", trial: "Trial", free: "Free", expired: "Ended" }[plan.state] ?? null) : null;
+  return [planned, machines === null ? null : machineCount(machines), ideas ? `ideas on ${ideas}` : null].filter(Boolean).join(" · ");
+}
+
+export function accountsGroup(accounts, current) {
+  const rows = accounts.map((one) => {
+    const open = one.account === current ? `<span class="meta ok">This one</span>` : `<span class="meta">Open</span>${CHEV_RIGHT}`;
+    return `<a class="task row-link acct-row" href="/account?account=${encodeURIComponent(one.account)}">${accountDot(one.colour)}<span class="about"><span class="name">${esc(one.name)}</span><span class="meta">${esc(accountSummary(one))}</span></span>${open}</a>`;
+  });
+  return `<h2 class="group g-muted">Accounts on this phone</h2>${rows.join("")}`;
+}
+
+export const addAccountRow = `<a class="task row-link" href="/?add=1" data-action="add-account"><span class="name">+ Add an account</span><span class="meta">Sign in to another account on this hub</span>${CHEV_RIGHT}</a>`;
+
+export function nameAndColour({ name, colour }) {
+  const swatches = COLOUR_NAMES.map((one) => `<label class="swatch"><input type="radio" name="account-colour" value="${one}"${one === colour ? " checked" : ""}>${accountDot(one)}<span class="sr">${one}</span></label>`).join("");
+  return `<h2 class="group g-muted">Name and colour</h2><section class="task"><div class="note-field"><label for="account-name">Name</label><input id="account-name" type="text" maxlength="24" value="${esc(name)}" autocomplete="off"></div><div class="swatches" role="radiogroup" aria-label="Colour">${swatches}</div><button type="button" class="btn small" data-action="save-account">Save</button></section>`;
+}
+
+const COLOUR_NAMES = ["blue", "peach", "teal", "green", "yellow"];
+
+export function accountScreen({ me, github, email = false, codes = false, changing = false, address = null, notice = null, busy = false, allowed = null, devices = null, notify = null, now = Date.now() / 1000, accounts = [] }) {
+  const multi = accounts.length > 1;
+  const own = accounts.find((one) => one.account === me.account) ?? null;
   const linked = me.github
     ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Signed in with GitHub as ${esc(me.github)}</div></div><button type="button" class="btn small" data-action="remove-github">Remove</button></div></section>`
     : github
-      ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account" }))}">Connect GitHub</a></div></section>`
+      ? `<section class="task"><div class="row"><div><div class="name">GitHub</div><div class="meta">Not connected</div></div><a class="btn small" href="${esc(githubHref({ link: true, next: "/account", account: multi ? me.account : null }))}">Connect GitHub</a></div></section>`
       : "";
-  return brand + `<h1 class="title">Account</h1>` + planGroup(me.plan, now) + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifyRow(notify) : "")) + (devices ? devicesSection(devices, now) : "") + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a><button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>` + backButton("/");
+  const head = multi ? accountsGroup(accounts, me.account) + `<h2 class="title acct-title">${accountDot(own?.colour)}${esc(own?.name ?? "This account")}</h2>` + nameAndColour(own ?? { name: "", colour: "blue" }) : "";
+  const leave = multi ? `<button type="button" class="btn" data-action="remove-account"${disabled(busy)}>Remove from this phone</button>` : `<button type="button" class="btn" data-action="sign-out"${disabled(busy)}>Sign out</button>`;
+  return brand + `<h1 class="title">Account</h1>` + head + planGroup(me.plan, now) + linked + (email ? emailSection(address, { busy, codes, changing }) : "") + (allowed === null ? "" : thisDevice(allowed) + (notify ? notifyRow(notify) : "")) + (devices ? devicesSection(devices, now) : "") + addAccountRow + warn(notice) + `<a class="btn back-link" href="/">Back to your boards</a>${leave}` + backButton("/");
 }
 
 export function cantUnlockScreen({ state = "no-prf", notice = null }) {

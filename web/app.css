@@ -220,6 +220,22 @@ a.task:active { background: var(--sel); }
 .mrow small { color: var(--muted); font-size: 12.5px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
 .dot.awake { background: var(--green); }
+.dot.acct { width: 9px; height: 9px; }
+.dot.c-blue { background: var(--blue); }
+.dot.c-peach { background: var(--peach); }
+.dot.c-teal { background: var(--teal); }
+.dot.c-green { background: var(--green); }
+.dot.c-yellow { background: var(--yellow); }
+.acct-row { display: flex; align-items: center; gap: 12px; }
+.acct-row .about { display: grid; flex: 1; min-width: 0; }
+.acct-title { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 18px 0 4px; }
+.swatches { display: flex; gap: 14px; margin: 10px 0; }
+.swatch { display: inline-flex; align-items: center; padding: 6px; border-radius: 50%; cursor: pointer; }
+.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch .dot { width: 18px; height: 18px; }
+.swatch:has(input:checked) { outline: 2px solid var(--ink, currentColor); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.acct-tag { display: inline-flex; align-items: center; gap: 6px; }
 .dmach { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 16px; font-size: 13px; color: var(--muted); }
 .dmach > span { display: inline-flex; gap: 6px; align-items: center; }
 .dmach .dot { width: 8px; height: 8px; }

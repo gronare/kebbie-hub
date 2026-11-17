@@ -204,7 +204,7 @@ test("the connect link after GitHub asks for a passkey first, and Not now says h
 
 test("the account page connects GitHub or removes it", () => {
   const linked = accountScreen({ me: { ...me, github: "octocat" }, github: true });
-  assert.equal(text(linked), "kebbie hub Account GitHub Signed in with GitHub as octocat Remove Back to your boards Sign out");
+  assert.equal(text(linked), "kebbie hub Account GitHub Signed in with GitHub as octocat Remove + Add an account Sign in to another account on this hub Back to your boards Sign out");
   assert.deepEqual(buttons(linked)[0], { label: "Remove", disabled: false });
   const unlinked = accountScreen({ me, github: true });
   assert.deepEqual(hrefs(unlinked)[0], { label: "Connect GitHub", href: "/auth/github?link=1&next=%2Faccount" });
@@ -545,7 +545,7 @@ test("a hub that keeps email asks for it at passkey sign-up and shows its state 
   assert.match(text(signupScreen({ invite: "K7QF-M2XD", email: true })), new RegExp(EMAIL_LABEL.replace(/[()]/g, "\\$&")));
   assert.match(text(accountScreen({ me, github: false, email: true })), /Email No email yet .* Save email/);
   const ada = { email: "ada@example.com", verified: true };
-  assert.equal(text(accountScreen({ me, github: false, email: true, address: ada })), "kebbie hub Account Email ada@example.com · confirmed Change Back to your boards Sign out");
+  assert.equal(text(accountScreen({ me, github: false, email: true, address: ada })), "kebbie hub Account Email ada@example.com · confirmed Change + Add an account Sign in to another account on this hub Back to your boards Sign out");
   assert.doesNotMatch(accountScreen({ me, github: false, email: true, address: ada }), /type="email"/);
   assert.match(text(accountScreen({ me, github: false, email: true, changing: true, address: ada })), /Email ada@example\.com · confirmed New email Save email Remove email Cancel/);
   assert.match(text(accountScreen({ me, github: false, email: true, address: { email: "ada@example.com", verified: false, sent: true } })), /not confirmed yet\. We sent a link/);
@@ -555,10 +555,10 @@ test("a hub that keeps email asks for it at passkey sign-up and shows its state 
 test("on a hub that signs in by email the account page shows the address and opens a field only on Change", () => {
   const ada = { email: "ada@example.com", verified: true };
   const closed = accountScreen({ me, github: false, email: true, codes: true, address: ada });
-  assert.equal(text(closed), "kebbie hub Account Email ada@example.com · confirmed Change Back to your boards Sign out");
+  assert.equal(text(closed), "kebbie hub Account Email ada@example.com · confirmed Change + Add an account Sign in to another account on this hub Back to your boards Sign out");
   assert.doesNotMatch(closed, /type="email"|Send code/);
   const open = accountScreen({ me, github: false, email: true, codes: true, changing: true, address: ada });
-  assert.match(text(open), /Email ada@example\.com · confirmed New email Send code Cancel Back to your boards Sign out$/);
+  assert.match(text(open), /Email ada@example\.com · confirmed New email Send code Cancel \+ Add an account Sign in to another account on this hub Back to your boards Sign out$/);
   assert.match(open, /<input id="email"[^>]* value="">/);
 });
 
@@ -834,4 +834,21 @@ test("a vault plan reads whole as the backlog card reads a note", () => {
 
 test("the card's waiting line shows the question's title when the machine sends one", () => {
   assert.equal(questionLine({ question: { text: "Is this the app to build? The mockup of the native iOS app.", title: "Is this the app to build?" } }), "Is this the app to build?");
+});
+
+test("with two accounts on the phone Account lists both with their dot, plan and machines, names this one, and removes it from the phone instead of signing out", () => {
+  const accounts = [
+    { account: "acc_home", name: "Home", colour: "blue", plan: { state: "pro" }, machines: 3, ideas: "devbox" },
+    { account: "acc_work", name: "Work", colour: "peach", plan: { state: "trial", until: 9e9 }, machines: 1, ideas: null },
+  ];
+  const html = accountScreen({ me: { ...me, account: "acc_work" }, github: true, accounts });
+  assert.match(text(html), /^kebbie hub Account Accounts on this phone Home Pro · 3 machines · ideas on devbox Open Work Trial · 1 machine This one Work Name and colour Name/);
+  assert.match(html, /href="\/account\?account=acc_home"/);
+  assert.match(html, /class="dot acct c-peach"/);
+  assert.match(html, /name="account-colour" value="peach" checked/);
+  assert.match(text(html), /\+ Add an account .* Back to your boards Remove from this phone$/);
+  assert.doesNotMatch(text(html), /Sign out/);
+  assert.equal(hrefs(html).find((one) => one.label === "Connect GitHub").href, "/auth/github?link=1&account=acc_work&next=%2Faccount");
+  const alone = accountScreen({ me, github: true, accounts: [accounts[0]] });
+  assert.doesNotMatch(alone, /Accounts on this phone|class="dot acct|account-colour/, "one account shows no list, dot or colour");
 });

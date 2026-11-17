@@ -2,14 +2,14 @@ import { approveFromLink, CONNECT_TEXT, connectText, finishConnect, forgetFragme
 import { emptyMarks, mergeMarks, openBoards } from "./board.js";
 import { proposedName } from "./device-name.js";
 import { signInText, signInWith, signUpText, signUpWith } from "./signin.js";
-import { account, connectCalls, HubError } from "./hub.js";
+import { HubError, scoped } from "./hub.js";
 import { put, get, del } from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, heldDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 import { fromB64, toB64 } from "../js/protocol.js";
 import { COMMAND_TEXT, decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, notifyPhase, notifyText, withCategory } from "./notify.js";
-import { failureKey, forgetNotifyRecord, keepNotifyRecord as recordNotify, migrate, notifyRecord, othersNotified } from "./accounts.js";
-import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
+import { dropAccount, failureKey, forgetNotifyRecord, keepAccount, keepNotifyRecord as recordNotify, marksKey as marksOf, migrate, notifyRecord, othersNotified } from "./accounts.js";
+import { addFirstPasskey, forgetCredential, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
 import { currentPlan, machineNeedsPro, placeSheet, proCard } from "./pro.js";
@@ -77,8 +77,14 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const rest = params.toString();
     history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
   }
-  const state = { info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, notifying: false, kept: null, deciding: false, pro: null };
+  const wanted = params.get("account");
+  let { account, connectCalls } = scoped(given?.me?.account ?? wanted ?? null);
+  const state = { held: given?.accounts ?? [], info: null, me: null, address: null, session: null, notice: githubError, busy: false, phase: "start", view: null, machines: [], left: false, codeFor: null, typed: "", emailStep: null, changingEmail: false, allowed: null, device: null, devices: null, opened: [], keys: new Map(), viewing: null, history: null, older: null, removing: false, notify: null, notifying: false, kept: null, deciding: false, pro: null };
   const hub = { account, credentials: navigator.credentials };
+  const retarget = (id) => {
+    ({ account, connectCalls } = scoped(id));
+    hub.account = account;
+  };
   const path = location.pathname;
   const code = params.get("code") ?? "";
   const unlockEnds = lockWhenDue(() => {
@@ -110,7 +116,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
   const settle = (ceremony) => unlockAfter(hub, ceremony);
 
   async function signIn() {
-    state.session = await settle(await signingIn.withPasskey(rememberedCredential()));
+    state.session = await settle(await signingIn.withPasskey(rememberedCredential(undefined, wanted ?? undefined)));
     state.me = state.session.me;
     state.notice = null;
   }
@@ -123,7 +129,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
 
   const reauth = signIn;
 
-  const marksKey = () => `marks:${state.me?.account}`;
+  const marksKey = () => marksOf(state.me?.account);
 
   async function storedMarks() {
     try {
@@ -176,7 +182,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     if (viewing) return deviceScreen({ device: viewing, history: state.history ?? [], loading: state.history === null, older: state.older !== null, removing: state.removing, busy: state.busy, notice: state.notice, decisions: decisionsFor(viewing), now: nowSeconds() });
     const notify = state.info?.commands && state.notify ? { phase: state.notify.phase, categories: state.notify.categories, failure: failureLine(state.notify.failure, nowSeconds()), text: notifyText(state.notify.phase, { ios: state.notify.env.ios, word: state.notify.env.word }), senders: namesSendHere(state.opened.map((machine) => machine.name)).trim() } : null;
     if (notify && state.notifying) return notificationsScreen({ notify, notice: state.notice });
-    return accountScreen({ notify, me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
+    return accountScreen({ accounts: state.held, notify, me: state.me, github: Boolean(state.info?.github), email: keepsEmail(), codes: emailSignIn(), changing: state.changingEmail, address: state.address, notice: state.notice, busy: state.busy, allowed: state.info?.commands ? state.allowed === true : null, devices: state.info?.commands ? state.devices : null, now: nowSeconds() });
   }
 
   const unlockedIdentity = () => (state.session?.state === "unlocked" ? state.session.identity : null);
@@ -727,6 +733,37 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     }
   }
 
+  async function saveAccount() {
+    const name = root.querySelector("#account-name")?.value.trim() ?? "";
+    const colour = root.querySelector('input[name="account-colour"]:checked')?.value ?? null;
+    if (!name) {
+      state.notice = "Give the account a name.";
+      return draw();
+    }
+    const kept = await keepAccount({ get, put }, state.me.account, { name, ...(colour ? { colour } : {}) });
+    state.held = state.held.map((one) => ({ ...one, ...(kept.find((held) => held.account === one.account) ?? {}) }));
+    state.notice = null;
+    draw();
+  }
+
+  async function removeFromPhone() {
+    const id = state.me?.account;
+    const name = state.held.find((one) => one.account === id)?.name ?? "this account";
+    if (!id || !confirm(`Remove ${name} from this phone? Its boards, keys and notifications leave this phone; the account and its machines stay on the hub.`)) return;
+    state.busy = true;
+    draw();
+    try {
+      if (state.device) await account.removeDevice(state.device.id).catch(() => undefined);
+      await signOut(account, { get, put, del }, undefined, id).catch(() => undefined);
+    } finally {
+      await dropAccount({ get, put, del }, id).catch(() => undefined);
+      await forgetDevice({ del }, id);
+      for (const key of [`allow-changes:${id}`, `hub-sent:${id}`, `backlog-machine:${id}`, marksOf(id)]) await del(key).catch(() => undefined);
+      forgetCredential(id);
+    }
+    location.assign("/");
+  }
+
   async function signOutClicked() {
     state.busy = true;
     state.notice = null;
@@ -799,6 +836,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       if (action === "sign-in" || action === "other-passkey") return await signInClicked();
       if (action === "add-passkey") return await addPasskey();
       if (action === "sign-out") return await signOutClicked();
+      if (action === "save-account") return await saveAccount();
+      if (action === "remove-account") return await removeFromPhone();
       if (action === "not-now") {
         state.session = { state: "github", me: state.me };
         return draw();
@@ -871,11 +910,12 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     } else {
       render(top("kebbie hub"));
       state.info = await account.hub().catch(() => null);
-      await migrate({ get, put, del }).catch(() => undefined);
+      state.held = await migrate({ get, put, del }).catch(() => []);
+      if (!wanted && state.held.length) retarget(state.held[0].account);
       state.me = await signedInAccount(account);
       const onward = state.me ? signedInDestination(path, params) : null;
       if (onward) return location.assign(onward);
-      if (state.me) await migrate({ get, put, del }, state.me.account).catch(() => undefined);
+      if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => state.held);
       const kept = await keptUnlock(state.me);
       state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
     }

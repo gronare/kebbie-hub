@@ -32,7 +32,8 @@ import { acceptCount, addPasskeyScreen, awayLine, brand, cantUnlockScreen, conne
 
 const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
-const onward = safeNext(new URLSearchParams(location.search).get("next"));
+const adding = !pageMode && new URLSearchParams(location.search).has("add");
+const onward = adding ? "/" : safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const PLAN_INACTIVE = "plan-inactive";
 const state = { info: null, me: null, session: null, held: [], opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
@@ -774,9 +775,9 @@ function findEntry(id, machine = null) {
   return { entries, entry: started ? startedEntry(id, started) : null };
 }
 
-function ideaCandidates() {
+function ideaCandidates(account = null) {
   const now = nowSeconds();
-  return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea")).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo), ideas: opened.board.idea_machine === true }));
+  return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea") && (!account || opened.account === account)).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo), ideas: opened.board.idea_machine === true }));
 }
 
 const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine, main: mainMachine(), ideas: ideaMachine(ideaCandidates()) });
@@ -1118,11 +1119,17 @@ const liftKeyboard = keyboardLift();
 
 function signedOutScreen() {
   const shown = { notice: state.notice, busy: state.busy };
-  const step = signedOutStep({ info: state.info, remembered: rememberedCredential(), ...state.signin });
+  const step = signedOutStep({ info: state.info, remembered: adding ? null : rememberedCredential(), ...state.signin });
+  if (adding) return signInStep(step, shown) + `<a class="btn back-link" href="/">Back to your boards</a>`;
+  return signInStep(step, shown);
+}
+
+function signInStep(step, shown) {
   if (step === "code") return codeScreen({ purpose: "sign-in", email: state.signin.email, code: state.draft.code, ...shown });
   if (step === "passkey") return passkeySignInScreen(shown);
-  if (step === "email") return emailSignInScreen({ github: Boolean(state.info?.github), email: state.draft.email ?? state.signin.email, next: onward, ...shown });
-  return signInScreen({ github: Boolean(state.info?.github), notice: state.notice, next: onward });
+  const github = Boolean(state.info?.github) && !adding;
+  if (step === "email") return emailSignInScreen({ github, email: state.draft.email ?? state.signin.email, next: onward, ...shown });
+  return signInScreen({ github, notice: state.notice, next: onward });
 }
 
 const signedInWaits = () => signedInStep({ info: state.info, me: state.me, session: state.session, address: state.address, emailStep: state.emailStep });
@@ -1966,6 +1973,7 @@ async function entered(unlock) {
     state.unlocking = false;
   }
   state.me = state.session.me;
+  if (adding) state.held = await keepAccount(deviceStore, state.me.account).catch(() => state.held);
   if (onward) return location.assign(onward);
   if (previous && previous !== state.me.account && slots.has(previous)) dropSlot(slots.get(previous));
   slotFor(state.me.account);
@@ -2066,7 +2074,7 @@ function enterCode() {
   }
   return emailStep(async () => {
     const signed = await primary().enterCode(state.signin.email, code);
-    if (onward) return location.assign(onward);
+    if (onward && !adding) return location.assign(onward);
     state.me = signed.account;
     state.session = { state: "locked", me: state.me };
     slotFor(state.me.account);
@@ -2164,6 +2172,16 @@ function closeSheet(after = render) {
 
 let accountPage = null;
 
+function accountSummaries() {
+  return state.held.map((held) => {
+    const slot = slots.get(held.account);
+    const open = slot && sessionOf(slot)?.state === "unlocked";
+    const candidates = open ? ideaCandidates(held.account) : [];
+    const ideas = ideaMachine(candidates);
+    return { ...held, plan: slot ? (meOf(slot)?.plan ?? null) : null, machines: open ? slot.opened.length : null, ideas: candidates.find((one) => one.machine === ideas)?.name ?? null };
+  });
+}
+
 // The account page opens inside the running app so the unlocked session outlives it: a fresh load can only resume the unlock the device store kept.
 function openAccount() {
   history.pushState(null, "", "/account");
@@ -2171,7 +2189,7 @@ function openAccount() {
   state.sheet = false;
   document.documentElement.classList.remove("panes");
   scrollTo(0, 0);
-  accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address, device: slots.get(state.me?.account)?.device ?? null }, back: () => history.back() });
+  accountPage = startPage(root, { showBoard, given: { accounts: accountSummaries(), info: state.info, me: state.me, session: state.session, address: state.address, device: slots.get(state.me?.account)?.device ?? null }, back: () => history.back() });
 }
 
 function leaveAccount() {
@@ -2291,7 +2309,7 @@ root.addEventListener("click", (event) => {
   else if (action === "confirm-email") confirmEmail();
   else if (action === "sign-in") {
     unlockPrompt.disarm();
-    signInWithPasskey(rememberedCredential());
+    signInWithPasskey(adding ? null : rememberedCredential());
   }
   else if (action === "other-passkey") signInWithPasskey(null);
   else if (action === "add-passkey") addPasskey();
@@ -2532,6 +2550,8 @@ async function start() {
   if (params.has("github_error")) history.replaceState(null, "", location.pathname + location.hash);
   state.info = await account.hub().catch(() => null);
   const held = await migrate({ get, put, del }).catch(() => []);
+  state.held = held;
+  if (adding) return render();
   state.me = await signedInHeld(held);
   if (state.me && onward) return location.assign(onward);
   if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => held);
