@@ -1,5 +1,5 @@
 import { HubError } from "./hub.js";
-import { authScreen, disabled, esc, githubHref, heading } from "./screens.js";
+import { authScreen, disabled, esc, githubHref, heading, newHere } from "./screens.js";
 
 export { authScreen, isAuthScreen } from "./screens.js";
 
@@ -15,24 +15,24 @@ const leadWith = (title, lead) => `<h1 class="title">${esc(title)}</h1><p class=
 const primary = (action, label, busy) => `<button type="button" class="btn primary" data-action="${action}"${disabled(busy)}>${esc(label)}</button>`;
 const githubLink = (href) => `<a class="btn" href="${esc(href)}">Continue with GitHub</a>`;
 const codeLinks = (busy) => `<p class="foot">Nothing arrived? <button type="button" class="link inline" data-action="resend-code"${disabled(busy)}>Send a new code</button></p><div class="links"><button type="button" class="link" data-action="other-email"${disabled(busy)}>Use another email</button></div>`;
-const newHere = `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p>`;
 
 const titleFor = (returning) => (returning ? `Sign in to ${returning}` : "See your boards");
 
-export function emailSignInScreen({ github = false, email = "", next = null, returning = null, notice = null, busy = false }) {
+export function emailSignInScreen({ github = false, email = "", next = null, returning = null, adding = false, notice = null, busy = false }) {
   return authScreen({
     intro: heading(titleFor(returning), `Your machines' boards, end-to-end encrypted. Sign in with your email${github ? " or GitHub" : ""}.`),
     fields: emailInput(email),
     actions: primary("send-code", "Send code", busy),
-    alt: (github ? or + githubLink(githubHref({ next })) : "") + newHere,
+    alt: (github ? or + githubLink(githubHref({ next })) : "") + (adding ? "" : newHere),
     notice,
   });
 }
 
-export function passkeySignInScreen({ returning = null, notice = null, busy = false }) {
+export function passkeySignInScreen({ returning = null, adding = false, notice = null, busy = false }) {
   return authScreen({
     intro: heading(titleFor(returning), "Your machines' boards, end-to-end encrypted."),
     actions: primary("sign-in", "Sign in with your passkey", busy) + `<p class="foot">Can't use your passkey? <button type="button" class="link inline" data-action="email-instead">Sign in with email instead</button></p>`,
+    alt: adding ? "" : newHere,
     notice,
   });
 }

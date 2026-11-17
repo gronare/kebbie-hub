@@ -19,7 +19,7 @@ test("without a remembered passkey the sign-in page offers email and GitHub and 
   const info = { email_signin: true };
   assert.equal(signedOutStep({ info }), "email");
   const html = emailSignInScreen({ github: true });
-  assert.equal(text(html), "kebbie hub See your boards Your machines' boards, end-to-end encrypted. Sign in with your email or GitHub. Email Send code or Continue with GitHub New to kebbie? Start in your terminal: kebbie setup");
+  assert.equal(text(html), "kebbie hub See your boards Your machines' boards, end-to-end encrypted. Sign in with your email or GitHub. Email Send code or Continue with GitHub New here? Run kebbie hub connect on a machine to make your account.");
   assert.doesNotMatch(text(html), /passkey/i);
   assert.deepEqual(primaries(html), ["send-code"]);
   assert.match(html, /autocomplete="email"/);
@@ -32,9 +32,15 @@ test("a remembered passkey is the one main action and email waits behind a muted
   assert.equal(signedOutStep({ info, remembered: "cred" }), "passkey");
   assert.equal(signedOutStep({ info, remembered: "cred", chosen: true }), "email");
   const html = passkeySignInScreen({});
-  assert.equal(text(html), "kebbie hub See your boards Your machines' boards, end-to-end encrypted. Sign in with your passkey Can't use your passkey? Sign in with email instead");
+  assert.equal(text(html), "kebbie hub See your boards Your machines' boards, end-to-end encrypted. Sign in with your passkey Can't use your passkey? Sign in with email instead New here? Run kebbie hub connect on a machine to make your account.");
   assert.deepEqual(primaries(html), ["sign-in"]);
   assert.match(html, /class="link inline" data-action="email-instead"/);
+});
+
+test("only the plain sign-in page tells a new person how to make an account, never the add-account flow or the connect page", () => {
+  const line = /New here\? Run <code>kebbie hub connect<\/code> on a machine to make your account\./;
+  for (const html of [passkeySignInScreen({}), emailSignInScreen({ github: true })]) assert.match(html, line);
+  for (const html of [passkeySignInScreen({ returning: "Work", adding: true }), emailSignInScreen({ returning: "Work", adding: true }), connectEmailScreen({ name: "mac" })]) assert.doesNotMatch(html, /New here/);
 });
 
 test("the code screen takes one-time-code autofill and says where the code went", () => {
@@ -96,7 +102,7 @@ test("every auth screen reads intro, art, then a form whose actions hold the one
     assert.equal(html.match(/class="art-row"/g).length, 3);
     assert.doesNotMatch(html, /autofocus|style="/);
   }
-  assert.match(emailSignInScreen({ github: true }), /<div class="auth-alt"><div class="or">.*Continue with GitHub.*kebbie setup/s);
+  assert.match(emailSignInScreen({ github: true }), /<div class="auth-alt"><div class="or">.*Continue with GitHub.*kebbie hub connect/s);
   assert.equal(address(" Ada@Example.COM "), "ada@example.com");
   for (const wrong of ["", "ada", "@example.com", "ada@example", "ada@.com", "a da@example.com", "Ada <ada@example.com>"]) assert.equal(address(wrong), null, wrong);
 });

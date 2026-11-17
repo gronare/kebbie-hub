@@ -82,8 +82,10 @@ test("connecting ends with mac is connected and how to reach the board on the ph
 
 test("the hub opened without a link asks to sign in and sends newcomers to the terminal", () => {
   const said = text(signInScreen({ github: false }));
-  assert.equal(said, "kebbie hub See your boards Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie. Sign in with passkey New to kebbie? Start in your terminal: kebbie setup");
+  assert.equal(said, "kebbie hub See your boards Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie. Sign in with passkey New here? Run kebbie hub connect on a machine to make your account.");
   assert.doesNotMatch(said, OLD_COPY);
+  assert.doesNotMatch(signInScreen({ github: false, adding: true }), /New here/);
+  assert.doesNotMatch(connectWelcome({ name: "mac", signupOpen: false, github: false }) + connectWelcome({ name: "mac", signupOpen: true, github: false }), /New here/);
   assert.equal(text(unlockingScreen()), "kebbie hub Unlocking your boards…");
 });
 

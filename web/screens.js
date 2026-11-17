@@ -20,6 +20,8 @@ export function authScreen({ intro, fields = "", actions, alt = "", notice = nul
   return `<div class="auth-intro">${brand}${intro}</div>${art}<div class="auth-form">${form}</div>`;
 }
 
+export const newHere = `<p class="foot">New here? Run <code>kebbie hub connect</code> on a machine to make your account.</p>`;
+
 export const isAuthScreen = (html) => html.startsWith('<div class="auth-intro">');
 const status = (text, tone = "") => `<div class="center${tone ? ` ${tone}` : ""}">${text}</div>`;
 const MACHINE_ICON = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg>`;
@@ -689,12 +691,12 @@ export function connectCancelled() {
   return authScreen({ intro: "", actions: status("Cancelled. The terminal shows it too.") });
 }
 
-export function signInScreen({ github, notice = null, next = null }) {
+export function signInScreen({ github, notice = null, next = null, adding = false }) {
   const gh = github ? `<a class="btn" href="${esc(githubHref({ next }))}">Sign in with GitHub</a>` : "";
   return authScreen({
     intro: heading("See your boards", "Your machines' boards, end-to-end encrypted. Sign in with the passkey you made for kebbie."),
     actions: `<button type="button" class="btn primary" data-action="sign-in">Sign in with passkey</button>${gh}`,
-    alt: `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p>`,
+    alt: adding ? "" : newHere,
     notice,
   });
 }

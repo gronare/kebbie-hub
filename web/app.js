@@ -1168,10 +1168,10 @@ function signedOutScreen() {
 
 function signInStep(step, shown) {
   if (step === "code") return codeScreen({ purpose: "sign-in", email: state.signin.email, code: state.draft.code, ...shown });
-  if (step === "passkey") return passkeySignInScreen({ returning: returning?.name, ...shown });
+  if (step === "passkey") return passkeySignInScreen({ returning: returning?.name, adding, ...shown });
   const github = Boolean(state.info?.github) && !adding;
-  if (step === "email") return emailSignInScreen({ github, email: state.draft.email ?? state.signin.email, next: onward, returning: returning?.name, ...shown });
-  return signInScreen({ github, notice: state.notice, next: onward });
+  if (step === "email") return emailSignInScreen({ github, email: state.draft.email ?? state.signin.email, next: onward, returning: returning?.name, adding, ...shown });
+  return signInScreen({ github, notice: state.notice, next: onward, adding });
 }
 
 const signedInWaits = () => signedInStep({ info: state.info, me: state.me, session: state.session, address: state.address, emailStep: state.emailStep });
