@@ -33,8 +33,12 @@ pub struct Board {
     pub backlog: Option<Vec<BacklogRow>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lead: Option<Box<LeadRef>>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not", deserialize_with = "null_as_false")]
     pub idea_machine: bool,
+}
+
+fn null_as_false<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    Ok(Option::<bool>::deserialize(deserializer)?.unwrap_or(false))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1781,6 +1785,15 @@ mod tests {
         let board: Board = serde_json::from_value(named.clone()).unwrap();
         assert!(board.idea_machine);
         assert_eq!(serde_json::to_value(&board).unwrap(), named);
+    }
+
+    #[test]
+    fn a_board_with_idea_machine_null_parses_as_not_the_ideas_machine_as_the_hub_reads_it() {
+        let mut null = plain_board();
+        null["idea_machine"] = serde_json::Value::Null;
+        let board: Board = serde_json::from_value(null).unwrap();
+        assert!(!board.idea_machine);
+        assert_eq!(serde_json::to_value(&board).unwrap(), plain_board());
     }
 
     #[test]

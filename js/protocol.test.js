@@ -131,6 +131,7 @@ test("a board item's subtasks, push order and pushable run carry only their own 
   const plain = envelopes.cases.find((vector) => vector.name === "board-opened-by-a-device").expect.payload;
   assert.equal(Object.hasOwn(plain.items[0], "subtasks"), false);
   checkPayload(plain);
+  checkPayload({ ...plain, idea_machine: null });
   const item = planned.items[0];
   assert.deepEqual(item.subtasks.map((one) => [one.id, one.state, one.commits.length]), [["docs", "pushed", 1], ["currency", "accepted", 1], ["gateway", "ready", 2], ["tests", "accepted", 1], ["new-gateway", "in-progress", 0], ["remove-old", "planned", 0]]);
   assert.deepEqual(item.order.map((row) => row.subtask), ["currency", "gateway", "tests", "gateway"], "a subtask's commits may sit apart in the push order");
