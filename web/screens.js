@@ -791,7 +791,7 @@ export function accountsGroup(accounts, current) {
   return `<h2 class="group g-muted">Accounts on this phone</h2>${rows.join("")}`;
 }
 
-export const addAccountRow = `<a class="task row-link" href="/?add=1" data-action="add-account"><span class="name">+ Add an account</span><span class="meta">Sign in to another account on this hub</span>${CHEV_RIGHT}</a>`;
+export const addAccountRow = `<a class="task row-link" href="/?add=1" data-action="add-account"><span class="name">+ Add an account<span class="meta under">Sign in to another account on this hub</span></span>${CHEV_RIGHT}</a>`;
 
 export function nameAndColour({ name, colour }) {
   const swatches = COLOUR_NAMES.map((one) => `<label class="swatch"><input type="radio" name="account-colour" value="${one}"${one === colour ? " checked" : ""}>${accountDot(one)}<span class="sr">${one}</span></label>`).join("");
