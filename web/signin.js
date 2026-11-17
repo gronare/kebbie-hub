@@ -14,6 +14,8 @@ export class WrongAccount extends Error {
   }
 }
 
+const fromB64url = (value) => Uint8Array.fromBase64(value, { alphabet: "base64url", lastChunkHandling: "loose" });
+
 const labelOf = (me, typed) => typed || me?.github || me?.handle || "another account";
 
 // Refused before anything here keeps the other account, so it never takes the signed-out one's place.
@@ -26,12 +28,14 @@ export function expectAccount(returning, signedIn, { prf = null, typed = null } 
 // A conditional request left pending blocks the next get(), so a new sign-in aborts the one before it.
 export function signInWith({ account, credentials, platform = globalThis.PublicKeyCredential, store = globalThis.localStorage }) {
   let pending = null;
-  const run = async (request, mediation) => {
+  const run = async (request, mediation, allow = null) => {
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
     const begun = await account.loginBegin(request);
-    const options = { ...requestOptions(begun.options, { first: begun.prf_salt }), signal: controller.signal, ...(mediation ? { mediation } : {}) };
+    const asked = requestOptions(begun.options, { first: begun.prf_salt });
+    const limited = allow?.length && !request.credential ? { publicKey: { ...asked.publicKey, allowCredentials: allow.map((id) => ({ type: "public-key", id: fromB64url(id) })) } } : asked;
+    const options = { ...limited, signal: controller.signal, ...(mediation ? { mediation } : {}) };
     let credential;
     try {
       credential = await credentials.get(options);
@@ -47,7 +51,7 @@ export function signInWith({ account, credentials, platform = globalThis.PublicK
     return { signedIn, prf: prfOutput(credential), salt: begun.prf_salt ?? null };
   };
   return {
-    withPasskey: (remembered = null, bound = {}) => (remembered ? run({ credential: remembered, ...bound }, null).catch((error) => (error instanceof HubError ? run(bound, null) : Promise.reject(error))) : run(bound, null)),
+    withPasskey: (remembered = null, bound = {}, allow = null) => (remembered ? run({ credential: remembered, ...bound }, null).catch((error) => (error instanceof HubError ? run(bound, null, allow) : Promise.reject(error))) : run(bound, null, allow)),
     autofill: () => run({}, "conditional"),
     stop: () => pending?.abort(),
   };

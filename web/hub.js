@@ -44,6 +44,7 @@ function accountCalls(id) {
     loginBegin: (request = {}) => call("POST", "/v1/a/login/begin", { body: request }),
     loginFinish: (ceremony, credential) => call("POST", "/v1/a/login/finish", { body: { ceremony, credential } }),
     logout: () => on("POST", "/v1/a/logout"),
+    passkeys: () => on("GET", "/v1/a/passkeys"),
     passkeyBegin: () => on("POST", "/v1/a/passkeys/begin", {}),
     passkeyFinish: (ceremony, credential, name) => on("POST", "/v1/a/passkeys/finish", { ceremony, credential, name }),
     setKey: (setup) => on("POST", "/v1/a/key", setup),
