@@ -64,3 +64,35 @@ test("a new passkey is named after the account's GitHub login, or kebbie hub, an
   const plain = creationOptions(options, null, passkeyName({ account: "acc_1", handle: "kaca606abca3f", github: null }));
   assert.deepEqual(plain.publicKey.user, { id: new Uint8Array([4, 5]), name: "kebbie hub", displayName: "kebbie hub" });
 });
+
+test("every call under /v1/a/ names the account it was scoped to, and the sign-in calls name none", async () => {
+  const { scoped, ACCOUNT_HEADER, linkFor } = await import("./hub.js");
+  const seen = [];
+  const held = globalThis.fetch;
+  globalThis.fetch = async (path, init = {}) => {
+    seen.push({ path, account: init.headers?.[ACCOUNT_HEADER] ?? null });
+    return { ok: true, status: 200, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) };
+  };
+  try {
+    const work = scoped("acc_work");
+    const skip = new Set(["id", "hub", "registerBegin", "registerFinish", "loginBegin", "loginFinish", "askCode", "enterCode", "peek"]);
+    for (const calls of [work.account, work.connectCalls]) {
+      for (const [name, method] of Object.entries(calls)) {
+        if (name === "id") continue;
+        seen.length = 0;
+        await method("x", "y", "z");
+        assert.equal(seen.length, 1, name);
+        assert.equal(seen[0].account, skip.has(name) ? null : "acc_work", `${name} ${seen[0].path}`);
+        if (!skip.has(name)) assert.match(seen[0].path, /^\/v1\/a\//, name);
+      }
+    }
+    seen.length = 0;
+    await scoped(null).account.boards();
+    assert.equal(seen[0].account, null);
+    assert.equal(linkFor("/v1/a/billing/manage", "acc_work"), "/v1/a/billing/manage?account=acc_work");
+    assert.equal(linkFor("/auth/github?link=1", "acc_work"), "/auth/github?link=1&account=acc_work");
+    assert.equal(linkFor("/auth/github?link=1", null), "/auth/github?link=1");
+  } finally {
+    globalThis.fetch = held;
+  }
+});
