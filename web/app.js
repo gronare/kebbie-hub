@@ -17,6 +17,7 @@ import { accountChips, accountHeading, accountPicker, accountSummary, lockedAcco
 import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf, returningTo } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
+import { heldSession, lockedMachines, NoPasskeyHere, unlockHeld } from "./locked.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
 import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fileAt, foldCommitsOn, freshReviewUi, hangLines, openFileAt, openOf, readKey, keptTaskView, readOf, readShaOf, reviewEntry, rowOf, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
@@ -65,7 +66,15 @@ function arranged(now) {
   return multi() ? { ...view, next: view.next.map((list) => ({ ...list, tag: tagOf(list.machine) })) } : view;
 }
 
-const lockedHeld = () => (multi() ? liveHeld().filter((one) => one.account !== state.me?.account && slots.get(one.account)?.session?.state === "locked") : []);
+const lockedHeld = () =>
+  multi()
+    ? liveHeld()
+        .filter((one) => one.account !== state.me?.account && slots.get(one.account)?.session?.state === "locked")
+        .map((one) => {
+          const slot = slots.get(one.account);
+          return { ...one, machines: slot.lockedMachines ?? [], notice: slot.unlockNotice ?? null, busy: slot.unlockBusy === true };
+        })
+    : [];
 
 const accountName = (id) => {
   const one = state.held.find((held) => held.account === id);
@@ -1367,17 +1376,41 @@ async function removeMachine(machine, name) {
 
 async function unlockAccount(id) {
   const slot = slots.get(id);
-  if (!slot) return;
-  state.notice = null;
+  if (!slot || slot.unlockBusy) return;
+  const held = state.held.find((one) => one.account === id) ?? { account: id };
+  const hubFor = { account: slot.calls.account, credentials: hub.credentials };
+  slot.unlockNotice = null;
+  slot.unlockBusy = true;
+  render();
   try {
-    await reauthenticate(slot);
+    const session = slot.me && !slot.me.key ? await addFirstPasskey(hubFor, slot.me, proposedName(navigator.userAgent)) : await unlockHeld(hubFor, held, { remembered: rememberedCredential(undefined, id) });
+    slot.me = session.me;
+    if (session.state !== "unlocked") {
+      slot.unlockNotice = STATE_TEXT[session.state] ?? STATE_TEXT.locked;
+      return;
+    }
+    slot.session = session;
     watchSlot(slot);
     await refresh();
     startFeed();
   } catch (error) {
-    state.notice = signInText(error) ?? hubMessage(error);
+    slot.unlockNotice = error instanceof NoPasskeyHere ? error.message : (signInText(error) ?? hubMessage(error));
+  } finally {
+    slot.unlockBusy = false;
     render();
   }
+}
+
+async function lockedListing(slot) {
+  if (slot.me?.key_access !== false) {
+    const fresh = await slot.calls.account.boards().catch(() => null);
+    if (fresh) return fresh;
+  }
+  return (await cachedListing(slot.id))?.listing ?? null;
+}
+
+async function nameLockedMachines(slot) {
+  slot.lockedMachines = await lockedMachines(slot.me?.key, await lockedListing(slot)).catch(() => []);
 }
 
 async function reauthenticate(slot) {
@@ -1954,6 +1987,7 @@ function lockSlot(slot) {
   slot.session = { state: "locked", me: slot.me };
   mergeSlots();
   render();
+  nameLockedMachines(slot).then(render);
 }
 
 function signedOut(message) {
@@ -2602,7 +2636,8 @@ async function resumeOthers() {
     await remember(me);
     const slot = slotFor(held.account);
     slot.me = me;
-    slot.session = (await keptUnlock(me)) ?? { state: "locked", me };
+    slot.session = await heldSession(me);
+    if (slot.session.state === "locked") await nameLockedMachines(slot);
     watchSlot(slot);
   }
 }

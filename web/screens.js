@@ -991,8 +991,16 @@ export function accountPicker(accounts, chosen) {
   return `<div class="note-field"><span class="label">Account</span><div class="pills acct-chips" role="radiogroup" aria-label="Account">${options.join("")}</div></div>`;
 }
 
+const sealedMachine = (machine) => `<div class="task acct-locked-machine"><span class="name">${esc(machine.name)}</span><span class="meta">Locked · unlock to read</span></div>`;
+
 export function lockedAccounts(locked) {
-  return locked.map((one) => `<div class="task acct-locked">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))} is locked</span><span class="meta">Its boards and commands wait for its passkey.</span></span><button type="button" class="btn small" data-action="unlock-account" data-account="${esc(one.account)}">Unlock</button></div>`).join("");
+  return locked
+    .map((one) => {
+      const notice = one.notice ? `<span class="meta warn" role="status">${esc(one.notice)}</span>` : "";
+      const head = `<div class="task acct-locked">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))}</span><span class="meta">Locked</span>${notice}</span><button type="button" class="btn small" data-action="unlock-account" data-account="${esc(one.account)}"${one.busy ? " disabled" : ""}>Unlock with passkey</button></div>`;
+      return head + (one.machines ?? []).map(sealedMachine).join("");
+    })
+    .join("");
 }
 
 export function connectAccountPicker(accounts, current, code) {

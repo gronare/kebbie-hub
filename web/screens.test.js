@@ -876,7 +876,7 @@ test("with two accounts Next heads each machine with its account's dot and name,
   assert.equal(text(accountChips(held, "acc_work")), "All Home Work");
   assert.match(accountChips(held, "acc_work"), /data-account="acc_work" aria-pressed="true"/);
   assert.match(accountPicker(held, "acc_home"), /data-action="idea-account" data-account="acc_home" aria-pressed="true"/);
-  assert.match(text(lockedAccounts([held[1]])), /^Work is locked .* Unlock$/);
+  assert.equal(text(lockedAccounts([held[1]])), "Work Locked Unlock with passkey");
 });
 
 test("the connect page asks which account a new machine joins when the phone holds two, keeping the code", async () => {

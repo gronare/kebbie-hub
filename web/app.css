@@ -245,6 +245,7 @@ a.task:active { background: var(--sel); }
 .acct-out .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .acct-locked { display: flex; align-items: center; gap: 12px; }
 .acct-locked .about { display: grid; flex: 1; min-width: 0; }
+.acct-locked-machine { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .note-field .label { font-size: 13px; color: var(--muted); }
 .dmach { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 16px; font-size: 13px; color: var(--muted); }
 .dmach > span { display: inline-flex; gap: 6px; align-items: center; }
