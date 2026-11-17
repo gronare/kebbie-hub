@@ -1,5 +1,5 @@
 import { fromB64, verifyMachineList } from "../js/protocol.js";
-import { nameOf } from "./accounts.js";
+import { keepAccount, labelsOf, nameOf } from "./accounts.js";
 import { NoPasskeyOffered, signInWith } from "./signin.js";
 import { keptUnlock, unlockAfter } from "./unlock.js";
 
@@ -16,6 +16,17 @@ export class OtherAccount extends Error {
   constructor(name) {
     super(`That passkey belongs to another account than ${name}. Nothing changed.`);
     this.code = "other-account";
+  }
+}
+
+// An account signed in by email or code is kept on the phone locked; a phone that cannot keep it ends the session, so no account is held that the phone does not list.
+export async function keepAdded(store, calls, me, { emails = true } = {}) {
+  try {
+    const address = emails ? await calls.email().catch(() => null) : null;
+    return await keepAccount(store, me.account, { ...labelsOf(me, address), signedOut: false });
+  } catch (error) {
+    await calls.logout().catch(() => undefined);
+    throw error;
   }
 }
 

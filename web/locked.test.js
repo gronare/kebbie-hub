@@ -4,10 +4,10 @@ import { test } from "node:test";
 
 import { fromB64, toB64 } from "../js/protocol.js";
 import { HubError } from "./hub.js";
-import { unlockKey } from "./accounts.js";
+import { heldAccounts, unlockKey } from "./accounts.js";
 import { rememberCredential } from "./unlock.js";
 import { lockedAccounts } from "./screens.js";
-import { heldSession, lockedMachines, NoPasskeyHere, noPasskeyText, unlockHeld } from "./locked.js";
+import { heldSession, keepAdded, lockedMachines, NoPasskeyHere, noPasskeyText, unlockHeld } from "./locked.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -80,11 +80,25 @@ function workHub({ passkeys = [CREDENTIAL] } = {}) {
   };
 }
 
-test("a session signed in by code stays locked whatever unlock the phone kept", async () => {
+async function addByEmail(account, store, code) {
+  const signed = await account.enterCode("carl@work.example", code);
+  return keepAdded(store, account, signed.account);
+}
+
+test("adding an account by email and code keeps it on the phone locked, without asking for a passkey", async () => {
+  const account = workHub();
+  const credentials = authenticator();
   const store = memoryStore();
   await store.put(unlockKey(ACCOUNT), { identity: { id: ACCOUNT }, encryption: null, until: Date.now() + 1000 });
-  const session = await heldSession(await workHub().me(), store, Date.now(), storage());
-  assert.equal(session.state, "locked");
+  await addByEmail(account, store, "123456");
+  const [held] = await heldAccounts(store);
+  assert.equal(held.account, ACCOUNT);
+  assert.equal(held.email, "carl@work.example");
+  assert.equal(held.signedOut, false);
+  const session = await heldSession(await account.me(), store, Date.now(), storage());
+  assert.equal(session.state, "locked", "a session signed in by code holds no key, whatever unlock the phone kept");
+  assert.deepEqual([credentials.asked.length, credentials.made.length], [0, 0]);
+  assert.ok(!account.calls.some(([name]) => name === "loginBegin"));
 });
 
 test("a locked account unlocks with the passkey this phone remembers for it, in one prompt", async () => {
@@ -131,4 +145,15 @@ test("a locked account's machines are named from its signed list while its board
   const html = lockedAccounts([{ ...WORK, machines: named }]);
   assert.match(text(html), new RegExp(`^Work Locked Unlock with passkey ${named.map(({ name }) => `${name} Locked · unlock to read`).join(" ")}$`));
   assert.deepEqual([...html.matchAll(/data-action="([^"]+)"/g)].map((found) => found[1]), ["unlock-account"], "nothing but Unlock can be tapped");
+});
+
+test("an add cancelled at the code, or one the phone cannot keep, leaves no account on the phone", async () => {
+  const account = workHub();
+  const store = memoryStore();
+  await assert.rejects(addByEmail(account, store, "000000"), HubError);
+  assert.deepEqual(await heldAccounts(store), []);
+  const full = memoryStore({ failPut: true });
+  await assert.rejects(addByEmail(account, full, "123456"), /quota/);
+  assert.deepEqual(await heldAccounts(full), []);
+  assert.deepEqual(account.calls.at(-1), ["logout"], "a session the phone could not keep is ended");
 });

@@ -17,7 +17,7 @@ import { accountChips, accountHeading, accountPicker, accountSummary, lockedAcco
 import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf, returningTo } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
-import { heldSession, lockedMachines, NoPasskeyHere, unlockHeld } from "./locked.js";
+import { heldSession, keepAdded, lockedMachines, NoPasskeyHere, unlockHeld } from "./locked.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
 import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fileAt, foldCommitsOn, freshReviewUi, hangLines, openFileAt, openOf, readKey, keptTaskView, readOf, readShaOf, reviewEntry, rowOf, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
@@ -2169,7 +2169,11 @@ function enterCode() {
   return emailStep(async () => {
     const signed = await primary().enterCode(state.signin.email, code);
     await landedOn(signed.account, { typed: state.signin.email });
-    if (onward && !adding) return location.assign(onward);
+    if (adding) {
+      await keepAdded(deviceStore, scoped(signed.account.account).account, signed.account, { emails: Boolean(state.info?.email) });
+      return location.assign("/");
+    }
+    if (onward) return location.assign(onward);
     state.me = signed.account;
     state.session = { state: "locked", me: state.me };
     slotFor(state.me.account);
