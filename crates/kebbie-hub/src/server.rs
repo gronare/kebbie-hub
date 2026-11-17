@@ -149,7 +149,7 @@ async fn connection(
     builder
         .timer(TokioTimer::new())
         .header_read_timeout(hub.config().header_read_timeout);
-    let connection = builder.serve_connection(TokioIo::new(stream), service);
+    let connection = builder.serve_connection(TokioIo::new(stream), service).with_upgrades();
     let mut connection = std::pin::pin!(connection);
     let stop = async {
         let _ = stopping.wait_for(|stop| *stop).await;
