@@ -36,6 +36,7 @@ function accountCalls(id) {
   const on = (method, path, body) => call(method, path, { body, account: id });
   return {
     id,
+    as: (other) => accountCalls(other),
     hub: () => call("GET", "/v1/hub"),
     me: () => on("GET", "/v1/a/account"),
     registerBegin: (ticket) => call("POST", "/v1/a/register/begin", { body: ticket }),

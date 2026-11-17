@@ -287,8 +287,11 @@ export async function unlockAfter(hub, ceremony, storage = localStore(), store =
   return session;
 }
 
-async function settleUnlock(hub, ceremony, storage) {
+const scopedTo = (hub, account) => (hub.account.as && account ? { ...hub, account: hub.account.as(account) } : hub);
+
+async function settleUnlock(unscoped, ceremony, storage) {
   let { signedIn, prf, salt } = ceremony;
+  const hub = scopedTo(unscoped, signedIn.account);
   if (!prf) ({ signedIn, prf, salt } = await prfCeremony(hub, signedIn.unlock.credential));
   const { unlock } = signedIn;
   const me = withoutUnlock(signedIn);
@@ -322,7 +325,8 @@ async function settleUnlock(hub, ceremony, storage) {
   }
 }
 
-export async function addFirstPasskey(hub, me, name, storage = localStore(), store = deviceStore) {
+export async function addFirstPasskey(unscoped, me, name, storage = localStore(), store = deviceStore) {
+  const hub = scopedTo(unscoped, me.account);
   const begun = await hub.account.passkeyBegin();
   const created = await hub.credentials.create(creationOptions(begun.options, begun.prf_salt, passkeyName(me)));
   const added = await hub.account.passkeyFinish(begun.ceremony, registrationJSON(created), name);
@@ -330,7 +334,8 @@ export async function addFirstPasskey(hub, me, name, storage = localStore(), sto
   return unlockAfter(hub, { signedIn, prf: prfOutput(created), salt: begun.prf_salt }, storage, store);
 }
 
-export async function addUnlockingPasskey(hub, session, name) {
+export async function addUnlockingPasskey(unscoped, session, name) {
+  const hub = scopedTo(unscoped, session?.me?.account);
   const begun = await hub.account.passkeyBegin();
   const created = await hub.credentials.create(creationOptions(begun.options, begun.prf_salt, passkeyName(session?.me)));
   const added = await hub.account.passkeyFinish(begun.ceremony, registrationJSON(created), name);

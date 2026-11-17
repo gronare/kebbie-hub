@@ -5,14 +5,15 @@ import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js"
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, signInText, signInWith } from "./signin.js";
-import { account, connectCalls, follow, HubError } from "./hub.js";
+import { account, HubError, scoped } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
 import { BACKLOG_BODY_MEDIA_TYPE, CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
 import { assessmentBlock, cardLead, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea, readyCard, readyPush } from "./card.js";
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
 import { del, forgetDeviceKeys, get, put } from "./store.js";
-import { listingKey, migrate } from "./accounts.js";
+import { freshSlot, holderOf, merged, unlockedOf } from "./slots.js";
+import { heldAccounts, keepAccount, listingKey, marksKey, migrate } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
@@ -34,8 +35,32 @@ let pageMode = PAGES.includes(location.pathname);
 const onward = safeNext(new URLSearchParams(location.search).get("next"));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const PLAN_INACTIVE = "plan-inactive";
-const state = { info: null, me: null, session: null, opened: [], marks: emptyMarks(), storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
-const myPlan = () => currentPlan(state.me?.plan, nowSeconds());
+const state = { info: null, me: null, session: null, held: [], opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const slots = new Map();
+function slotFor(id) {
+  if (!slots.has(id)) slots.set(id, freshSlot(id, scoped(id)));
+  return slots.get(id);
+}
+const isPrimary = (slot) => slot.id === state.me?.account;
+const sessionOf = (slot) => (isPrimary(slot) ? state.session : slot.session);
+const meOf = (slot) => (isPrimary(slot) ? state.me : slot.me);
+const unlockedSlots = () => unlockedOf(slots, sessionOf);
+const slotOfMachine = (machine) => holderOf(unlockedSlots(), machine);
+const primary = () => scoped(state.me?.account ?? null).account;
+const listsOf = (slot) => ({ boards: slot.calls.account.boards, putMachines: slot.calls.connectCalls.putMachines });
+
+function mergeSlots() {
+  Object.assign(state, merged(unlockedSlots()));
+}
+
+const accountName = (id) => state.held.find((one) => one.account === id)?.name ?? "Another account";
+const multi = () => state.held.length > 1;
+
+const planOf = (machine) => {
+  const slot = machine ? slotOfMachine(machine) : null;
+  return currentPlan((slot ? meOf(slot) : state.me)?.plan, nowSeconds());
+};
+const myPlan = () => planOf(state.pro?.machine ?? null);
 let reloading = false;
 const hub = { account, credentials: globalThis.navigator?.credentials };
 
@@ -86,14 +111,25 @@ let rendered = null;
 const splitLike = () => pose === "split" || pose === "land";
 const twoColumns = () => splitLike() || pose === "desk";
 const overview = () => overviewPose(pose, innerHeight > innerWidth);
-const lists = { boards: account.boards, putMachines: connectCalls.putMachines };
 const unlockEnds = lockWhenDue(lockBoards);
 const unlockPrompt = unlockOnShow(() => signInWithPasskey(rememberedCredential()), () => passkeyLocked());
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 const short = (sha) => (sha ?? "").slice(0, 7);
-const blobs = blobReader(keptBytes(account.blob, deviceStore.keptBlobs));
+async function fetchBlob(id) {
+  let missing = null;
+  for (const slot of unlockedSlots().length ? unlockedSlots() : [slotFor(state.me?.account ?? null)]) {
+    try {
+      return await slot.calls.account.blob(id);
+    } catch (error) {
+      if (!(error instanceof HubError && error.status === 404)) throw error;
+      missing = error;
+    }
+  }
+  throw missing ?? new HubError(404, "unknown-blob");
+}
+const blobs = blobReader(keptBytes(fetchBlob, deviceStore.keptBlobs));
 const KEEP_BLOBS_SECONDS = 30 * 86_400;
 deviceStore.keptBlobs.prune(Math.floor(Date.now() / 1000) - KEEP_BLOBS_SECONDS).catch(() => undefined);
 const deviceStorage = () => {
@@ -354,7 +390,7 @@ function cardSections(found, card, shown = card) {
   const { item } = found;
   const ui = uiOf(found.machine, item.address);
   const backlog = state.opened.find((machine) => machine.machine === found.machine)?.board?.backlog ?? [];
-  const noticed = (line) => noticedArea(line, { access: commandGate(), accepts: found.accepts, sent: line.found ? noticedSent(found, line.found) : null, busy: ui.busy, error: ui.error, now: nowSeconds(), recurring: backlog.find((row) => row.item === line.found)?.found?.sources.length ?? 0 });
+  const noticed = (line) => noticedArea(line, { access: commandGate(found.machine), accepts: found.accepts, sent: line.found ? noticedSent(found, line.found) : null, busy: ui.busy, error: ui.error, now: nowSeconds(), recurring: backlog.find((row) => row.item === line.found)?.found?.sources.length ?? 0 });
   return changedNotice(card, seenVersion(found.machine, item.address)) + cardParts(shown, { noticed });
 }
 
@@ -368,7 +404,7 @@ function assessArea(found) {
   const ui = uiOf(found.machine, item.address);
   const shown = sentFor(found, "review-send");
   const sent = shown.sent ? shown : null;
-  return assessmentBlock(item, { access: commandGate(), accepts: found.accepts, sent, busy: ui.busy, error: ui.error, status: (one) => foundStatus(one.sent, one.state, { standing: one.standing, now: nowSeconds() }) });
+  return assessmentBlock(item, { access: commandGate(found.machine), accepts: found.accepts, sent, busy: ui.busy, error: ui.error, status: (one) => foundStatus(one.sent, one.state, { standing: one.standing, now: nowSeconds() }) });
 }
 
 const structuredOf = (item) => item.card?.blob.media_type === CARD_MEDIA_TYPE;
@@ -440,20 +476,21 @@ function uiOf(machine, address) {
   return state.ui.get(key);
 }
 
-const commandGate = () => gate({ info: state.info, refused: state.refused, allowed: state.allowed });
+const commandGate = (machine = null) => gate({ info: state.info, refused: state.refused, allowed: machine ? slotOfMachine(machine)?.allowed === true : state.allowed });
+const deviceOf = (machine) => slotOfMachine(machine)?.device ?? null;
 const decide = (found, html) => `<div class="decide" data-machine="${esc(found.machine)}" data-address="${esc(found.item.address)}">${html}</div>`;
 
 function sentFor(found, kind, question = null, prompt = null, address = found.item.address) {
   const sent = latestSent(state.kept.sent, { machine: found.machine, address, kind, question, prompt });
   if (!sent) return { sent: null, state: null, standing: null };
   const opened = state.opened.find((machine) => machine.machine === found.machine);
-  const standing = standingOn(opened?.board, state.device?.id === sent.device ? state.device : null);
+  const standing = standingOn(opened?.board, deviceOf(sent.machine)?.id === sent.device ? deviceOf(sent.machine) : null);
   return { sent, standing, state: sentState(sent, { now: nowSeconds(), asleep: isAsleep({ lastSeen: opened?.lastSeen ?? null }, nowSeconds()), standing }) };
 }
 
 function answerArea(found) {
   const question = shownQuestion(found.item);
-  const access = commandGate();
+  const access = commandGate(found.machine);
   if (access === "off") return optionCards(question.options, question.recommend) + machineAnswerNote();
   if (access === "refused") return optionCards(question.options, question.recommend) + refusedBlock(state.refused.url);
   if (access === "view-only") return optionCards(question.options, question.recommend) + viewOnlyBlock();
@@ -469,7 +506,7 @@ function answerArea(found) {
 
 function promptArea(found) {
   const prompt = found.item.prompt;
-  const access = commandGate();
+  const access = commandGate(found.machine);
   if (access === "off") return promptCards(prompt) + machineAnswerNote();
   if (access === "refused") return promptCards(prompt) + refusedBlock(state.refused.url);
   if (access === "view-only") return promptCards(prompt) + viewOnlyBlock();
@@ -484,7 +521,7 @@ function pushGated(found, plain = false) {
   const { item } = found;
   const pushable = item.group === "READY TO PUSH" || item.card || item.pushable;
   if (!pushable || !item.head) return "";
-  const access = commandGate();
+  const access = commandGate(found.machine);
   const what = plain ? `${pushCount(item)} ${pushCount(item) === 1 ? "commit" : "commits"}` : short(item.head);
   if (access === "off" || !pushReady(item)) return `<button type="button" class="btn primary off" disabled>Push ${esc(what)} · coming in a later version</button>`;
   if (access === "refused") return refusedBlock(state.refused.url);
@@ -572,7 +609,7 @@ function wideTaskScreen(params, panel = taskPanel) {
 
 function shownOf(sent) {
   const opened = state.opened.find((machine) => machine.machine === sent.machine);
-  const standing = standingOn(opened?.board, state.device?.id === sent.device ? state.device : null);
+  const standing = standingOn(opened?.board, deviceOf(sent.machine)?.id === sent.device ? deviceOf(sent.machine) : null);
   const shown = sentState(sent, { now: nowSeconds(), asleep: isAsleep({ lastSeen: opened?.lastSeen ?? null }, nowSeconds()), standing });
   return { sent, state: shown, standing, live: !settled(shown) };
 }
@@ -696,7 +733,7 @@ function itemCardHtml(entry) {
   const shown = bodyOf(entry);
   if (shown.body && settleDrafts(ui, shown.body, answerSentOf(entry))) keepDrafts(deviceStorage(), entry.id, ui.answers);
   const strays = shown.body ? strayDrafts(ui, shown.body, answerSentOf(entry)) : [];
-  return itemBody(idea ? { ...entry, idea } : entry, { ...shown, strays, main: mainMachine(), access: commandGate(), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null, write });
+  return itemBody(idea ? { ...entry, idea } : entry, { ...shown, strays, main: mainMachine(), access: commandGate(entry.machines[0]?.machine ?? null), refusedUrl: state.refused?.url ?? null, ui, sentFor, start, candidates, chosen, now: nowSeconds(), taskHref: taskHrefFor(entry, start), edits, found: isFound(entry) ? foundOf(entry) : null, write });
 }
 
 const FOUND_KINDS = ["found-start", "found-add", "found-dismiss"];
@@ -821,7 +858,7 @@ function reviewView(found, page) {
   const ui = reviewUiOf(found.machine, found.item.address, subtask);
   foldCommitsOn(ui, location.hash);
   const wanted = `${head ?? ""}|${subtask ?? ""}`;
-  const access = commandGate();
+  const access = commandGate(found.machine);
   const opener = sentOn(found, "review-open", (sent) => (sent.subtask ?? null) === subtask && (sent.head ?? null) === head)[0] ?? null;
   const { review, failed } = heldReview(found, opener, subtask);
   settleReview(ui, review);
@@ -905,20 +942,23 @@ function markLeadSeen(machine, at) {
 }
 
 function deviceName(id) {
-  if (id === state.device?.id) return state.device.cert.name;
+  const own = [...slots.values()].find((slot) => slot.device?.id === id)?.device;
+  if (own) return own.cert.name;
   return state.lead.names?.get(id) ?? "another device";
 }
 
 function loadDeviceNames() {
   if (state.lead.names) return;
   state.lead.names = new Map();
-  account
-    .devices()
-    .then((listed) => {
-      for (const device of listed.devices ?? []) state.lead.names.set(device.cert.device, device.cert.name);
-      if (route().name === "lead") render();
-    })
-    .catch(() => undefined);
+  for (const slot of unlockedSlots()) {
+    slot.calls.account
+      .devices()
+      .then((listed) => {
+        for (const device of listed.devices ?? []) state.lead.names.set(device.cert.device, device.cert.name);
+        if (route().name === "lead") render();
+      })
+      .catch(() => undefined);
+  }
 }
 
 function leadView(machine, now) {
@@ -976,7 +1016,7 @@ async function sendLead() {
 async function switchAway(on) {
   const machines = state.opened.filter((one) => one.board && !one.problem && (one.board.accepts ?? []).includes("away"));
   const ui = { busy: false, error: null };
-  if (machines.length && !(await proAllows("away"))) return render();
+  if (machines.length && !(await proAllows("away", machines[0].machine))) return render();
   for (const machine of machines) await sendTo({ machine: { machine: machine.machine, name: machine.name }, payload: { type: "away", on }, meta: { on }, ui });
   state.lead.error = ui.error;
   render();
@@ -1179,25 +1219,23 @@ function scrollListToTop() {
 
 let retrying = null;
 
-const marksKey = () => `marks:${state.me?.account}`;
-
-async function storedMarks() {
-  const { marks, failed } = await readMarks(get, marksKey());
+async function storedMarks(id) {
+  const { marks, failed } = await readMarks(get, marksKey(id));
   if (failed) state.storeFailed = true;
   return marks;
 }
 
-async function keepMarks() {
+async function keepMarks(slot) {
   try {
-    await put(marksKey(), state.marks);
+    await put(marksKey(slot.id), slot.marks);
   } catch {
     state.storeFailed = true;
   }
 }
 
-async function cachedListing() {
+async function cachedListing(id) {
   try {
-    return (await get(listingKey(state.me?.account))) ?? null;
+    return (await get(listingKey(id))) ?? null;
   } catch {
     state.storeFailed = true;
     return null;
@@ -1205,47 +1243,58 @@ async function cachedListing() {
 }
 
 async function refresh() {
-  const session = state.session;
+  await Promise.all(unlockedSlots().map((slot) => refreshSlot(slot)));
+  mergeSlots();
+  closeSettledNotices();
+  blobs.retryFailed();
+  render();
+}
+
+async function refreshSlot(slot) {
+  const session = sessionOf(slot);
   if (session?.state !== "unlocked") return;
   let listing;
   let fresh = false;
   try {
-    listing = await account.boards();
-    state.offline = false;
-    state.fetchedAt = nowSeconds();
+    listing = await slot.calls.account.boards();
+    slot.offline = false;
+    slot.fetchedAt = nowSeconds();
     fresh = true;
   } catch (error) {
-    if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
-    clearTimeout(retrying);
-    retrying = setTimeout(refresh, 15_000);
-    state.offline = true;
-    const cached = await cachedListing();
-    if (!cached?.listing) return render();
+    if (error instanceof HubError && error.status === 401) return sessionEnded(slot);
+    clearTimeout(slot.retrying);
+    slot.retrying = setTimeout(refresh, 15_000);
+    slot.offline = true;
+    const cached = await cachedListing(slot.id);
+    if (!cached?.listing) return;
     listing = cached.listing;
-    state.fetchedAt = cached.at;
+    slot.fetchedAt = cached.at;
   }
-  state.marks = mergeMarks(state.marks, await storedMarks());
-  const result = await openBoards(listing, session.identity, nowSeconds(), state.marks);
-  if (state.session !== session) return render();
-  if (fresh && result.list) await put(listingKey(session.me.account), { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
-  state.opened = result.opened;
-  state.marks = result.marks;
-  state.keys = new Map((result.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
-  await loadCommands(session);
-  closeSettledNotices();
-  blobs.retryFailed();
-  await keepMarks();
-  if (result.gone.length && !state.offline) {
+  slot.marks = mergeMarks(slot.marks, await storedMarks(slot.id));
+  const result = await openBoards(listing, session.identity, nowSeconds(), slot.marks);
+  if (sessionOf(slot) !== session) return;
+  if (fresh && result.list) await put(listingKey(slot.id), { listing, at: slot.fetchedAt }).catch(() => (state.storeFailed = true));
+  slot.opened = result.opened;
+  slot.marks = result.marks;
+  slot.keys = new Map((result.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
+  await loadCommands(slot);
+  await keepMarks(slot);
+  if (result.gone.length && !slot.offline) {
     try {
-      const pruned = await publishList({ hub: lists, identity: session.identity, marks: state.marks, change: (list) => result.gone.reduce((next, machine) => listWithout(machine)(next), list) });
-      state.marks = mergeMarks(state.marks, { list: pruned.counter });
-      await keepMarks();
-      return refresh();
+      const pruned = await publishList({ hub: listsOf(slot), identity: session.identity, marks: slot.marks, change: (list) => result.gone.reduce((next, machine) => listWithout(machine)(next), list) });
+      slot.marks = mergeMarks(slot.marks, { list: pruned.counter });
+      await keepMarks(slot);
+      return refreshSlot(slot);
     } catch (error) {
       state.notice = error instanceof PairingFailed ? connectText(error.reason) : hubMessage(error);
     }
   }
-  render();
+}
+
+function sessionEnded(slot) {
+  if (isPrimary(slot)) return signedOut("Your session ended. Sign in again.");
+  dropSlot(slot);
+  state.notice = `${accountName(slot.id)}'s session ended. Sign in to it again from Account.`;
 }
 
 function closeSettledNotices() {
@@ -1257,17 +1306,16 @@ function closeSettledNotices() {
 
 async function removeMachine(machine, name) {
   if (!confirm(`Remove ${name}? Its token stops working and your account stops trusting it.`)) return;
+  const slot = slotOfMachine(machine);
+  if (!slot) return;
   state.notice = null;
   try {
-    const list = await publishList({ hub: lists, identity: state.session.identity, marks: state.marks, change: listWithout(machine) });
-    state.marks = mergeMarks(state.marks, { list: list.counter });
-    await keepMarks();
+    const list = await publishList({ hub: listsOf(slot), identity: sessionOf(slot).identity, marks: slot.marks, change: listWithout(machine) });
+    slot.marks = mergeMarks(slot.marks, { list: list.counter });
+    await keepMarks(slot);
     await withReauth(
-      () => connectCalls.removeMachine(machine),
-      async () => {
-        state.session = await unlockAfter(hub, await signingIn.withPasskey(rememberedCredential()));
-        state.me = state.session.me;
-      },
+      () => slot.calls.connectCalls.removeMachine(machine),
+      () => reauthenticate(slot),
     );
   } catch (error) {
     state.notice = error instanceof PairingFailed ? connectText(error.reason) : hubMessage(error);
@@ -1275,11 +1323,24 @@ async function removeMachine(machine, name) {
   await refresh();
 }
 
-async function refusedDevice(error) {
-  if (!(error instanceof HubError && error.code === "device-removed") || !state.session?.identity) return;
-  state.device = null;
-  await forgetDevice(deviceStore, state.session.identity.id);
-  await stopNotifications(account, deviceStore, undefined, state.session.identity.id);
+async function reauthenticate(slot) {
+  const hubFor = { account: slot.calls.account, credentials: hub.credentials };
+  const session = await unlockAfter(hubFor, await signInWith(hubFor).withPasskey(rememberedCredential(undefined, slot.id)));
+  if (session.me.account !== slot.id) throw new Error(`That passkey belongs to another account than ${accountName(slot.id)}.`);
+  if (isPrimary(slot)) {
+    state.session = session;
+    state.me = session.me;
+  } else {
+    slot.session = session;
+    slot.me = session.me;
+  }
+}
+
+async function refusedDevice(error, slot) {
+  if (!(error instanceof HubError && error.code === "device-removed") || !slot || !sessionOf(slot)?.identity) return;
+  slot.device = null;
+  await forgetDevice(deviceStore, slot.id);
+  await stopNotifications(slot.calls.account, deviceStore, undefined, slot.id);
 }
 
 function commandText(error) {
@@ -1288,66 +1349,76 @@ function commandText(error) {
   return hubMessage(error);
 }
 
-async function loadCommands(session) {
-  if (!state.info?.commands || session?.state !== "unlocked") return;
-  const id = session.identity.id;
-  if (state.keptFor !== id) {
-    state.kept = await loadSent(deviceStore, id, nowSeconds());
-    state.allowed = await allowsChanges(deviceStore, id);
-    state.device = await loadDevice(deviceStore, id);
-    state.lastMachine = (await get(`backlog-machine:${id}`).catch(() => null)) ?? null;
-    state.keptFor = id;
+async function loadCommands(slot) {
+  if (!state.info?.commands || sessionOf(slot)?.state !== "unlocked") return;
+  const id = slot.id;
+  if (slot.keptFor !== id) {
+    slot.kept = await loadSent(deviceStore, id, nowSeconds());
+    slot.allowed = await allowsChanges(deviceStore, id);
+    slot.device = await loadDevice(deviceStore, id);
+    slot.lastMachine = (await get(`backlog-machine:${id}`).catch(() => null)) ?? null;
+    if (isPrimary(slot) || !state.lastMachine) state.lastMachine = slot.lastMachine;
+    slot.keptFor = id;
   }
-  collect();
+  collect(slot);
 }
 
 const keysOf = (machine) => state.keys.get(machine) ?? null;
-let collecting = null;
 
-function collect() {
-  const identity = state.session?.identity;
-  if (!identity || !state.info?.commands || collecting || state.kept.sent.every((one) => one.result)) return collecting;
-  collecting = (async () => {
+function collect(slot = null) {
+  if (!slot) return Promise.all(unlockedSlots().map((one) => collect(one)));
+  const identity = sessionOf(slot)?.identity;
+  if (!identity || !state.info?.commands || slot.collecting || slot.kept.sent.every((one) => one.result)) return slot.collecting;
+  slot.collecting = (async () => {
     try {
-      const kept = await collectResults({ calls: account, identity, kept: state.kept, keysOf, now: nowSeconds() });
-      if (state.session?.identity !== identity) return;
-      state.kept = kept;
-      await keepSent(deviceStore, identity.id, kept);
+      const kept = await collectResults({ calls: slot.calls.account, identity, kept: slot.kept, keysOf, now: nowSeconds() });
+      if (sessionOf(slot)?.identity !== identity) return;
+      slot.kept = kept;
+      await keepSent(deviceStore, slot.id, kept);
+      mergeSlots();
       render();
     } catch {
     } finally {
-      collecting = null;
+      slot.collecting = null;
     }
   })();
-  return collecting;
+  return slot.collecting;
+}
+
+// A command goes out through the account that holds its machine, signed by that account's device, and never through another.
+async function sendThrough(slot, machine, payload, meta, ttl = undefined) {
+  const keys = keysOf(machine);
+  if (!keys || !slot) throw new Error("Your account doesn't list this machine's keys.");
+  const identity = sessionOf(slot).identity;
+  if (slot.allowed !== true) throw new CommandProblem("view-only");
+  slot.device = await ensureDevice({ store: deviceStore, calls: slot.calls.account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: slot.device });
+  const sent = await sendCommand({ calls: slot.calls.account, identity, device: slot.device, allowed: slot.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta, ttl });
+  slot.kept = { ...slot.kept, sent: [...slot.kept.sent, sent] };
+  await keepSent(deviceStore, slot.id, slot.kept);
+  mergeSlots();
+  return sent;
 }
 
 async function send(target, payload, meta, ttl = undefined, retried = false) {
   const { machine, address } = target.dataset;
   const ui = uiOf(machine, address);
-  const keys = keysOf(machine);
-  if (!retried && !(await proAllows(payload.type))) return render();
+  const slot = slotOfMachine(machine);
+  if (!retried && !(await proAllows(payload.type, machine))) return render();
   ui.busy = true;
   ui.error = null;
   render();
   try {
-    if (!keys) throw new Error("Your account doesn't list this machine's keys.");
-    const identity = state.session.identity;
-    if (state.allowed !== true) throw new CommandProblem("view-only");
-    state.device = await ensureDevice({ store: deviceStore, calls: account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: state.device });
-    const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine, keys }, payload, at: nowSeconds(), meta, ttl });
-    state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
-    await keepSent(deviceStore, identity.id, state.kept);
+    await sendThrough(slot, machine, payload, meta, ttl);
     state.ui.set(uiKey(machine, address), freshUi());
   } catch (error) {
     ui.busy = false;
     ui.error = commandText(error);
-    await refusedDevice(error);
+    await refusedDevice(error, slot);
     if (error instanceof HubError && error.code === PLAN_INACTIVE) state.refused = { url: error.url };
-    if (!retried && (await proRefused(error, payload.type))) return send(target, payload, meta, ttl, true);
+    if (!retried && (await proRefused(error, payload.type, machine))) return send(target, payload, meta, ttl, true);
   }
   render();
-  collect();
+  collect(slot);
 }
 
 function sendAnswer(target) {
@@ -1399,11 +1470,10 @@ function sendNoticed(target, action, key) {
   send(target, payload, { address: key, label: line?.text ?? null, ...(kind === "found-add" ? { task: address } : {}), machineName: found.name });
 }
 
-const lastMachineKey = () => `backlog-machine:${state.session?.identity?.id}`;
 
 async function sendTo({ machine, payload, meta, ui }, retried = false) {
-  const keys = keysOf(machine.machine);
-  if (!retried && !(await proAllows(payload.type))) {
+  const slot = slotOfMachine(machine.machine);
+  if (!retried && !(await proAllows(payload.type, machine.machine))) {
     render();
     return null;
   }
@@ -1411,25 +1481,19 @@ async function sendTo({ machine, payload, meta, ui }, retried = false) {
   ui.error = null;
   render();
   try {
-    if (!keys) throw new Error("Your account doesn't list this machine's keys.");
-    const identity = state.session.identity;
-    if (state.allowed !== true) throw new CommandProblem("view-only");
-    state.device = await ensureDevice({ store: deviceStore, calls: account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: state.device });
-    const sent = await sendCommand({ calls: account, identity, device: state.device, allowed: state.allowed, machine: { id: machine.machine, keys }, payload, at: nowSeconds(), meta: { machineName: machine.name, ...meta } });
-    state.kept = { ...state.kept, sent: [...state.kept.sent, sent] };
-    await keepSent(deviceStore, identity.id, state.kept);
+    const sent = await sendThrough(slot, machine.machine, payload, { machineName: machine.name, ...meta });
     ui.busy = false;
     return sent;
   } catch (error) {
     ui.busy = false;
     ui.error = commandText(error);
-    await refusedDevice(error);
+    await refusedDevice(error, slot);
     if (error instanceof HubError && error.code === PLAN_INACTIVE) state.refused = { url: error.url };
-    if (!retried && (await proRefused(error, payload.type))) return sendTo({ machine, payload, meta, ui }, true);
+    if (!retried && (await proRefused(error, payload.type, machine.machine))) return sendTo({ machine, payload, meta, ui }, true);
     render();
     return null;
   } finally {
-    collect();
+    collect(slot);
   }
 }
 
@@ -1437,7 +1501,11 @@ async function sendBacklog({ machine, payload, meta, ui }) {
   const sent = await sendTo({ machine, payload, meta, ui });
   if (!sent) return null;
   state.lastMachine = machine.machine;
-  await put(lastMachineKey(), machine.machine).catch(() => undefined);
+  const slot = slotOfMachine(machine.machine);
+  if (slot) {
+    slot.lastMachine = machine.machine;
+    await put(`backlog-machine:${slot.id}`, machine.machine).catch(() => undefined);
+  }
   return sent;
 }
 
@@ -1724,7 +1792,7 @@ function decideAction(action, target, element) {
     Object.assign(ui, { picked: index, free: false, error: null });
   } else if (action === "write-own") Object.assign(ui, { picked: null, free: true, note: "", error: null });
   else if (action === "pick-instead") Object.assign(ui, { free: false, note: "", error: null });
-  else if (action === "push-ask") return askPush(ui);
+  else if (action === "push-ask") return askPush(ui, machine);
   else if (action === "push-cancel") Object.assign(ui, { confirming: false, error: null });
   else if (action === "answer") return sendAnswer(target);
   else if (action === "choose") return sendPromptAnswer(target);
@@ -1735,19 +1803,26 @@ function decideAction(action, target, element) {
   render();
 }
 
-async function askPush(ui) {
-  if (!(await proAllows("push"))) return;
+async function askPush(ui, machine) {
+  if (!(await proAllows("push", machine))) return;
   Object.assign(ui, { confirming: true, error: null });
   render();
 }
 
-function proAllows(kind) {
-  if (!needsPro(myPlan(), kind)) return Promise.resolve(true);
+function proAllows(kind, machine = null) {
+  if (!needsPro(planOf(machine), kind)) return Promise.resolve(true);
   state.pro?.resolve(false);
   return new Promise((resolve) => {
-    state.pro = { kind, resolve, busy: false, error: null };
+    state.pro = { kind, machine, resolve, busy: false, error: null };
     render();
   });
+}
+
+const proSlot = () => (state.pro?.machine ? slotOfMachine(state.pro.machine) : null) ?? slotFor(state.me?.account ?? null);
+
+function setMe(slot, me) {
+  if (isPrimary(slot)) state.me = me;
+  else slot.me = me;
 }
 
 function closePro(allowed) {
@@ -1763,46 +1838,64 @@ async function startTrial() {
   if (!pro || pro.busy) return;
   Object.assign(pro, { busy: true, error: null });
   render();
+  const slot = proSlot();
   try {
-    const plan = await account.startTrial();
-    state.me = { ...state.me, plan };
+    const plan = await slot.calls.account.startTrial();
+    setMe(slot, { ...meOf(slot), plan });
     if (plan.state === "trial") state.trialLine = { kind: pro.kind, until: plan.until, hash: location.hash };
     closePro(true);
   } catch (error) {
     Object.assign(pro, { busy: false, error: commandText(error) });
-    if (error instanceof HubError && error.code === "trial-used") state.me = await account.me().catch(() => state.me);
+    if (error instanceof HubError && error.code === "trial-used") setMe(slot, await slot.calls.account.me().catch(() => meOf(slot)));
     render();
   }
 }
 
-async function proRefused(error, kind) {
+async function proRefused(error, kind, machine = null) {
   if (!(error instanceof HubError && error.code === "pro-required")) return false;
-  state.me = await account.me().catch(() => state.me);
-  return needsPro(myPlan(), kind) && (await proAllows(kind));
+  const slot = (machine ? slotOfMachine(machine) : null) ?? slotFor(state.me?.account ?? null);
+  setMe(slot, await slot.calls.account.me().catch(() => meOf(slot)));
+  return needsPro(planOf(machine), kind) && (await proAllows(kind, machine));
+}
+
+function closeSlot(slot) {
+  slot.following?.abort();
+  clearTimeout(slot.retrying);
+  slot.ends?.watch(null);
+  Object.assign(slot, { following: null, retrying: null, opened: [], keys: new Map(), kept: { cursor: 0, sent: [] }, keptFor: null, allowed: false, device: null, lastMachine: null });
 }
 
 function stopCommands() {
-  state.allowed = false;
-  state.device = null;
-  state.keptFor = null;
-  state.kept = { cursor: 0, sent: [] };
+  for (const slot of slots.values()) closeSlot(slot);
+  mergeSlots();
   state.ui = new Map();
-  state.keys = new Map();
   state.backlogUi = new Map();
-  state.idea = { text: "", machine: null, choosing: false, busy: false, error: null };
+  state.idea = { text: "", machine: null, account: null, choosing: false, busy: false, error: null };
   state.lastMachine = null;
   state.reviewUi = new Map();
+}
+
+function dropSlot(slot) {
+  closeSlot(slot);
+  slots.delete(slot.id);
+  mergeSlots();
 }
 
 function lockBoards() {
   blobs.forget();
   bodies.stop();
-  stopCommands();
-  following?.abort();
-  following = null;
-  state.opened = [];
+  const own = slots.get(state.me?.account);
+  if (own) closeSlot(own);
+  mergeSlots();
   state.session = { state: "locked", me: state.me };
   unlockPrompt.arm();
+  render();
+}
+
+function lockSlot(slot) {
+  closeSlot(slot);
+  slot.session = { state: "locked", me: slot.me };
+  mergeSlots();
   render();
 }
 
@@ -1812,41 +1905,42 @@ function signedOut(message) {
   bodies.stop();
   stopCommands();
   forgetUnlock(deviceStore, state.me?.account);
-  following?.abort();
-  following = null;
+  for (const slot of [...slots.values()]) dropSlot(slot);
   state.me = null;
   state.session = null;
   state.address = null;
   state.emailStep = null;
   state.signin = { step: "email", email: "", chosen: false };
-  state.opened = [];
-  state.marks = emptyMarks();
   state.notice = message;
   go("#/login");
 }
 
-let following = null;
 function startFeed() {
-  if (state.session?.state !== "unlocked" || following) return;
-  const controller = new AbortController();
-  following = controller;
-  let delay = 2000;
-  const loop = async () => {
-    while (!controller.signal.aborted) {
-      try {
-        await follow((name) => {
-          delay = 2000;
-          if (name === "board" || name === "machine-removed" || name === "machines") refresh();
-          if (name === "result") collect();
-        }, controller.signal);
-      } catch (error) {
-        if (error instanceof HubError && error.status === 401) return signedOut("Your session ended. Sign in again.");
+  for (const slot of unlockedSlots()) {
+    if (slot.following) continue;
+    const controller = new AbortController();
+    slot.following = controller;
+    let delay = 2000;
+    const loop = async () => {
+      while (!controller.signal.aborted) {
+        try {
+          await slot.calls.follow((name) => {
+            delay = 2000;
+            if (name === "board" || name === "machine-removed" || name === "machines") refresh();
+            if (name === "result") collect(slot);
+          }, controller.signal);
+        } catch (error) {
+          if (error instanceof HubError && error.status === 401) {
+            sessionEnded(slot);
+            return render();
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay = Math.min(delay * 2, 60_000);
       }
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay = Math.min(delay * 2, 60_000);
-    }
-  };
-  loop();
+    };
+    loop();
+  }
 }
 
 function hubMessage(error) {
@@ -1871,8 +1965,10 @@ async function entered(unlock) {
   }
   state.me = state.session.me;
   if (onward) return location.assign(onward);
-  if (previous !== state.me.account) state.marks = emptyMarks();
-  if (emailSignIn()) state.address = await account.email().catch(() => null);
+  if (previous && previous !== state.me.account && slots.has(previous)) dropSlot(slots.get(previous));
+  slotFor(state.me.account);
+  state.held = await keepAccount(deviceStore, state.me.account).catch(() => state.held);
+  if (emailSignIn()) state.address = await primary().email().catch(() => null);
   state.notice = null;
   if (state.session.state !== "unlocked") return render();
   state.unlocking = true;
@@ -1953,7 +2049,7 @@ function sendCode() {
   state.notice = null;
   render();
   focusCode();
-  return account.askCode(email).catch((error) => {
+  return primary().askCode(email).catch((error) => {
     state.signin = { ...state.signin, step: "email" };
     state.notice = emailText(error);
     render();
@@ -1967,19 +2063,20 @@ function enterCode() {
     return render();
   }
   return emailStep(async () => {
-    const signed = await account.enterCode(state.signin.email, code);
+    const signed = await primary().enterCode(state.signin.email, code);
     if (onward) return location.assign(onward);
     state.me = signed.account;
     state.session = { state: "locked", me: state.me };
-    state.address = await account.email().catch(() => null);
+    slotFor(state.me.account);
+    state.address = await primary().email().catch(() => null);
     state.signin = freshSignIn();
     state.draft = { email: null, code: "" };
   });
 }
 
 function resendCode() {
-  if (state.emailStep) return emailStep(async () => void (await account.setEmail(state.emailStep.email)));
-  return emailStep(async () => void (await account.askCode(state.signin.email)));
+  if (state.emailStep) return emailStep(async () => void (await primary().setEmail(state.emailStep.email)));
+  return emailStep(async () => void (await primary().askCode(state.signin.email)));
 }
 
 function otherEmail() {
@@ -2001,7 +2098,7 @@ function addEmail() {
   state.notice = null;
   render();
   focusCode();
-  return account.setEmail(email).then(
+  return primary().setEmail(email).then(
     (asked) => {
       if (!asked.verified) return;
       state.address = asked;
@@ -2023,7 +2120,7 @@ function confirmEmail() {
     return render();
   }
   return emailStep(async () => {
-    state.address = await account.confirmEmail(code);
+    state.address = await primary().confirmEmail(code);
     state.emailStep = null;
     state.draft = { email: null, code: "" };
   });
@@ -2035,7 +2132,7 @@ function showBoard(session, name) {
   state.session = session;
   state.me = session.me;
   state.connected = name;
-  state.marks = emptyMarks();
+  slotFor(session.me.account).marks = emptyMarks();
   showHint();
   render();
   refresh();
@@ -2072,7 +2169,7 @@ function openAccount() {
   state.sheet = false;
   document.documentElement.classList.remove("panes");
   scrollTo(0, 0);
-  accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address, device: state.device }, back: () => history.back() });
+  accountPage = startPage(root, { showBoard, given: { info: state.info, me: state.me, session: state.session, address: state.address, device: slots.get(state.me?.account)?.device ?? null }, back: () => history.back() });
 }
 
 function leaveAccount() {
@@ -2082,9 +2179,11 @@ function leaveAccount() {
   if (left.session) state.session = left.session;
   if (left.me) state.me = left.me;
   state.address = left.address;
-  if (left.allowed !== null) state.allowed = left.allowed;
-  if (left.device) state.device = left.device;
-  if (left.kept) state.kept = left.kept;
+  const own = state.me ? slotFor(state.me.account) : null;
+  if (own && left.allowed !== null) own.allowed = left.allowed;
+  if (own && left.device) own.device = left.device;
+  if (own && left.kept) own.kept = left.kept;
+  mergeSlots();
   render();
 }
 
@@ -2388,6 +2487,31 @@ async function resumeBoards() {
   startFeed();
 }
 
+async function signedInHeld(list) {
+  for (const held of list) {
+    const me = await signedInAccount(scoped(held.account).account, deviceStore, held.account);
+    if (me) return me;
+  }
+  return list.length ? null : signedInAccount(account);
+}
+
+async function resumeOthers() {
+  for (const held of state.held) {
+    if (held.account === state.me?.account) continue;
+    const me = await signedInAccount(scoped(held.account).account, deviceStore, held.account);
+    if (!me) continue;
+    const slot = slotFor(held.account);
+    slot.me = me;
+    slot.session = (await keptUnlock(me)) ?? { state: "locked", me };
+    watchSlot(slot);
+  }
+}
+
+function watchSlot(slot) {
+  slot.ends ??= lockWhenDue(() => lockSlot(slot));
+  slot.ends.watch(slot.session);
+}
+
 async function start() {
   if (pageMode) return startPage(root, { showBoard });
   if (!cryptoReady()) return render();
@@ -2405,17 +2529,19 @@ async function start() {
   state.notice = githubErrorText(params.get("github_error"));
   if (params.has("github_error")) history.replaceState(null, "", location.pathname + location.hash);
   state.info = await account.hub().catch(() => null);
-  await migrate({ get, put, del }).catch(() => undefined);
-  state.me = await signedInAccount(account);
+  const held = await migrate({ get, put, del }).catch(() => []);
+  state.me = await signedInHeld(held);
   if (state.me && onward) return location.assign(onward);
-  if (state.me) await migrate({ get, put, del }, state.me.account).catch(() => undefined);
-  if (state.me && emailSignIn()) state.address = await account.email().catch(() => null);
+  if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => held);
+  if (state.me) slotFor(state.me.account);
+  if (state.me && emailSignIn()) state.address = await primary().email().catch(() => null);
   const kept = await keptUnlock(state.me);
   state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
+  if (state.me) await resumeOthers();
   state.unlocking = Boolean(kept);
   render();
   if (!state.me) return startAutofill();
-  if (kept) await resumeBoards();
+  if (kept || unlockedSlots().length) await resumeBoards();
   setInterval(() => document.visibilityState === "visible" && refresh(), 60_000);
 }
 

@@ -78,7 +78,7 @@ test("every call under /v1/a/ names the account it was scoped to, and the sign-i
     const skip = new Set(["id", "hub", "registerBegin", "registerFinish", "loginBegin", "loginFinish", "askCode", "enterCode", "peek"]);
     for (const calls of [work.account, work.connectCalls]) {
       for (const [name, method] of Object.entries(calls)) {
-        if (name === "id") continue;
+        if (name === "id" || name === "as") continue;
         seen.length = 0;
         await method("x", "y", "z");
         assert.equal(seen.length, 1, name);
@@ -86,6 +86,9 @@ test("every call under /v1/a/ names the account it was scoped to, and the sign-i
         if (!skip.has(name)) assert.match(seen[0].path, /^\/v1\/a\//, name);
       }
     }
+    seen.length = 0;
+    await scoped(null).account.as("acc_home").boards();
+    assert.equal(seen[0].account, "acc_home");
     seen.length = 0;
     await scoped(null).account.boards();
     assert.equal(seen[0].account, null);

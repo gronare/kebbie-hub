@@ -25,7 +25,8 @@ export function signInWith({ account, credentials, platform = globalThis.PublicK
     }
     if (pending === controller) pending = null;
     const signedIn = await account.loginFinish(begun.ceremony, assertionJSON(credential));
-    const email = account.email ? await account.email().then((kept) => kept?.email ?? null, () => null) : null;
+    const own = account.as ? account.as(signedIn.account) : account;
+    const email = own.email ? await own.email().then((kept) => kept?.email ?? null, () => null) : null;
     signalName(credential, signedIn, begun.options.publicKey.rpId ?? undefined, platform, email, store);
     return { signedIn, prf: prfOutput(credential), salt: begun.prf_salt ?? null };
   };
