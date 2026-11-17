@@ -866,3 +866,12 @@ test("with two accounts Next heads each machine with its account's dot and name,
   assert.match(accountPicker(held, "acc_home"), /data-action="idea-account" data-account="acc_home" aria-pressed="true"/);
   assert.match(text(lockedAccounts([held[1]])), /^Work is locked .* Unlock$/);
 });
+
+test("the connect page asks which account a new machine joins when the phone holds two, keeping the code", async () => {
+  const { connectAccountPicker } = await import("./screens.js");
+  const held = [{ account: "acc_home", name: "Home", colour: "blue" }, { account: "acc_work", name: "Work", colour: "peach" }];
+  const html = connectAccountPicker(held, "acc_work", "ABCD-EFGH");
+  assert.equal(text(html), "Connect it to Home Work");
+  assert.match(html, /href="\/connect\?code=ABCD-EFGH&account=acc_home" aria-pressed="false"/);
+  assert.match(html, /href="\/connect\?code=ABCD-EFGH&account=acc_work" aria-pressed="true" aria-current="true"/);
+});

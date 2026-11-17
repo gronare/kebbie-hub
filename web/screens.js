@@ -990,3 +990,8 @@ export function accountPicker(accounts, chosen) {
 export function lockedAccounts(locked) {
   return locked.map((one) => `<div class="task acct-locked">${accountDot(one.colour)}<span class="about"><span class="name">${esc(one.name)} is locked</span><span class="meta">Its boards and commands wait for its passkey.</span></span><button type="button" class="btn small" data-action="unlock-account" data-account="${esc(one.account)}">Unlock</button></div>`).join("");
 }
+
+export function connectAccountPicker(accounts, current, code) {
+  const options = accounts.map((one) => `<a class="pill" href="/connect?code=${encodeURIComponent(code)}&account=${encodeURIComponent(one.account)}" aria-pressed="${one.account === current}"${one.account === current ? ' aria-current="true"' : ""}>${accountDot(one.colour)}${esc(one.name)}</a>`);
+  return `<div class="note-field connect-account"><span class="label">Connect it to</span><div class="pills acct-chips" role="group" aria-label="Account">${options.join("")}</div></div>`;
+}

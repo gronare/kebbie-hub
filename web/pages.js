@@ -11,7 +11,7 @@ import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, 
 import { dropAccount, failureKey, forgetNotifyRecord, keepAccount, keepNotifyRecord as recordNotify, marksKey as marksOf, migrate, notifyRecord, othersNotified } from "./accounts.js";
 import { addFirstPasskey, forgetCredential, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
-import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
+import { accountScreen, authScreen, connectAccountPicker, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
 import { currentPlan, machineNeedsPro, placeSheet, proCard } from "./pro.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
 
@@ -172,7 +172,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       if (!state.me) return connectEmailScreen({ name, code: state.view.code || code, github: Boolean(state.info?.github), email: state.typed, ...shown });
       if (state.me.key_access === false && !state.me.key) return createPasskeyScreen({ who: signedInAs(state.me, state.address), ...shown });
     }
-    return connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), email: keepsEmail(), machines: state.machines, notice: state.notice, busy: state.busy, code });
+    const picker = state.held.length > 1 && state.me && state.phase === "start" && state.view ? connectAccountPicker(state.held, state.me.account, code || state.view.code) : "";
+    return picker + connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), email: keepsEmail(), machines: state.machines, notice: state.notice, busy: state.busy, code });
   }
 
   function accountPage() {
