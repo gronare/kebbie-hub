@@ -603,3 +603,15 @@ test("a key pin kept for one account never pins another, so a second account unl
   assert.equal(rememberedCredential(local, "acc_work"), "Y3JlZA");
   assert.equal(rememberedCredential(local, "acc_other"), legacy.credential);
 });
+
+test("signing one account out keeps the browser's subscription while another account on the phone still notifies", async () => {
+  const { store, me, session } = await unlockedOnce();
+  await store.put("accounts", [{ account: me.account }, { account: "acc_work" }]);
+  await store.put(notifyKey(me.account), { account: session.identity.key, device: "dev_home" });
+  await store.put(notifyKey("acc_work"), { account: { account: "acc_work" }, device: "dev_work" });
+  const ended = [];
+  const subscription = { unsubscribe: async () => void ended.push("browser unsubscribed") };
+  await signOut({ id: me.account, unsubscribePush: async (device) => void ended.push(`hub forgot ${device}`), logout: async () => void ended.push("logout") }, store, async () => subscription);
+  assert.deepEqual(ended, ["hub forgot dev_home", "logout"]);
+  assert.ok(await store.get(notifyKey("acc_work")));
+});

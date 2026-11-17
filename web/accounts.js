@@ -86,3 +86,14 @@ export async function migrate(store, signedIn = null) {
   const list = await heldAccounts(store);
   return list.some((one) => one.account === owner) ? list : keepAccount(store, owner);
 }
+
+export async function othersNotified(store, account) {
+  for (const one of await heldAccounts(store)) if (one.account !== account && (await notifyRecord(store, one.account))) return true;
+  return false;
+}
+
+export async function titled(store, account, title) {
+  const list = await heldAccounts(store);
+  const name = list.length > 1 ? list.find((one) => one.account === account)?.name : null;
+  return name ? `${name} · ${title}` : title;
+}

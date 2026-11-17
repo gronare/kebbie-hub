@@ -302,3 +302,14 @@ test("a notice opens in a store kept before several accounts once the worker has
   assert.equal(shown.failure, null);
   assert.equal(shown.title, notice.title);
 });
+
+test("with two accounts on the phone a notice's title starts with its account's name, with one it is the notice's own", async () => {
+  const { kv, get, put, del, seal, owner } = await world();
+  const titles = [];
+  const registration = { getNotifications: async () => [], showNotification: async (title) => void titles.push(title) };
+  kv.set("accounts", [{ account: owner, name: "Home", colour: "blue" }]);
+  await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
+  kv.set("accounts", [{ account: owner, name: "Home", colour: "blue" }, { account: "acc_work", name: "Work", colour: "peach" }]);
+  await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
+  assert.deepEqual(titles, [notice.title, `Home · ${notice.title}`]);
+});

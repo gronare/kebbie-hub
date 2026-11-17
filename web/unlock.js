@@ -3,7 +3,7 @@ import { HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { openEncryption, sealKey } from "./store.js";
 import { browserPush } from "./notify.js";
-import { forgetNotifyRecord, heldAccounts, keepAccount, listingKey, notifyRecord, unlockKey } from "./accounts.js";
+import { forgetNotifyRecord, heldAccounts, keepAccount, listingKey, notifyRecord, othersNotified, unlockKey } from "./accounts.js";
 import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
 const REMEMBERED = "kebbie-credential";
@@ -154,7 +154,7 @@ export const forgetUnlock = (store = deviceStore, account = null) => (account ? 
 
 export async function stopNotifications(account, store = deviceStore, subscription = browserPush, id = account.id) {
   const record = id ? await notifyRecord(store, id) : null;
-  await (await subscription().catch(() => null))?.unsubscribe().catch(() => undefined);
+  if (!(id && (await othersNotified(store, id)))) await (await subscription().catch(() => null))?.unsubscribe().catch(() => undefined);
   if (record?.device) await account.unsubscribePush(record.device).catch(() => undefined);
   if (id) await forgetNotifyRecord(store, id);
 }

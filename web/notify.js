@@ -1,6 +1,6 @@
 import { DEFAULT_NOTICE_CATEGORIES, fromB64, NOTICE_CATEGORIES, noticeCategoryOf, openNotice, ProtocolError, verifyMachineList } from "../js/protocol.js";
 import { openEncryption } from "./store.js";
-import { accountOfDevice, failureKey, listingKey, marksKey, notifyKey } from "./accounts.js";
+import { accountOfDevice, failureKey, listingKey, marksKey, notifyKey, titled } from "./accounts.js";
 
 export const categoriesKey = (device) => `notify-categories:${device}`;
 export const GENERIC = { title: "kebbie", body: "Open kebbie to see what changed." };
@@ -237,7 +237,7 @@ export async function showPushed(registration, envelope, { get, now, put = null,
     for (const notification of await registration.getNotifications()) if (shown.retract.includes(notification.tag)) notification.close();
   }
   for (const client of open) client.postMessage({ type: PUSHED, tag: shown.tag, url: shown.data.url });
-  await registration.showNotification(shown.title, { body: shown.body, tag: shown.tag, data: shown.data, icon: "/icon-192.png", silent: open.length > 0 });
+  await registration.showNotification(shown.account ? await titled({ get }, shown.account, shown.title).catch(() => shown.title) : shown.title, { body: shown.body, tag: shown.tag, data: shown.data, icon: "/icon-192.png", silent: open.length > 0 });
   if (open.length) for (const notification of await registration.getNotifications({ tag: shown.tag })) if (notification.tag === shown.tag) notification.close();
   return { ...shown, quiet: open.length > 0 };
 }

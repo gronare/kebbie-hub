@@ -8,7 +8,7 @@ import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevi
 import { fromB64, toB64 } from "../js/protocol.js";
 import { COMMAND_TEXT, decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, notifyPhase, notifyText, withCategory } from "./notify.js";
-import { failureKey, forgetNotifyRecord, keepNotifyRecord as recordNotify, migrate, notifyRecord } from "./accounts.js";
+import { failureKey, forgetNotifyRecord, keepNotifyRecord as recordNotify, migrate, notifyRecord, othersNotified } from "./accounts.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
@@ -423,7 +423,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     notify.busy = true;
     draw();
     try {
-      await (await currentSubscription())?.unsubscribe();
+      if (!(state.me && (await othersNotified({ get }, state.me.account)))) await (await currentSubscription())?.unsubscribe();
       if (state.device) await account.unsubscribePush(state.device.id);
       if (state.me) await forgetNotifyRecord({ del }, state.me.account);
       await loadDevices().catch(() => undefined);
