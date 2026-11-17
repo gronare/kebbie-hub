@@ -123,7 +123,7 @@ test("without a remembered passkey the prompt offers only the locked account's o
 });
 
 test("a phone without a passkey for the account says so and where to add one", async () => {
-  const expected = "This phone has no passkey for Work. Add one from a device where Work is unlocked: Account → Work → Add a passkey for another device.";
+  const expected = "This phone has no passkey for Work. Unlock Work here with a passkey that belongs to it, such as one saved in your password manager.";
   assert.equal(noPasskeyText("Work"), expected);
   const refused = authenticator({ refuse: "NotAllowedError" });
   await assert.rejects(unlockHeld({ account: workHub(), credentials: refused }, WORK, { storage: storage(), store: memoryStore() }), (error) => error instanceof NoPasskeyHere && error.message === expected);

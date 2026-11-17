@@ -3,7 +3,7 @@ import { keepAccount, labelsOf, nameOf } from "./accounts.js";
 import { NoPasskeyOffered, signInWith } from "./signin.js";
 import { keptUnlock, unlockAfter } from "./unlock.js";
 
-export const noPasskeyText = (name) => `This phone has no passkey for ${name}. Add one from a device where ${name} is unlocked: Account → ${name} → Add a passkey for another device.`;
+export const noPasskeyText = (name) => `This phone has no passkey for ${name}. Unlock ${name} here with a passkey that belongs to it, such as one saved in your password manager.`;
 
 export class NoPasskeyHere extends Error {
   constructor(name) {
