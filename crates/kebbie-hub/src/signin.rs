@@ -1,7 +1,8 @@
+use axum::http::HeaderMap;
 use kebbie_hub_api::{AccountView, SignupMode, normalize_code};
 use webauthn_rs::prelude::Uuid;
 
-use crate::account::{ACCOUNT_PREFIX, account_view, generated_handle, new_id, session_set_cookie};
+use crate::account::{ACCOUNT_PREFIX, account_view, generated_handle, new_id, session_set_cookie, session_set_cookie_beside};
 use crate::auth::{SESSION_TOKEN_PREFIX, digest, new_token};
 use crate::error::ApiError;
 use crate::store::{Access, KeylessSignUp, SignUpOutcome};
@@ -11,6 +12,14 @@ pub struct KeylessSignIn {
     pub account: AccountView,
     pub set_cookie: String,
     pub created: bool,
+    token: String,
+}
+
+impl KeylessSignIn {
+    // The cookie that keeps the sessions this browser already holds for other accounts beside the new one.
+    pub fn set_cookie_beside(&self, hub: &Hub, headers: &HeaderMap) -> Result<String, ApiError> {
+        session_set_cookie_beside(hub, headers, &self.account.account, &self.token)
+    }
 }
 
 fn opened(hub: &Hub, account: &str, session: &str, created: bool) -> Result<KeylessSignIn, ApiError> {
@@ -18,6 +27,7 @@ fn opened(hub: &Hub, account: &str, session: &str, created: bool) -> Result<Keyl
         account: account_view(hub, account, Access::AccountOnly)?,
         set_cookie: session_set_cookie(hub, session, hub.config().session_ttl),
         created,
+        token: session.to_string(),
     })
 }
 

@@ -4,6 +4,7 @@ mod common;
 use std::sync::Arc;
 
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::http::header::SET_COOKIE;
 use axum::response::{AppendHeaders, IntoResponse};
 use axum::routing::post;
@@ -30,8 +31,13 @@ async fn proven(State(hub): State<Arc<Hub>>, Json(proven): Json<Proven>) -> Resu
     Ok((AppendHeaders([(SET_COOKIE, signed.set_cookie)]), Json(signed.account)))
 }
 
+async fn proven_beside(State(hub): State<Arc<Hub>>, headers: HeaderMap, Json(proven): Json<Proven>) -> Result<impl IntoResponse, ApiError> {
+    let signed = sign_in_without_key(&hub, proven.account.as_deref().unwrap_or_default(), "test")?;
+    Ok((AppendHeaders([(SET_COOKIE, signed.set_cookie_beside(&hub, &headers)?)]), Json(signed.account)))
+}
+
 fn embedder() -> Router<Arc<Hub>> {
-    Router::new().route("/test/proven", post(proven))
+    Router::new().route("/test/proven", post(proven)).route("/test/proven-beside", post(proven_beside))
 }
 
 async fn embedding_hub(email_sign_in: bool) -> TestHub {
@@ -141,4 +147,21 @@ async fn a_deactivated_account_opens_no_keyless_session() {
     kebbie_hub::set_account_active(&test.hub.store(), &account, false, "test").unwrap();
     let refused = browser(&test).post::<_, AccountView>("/test/proven", &json!({ "account": account })).await;
     assert_eq!(hub_code(refused.unwrap_err()).0, 403);
+}
+
+#[tokio::test]
+async fn an_embedder_sign_in_beside_a_held_session_keeps_both_accounts() {
+    let test = embedding_hub(true).await;
+    let mut home = member(&test).await;
+    let home_id = home.account().await.unwrap().account;
+    let mut work = member(&test).await;
+    let work_id = work.account().await.unwrap().account;
+    home.post::<_, AccountView>("/test/proven-beside", &json!({ "account": work_id })).await.unwrap();
+    let held = home.cookie.clone().unwrap();
+    assert_eq!(held.split_once('=').unwrap().1.split('.').count(), 2, "{held}");
+    for account in [&home_id, &work_id] {
+        home.account_header = Some(account.clone());
+        let seen = home.account().await.unwrap();
+        assert_eq!(&seen.account, account);
+    }
 }

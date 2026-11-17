@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::header::SET_COOKIE;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::AppendHeaders;
@@ -28,8 +28,8 @@ use webauthn_rs_proto::{
 
 use crate::auth::{
     AccountAuth, Anonymous, FreshAccount, KeyAccount, SESSION_TOKEN_PREFIX,
-    SETUP_TOKEN_PREFIX, SameOrigin, SessionAuth, digest, new_token, passkey_required, random,
-    session_cookie,
+    Held, SETUP_TOKEN_PREFIX, SameOrigin, SessionAuth, digest, held_sessions, joined_tokens, new_token,
+    passkey_required, random, session_cookie, wanted_account,
 };
 use crate::error::ApiError;
 use crate::store::{
@@ -93,14 +93,22 @@ pub(crate) fn session_set_cookie(hub: &Hub, token: &str, max_age: u64) -> String
     format!("{name}={token}; Path=/; Max-Age={max_age}; HttpOnly;{secure} SameSite=Strict")
 }
 
-pub(crate) fn with_session<T>(hub: &Hub, token: &str, body: T) -> WithCookie<T> {
-    (
-        AppendHeaders([(
-            SET_COOKIE,
-            session_set_cookie(hub, token, hub.config().session_ttl),
-        )]),
-        Json(body),
-    )
+pub fn session_set_cookie_beside(hub: &Hub, headers: &HeaderMap, account: &str, token: &str) -> Result<String, ApiError> {
+    let held = held_sessions(hub, headers)?;
+    let mut tokens: Vec<&str> = Vec::new();
+    let mut accounts: Vec<&str> = vec![account];
+    for one in &held {
+        if !accounts.contains(&one.session.account.as_str()) {
+            accounts.push(&one.session.account);
+            tokens.push(one.token);
+        }
+    }
+    tokens.push(token);
+    Ok(session_set_cookie(hub, &joined_tokens(&tokens), hub.config().session_ttl))
+}
+
+pub(crate) fn with_session<T>(hub: &Hub, headers: &HeaderMap, account: &str, token: &str, body: T) -> Result<WithCookie<T>, ApiError> {
+    Ok((AppendHeaders([(SET_COOKIE, session_set_cookie_beside(hub, headers, account, token)?)]), Json(body)))
 }
 
 fn passkey_view(stored: &StoredPasskey) -> PasskeyView {
@@ -294,6 +302,7 @@ pub async fn register_finish(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
     client: Anonymous,
+    headers: HeaderMap,
     Json(request): Json<RegisterFinish>,
 ) -> Result<WithCookie<SignedIn>, ApiError> {
     hub.limit_anonymous(&client.address)?;
@@ -347,7 +356,7 @@ pub async fn register_finish(
         hub.forget_setup();
     }
     let view = signed_in(&hub, &account, passkey.cred_id().as_ref(), prf_salt)?;
-    Ok(with_session(&hub, &session, view))
+    with_session(&hub, &headers, &account, &session, view)
 }
 
 pub async fn login_begin(
@@ -477,6 +486,7 @@ pub async fn login_finish(
     State(hub): State<Arc<Hub>>,
     _: SameOrigin,
     client: Anonymous,
+    headers: HeaderMap,
     Json(request): Json<LoginFinish>,
 ) -> Result<WithCookie<SignedIn>, ApiError> {
     hub.limit_anonymous(&client.address)?;
@@ -526,7 +536,7 @@ pub async fn login_finish(
         stored.prf_salt
     };
     let view = signed_in(&hub, &account, used, prf_salt)?;
-    Ok(with_session(&hub, &session, view))
+    with_session(&hub, &headers, &account, &session, view)
 }
 
 pub async fn logout(
@@ -534,6 +544,7 @@ pub async fn logout(
     _: SameOrigin,
     client: Anonymous,
     headers: HeaderMap,
+    RawQuery(query): RawQuery,
 ) -> Result<
     (
         AppendHeaders<[(axum::http::HeaderName, String); 1]>,
@@ -542,13 +553,23 @@ pub async fn logout(
     ApiError,
 > {
     hub.limit_anonymous(&client.address)?;
-    if let Some(token) = session_cookie(&hub, &headers) {
-        hub.store().end_session(&digest(token))?;
+    let wanted = wanted_account(&headers, query.as_deref());
+    let (ending, kept): (Vec<Held>, Vec<Held>) = held_sessions(&hub, &headers)?
+        .into_iter()
+        .partition(|one| wanted.is_none_or(|account| one.session.account == account));
+    {
+        let store = hub.store();
+        for one in &ending {
+            store.end_session(&digest(one.token))?;
+        }
     }
-    Ok((
-        AppendHeaders([(SET_COOKIE, session_set_cookie(&hub, "", 0))]),
-        StatusCode::NO_CONTENT,
-    ))
+    let tokens: Vec<&str> = kept.iter().map(|one| one.token).collect();
+    let cookie = if tokens.is_empty() {
+        session_set_cookie(&hub, "", 0)
+    } else {
+        session_set_cookie(&hub, &joined_tokens(&tokens), hub.config().session_ttl)
+    };
+    Ok((AppendHeaders([(SET_COOKIE, cookie)]), StatusCode::NO_CONTENT))
 }
 
 pub async fn hub_info(

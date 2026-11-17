@@ -44,6 +44,7 @@ pub struct Browser {
     pub origin: String,
     pub handle: String,
     pub cookie: Option<String>,
+    pub account_header: Option<String>,
     pub passkey: WebauthnAuthenticator<DiscoverablePasskey>,
     pub machines: BTreeMap<Id, PublicKeys>,
     pub prf_capable: bool,
@@ -147,6 +148,7 @@ impl Browser {
             origin: origin.to_string(),
             handle: String::new(),
             cookie: None,
+            account_header: None,
             passkey: WebauthnAuthenticator::new(DiscoverablePasskey::new(true)),
             machines: BTreeMap::new(),
             prf_capable: true,
@@ -281,6 +283,9 @@ impl Browser {
             .header("origin", &self.origin);
         if let Some(cookie) = &self.cookie {
             request = request.header("cookie", cookie);
+        }
+        if let Some(account) = &self.account_header {
+            request = request.header("kebbie-account", account);
         }
         request
     }

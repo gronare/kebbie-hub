@@ -46,7 +46,11 @@ pub fn bearer(headers: &HeaderMap) -> Option<&str> {
         .filter(|token| !token.is_empty())
 }
 
-pub fn session_cookie<'a>(hub: &Hub, headers: &'a HeaderMap) -> Option<&'a str> {
+pub const ACCOUNT_HEADER: &str = "kebbie-account";
+const TOKEN_SEPARATOR: &str = ".";
+
+// One cookie holds a session token per account this browser signed in to, so a sign-in to another account keeps the first.
+pub fn session_tokens<'a>(hub: &Hub, headers: &'a HeaderMap) -> Vec<&'a str> {
     let wanted = hub.session_cookie_name();
     headers
         .get_all(COOKIE)
@@ -54,9 +58,69 @@ pub fn session_cookie<'a>(hub: &Hub, headers: &'a HeaderMap) -> Option<&'a str> 
         .filter_map(|value| value.to_str().ok())
         .flat_map(|value| value.split(';'))
         .filter_map(|pair| pair.trim().split_once('='))
-        .find(|(name, _)| *name == wanted)
-        .map(|(_, value)| value.trim())
-        .filter(|token| token.starts_with(SESSION_TOKEN_PREFIX))
+        .filter(|(name, _)| *name == wanted)
+        .flat_map(|(_, value)| value.trim().split(TOKEN_SEPARATOR))
+        .filter(|token| token.len() > SESSION_TOKEN_PREFIX.len() && token.starts_with(SESSION_TOKEN_PREFIX))
+        .collect()
+}
+
+pub fn session_cookie<'a>(hub: &Hub, headers: &'a HeaderMap) -> Option<&'a str> {
+    session_tokens(hub, headers).into_iter().next()
+}
+
+pub fn query_account(query: Option<&str>) -> Option<&str> {
+    query?
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("account="))
+        .filter(|account| !account.is_empty())
+}
+
+pub fn wanted_account<'a>(headers: &'a HeaderMap, query: Option<&'a str>) -> Option<&'a str> {
+    headers
+        .get(ACCOUNT_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|account| !account.is_empty())
+        .or_else(|| query_account(query))
+}
+
+pub struct Held<'a> {
+    pub token: &'a str,
+    pub session: Session,
+}
+
+pub fn held_sessions<'a>(hub: &Hub, headers: &'a HeaderMap) -> Result<Vec<Held<'a>>, ApiError> {
+    let at = crate::now();
+    let store = hub.store();
+    let mut held = Vec::new();
+    for token in session_tokens(hub, headers) {
+        if let Some(session) = store.session(&digest(token), at)? {
+            held.push(Held { token, session });
+        }
+    }
+    Ok(held)
+}
+
+pub fn account_required() -> ApiError {
+    ApiError::bad_request("account-required")
+}
+
+pub fn selected_session<'a>(hub: &Hub, headers: &'a HeaderMap, wanted: Option<&str>) -> Result<Option<Held<'a>>, ApiError> {
+    let mut held = held_sessions(hub, headers)?.into_iter();
+    if let Some(account) = wanted {
+        return Ok(held.find(|one| one.session.account == account));
+    }
+    let first = held.next();
+    if let Some(first) = &first
+        && held.any(|other| other.session.account != first.session.account)
+    {
+        return Err(account_required());
+    }
+    Ok(first)
+}
+
+pub fn joined_tokens(tokens: &[&str]) -> String {
+    tokens.join(TOKEN_SEPARATOR)
 }
 
 const CLOUDFLARE_CLIENT_HEADER: &str = "cf-connecting-ip";
@@ -136,11 +200,8 @@ impl FromRequestParts<Arc<Hub>> for AccountAuth {
 fn signed_in(parts: &Parts, hub: &Arc<Hub>) -> Result<Session, ApiError> {
     let address = client_address(parts, hub);
     hub.check_anonymous(&address)?;
-    let session = match session_cookie(hub, &parts.headers) {
-        Some(token) => hub.store().session(&digest(token), crate::now())?,
-        None => None,
-    };
-    let Some(session) = session else {
+    let wanted = wanted_account(&parts.headers, parts.uri.query());
+    let Some(Held { session, .. }) = selected_session(hub, &parts.headers, wanted)? else {
         return Err(hub.refuse_anonymous(&address));
     };
     hub.limit(&format!("account:{}", session.account))?;

@@ -37,7 +37,7 @@ use tokio::sync::watch;
 use webauthn_rs::prelude::{Url, Webauthn, WebauthnBuilder};
 
 pub use admin::{AccountSwitch, set_account_active};
-pub use auth::{AccountAuth, Anonymous, DEV_SESSION_COOKIE, FreshAccount, KeyAccount, SameOrigin, SESSION_COOKIE, SessionAuth, client_address, digest, new_token, passkey_required};
+pub use auth::{ACCOUNT_HEADER, AccountAuth, Anonymous, DEV_SESSION_COOKIE, FreshAccount, KeyAccount, SameOrigin, SESSION_COOKIE, SessionAuth, client_address, digest, new_token, passkey_required};
 pub use account::account_view;
 pub use signin::{KeylessSignIn, sign_in_without_key, sign_up_without_key};
 pub use error::ApiError;

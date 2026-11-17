@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 use webauthn_rs::prelude::{Url, Uuid};
 
 use crate::account::{
-    ACCOUNT_PREFIX, checked_ticket, connect_ticket, generated_handle, new_id, session_set_cookie,
+    ACCOUNT_PREFIX, checked_ticket, connect_ticket, generated_handle, new_id, session_set_cookie_beside,
 };
 use crate::auth::{Anonymous, SESSION_TOKEN_PREFIX, digest, new_token, random, session_cookie};
 use crate::error::ApiError;
@@ -421,7 +421,7 @@ pub async fn callback(
                 hub.verified_email(&account, email);
             }
             hub.store().log(now(), "account.logged-in", None, Some(&format!("{account} via=github")))?;
-            let cookie = session_set_cookie(&hub, &session, hub.config().session_ttl);
+            let cookie = session_set_cookie_beside(&hub, &headers, &account, &session)?;
             redirect(&pending.next, &[cleared, cookie])
         }
         Outcome::Linked(account) => {
