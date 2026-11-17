@@ -38,6 +38,12 @@ async function passkeyIds(calls) {
   return (listed?.passkeys ?? []).map((one) => one.passkey).filter((id) => typeof id === "string" && id);
 }
 
+// A passkey list the hub cannot give still offers the prompt, since only a listed empty set proves it cannot succeed.
+export async function addedStep(calls, held) {
+  const offered = await passkeyIds(calls).then((ids) => ids.length > 0, () => true);
+  return { account: held.account, name: nameOf(held), offered };
+}
+
 export async function unlockHeld(hub, held, { remembered = null, storage, store, clock } = {}) {
   const name = nameOf(held);
   const allow = await passkeyIds(hub.account);

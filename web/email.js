@@ -37,6 +37,15 @@ export function passkeySignInScreen({ returning = null, notice = null, busy = fa
   });
 }
 
+export function addedScreen({ name, offered, notice = null, busy = false }) {
+  if (!offered) return authScreen({ intro: heading(`${name} is added.`, "It has no passkey yet."), actions: `<a class="btn primary" href="/">Back to your boards</a>`, notice });
+  return authScreen({
+    intro: heading(`${name} is added.`, "Unlock it now with its passkey?"),
+    actions: primary("unlock-added", "Unlock with passkey", busy) + `<button type="button" class="btn" data-action="added-later"${disabled(busy)}>Later</button>`,
+    notice,
+  });
+}
+
 const CODE_TEXT = {
   "sign-in": { title: "Check your email", button: "Sign in" },
   connect: { title: "Check your email", button: "Continue" },

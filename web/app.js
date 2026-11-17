@@ -17,12 +17,12 @@ import { accountChips, accountHeading, accountPicker, accountSummary, lockedAcco
 import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf, returningTo } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
-import { heldSession, keepAdded, lockedMachines, NoPasskeyHere, unlockHeld } from "./locked.js";
+import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, unlockHeld } from "./locked.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
 import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fileAt, foldCommitsOn, freshReviewUi, hangLines, openFileAt, openOf, readKey, keptTaskView, readOf, readShaOf, reviewEntry, rowOf, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
 import { hasTextField, keepFieldsAboveKeyboard } from "./keyboard.js";
-import { addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
+import { addedScreen, addEmailScreen, address, authScreen, codeScreen, createPasskeyScreen, emailSignInScreen, emailText, isAuthScreen, keyboardLift, keylessUnlockScreen, passkeySignInScreen, signedInAs, signedInStep, signedOutStep, typedCode } from "./email.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { outOfRangeScroll } from "./scroll.js";
 import { currentPlan, endingChip, needsPro, placeSheet, proCard, showTrialLine } from "./pro.js";
@@ -1160,6 +1160,7 @@ const liftKeyboard = keyboardLift();
 
 function signedOutScreen() {
   const shown = { notice: state.notice, busy: state.busy };
+  if (state.added) return addedScreen({ ...state.added, ...shown });
   const step = signedOutStep({ info: state.info, remembered: adding ? (returning?.credential ?? null) : rememberedCredential(), ...state.signin });
   if (adding) return signInStep(step, shown) + `<a class="btn back-link" href="/">Back to your boards</a>`;
   return signInStep(step, shown);
@@ -2092,6 +2093,19 @@ async function landedOn(signedIn, options) {
   }
 }
 
+async function unlockAdded() {
+  const { account: id } = state.added;
+  const held = (await heldAccounts(deviceStore).catch(() => [])).find((one) => one.account === id) ?? { account: id };
+  return emailStep(async () => {
+    try {
+      await unlockHeld({ account: scoped(id).account, credentials: hub.credentials }, held, { remembered: rememberedCredential(undefined, id) });
+    } catch (error) {
+      throw new Error(error instanceof NoPasskeyHere ? error.message : (signInText(error) ?? hubMessage(error)));
+    }
+    location.assign("/");
+  });
+}
+
 async function signInWithPasskey(remembered) {
   try {
     const ceremony = await signingIn.withPasskey(remembered);
@@ -2170,8 +2184,10 @@ function enterCode() {
     const signed = await primary().enterCode(state.signin.email, code);
     await landedOn(signed.account, { typed: state.signin.email });
     if (adding) {
-      await keepAdded(deviceStore, scoped(signed.account.account).account, signed.account, { emails: Boolean(state.info?.email) });
-      return location.assign("/");
+      const calls = scoped(signed.account.account).account;
+      const list = await keepAdded(deviceStore, calls, signed.account, { emails: Boolean(state.info?.email) });
+      state.added = await addedStep(calls, list.find((one) => one.account === signed.account.account) ?? { account: signed.account.account });
+      return;
     }
     if (onward) return location.assign(onward);
     state.me = signed.account;
@@ -2414,6 +2430,8 @@ root.addEventListener("click", (event) => {
     state.notice = null;
     render();
   } else if (action === "use-passkey") signInWithPasskey(null);
+  else if (action === "unlock-added") unlockAdded();
+  else if (action === "added-later") location.assign("/");
   else if (action === "add-email") addEmail();
   else if (action === "confirm-email") confirmEmail();
   else if (action === "sign-in") {

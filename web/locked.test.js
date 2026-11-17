@@ -7,7 +7,8 @@ import { HubError } from "./hub.js";
 import { heldAccounts, unlockKey } from "./accounts.js";
 import { rememberCredential } from "./unlock.js";
 import { lockedAccounts } from "./screens.js";
-import { heldSession, keepAdded, lockedMachines, NoPasskeyHere, noPasskeyText, unlockHeld } from "./locked.js";
+import { addedScreen } from "./email.js";
+import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, noPasskeyText, unlockHeld } from "./locked.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -156,4 +157,69 @@ test("an add cancelled at the code, or one the phone cannot keep, leaves no acco
   await assert.rejects(addByEmail(account, full, "123456"), /quota/);
   assert.deepEqual(await heldAccounts(full), []);
   assert.deepEqual(account.calls.at(-1), ["logout"], "a session the phone could not keep is ended");
+});
+
+async function added(account, store) {
+  await addByEmail(account, store, "123456");
+  const [held] = await heldAccounts(store);
+  return { held, step: await addedStep(account, held) };
+}
+
+const actions = (html) => [...html.matchAll(/data-action="([^"]+)"/g)].map((found) => found[1]);
+
+async function stillLocked(account, store) {
+  const [held] = await heldAccounts(store);
+  assert.deepEqual([held.account, held.signedOut], [ACCOUNT, false], "the account stays saved on the phone");
+  assert.equal(await store.get(unlockKey(ACCOUNT)), undefined, "no unlock is kept");
+  assert.equal((await heldSession(await account.me(), store, Date.now(), storage())).state, "locked");
+}
+
+test("after the code the add flow offers to unlock the saved account with its passkey, or later", async () => {
+  const account = workHub();
+  const { held, step } = await added(account, memoryStore());
+  assert.deepEqual(step, { account: ACCOUNT, name: held.name || held.email, offered: true });
+  const html = addedScreen(step);
+  assert.equal(text(html), `kebbie hub ${step.name} is added. Unlock it now with its passkey? Unlock with passkey Later`);
+  assert.deepEqual(actions(html), ["unlock-added", "added-later"]);
+});
+
+test("Later leaves the added account saved and locked", async () => {
+  const account = workHub();
+  const store = memoryStore();
+  await added(account, store);
+  await stillLocked(account, store);
+  assert.ok(!account.calls.some(([name]) => name === "loginBegin"), "no passkey prompt was started");
+});
+
+test("a cancelled passkey prompt after adding leaves the account saved and locked", async () => {
+  const account = workHub();
+  const store = memoryStore();
+  const { held } = await added(account, store);
+  const refused = authenticator({ refuse: "NotAllowedError" });
+  await assert.rejects(unlockHeld({ account, credentials: refused }, held, { storage: storage(), store }), NoPasskeyHere);
+  assert.equal(refused.asked.length, 1);
+  await stillLocked(account, store);
+});
+
+test("unlocking with the passkey after adding opens the account at once", async () => {
+  const account = workHub();
+  const store = memoryStore();
+  const { held } = await added(account, store);
+  const credentials = authenticator();
+  const session = await unlockHeld({ account, credentials }, held, { storage: storage(), store });
+  assert.equal(session.state, "unlocked");
+  assert.equal(session.me.account, ACCOUNT);
+  assert.ok(await store.get(unlockKey(ACCOUNT)), "the unlock is kept for the boards to open with");
+  assert.deepEqual(credentials.asked[0].publicKey.allowCredentials.map((allowed) => toB64(allowed.id)), [CREDENTIAL]);
+});
+
+test("an added account with no passkey skips the step and says so", async () => {
+  const account = workHub({ passkeys: [] });
+  const store = memoryStore();
+  const { step } = await added(account, store);
+  assert.equal(step.offered, false);
+  const html = addedScreen(step);
+  assert.equal(text(html), `kebbie hub ${step.name} is added. It has no passkey yet. Back to your boards`);
+  assert.deepEqual(actions(html), [], "no prompt is offered that cannot succeed");
+  await stillLocked(account, store);
 });
