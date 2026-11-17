@@ -20,15 +20,19 @@ export const entryHref = (id) => `#/item/${encodeURIComponent(id)}`;
 
 const STATE_RANK = { "to-write": 0, drafting: 1, ready: 2 };
 
+// A vault note is one row across the machines of one account; the same note in another account is that account's own row, so an answer never reaches the other account's machines.
+export const vaultPrefix = (opened, account) => (account === undefined || account === (opened.find((machine) => machine.account !== undefined)?.account ?? account) ? "" : `${account}|`);
+
 export function mergeBacklog(opened, now) {
   const entries = new Map();
   for (const machine of opened) {
     for (const row of machine.board?.backlog ?? []) {
       const vault = row.home.kind === "vault";
-      const id = vault ? row.item : `${machine.machine}|${row.item}`;
+      const prefix = vaultPrefix(opened, machine.account);
+      const id = vault ? `${prefix}${row.item}` : `${machine.machine}|${row.item}`;
       const seen = { machine: machine.machine, name: machine.name, accepts: machine.board.accepts ?? null, asleep: isAsleep({ lastSeen: machine.lastSeen }, now), repos: (machine.board.checkouts ?? []).map((checkout) => checkout.repo), row };
       const held = entries.get(id);
-      if (!held) entries.set(id, { id, key: row.item, vault, row, machines: [seen] });
+      if (!held) entries.set(id, { id, key: row.item, vault, prefix, account: machine.account ?? null, row, machines: [seen] });
       else {
         held.machines.push(seen);
         if (STATE_RANK[row.state] > STATE_RANK[held.row.state] || (row.state === held.row.state && row.blocking < held.row.blocking)) held.row = row;

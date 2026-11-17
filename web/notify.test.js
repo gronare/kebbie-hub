@@ -46,7 +46,7 @@ test("categories keep the cards' order, start with everything but a start going 
 test("a tap opens the task, the item at its questions or the device's page", () => {
   assert.equal(routeOf("mch_1", { to: "task", address: "refunds@shop" }), "/#/task/mch_1/refunds%40shop");
   assert.equal(routeOf("mch_1", { to: "item", item: "local:retry.md" }), `/#/item/${encodeURIComponent("mch_1|local:retry.md")}`);
-  assert.equal(routeOf("mch_1", { to: "item", item: "vault:Projects/retry" }), `/#/item/${encodeURIComponent("vault:Projects/retry")}`);
+  assert.equal(routeOf("mch_1", { to: "item", item: "vault:Projects/retry" }), `/#/item/${encodeURIComponent("vault:Projects/retry")}/mch_1`, "the machine says which account's row a vault note is");
   assert.equal(routeOf("mch_1", { to: "device", device: "dev_1" }), "/account#device/dev_1");
   assert.equal(routeOf("mch_1", { to: "lead" }), "/#/lead/mch_1");
   assert.equal(routeOf("mch_1", undefined), "/#/board");

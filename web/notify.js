@@ -73,7 +73,7 @@ const part = (text) => encodeURIComponent(text);
 
 export function routeOf(machine, open) {
   if (open?.to === "task") return `/#/task/${part(machine)}/${part(open.address)}`;
-  if (open?.to === "item") return `/#/item/${part(open.item.startsWith("vault:") ? open.item : `${machine}|${open.item}`)}`;
+  if (open?.to === "item") return open.item.startsWith("vault:") ? `/#/item/${part(open.item)}/${part(machine)}` : `/#/item/${part(`${machine}|${open.item}`)}`;
   if (open?.to === "device") return `/account#device/${part(open.device)}`;
   if (open?.to === "lead") return `/#/lead/${part(machine)}`;
   return "/#/board";

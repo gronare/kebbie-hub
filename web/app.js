@@ -620,15 +620,15 @@ function backlogEntries() {
   const ids = new Set(merged.map((entry) => entry.id));
   for (const entry of merged) {
     const note = mergedInto(entry.row);
-    if (note) entry.opens = ids.has(note) ? entryHref(note) : (noteTaskHref(note) ?? undefined);
+    if (note) entry.opens = ids.has(`${entry.prefix ?? ""}${note}`) ? entryHref(`${entry.prefix ?? ""}${note}`) : (noteTaskHref(note, entry.account) ?? undefined);
   }
   return [...ideaEntries(state.kept.sent, state.opened, now, (sent) => shownOf(sent).state), ...merged];
 }
 
 // The task whose plan or links name the note, for a merged row whose note is no longer in the backlog.
-function noteTaskHref(note) {
+function noteTaskHref(note, account = null) {
   const path = note.slice("vault:".length);
-  for (const opened of state.opened) {
+  for (const opened of state.opened.filter((one) => !account || one.account === account)) {
     const item = opened.board?.items.find((one) => one.question?.plan_note?.key === note || (one.links ?? []).some((link) => link.kind === "note" && link.url.includes(encodeURIComponent(path))));
     if (item) return cardHref(opened.machine, item.address);
   }
@@ -764,9 +764,11 @@ function editFor(entry, section) {
   return { ...shown, saving, recent: shown.sent.at >= backlogUi(entry.id).visit };
 }
 
-function findEntry(id) {
+// A notice names a vault note and the machine it came from, which tells which account's row it means.
+function findEntry(id, machine = null) {
   const entries = backlogEntries();
-  const found = entries.find((entry) => entry.id === id);
+  const named = entries.filter((entry) => entry.id === id || (entry.vault && entry.key === id));
+  const found = named.find((entry) => machine && entry.machines.some((one) => one.machine === machine)) ?? named.find((entry) => entry.id === id);
   if (found) return { entries, entry: found };
   const started = state.kept.sent.filter((sent) => sent.kind === "start-item" && sent.result?.outcome === "done" && (sent.address === id || id.endsWith(`|${sent.address}`))).sort((a, b) => b.at - a.at)[0];
   return { entries, entry: started ? startedEntry(id, started) : null };
@@ -795,8 +797,8 @@ function backlogRoute() {
   return shell("backlog", backlogListHtml(entries, null, false, view));
 }
 
-function itemRoute(id) {
-  const { entries, entry } = findEntry(id);
+function itemRoute(id, machine = null) {
+  const { entries, entry } = findEntry(id, machine);
   if (twoColumns()) return shell("backlog", backlogListHtml(entries, id), entry ? itemPanel(entry) : `<h2>Backlog</h2>${missingItem}`);
   const back = backButton("#/backlog");
   if (!entry) return shell("backlog", back + top("Backlog") + missingItem);
@@ -1157,7 +1159,7 @@ function render() {
   else if (name === "plan") html = twoColumns() ? wideTaskScreen(params, planPanel) : planScreen(params);
   else if (name === "section") html = sectionRoute(params[0]);
   else if (name === "backlog") html = backlogRoute();
-  else if (name === "item") html = itemRoute(params[0]);
+  else if (name === "item") html = itemRoute(params[0], params[1] ?? null);
   else if (name === "idea") html = ideaRoute();
   else if (name === "review") html = reviewRoute(params);
   else if (name === "diff") html = reviewRoute(params, true);

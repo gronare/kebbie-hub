@@ -539,3 +539,14 @@ test("a row kept after its idea was merged into a note opens that note's card", 
   const entry = { ...mergeBacklog([machine("mch_mac", "MacBook", [merged])], NOW)[0], opens: "#/item/vault%3AProjects%2Fkebbie-ios.md" };
   assert.match(backlogRow(entry, null, NOW), /href="#\/item\/vault%3AProjects%2Fkebbie-ios\.md"/);
 });
+
+test("the same vault note in two accounts stays two rows, and each row's machines are its own account's only", () => {
+  const note = row("vault:Projects/round.md", { title: "Round invoices", priority: "high" });
+  const tagged = (account, made) => ({ ...made, account });
+  const entries = mergeBacklog([tagged("acc_home", machine("mch_mac", "MacBook", [note])), tagged("acc_home", machine("mch_mini", "mini", [note])), tagged("acc_work", machine("mch_work", "work-mac", [note]))], NOW);
+  assert.deepEqual(entries.map((entry) => [entry.id, entry.account, entry.machines.map((one) => one.machine)]), [
+    ["vault:Projects/round.md", "acc_home", ["mch_mac", "mch_mini"]],
+    ["acc_work|vault:Projects/round.md", "acc_work", ["mch_work"]],
+  ]);
+  assert.equal(entries[1].key, "vault:Projects/round.md", "the command still names the note itself");
+});
