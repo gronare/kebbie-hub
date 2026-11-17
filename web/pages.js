@@ -28,7 +28,7 @@ const EMAIL_ERRORS = {
 };
 
 const ERRORS = {
-  unauthorized: "That link is used or expired. Ask for a new one.",
+  unauthorized: "You were signed out. Sign in again.",
   "endpoint-not-allowed": "The hub doesn't send to this browser's push service.",
   "endpoint-not-https": "The hub doesn't send to this browser's push service.",
   "bad-endpoint": "This browser gave a subscription the hub can't use.",

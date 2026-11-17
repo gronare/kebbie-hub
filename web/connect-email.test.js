@@ -24,7 +24,7 @@ globalThis.indexedDB = {
 const CODE = "K7QF-M2XD";
 const VIEW = { code: CODE, name: "work-mac", state: "pending", expires_at: 1_900_000_000 };
 
-function hostedHub({ sessions }) {
+function hostedHub({ sessions, ended = [] }) {
   const calls = [];
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   const me = (account) => ({ account, handle: "k0123456789ab", key_access: false, key: null });
@@ -43,7 +43,7 @@ function hostedHub({ sessions }) {
       return answer({ account: me("acc_new"), created: true });
     }
     if (sessions.length > 1 && !named) return answer({ error: "account-required" }, 400);
-    if (!signedIn) return answer({ error: "unauthorized" }, 401);
+    if (!signedIn || ended.includes(path)) return answer({ error: "unauthorized" }, 401);
     if (path === "/v1/a/account") return answer(me(signedIn));
     if (path === "/v1/a/email") return answer({ email: "new@example.com", verified: true, sent: false });
     if (path === `/v1/a/connect?code=${CODE}`) return answer(VIEW);
@@ -96,6 +96,17 @@ test("an email sign-up on the connect page carries on as the new account in a br
   const after = calls.slice(calls.findIndex((call) => call.path === "/v1/a/email/verify") + 1);
   assert.deepEqual(after.filter((call) => call.status === 401), [], "no call after the code names an account this browser holds no session for");
   assert.ok(after.some((call) => call.path === `/v1/a/connect?code=${CODE}` && call.named === "acc_new"), JSON.stringify(after));
+  assert.doesNotMatch(root.innerHTML, /used or expired|signed out/);
+  page.leave();
+});
+
+test("a session that ends on the connect page reads as signed out, not as a used or expired link", async () => {
+  kept.clear();
+  const calls = hostedHub({ sessions: ["acc_home"], ended: [`/v1/a/connect?code=${CODE}`] });
+  const { root, page } = connectPage();
+  await page.started;
+  assert.ok(calls.some((call) => call.path === `/v1/a/connect?code=${CODE}` && call.status === 401));
+  assert.match(root.innerHTML, /You were signed out\. Sign in again\./);
   assert.doesNotMatch(root.innerHTML, /used or expired/);
   page.leave();
 });
