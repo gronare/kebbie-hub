@@ -108,10 +108,6 @@ pub async fn subscribe(
     })?;
     let detail = format!("device={device} host={host}");
     match outcome {
-        Subscribed::Taken => {
-            store.log(at, "push.endpoint-taken", None, Some(&detail))?;
-            return Err(ApiError::conflict("endpoint-taken"));
-        }
         Subscribed::Moved(from) => store.log(at, "push.moved", None, Some(&format!("{detail} from={from}")))?,
         Subscribed::New => {}
     }

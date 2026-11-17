@@ -32,7 +32,6 @@ const ERRORS = {
   "endpoint-not-https": "The hub doesn't send to this browser's push service.",
   "bad-endpoint": "This browser gave a subscription the hub can't use.",
   "bad-push-keys": "This browser gave a subscription the hub can't use.",
-  "endpoint-taken": "Another device holds this browser's subscription. Turn notifications off and on there.",
   "unknown-device": "The hub doesn't know this device. Reload the page and try again.",
   ...CONNECT_TEXT,
 };

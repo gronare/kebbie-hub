@@ -95,12 +95,13 @@ CREATE TABLE IF NOT EXISTS devices (
 CREATE INDEX IF NOT EXISTS devices_by_account ON devices (account_id);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     device_id TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE,
-    endpoint TEXT NOT NULL UNIQUE,
+    endpoint TEXT NOT NULL,
     p256dh BLOB NOT NULL,
     auth BLOB NOT NULL,
     categories TEXT NOT NULL,
     subscribed_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS push_by_endpoint ON push_subscriptions (endpoint);
 CREATE TABLE IF NOT EXISTS notices (
     machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
     notice_id TEXT NOT NULL,
@@ -240,6 +241,24 @@ DROP TABLE IF EXISTS notices;
 DROP TABLE IF EXISTS devices;
 DROP TABLE IF EXISTS events;
 ";
+// A browser holds one push endpoint, and each account on it subscribes that endpoint for its own device.
+const SHARED_ENDPOINTS: &str = "
+CREATE TABLE push_subscriptions_shared (
+    device_id TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL,
+    p256dh BLOB NOT NULL,
+    auth BLOB NOT NULL,
+    categories TEXT NOT NULL,
+    subscribed_at INTEGER NOT NULL,
+    offered TEXT NOT NULL
+);
+INSERT INTO push_subscriptions_shared (device_id, endpoint, p256dh, auth, categories, subscribed_at, offered)
+    SELECT device_id, endpoint, p256dh, auth, categories, subscribed_at, offered FROM push_subscriptions
+    WHERE device_id IN (SELECT device_id FROM devices);
+DROP TABLE push_subscriptions;
+ALTER TABLE push_subscriptions_shared RENAME TO push_subscriptions;
+CREATE INDEX IF NOT EXISTS push_by_endpoint ON push_subscriptions (endpoint);
+";
 pub const COMMAND_KEEP_SECONDS: u64 = 90 * 86_400;
 const PAIRING_KEEP_SECONDS: u64 = 3_600;
 const EVENT_KEEP_SECONDS: u64 = 30 * 86_400;
@@ -375,7 +394,6 @@ pub struct NewSubscription<'a> {
 pub enum Subscribed {
     New,
     Moved(Id),
-    Taken,
 }
 
 pub struct StoredSubscription {
@@ -475,6 +493,14 @@ impl Store {
             .collect::<Result<_>>()?;
         if !push_columns.iter().any(|column| column == "offered") {
             tx.execute_batch(&format!("ALTER TABLE push_subscriptions ADD COLUMN offered TEXT NOT NULL DEFAULT '{OFFERED_BEFORE_LEAD}'"))?;
+        }
+        let endpoint_unique: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE name = 'push_subscriptions' AND sql LIKE '%endpoint TEXT NOT NULL UNIQUE%')",
+            [],
+            |row| row.get(0),
+        )?;
+        if endpoint_unique {
+            tx.execute_batch(SHARED_ENDPOINTS)?;
         }
         let worker: bool = tx.query_row(
             "SELECT EXISTS (SELECT 1 FROM pragma_table_info('machines') WHERE name = 'worker_os')",
@@ -955,18 +981,17 @@ impl Store {
 
     pub fn subscribe_push(&mut self, new: &NewSubscription<'_>) -> Result<Subscribed> {
         let tx = self.connection.transaction()?;
-        let holder: Option<(Id, String)> = tx
+        let holder: Option<Id> = tx
             .query_row(
-                "SELECT holder.device_id, holder.account_id
+                "SELECT holder.device_id
                  FROM push_subscriptions JOIN devices AS holder ON holder.device_id = push_subscriptions.device_id
-                 WHERE push_subscriptions.endpoint = ?1 AND push_subscriptions.device_id != ?2",
-                params![new.endpoint, new.device.as_str()],
-                |row| Ok((id_at(row, 0)?, row.get(1)?)),
+                 WHERE push_subscriptions.endpoint = ?1 AND push_subscriptions.device_id != ?2 AND holder.account_id = ?3",
+                params![new.endpoint, new.device.as_str(), new.account],
+                |row| id_at(row, 0),
             )
             .optional()?;
         let outcome = match holder {
-            Some((_, account)) if account != new.account => return Ok(Subscribed::Taken),
-            Some((from, _)) => {
+            Some(from) => {
                 tx.execute("DELETE FROM push_subscriptions WHERE device_id = ?1", [from.as_str()])?;
                 Subscribed::Moved(from)
             }

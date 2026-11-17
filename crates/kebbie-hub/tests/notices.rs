@@ -456,23 +456,39 @@ async fn a_subscription_must_point_at_a_known_push_service_and_hold_real_keys() 
 }
 
 #[tokio::test]
-async fn an_endpoint_moves_between_devices_of_one_account_and_never_to_another() {
-    let test = start_hub(|config| config.vapid_subject = SUBJECT.to_string()).await;
-    let (_machine, mut person) = notifying(&test).await;
+async fn an_endpoint_moves_between_devices_of_one_account_and_is_shared_never_taken_by_another() {
+    let test = push_hub(|_| {}).await;
+    let mut service = PushService::start().await;
+    let (mut machine, mut person) = notifying(&test).await;
     person.register_device().await.unwrap();
-    let shared = PushSecret::generate("https://web.push.apple.com/shared");
+    let shared = PushSecret::generate(&service.endpoint("phone"));
     person.subscribe_push(&shared.subscription(&[])).await.unwrap();
     let (key, cert) = another_device(&person, "Same phone, new key");
     person.use_device(key, cert);
     person.register_device().await.unwrap();
-    person.subscribe_push(&shared.subscription(&[])).await.unwrap();
+    person.subscribe_push(&shared.subscription(&NoticeCategory::defaults())).await.unwrap();
     assert_eq!(rows(&test, "push_subscriptions"), 1);
     assert!(test.hub.store().events().unwrap().iter().any(|(kind, _)| kind == "push.moved"));
 
-    let mut stranger = member(&test).await;
-    let _theirs = connected_with_board(&test, &mut stranger).await;
-    stranger.register_device().await.unwrap();
-    assert_eq!(refusal_of(stranger.subscribe_push(&shared.subscription(&[])).await), (409, "endpoint-taken".to_string()));
+    let mut work = member(&test).await;
+    let mut work_machine = connected_with_board(&test, &mut work).await;
+    work.knows(&work_machine.machine, work_machine.public());
+    work.register_device().await.unwrap();
+    work.subscribe_push(&shared.subscription(&NoticeCategory::defaults())).await.unwrap();
+    assert_eq!(rows(&test, "push_subscriptions"), 2, "the second account adds its own row and takes nothing");
+
+    let home_sent = machine.notify(notice(NoticeCategory::Questions, "home"), "q-home", Urgency::High).await.unwrap();
+    assert_eq!(home_sent.pushes, 1);
+    let push = service.next().await;
+    assert_eq!(opened_push(&shared, &person, &push).unwrap().1.body, "home");
+    assert!(opened_push(&shared, &work, &push).is_err(), "a home notice never opens with the work device");
+
+    let work_sent = work_machine.notify(notice(NoticeCategory::Questions, "work"), "q-work", Urgency::High).await.unwrap();
+    assert_eq!(work_sent.pushes, 1);
+    let push = service.next().await;
+    assert_eq!(opened_push(&shared, &work, &push).unwrap().1.body, "work");
+    settle(&test).await;
+    assert!(service.drain().is_empty());
 }
 
 #[tokio::test]

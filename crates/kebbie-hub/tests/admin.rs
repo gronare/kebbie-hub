@@ -178,6 +178,8 @@ fn a_push_subscription_from_before_the_lead_answered_category_was_offered_the_si
             "PRAGMA foreign_keys = OFF;
              DROP TABLE push_subscriptions;
              CREATE TABLE push_subscriptions (device_id TEXT PRIMARY KEY, endpoint TEXT NOT NULL UNIQUE, p256dh BLOB NOT NULL, auth BLOB NOT NULL, categories TEXT NOT NULL, subscribed_at INTEGER NOT NULL);
+             INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_kept', 'alice', x'00112233445566778899aabbccddeeff', 1);
+             INSERT INTO devices (device_id, account_id, signing_key, cert, created_at) VALUES ('dev_kept', 'acc_kept', x'01', '{}', 1);
              INSERT INTO push_subscriptions VALUES ('dev_kept', 'https://push.example/1', x'01', x'02', '[\"questions\"]', 1);",
         )
         .unwrap();
@@ -470,3 +472,28 @@ fn an_owner_made_without_another_owner_needs_no_replace() {
     assert!(store.account("acc_a").unwrap().unwrap().owner);
 }
 
+
+#[test]
+fn a_push_endpoint_held_unique_opens_shared_between_accounts_with_its_subscriptions_kept() {
+    let data = tempfile::tempdir().unwrap();
+    let path = data.path().join("hub.sqlite3");
+    drop(Store::open(&path).unwrap());
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "DROP TABLE push_subscriptions;
+             CREATE TABLE push_subscriptions (device_id TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh BLOB NOT NULL, auth BLOB NOT NULL, categories TEXT NOT NULL, subscribed_at INTEGER NOT NULL, offered TEXT NOT NULL DEFAULT '[]');
+             INSERT INTO accounts (id, handle, user_handle, created_at) VALUES ('acc_home', 'home', x'00112233445566778899aabbccddeeff', 1), ('acc_work', 'work', x'ffeeddccbbaa99887766554433221100', 1);
+             INSERT INTO devices (device_id, account_id, signing_key, cert, created_at) VALUES ('dev_home', 'acc_home', x'01', '{}', 1), ('dev_work', 'acc_work', x'02', '{}', 1);
+             INSERT INTO push_subscriptions VALUES ('dev_home', 'https://push.example/phone', x'01', x'02', '[\"questions\"]', 1, '[]');",
+        )
+        .unwrap();
+    drop(Store::open(&path).unwrap());
+    drop(Store::open(&path).unwrap());
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    let kept: (String, String) = connection.query_row("SELECT device_id, categories FROM push_subscriptions", [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(kept, ("dev_home".to_string(), r#"["questions"]"#.to_string()));
+    connection
+        .execute("INSERT INTO push_subscriptions VALUES ('dev_work', 'https://push.example/phone', x'03', x'04', '[]', 2, '[]')", [])
+        .expect("a second account subscribes the same endpoint");
+}
