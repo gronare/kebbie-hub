@@ -1,11 +1,9 @@
 import { DEFAULT_NOTICE_CATEGORIES, fromB64, NOTICE_CATEGORIES, noticeCategoryOf, openNotice, ProtocolError, verifyMachineList } from "../js/protocol.js";
 import { openEncryption } from "./store.js";
+import { accountOfDevice, failureKey, listingKey, marksKey, notifyKey } from "./accounts.js";
 
-export const NOTIFY_RECORD = "notify";
-export const LISTING = "listing";
 export const categoriesKey = (device) => `notify-categories:${device}`;
 export const GENERIC = { title: "kebbie", body: "Open kebbie to see what changed." };
-export const NOTICE_FAILURE = "notice-failure";
 
 export const browserPush = async () => (await globalThis.navigator?.serviceWorker?.getRegistration("/"))?.pushManager.getSubscription() ?? null;
 
@@ -125,7 +123,7 @@ async function trusted(listing, record, get) {
   const signed = listing?.list;
   const key = record.account;
   if (!signed || !key?.keys?.signing) return { reason: "no-list" };
-  const seen = (await get(`marks:${key.account}`).catch(() => null))?.list ?? 0;
+  const seen = (await get(marksKey(key.account)).catch(() => null))?.list ?? 0;
   if (!(signed.list?.counter >= seen)) return { reason: "list-older" };
   const verifying = await crypto.subtle.importKey("raw", fromB64(key.keys.signing), { name: "Ed25519" }, false, ["verify"]);
   return (await verifyMachineList({ id: key.account, verifying }, signed)) ? { listing } : { reason: "list-unsigned" };
@@ -133,20 +131,21 @@ async function trusted(listing, record, get) {
 
 // A machine missing from the kept list may have joined since the app last ran, so the worker reads the hub's list once and keeps it when the account vouches for it.
 async function vouched(machine, record, { get, put, boards, now }) {
-  const kept = (await get(LISTING))?.listing ?? null;
+  const owner = record.account.account;
+  const kept = (await get(listingKey(owner)))?.listing ?? null;
   const held = await trusted(kept, record, get);
   if (held.listing && machineIn(held.listing, machine)) return held;
   const missing = held.reason ?? "unknown-machine";
   if (!boards) return { reason: missing, named: kept };
   let fetched;
   try {
-    fetched = await boards();
+    fetched = await boards(owner);
   } catch (error) {
     return { reason: error?.status === 401 ? "signed-out" : missing, named: kept };
   }
   const fresh = await trusted(fetched, record, get);
   if (!fresh.listing) return { reason: fresh.reason, named: kept };
-  if (put && fresh.listing.list.list.counter >= (kept?.list?.list?.counter ?? 0)) await put(LISTING, { listing: fresh.listing, at: now }).catch(() => undefined);
+  if (put && fresh.listing.list.list.counter >= (kept?.list?.list?.counter ?? 0)) await put(listingKey(owner), { listing: fresh.listing, at: now }).catch(() => undefined);
   return machineIn(fresh.listing, machine) ? fresh : { reason: "unknown-machine", named: fresh.listing };
 }
 
@@ -158,13 +157,17 @@ function unopened(envelope, tag, failure, named) {
 
 export async function pushedNotice(envelope, { get, now, put = null, boards = null }) {
   const tag = typeof envelope?.collapse === "string" ? envelope.collapse : "kebbie";
-  const failure = { at: now, reason: null, detail: null, machine: typeof envelope?.machine === "string" ? envelope.machine : null, recipient: Object.keys(envelope?.keys ?? {})[0] ?? null, device: null };
+  const recipient = Object.keys(envelope?.keys ?? {})[0] ?? null;
+  const failure = { at: now, reason: null, detail: null, machine: typeof envelope?.machine === "string" ? envelope.machine : null, recipient, device: null };
   let named = null;
-  const failed = (reason, detail = null) => unopened(envelope, tag, { ...failure, reason, detail }, named);
+  let owner = null;
+  const failed = (reason, detail = null) => ({ ...unopened(envelope, tag, { ...failure, reason, detail }, named), account: owner });
   try {
-    named = (await get(LISTING).catch(() => null))?.listing ?? null;
     if (!envelope) return failed("no-envelope");
-    const record = await get(NOTIFY_RECORD);
+    owner = recipient ? await accountOfDevice({ get }, recipient) : null;
+    if (!owner) return failed("no-record");
+    named = (await get(listingKey(owner)).catch(() => null))?.listing ?? null;
+    const record = await get(notifyKey(owner));
     if (!record?.account?.account) return failed("no-record");
     const device = await get(`device-key:${record.account.account}`);
     failure.device = device?.id ?? null;
@@ -179,7 +182,7 @@ export async function pushedNotice(envelope, { get, now, put = null, boards = nu
     const listed = machineIn(found.listing, envelope.machine);
     const notice = await openNotice(envelope, { id: device.id, encryption: await openEncryption(device.encryption, device.cert?.encryption) }, { id: listed.machine, keys: listed.keys }, now);
     const name = nameIn(found.listing, listed.machine);
-    return { title: notice.title, body: notice.body, tag, data: { machine: listed.machine, name, category: notice.category, open: notice.open, url: routeOf(listed.machine, notice.open) }, retract: notice.retract ?? [], failure: null };
+    return { title: notice.title, body: notice.body, tag, data: { account: owner, machine: listed.machine, name, category: notice.category, open: notice.open, url: routeOf(listed.machine, notice.open) }, retract: notice.retract ?? [], failure: null, account: owner };
   } catch (error) {
     return error instanceof ProtocolError ? failed(error.code) : failed("error", `${error?.name ?? "Error"}: ${error?.message ?? error}`);
   }
@@ -228,8 +231,8 @@ export async function watching(clients) {
 export async function showPushed(registration, envelope, { get, now, put = null, del = null, boards = null, clients = null }) {
   const shown = await pushedNotice(envelope, { get, now, put, boards });
   const open = await watching(clients);
-  if (shown.failure && put) await put(NOTICE_FAILURE, shown.failure).catch(() => undefined);
-  if (!shown.failure && del) await del(NOTICE_FAILURE).catch(() => undefined);
+  if (shown.failure && put) await put(failureKey(shown.account), shown.failure).catch(() => undefined);
+  if (!shown.failure && del) await del(failureKey(shown.account)).catch(() => undefined);
   if (shown.retract.length) {
     for (const notification of await registration.getNotifications()) if (shown.retract.includes(notification.tag)) notification.close();
   }

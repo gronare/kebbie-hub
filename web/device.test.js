@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { notifyKey } from "./accounts.js";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
@@ -109,18 +110,18 @@ test("a device that registers anew while notifications are on takes the browser'
   const calls = { addDevice: async () => undefined, subscribePush: async (device, body) => void subscribed.push({ device, body }) };
   const store = memoryStore();
   const before = await ensureDevice({ store, calls, identity, name: "iPhone", now: AT, subscription: async () => null });
-  await store.put("notify", { account: identity.key, device: before.id });
+  await store.put(notifyKey(identity.id), { account: identity.key, device: before.id });
   await store.put(`notify-categories:${before.id}`, ["questions", "ready"]);
   const held = { toJSON: () => ({ endpoint: "https://web.push.apple.com/QGuQyavXutnMH", keys: { p256dh: "p256", auth: "auth" } }) };
   await store.del(`device-key:${identity.id}`);
   const after = await ensureDevice({ store, calls, identity, name: "iPhone", now: AT + 60, subscription: async () => held });
   assert.notEqual(after.id, before.id);
   assert.deepEqual(subscribed, [{ device: after.id, body: { endpoint: "https://web.push.apple.com/QGuQyavXutnMH", keys: { p256dh: "p256", auth: "auth" }, categories: ["questions", "ready"] } }]);
-  assert.equal((await store.get("notify")).device, after.id);
-  assert.equal((await loadDevice(store, identity.id)).id, (await store.get("notify")).device);
+  assert.equal((await store.get(notifyKey(identity.id))).device, after.id);
+  assert.equal((await loadDevice(store, identity.id)).id, (await store.get(notifyKey(identity.id))).device);
   assert.deepEqual(await store.get(`notify-categories:${after.id}`), ["questions", "ready"]);
   assert.equal(await pushFollows({ store, calls, identity, device: after, subscription: async () => held }), false, "a record that names this device moves nothing");
-  await store.del("notify");
+  await store.del(notifyKey(identity.id));
   await store.del(`device-key:${identity.id}`);
   await ensureDevice({ store, calls, identity, name: "iPhone", now: AT + 120, subscription: async () => held });
   assert.equal(subscribed.length, 1, "with notifications off nothing is subscribed");

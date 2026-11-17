@@ -142,7 +142,8 @@ test("the switch asks for permission from the tap itself, subscribes with the hu
   assert.equal(push.unsubscribed, 1);
   assert.equal(calls.find((call) => call.method === "DELETE").url, `/v1/a/devices/${device}/push`);
   assert.doesNotMatch(root.innerHTML, /Notify me when/);
-  assert.equal(kept.has("notify"), false, "off forgets which device the worker opens notices with");
+  assert.ok(added.body.cert.account);
+  assert.equal(kept.has(`notify:${added.body.cert.account}`), false, "off forgets which device the worker opens notices with");
   page.leave();
 });
 
@@ -152,10 +153,10 @@ test("Account moves the browser's subscription to this device when the worker's 
   const earlier = deviceId();
   const { root, calls } = browserWith({ permission: "granted" });
   await (await navigator.serviceWorker.getRegistration("/")).pushManager.subscribe({});
-  kept.set("notify", { account: given.session.identity.key, device: earlier });
+  kept.set(`notify:${given.me.account}`, { account: given.session.identity.key, device: earlier });
   kept.set(`notify-categories:${earlier}`, ["questions", "ready"]);
   const at = Math.floor(Date.now() / 1000) - 60;
-  kept.set("notice-failure", { at, reason: "device-changed", detail: earlier, machine: "mch_01", recipient: earlier, device: "dev_other", name: "MacBook" });
+  kept.set(`notice-failure:${given.me.account}`, { at, reason: "device-changed", detail: earlier, machine: "mch_01", recipient: earlier, device: "dev_other", name: "MacBook" });
   const page = startPage(root, { given });
   await page.started;
   root.click({ action: "notifications" });
@@ -164,11 +165,12 @@ test("Account moves the browser's subscription to this device when the worker's 
   const moved = calls.find((call) => call.method === "PUT" && call.url === `/v1/a/devices/${device}/push`);
   assert.deepEqual(moved.body.categories, ["questions", "ready"]);
   assert.equal(moved.body.endpoint, "https://web.push.apple.com/QGuQyavXutnMH");
-  assert.equal(kept.get("notify").device, device);
+  assert.equal(kept.get(`notify:${given.me.account}`).device, device);
+  assert.equal(kept.get(`notify-devices`)[device], given.me.account);
   assert.equal(kept.get(`device-key:${given.me.account}`).id, device);
   assert.match(root.innerHTML, /<div class="meta warn" id="notify-failure">The last notification, at \d\d:\d\d from MacBook, couldn&#39;t be opened: it was sealed to an earlier key of this device\.<\/div>/);
   page.leave();
-  kept.delete("notice-failure");
+  kept.delete(`notice-failure:${given.me.account}`);
 });
 
 test("Account never registers a device on its own when the kept one can't be read back, as WebKit does with an X25519 key", async () => {
@@ -177,13 +179,13 @@ test("Account never registers a device on its own when the kept one can't be rea
   const earlier = deviceId();
   const { root, calls } = browserWith({ permission: "granted" });
   await (await navigator.serviceWorker.getRegistration("/")).pushManager.subscribe({});
-  kept.set("notify", { account: given.session.identity.key, device: earlier });
+  kept.set(`notify:${given.me.account}`, { account: given.session.identity.key, device: earlier });
   kept.set(`device-key:${given.me.account}`, null);
   const page = startPage(root, { given });
   await page.started;
   root.click({ action: "notifications" });
   assert.equal(calls.some((call) => call.method === "POST" && call.url === "/v1/a/devices"), false);
-  assert.equal(kept.get("notify").device, earlier);
+  assert.equal(kept.get(`notify:${given.me.account}`).device, earlier);
   page.leave();
   kept.delete(`device-key:${given.me.account}`);
 });

@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceId, emptyMachineList, importIdentity, machineListWith, newAccountSecrets, newDeviceKey, sealEnvelope, signMachineList } from "../js/protocol.js";
-import { CATEGORY_GROUPS, closeSettled, deviceWord, failureLine, GENERIC, isSettled, keptCategories, LISTING, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, pushedNotice, PUSHED, routeOf, showPushed, switchable, withCategory } from "./notify.js";
+import { failureKey, listingKey, migrate, notifyKey, NOTIFY_DEVICES } from "./accounts.js";
+import { CATEGORY_GROUPS, closeSettled, deviceWord, failureLine, GENERIC, isSettled, keptCategories, notifyPhase, notifyText, pushedNotice, PUSHED, routeOf, showPushed, switchable, withCategory } from "./notify.js";
 
 const { parties } = JSON.parse(readFileSync(new URL("../vectors/keys.json", import.meta.url), "utf8"));
 const NOW = 1_761_070_000;
@@ -99,28 +100,30 @@ async function world() {
   const signed = { list, signature: await signMachineList(identity, list) };
   const key = await newDeviceKey();
   const device = { id: deviceId(), encryption: key.encryption, encryptionPublic: key.encryptionPublic };
+  const owner = fresh.key.account;
   const kv = new Map([
-    [NOTIFY_RECORD, { account: fresh.key, device: device.id }],
-    [`device-key:${fresh.key.account}`, { id: device.id, encryption: device.encryption }],
-    [LISTING, { listing: { list: signed, boards: [{ machine: machine.id, name: "MacBook" }] }, at: NOW }],
+    [notifyKey(owner), { account: fresh.key, device: device.id }],
+    [NOTIFY_DEVICES, { [device.id]: owner }],
+    [`device-key:${owner}`, { id: device.id, encryption: device.encryption }],
+    [listingKey(owner), { listing: { list: signed, boards: [{ machine: machine.id, name: "MacBook" }] }, at: NOW }],
   ]);
   const seal = async (payload, recipient = device, collapse = "q-refunds") => {
     const header = { v: 1, id: "ntc_01K85Y2D8G0000000000000000", kind: "notice", from: machine.id, machine: machine.id, at: NOW, exp: NOW + 3600, schema: 1, urgency: "high", collapse };
     return sealEnvelope(header, new TextEncoder().encode(JSON.stringify(payload)), machine, [{ id: recipient.id, encryption: recipient.encryptionPublic }]);
   };
-  return { kv, get: async (name) => kv.get(name), put: async (name, value) => void kv.set(name, value), del: async (name) => void kv.delete(name), seal, machine, device, identity, fresh, signed };
+  return { kv, owner, LISTING: listingKey(owner), NOTIFY_RECORD: notifyKey(owner), NOTICE_FAILURE: failureKey(owner), get: async (name) => kv.get(name), put: async (name, value) => void kv.set(name, value), del: async (name) => void kv.delete(name), seal, machine, device, identity, fresh, signed };
 }
 
 const notice = { type: "notice", category: "questions", title: "refunds · shop", body: "Keep the old endpoint for a release?", open: { to: "task", address: "refunds@shop" }, retract: ["q-old"] };
 
 test("a pushed notice opens with the device's key after the account-signed list vouches for its machine", async () => {
-  const { get, seal, machine } = await world();
+  const { get, seal, machine, owner } = await world();
   const shown = await pushedNotice(await seal(notice), { get, now: NOW });
-  assert.deepEqual(shown, { title: "refunds · shop", body: "Keep the old endpoint for a release?", tag: "q-refunds", data: { machine: machine.id, name: "MacBook", category: "questions", open: notice.open, url: `/#/task/${machine.id}/refunds%40shop` }, retract: ["q-old"], failure: null });
+  assert.deepEqual(shown, { account: owner, title: "refunds · shop", body: "Keep the old endpoint for a release?", tag: "q-refunds", data: { account: owner, machine: machine.id, name: "MacBook", category: "questions", open: notice.open, url: `/#/task/${machine.id}/refunds%40shop` }, retract: ["q-old"], failure: null });
 });
 
 test("a notice that can't be opened still names its machine and its kind, and says why", async () => {
-  const { kv, get, seal, device } = await world();
+  const { kv, get, seal, device, LISTING, NOTIFY_RECORD } = await world();
   const why = async (envelope, options = {}) => {
     const shown = await pushedNotice(envelope, { get, now: NOW, ...options });
     return { title: shown.title, body: shown.body, tag: shown.tag, url: shown.data.url, reason: shown.failure?.reason, detail: shown.failure?.detail ?? null };
@@ -162,7 +165,7 @@ test("a notice that can't be opened still names its machine and its kind, and sa
 });
 
 test("a machine missing from the kept list is looked up on the hub once, and kept when the account signed the list", async () => {
-  const { kv, get, put, seal, identity, machine, signed } = await world();
+  const { kv, get, put, seal, identity, machine, signed, LISTING } = await world();
   const envelope = await seal(notice);
   const empty = { counter: 0, machines: [] };
   const stale = { list: { list: empty, signature: await signMachineList(identity, empty) }, boards: [] };
@@ -186,7 +189,7 @@ test("a machine missing from the kept list is looked up on the hub once, and kep
 });
 
 test("the worker keeps why the last notice didn't open, and forgets it once one does", async () => {
-  const { kv, get, put, del, seal } = await world();
+  const { kv, get, put, del, seal, NOTICE_FAILURE } = await world();
   const registration = { getNotifications: async () => [], showNotification: async () => undefined };
   const envelope = await seal(notice);
   const other = await newDeviceKey();
@@ -285,4 +288,17 @@ test("the service worker's shell holds every module the app and the worker impor
   const modules = readdirSync(new URL(".", import.meta.url)).filter((name) => name.endsWith(".js") && !name.endsWith(".test.js") && name !== "sw.js");
   for (const name of modules) assert.ok(files.includes(`/${name}`), name);
   assert.ok(files.includes("/js/protocol.js") && files.includes("/js/hpke.js"));
+});
+
+test("a notice opens in a store kept before several accounts once the worker has moved it under its account", async () => {
+  const { kv, get, put, del, seal, owner } = await world();
+  for (const [from, to] of [["notify", `notify:${owner}`], ["listing", `listing:${owner}`]]) {
+    kv.set(from, kv.get(to));
+    kv.delete(to);
+  }
+  kv.delete("notify-devices");
+  await migrate({ get, put, del });
+  const shown = await pushedNotice(await seal(notice), { get, now: NOW });
+  assert.equal(shown.failure, null);
+  assert.equal(shown.title, notice.title);
 });

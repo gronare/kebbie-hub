@@ -7,7 +7,8 @@ import { put, get, del } from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, heldDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 import { fromB64, toB64 } from "../js/protocol.js";
 import { COMMAND_TEXT, decisionBlock, standingOn } from "./decide.js";
-import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, NOTICE_FAILURE, NOTIFY_RECORD, notifyPhase, notifyText, withCategory } from "./notify.js";
+import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, notifyPhase, notifyText, withCategory } from "./notify.js";
+import { failureKey, forgetNotifyRecord, keepNotifyRecord as recordNotify, migrate, notifyRecord } from "./accounts.js";
 import { addFirstPasskey, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
@@ -252,7 +253,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     try {
       await account.removeDevice(removed.id);
       if (removed.self) {
-        await stopNotifications(account, { get, del });
+        await stopNotifications(account, { get, del }, undefined, identity.id);
         await forgetDevice({ del }, identity.id);
         state.device = null;
         if (state.notify) state.notify.phase = "off";
@@ -335,7 +336,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
 
   async function keepNotifyRecord(identity) {
     if (!identity || !state.device) return;
-    await put(NOTIFY_RECORD, { account: identity.key, device: state.device.id }).catch(() => undefined);
+    await recordNotify({ get, put }, identity.id, { account: identity.key, device: state.device.id }).catch(() => undefined);
   }
 
   async function loadNotify() {
@@ -350,14 +351,14 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     const listed = state.devices ? (state.devices.find((device) => device.self)?.push ?? null) : undefined;
     const kept = state.device ? await get(categoriesKey(state.device.id)).catch(() => null) : null;
     const subscribed = Boolean(subscription) && listed !== null;
-    const failure = await get(NOTICE_FAILURE).catch(() => null);
+    const failure = (await get(failureKey(state.me?.account)).catch(() => null)) ?? (await get(failureKey(null)).catch(() => null));
     state.notify = { env, phase: notifyPhase({ ...env, subscribed }), categories: keptCategories(listed?.categories ?? kept), busy: false, failure };
     if (state.notify.phase === "on") await keepNotifyRecord(unlockedIdentity());
   }
 
   async function healPush(subscription) {
     const identity = unlockedIdentity();
-    const record = await get(NOTIFY_RECORD).catch(() => null);
+    const record = identity ? await notifyRecord({ get }, identity.id) : null;
     if (!identity || record?.account?.account !== identity.id || record.device === state.device?.id) return;
     if (!state.device && !(await heldDevice({ get }, identity.id)).missing) return;
     const store = { get, put };
@@ -424,7 +425,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     try {
       await (await currentSubscription())?.unsubscribe();
       if (state.device) await account.unsubscribePush(state.device.id);
-      await del(NOTIFY_RECORD).catch(() => undefined);
+      if (state.me) await forgetNotifyRecord({ del }, state.me.account);
       await loadDevices().catch(() => undefined);
     } catch (error) {
       state.notice = message(error);
@@ -731,7 +732,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     state.notice = null;
     draw();
     try {
-      await signOut(account);
+      await signOut(account, undefined, undefined, state.me?.account);
     } finally {
       state.session = null;
       state.me = null;
@@ -870,9 +871,11 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     } else {
       render(top("kebbie hub"));
       state.info = await account.hub().catch(() => null);
+      await migrate({ get, put, del }).catch(() => undefined);
       state.me = await signedInAccount(account);
       const onward = state.me ? signedInDestination(path, params) : null;
       if (onward) return location.assign(onward);
+      if (state.me) await migrate({ get, put, del }, state.me.account).catch(() => undefined);
       const kept = await keptUnlock(state.me);
       state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
     }

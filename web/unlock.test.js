@@ -6,7 +6,8 @@ import { fromB64, importSender, openEnvelope, toB64, unwrapAccountSecrets, wrapp
 import { HubError } from "./hub.js";
 import { signUpWith, signInWith } from "./signin.js";
 import { passkeySignInScreen, signedOutStep } from "./email.js";
-import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter, unlockOnShow } from "./unlock.js";
+import { listingKey, notifyKey, unlockKey } from "./accounts.js";
+import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter, unlockOnShow } from "./unlock.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -271,6 +272,8 @@ test("a passkey added after GitHub sign-in on a device without PRF leaves the ac
   assert.equal(account.state.key, null);
 });
 
+const kept = (store) => [...store.values.keys()].filter((key) => key !== "accounts").length;
+
 function deviceStore() {
   const values = new Map();
   return { values, get: async (key) => structuredClone(values.get(key)), put: async (key, value) => void values.set(key, structuredClone(value)), del: async (key) => void values.delete(key) };
@@ -304,21 +307,21 @@ test("an unlock kept less than an hour ago opens the boards after a reload witho
 test("an unlock kept more than an hour ago is deleted and leaves the boards locked", async () => {
   const { store, local, me } = await unlockedOnce();
   assert.equal(await keptUnlock(me, store, Date.now() + KEEP_MS + 1000, local), null);
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 test("an unlock that ends further out than an hour from now, as after the clock is set back, is deleted", async () => {
   const { store, local, me, before } = await unlockedOnce();
   assert.equal(await keptUnlock(me, store, before - 60_000, local), null);
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 test("an expired unlock is deleted at start even when nobody is signed in, an unexpired one is kept for later", async () => {
   const { store, local, before } = await unlockedOnce();
   assert.equal(await keptUnlock(null, store, before + 60_000, local), null);
-  assert.equal(store.values.size, 1);
+  assert.equal(kept(store), 1);
   assert.equal(await keptUnlock(null, store, before + KEEP_MS + 1000, local), null);
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 test("a kept unlock holding an extractable signing or encryption key is not used and is deleted", async () => {
@@ -326,17 +329,17 @@ test("a kept unlock holding an extractable signing or encryption key is not used
   const privateKey = (await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"])).privateKey;
   for (const swap of [(identity) => ({ ...identity, signing }), (identity) => ({ ...identity, encryption: { ...identity.encryption, privateKey } })]) {
     const { store, local, me, before } = await unlockedOnce();
-    const kept = await store.get("unlock");
-    await store.put("unlock", { ...kept, identity: swap(kept.identity) });
+    const held = await store.get(unlockKey(me.account));
+    await store.put(unlockKey(me.account), { ...held, identity: swap(held.identity) });
     assert.equal(await keptUnlock(me, store, before + 60_000, local), null);
-    assert.equal(store.values.size, 0);
+    assert.equal(kept(store), 0);
   }
 });
 
 test("a kept unlock without this account's remembered passkey on the device is deleted", async () => {
   const { store, me, before } = await unlockedOnce();
   assert.equal(await keptUnlock(me, store, before + 60_000, storage()), null);
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 test("an unlock that does not end unlocked deletes the one kept before", async () => {
@@ -345,7 +348,7 @@ test("an unlock that does not end unlocked deletes the one kept before", async (
   const credentials = authenticator();
   const session = await unlockAfter({ account: unwrapped, credentials }, await signInWith({ account: unwrapped, credentials }).withPasskey(accounts.wrap.credential), local, store);
   assert.equal(session.state, "not-wrapped");
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 function page() {
@@ -357,8 +360,8 @@ function page() {
 test("an open page locks its boards and deletes the kept unlock when the hour ends", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
   const store = deviceStore();
-  const session = { state: "unlocked", until: Date.now() + KEEP_MS };
-  await store.put("unlock", { until: session.until });
+  const session = { state: "unlocked", me: { account: "acc_x" }, until: Date.now() + KEEP_MS };
+  await store.put(unlockKey("acc_x"), { until: session.until });
   let locked = 0;
   const ends = lockWhenDue(() => locked++, { store, page: page() });
   ends.watch(session);
@@ -367,7 +370,7 @@ test("an open page locks its boards and deletes the kept unlock when the hour en
   t.mock.timers.tick(1);
   assert.equal(locked, 1);
   await Promise.resolve();
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 test("a page shown again after the hour ended while its timer slept locks at once", async (t) => {
@@ -477,8 +480,8 @@ test("boards that lock again while the app is open ask once more", async () => {
 });
 
 test("a kept unlock is never readable as key bytes", async () => {
-  const { store } = await unlockedOnce();
-  const { identity, encryption } = await store.get("unlock");
+  const { store, me } = await unlockedOnce();
+  const { identity, encryption } = await store.get(unlockKey(me.account));
   await assert.rejects(crypto.subtle.exportKey("pkcs8", identity.signing));
   await assert.rejects(crypto.subtle.exportKey("jwk", identity.signing));
   await assert.rejects(crypto.subtle.exportKey("raw", encryption.key));
@@ -488,7 +491,7 @@ const x25519Keys = (value) => (value instanceof CryptoKey ? (value.algorithm.nam
 
 test("a kept unlock holds no X25519 CryptoKey, which WebKit reads back as null, and still opens the boards after a reload", async () => {
   const { store, local, me, before } = await unlockedOnce();
-  assert.equal(x25519Keys(store.values.get("unlock")), 0);
+  assert.equal(x25519Keys(store.values.get(unlockKey(me.account))), 0);
   const resumed = await keptUnlock(me, store, before + 60_000, local);
   assert.equal(resumed.identity.encryption.privateKey.extractable, false);
   await boardOpens(resumed.identity);
@@ -496,43 +499,51 @@ test("a kept unlock holds no X25519 CryptoKey, which WebKit reads back as null, 
 
 test("an unlock kept by an earlier build with its keys as CryptoKeys still opens the boards", async () => {
   const { store, local, me, before, session } = await unlockedOnce();
-  await store.put("unlock", { identity: session.identity, until: session.until });
+  await store.put(unlockKey(me.account), { identity: session.identity, until: session.until });
   const resumed = await keptUnlock(me, store, before + 60_000, local);
   assert.equal(resumed?.state, "unlocked");
   await boardOpens(resumed.identity);
 });
 
-test("a kept unlock for another account, key version or signing key is ignored and deleted", async () => {
-  for (const me of [(m) => ({ ...m, account: "acc_other", key: { ...m.key, account: "acc_other" } }), (m) => ({ ...m, key: { ...m.key, version: m.key.version + 1 } }), (m) => ({ ...m, key: { ...m.key, keys: { ...m.key.keys, signing: parties.machine.public.signing } } })]) {
+test("a kept unlock under another key version or signing key is ignored and deleted", async () => {
+  for (const me of [(m) => ({ ...m, key: { ...m.key, version: m.key.version + 1 } }), (m) => ({ ...m, key: { ...m.key, keys: { ...m.key.keys, signing: parties.machine.public.signing } } })]) {
     const { store, local, me: signedIn } = await unlockedOnce();
     assert.equal(await keptUnlock(me(signedIn), store, Date.now(), local), null);
-    assert.equal(store.values.size, 0);
+    assert.equal(kept(store), 0);
   }
+});
+
+test("another account's kept unlock is neither used nor deleted when this one signs in", async () => {
+  const { store, local, me } = await unlockedOnce();
+  const other = { ...me, account: "acc_other", key: { ...me.key, account: "acc_other" } };
+  assert.equal(await keptUnlock(other, store, Date.now(), local), null);
+  assert.ok(await store.get(unlockKey(me.account)));
+  assert.equal((await keptUnlock(me, store, Date.now(), local))?.state, "unlocked");
 });
 
 test("a 401 from the hub when reading the account deletes the kept unlock, being offline keeps it", async () => {
   const { store } = await unlockedOnce();
   assert.equal(await signedInAccount({ me: async () => Promise.reject(new TypeError("offline")) }, store), null);
-  assert.equal(store.values.size, 1);
+  assert.equal(kept(store), 1);
   assert.equal(await signedInAccount({ me: async () => Promise.reject(new HubError(401, "unauthorized")) }, store), null);
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
 });
 
 test("signing out deletes the kept unlock", async () => {
-  const { store } = await unlockedOnce();
-  await forgetUnlock(store);
-  assert.equal(store.values.size, 0);
+  const { store, me } = await unlockedOnce();
+  await forgetUnlock(store, me.account);
+  assert.equal(kept(store), 0);
 });
 
 test("signing out ends the hub session, deletes the kept unlock and the cached boards, and keeps the passkey so sign-in offers it first", async () => {
-  const { account, store, local, session } = await unlockedOnce();
-  await store.put(LISTING, { listing: { boards: ["sealed"] }, at: 1 });
+  const { account, store, local, session, me } = await unlockedOnce();
+  await store.put(listingKey(me.account), { listing: { boards: ["sealed"] }, at: 1 });
   const ended = [];
-  await store.put("notify", { account: session.identity.key, device: "dev_phone" });
+  await store.put(notifyKey(me.account), { account: session.identity.key, device: "dev_phone" });
   const subscription = { unsubscribe: async () => void ended.push("browser unsubscribed") };
-  await signOut({ unsubscribePush: async (device) => void ended.push(`hub forgot ${device}`), logout: async () => void ended.push("logout") }, store, async () => subscription);
+  await signOut({ id: me.account, unsubscribePush: async (device) => void ended.push(`hub forgot ${device}`), logout: async () => void ended.push("logout") }, store, async () => subscription);
   assert.deepEqual(ended, ["browser unsubscribed", "hub forgot dev_phone", "logout"], "the next account on this browser can take the push endpoint");
-  assert.equal(store.values.size, 0);
+  assert.equal(kept(store), 0);
   assert.equal(await keptUnlock(await account.me(), store, Date.now(), local), null);
   assert.equal(rememberedCredential(local), session.credential);
   const step = signedOutStep({ info: { email_signin: true }, remembered: rememberedCredential(local) });
@@ -541,10 +552,10 @@ test("signing out ends the hub session, deletes the kept unlock and the cached b
 });
 
 test("signing out while the hub can't be reached still deletes what the device kept", async () => {
-  const { store, local, session } = await unlockedOnce();
-  await store.put(LISTING, { listing: { boards: ["sealed"] }, at: 1 });
-  await assert.rejects(signOut({ unsubscribePush: async () => Promise.reject(new TypeError("offline")), logout: async () => Promise.reject(new TypeError("offline")) }, store, async () => null), TypeError);
-  assert.equal(store.values.size, 0);
+  const { store, local, session, me } = await unlockedOnce();
+  await store.put(listingKey(me.account), { listing: { boards: ["sealed"] }, at: 1 });
+  await assert.rejects(signOut({ id: me.account, unsubscribePush: async () => Promise.reject(new TypeError("offline")), logout: async () => Promise.reject(new TypeError("offline")) }, store, async () => null), TypeError);
+  assert.equal(kept(store), 0);
   assert.equal(rememberedCredential(local), session.credential);
 });
 
@@ -555,4 +566,40 @@ test("a device that can't store the unlock still unlocks and stays locked after 
   const session = await unlockAfter({ account, credentials }, await signInWith({ account, credentials }).withPasskey(), storage(), broken);
   assert.equal(session.state, "unlocked");
   assert.equal(await keptUnlock(await account.me(), broken), null);
+});
+
+async function legacyPin() {
+  const account = hub({ key: accounts.key, passkeys: vectorPasskeys() });
+  const credentials = authenticator({ outputs: vectorOutputs() });
+  const first = storage();
+  await unlockAfter({ account, credentials }, await signInWith({ account, credentials }).withPasskey(accounts.wrap.credential), first);
+  const pinned = JSON.parse(first.getItem("kebbie-credentials")).accounts[ACCOUNT];
+  return { account, credentials, legacy: { credential: pinned.credential, account: ACCOUNT, signing: pinned.signing } };
+}
+
+test("the one key pin kept before several accounts still refuses a changed key for its account, and is copied per account on the next unlock", async () => {
+  const { account, credentials, legacy } = await legacyPin();
+  const local = storage();
+  local.setItem("kebbie-credential", JSON.stringify(legacy));
+  assert.equal(rememberedCredential(local), legacy.credential, "sign-in still offers the remembered passkey first");
+  account.state.key = { ...accounts.key, keys: parties.intruder.public };
+  const signingIn = signInWith({ account, credentials });
+  assert.equal((await unlockAfter({ account, credentials }, await signingIn.withPasskey(legacy.credential), local)).state, "key-changed");
+  account.state.key = accounts.key;
+  assert.equal((await unlockAfter({ account, credentials }, await signingIn.withPasskey(legacy.credential), local)).state, "unlocked");
+  assert.deepEqual(JSON.parse(local.getItem("kebbie-credentials")).accounts[ACCOUNT], { credential: legacy.credential, signing: legacy.signing });
+});
+
+test("a key pin kept for one account never pins another, so a second account unlocks without a false key-changed", async () => {
+  const { account, credentials, legacy } = await legacyPin();
+  const local = storage();
+  local.setItem("kebbie-credential", JSON.stringify({ ...legacy, account: "acc_other", signing: "not-this-key" }));
+  local.setItem("kebbie-credentials", JSON.stringify({ last: "acc_work", accounts: { acc_work: { credential: "Y3JlZA", signing: "work-print" } } }));
+  const signingIn = signInWith({ account, credentials });
+  assert.equal((await unlockAfter({ account, credentials }, await signingIn.withPasskey(legacy.credential), local)).state, "unlocked");
+  const pins = JSON.parse(local.getItem("kebbie-credentials")).accounts;
+  assert.deepEqual(pins.acc_work, { credential: "Y3JlZA", signing: "work-print" }, "the other account's pin stays");
+  assert.equal(pins[ACCOUNT].signing, legacy.signing);
+  assert.equal(rememberedCredential(local, "acc_work"), "Y3JlZA");
+  assert.equal(rememberedCredential(local, "acc_other"), legacy.credential);
 });

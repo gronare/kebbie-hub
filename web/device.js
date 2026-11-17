@@ -1,5 +1,6 @@
 import { deviceFingerprint, deviceId, importSender, newDeviceKey, openCommand, openEnvelope, sealCommand, signDeviceCert, verifyDeviceCert } from "../js/protocol.js";
-import { browserPush, categoriesKey, keptCategories, NOTIFY_RECORD } from "./notify.js";
+import { browserPush, categoriesKey, keptCategories } from "./notify.js";
+import { keepNotifyRecord, notifyRecord } from "./accounts.js";
 import { openEncryption, sealKey } from "./store.js";
 
 const sentKey = (account) => `hub-sent:${account}`;
@@ -67,7 +68,7 @@ export async function verifiedDevices(key, rows) {
 
 // The browser holds one push subscription, so when notifications were on for another of its devices the hub moves it here and the worker's record names the key it now holds.
 export async function pushFollows({ store, calls, identity, device, subscription = browserPush }) {
-  const record = await store.get(NOTIFY_RECORD).catch(() => null);
+  const record = await notifyRecord(store, identity.id);
   if (!record || record.account?.account !== identity.id || record.device === device.id) return false;
   const held = await subscription().catch(() => null);
   if (!held) return false;
@@ -75,7 +76,7 @@ export async function pushFollows({ store, calls, identity, device, subscription
   const { endpoint, keys } = held.toJSON();
   await calls.subscribePush(device.id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, categories });
   await store.put(categoriesKey(device.id), categories).catch(() => undefined);
-  await store.put(NOTIFY_RECORD, { account: identity.key, device: device.id }).catch(() => undefined);
+  await keepNotifyRecord(store, identity.id, { account: identity.key, device: device.id }).catch(() => undefined);
   return true;
 }
 

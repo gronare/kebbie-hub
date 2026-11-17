@@ -11,8 +11,9 @@ import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevi
 import { BACKLOG_BODY_MEDIA_TYPE, CARD_MEDIA_TYPE, KEPT_ANSWER_TTL, textHash } from "../js/protocol.js";
 import { assessmentBlock, cardLead, cardParts, changedNotice, NOTICED_ACTIONS, NOTICED_KINDS, noticedArea, readyCard, readyPush } from "./card.js";
 import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosable, COMMAND_TEXT, gate, latestSent, machinePolicy, notTakenBlock, promptAnswerBlock, pushBlock, pushCount, pushHead, pushReady, refusedBlock, sentState, settled, speaksFor, standingOn, takes, takesPromptAnswers, viewOnlyBlock } from "./decide.js";
-import { forgetDeviceKeys, get, put } from "./store.js";
-import { addFirstPasskey, forgetUnlock, keptUnlock, LISTING, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
+import { del, forgetDeviceKeys, get, put } from "./store.js";
+import { listingKey, migrate } from "./accounts.js";
+import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
@@ -1196,7 +1197,7 @@ async function keepMarks() {
 
 async function cachedListing() {
   try {
-    return (await get(LISTING)) ?? null;
+    return (await get(listingKey(state.me?.account))) ?? null;
   } catch {
     state.storeFailed = true;
     return null;
@@ -1226,7 +1227,7 @@ async function refresh() {
   state.marks = mergeMarks(state.marks, await storedMarks());
   const result = await openBoards(listing, session.identity, nowSeconds(), state.marks);
   if (state.session !== session) return render();
-  if (fresh && result.list) await put(LISTING, { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
+  if (fresh && result.list) await put(listingKey(session.me.account), { listing, at: state.fetchedAt }).catch(() => (state.storeFailed = true));
   state.opened = result.opened;
   state.marks = result.marks;
   state.keys = new Map((result.list?.machines ?? []).map((listed) => [listed.machine, listed.keys]));
@@ -1278,7 +1279,7 @@ async function refusedDevice(error) {
   if (!(error instanceof HubError && error.code === "device-removed") || !state.session?.identity) return;
   state.device = null;
   await forgetDevice(deviceStore, state.session.identity.id);
-  await stopNotifications(account, deviceStore);
+  await stopNotifications(account, deviceStore, undefined, state.session.identity.id);
 }
 
 function commandText(error) {
@@ -1810,7 +1811,7 @@ function signedOut(message) {
   deviceStore.keptBlobs.clear().catch(() => undefined);
   bodies.stop();
   stopCommands();
-  forgetUnlock();
+  forgetUnlock(deviceStore, state.me?.account);
   following?.abort();
   following = null;
   state.me = null;
@@ -2404,8 +2405,10 @@ async function start() {
   state.notice = githubErrorText(params.get("github_error"));
   if (params.has("github_error")) history.replaceState(null, "", location.pathname + location.hash);
   state.info = await account.hub().catch(() => null);
+  await migrate({ get, put, del }).catch(() => undefined);
   state.me = await signedInAccount(account);
   if (state.me && onward) return location.assign(onward);
+  if (state.me) await migrate({ get, put, del }, state.me.account).catch(() => undefined);
   if (state.me && emailSignIn()) state.address = await account.email().catch(() => null);
   const kept = await keptUnlock(state.me);
   state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);

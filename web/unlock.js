@@ -2,12 +2,12 @@ import { accountFingerprints, accountIdentity, encryptionPkcs8, fromB64, newAcco
 import { HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { openEncryption, sealKey } from "./store.js";
-import { browserPush, LISTING, NOTIFY_RECORD } from "./notify.js";
+import { browserPush } from "./notify.js";
+import { forgetNotifyRecord, heldAccounts, keepAccount, listingKey, notifyRecord, unlockKey } from "./accounts.js";
 import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
 const REMEMBERED = "kebbie-credential";
-const KEPT = "unlock";
-export { LISTING };
+const PINS = "kebbie-credentials";
 export const KEEP_MS = 60 * 60 * 1000;
 
 export const STATE_TEXT = {
@@ -26,7 +26,16 @@ const localStore = () => {
   }
 };
 
-export function remembered(storage = localStore()) {
+function pins(storage) {
+  try {
+    const kept = JSON.parse(storage?.getItem(PINS) ?? "null");
+    return kept && typeof kept.accounts === "object" ? kept : { last: null, accounts: {} };
+  } catch {
+    return { last: null, accounts: {} };
+  }
+}
+
+function legacy(storage) {
   try {
     const kept = JSON.parse(storage?.getItem(REMEMBERED) ?? "null");
     return kept && typeof kept.credential === "string" ? kept : null;
@@ -35,13 +44,35 @@ export function remembered(storage = localStore()) {
   }
 }
 
-export const rememberedCredential = (storage = localStore()) => remembered(storage)?.credential ?? null;
+// One credential and key pin per account; the single entry kept before several accounts still pins the account it names.
+export function remembered(storage = localStore(), account = undefined) {
+  const held = pins(storage);
+  const wanted = account === undefined ? held.last : account;
+  const pinned = wanted ? held.accounts[wanted] : null;
+  if (pinned && typeof pinned.credential === "string") return { credential: pinned.credential, account: wanted, signing: pinned.signing ?? null };
+  const old = legacy(storage);
+  if (!old) return null;
+  return account === undefined || old.account === account ? old : null;
+}
+
+export const rememberedCredential = (storage = localStore(), account = undefined) => remembered(storage, account)?.credential ?? null;
 
 export function rememberCredential(credential, account = null, signing = null, storage = localStore()) {
   try {
-    const held = remembered(storage);
-    const fingerprint = signing ?? (held?.account === account ? held.signing : null);
-    storage?.setItem(REMEMBERED, JSON.stringify({ credential, account, signing: fingerprint ?? null }));
+    const held = pins(storage);
+    const before = account ? remembered(storage, account) : null;
+    const fingerprint = signing ?? before?.signing ?? null;
+    const accounts = account ? { ...held.accounts, [account]: { credential, signing: fingerprint } } : held.accounts;
+    storage?.setItem(PINS, JSON.stringify({ last: account, accounts }));
+  } catch {}
+}
+
+export function forgetCredential(account, storage = localStore()) {
+  try {
+    const held = pins(storage);
+    const { [account]: _gone, ...accounts } = held.accounts;
+    storage?.setItem(PINS, JSON.stringify({ last: held.last === account ? null : held.last, accounts }));
+    if (legacy(storage)?.account === account) storage?.removeItem(REMEMBERED);
   } catch {}
 }
 
@@ -106,10 +137,11 @@ async function unlockOntoSalt(hub, me, unlock, prf, salt) {
 }
 
 export async function keepUnlock(session, sealed, store = deviceStore) {
-  if (!sealed) return forgetUnlock(store);
+  if (!sealed) return forgetUnlock(store, session.me?.account);
   const { encryption, ...identity } = session.identity;
   try {
-    await store.put(KEPT, { identity, encryption: sealed, until: session.until });
+    await store.put(unlockKey(identity.id), { identity, encryption: sealed, until: session.until });
+    await keepAccount(store, identity.id);
   } catch {}
 }
 
@@ -118,22 +150,22 @@ async function keptIdentity(kept) {
   return { ...kept.identity, encryption: await openEncryption(kept.encryption, kept.identity.key.keys.encryption) };
 }
 
-export const forgetUnlock = (store = deviceStore) => store.del(KEPT).catch(() => undefined);
+export const forgetUnlock = (store = deviceStore, account = null) => (account ? store.del(unlockKey(account)).catch(() => undefined) : Promise.resolve());
 
-export async function stopNotifications(account, store = deviceStore, subscription = browserPush) {
-  const record = await store.get(NOTIFY_RECORD).catch(() => null);
+export async function stopNotifications(account, store = deviceStore, subscription = browserPush, id = account.id) {
+  const record = id ? await notifyRecord(store, id) : null;
   await (await subscription().catch(() => null))?.unsubscribe().catch(() => undefined);
   if (record?.device) await account.unsubscribePush(record.device).catch(() => undefined);
-  await store.del(NOTIFY_RECORD).catch(() => undefined);
+  if (id) await forgetNotifyRecord(store, id);
 }
 
-export async function signOut(account, store = deviceStore, subscription = browserPush) {
+export async function signOut(account, store = deviceStore, subscription = browserPush, id = account.id) {
   try {
-    await stopNotifications(account, store, subscription);
+    await stopNotifications(account, store, subscription, id);
     await account.logout();
   } finally {
-    await forgetUnlock(store);
-    await store.del(LISTING).catch(() => undefined);
+    await forgetUnlock(store, id);
+    if (id) await store.del(listingKey(id)).catch(() => undefined);
   }
 }
 
@@ -149,21 +181,30 @@ async function sameKey(identity, me) {
   }
 }
 
+const freshAt = (kept, now) => kept.until > now && kept.until - now <= KEEP_MS;
+
+async function sweepUnlocks(store, now) {
+  for (const { account } of await heldAccounts(store)) {
+    const kept = await store.get(unlockKey(account)).catch(() => null);
+    if (kept && !freshAt(kept, now)) await forgetUnlock(store, account);
+  }
+  return null;
+}
+
 export async function keptUnlock(me, store = deviceStore, now = Date.now(), storage = localStore()) {
+  if (!me?.account) return sweepUnlocks(store, now);
   let kept;
   try {
-    kept = await store.get(KEPT);
+    kept = await store.get(unlockKey(me.account));
   } catch {
     return null;
   }
   if (!kept) return null;
-  const fresh = kept.until > now && kept.until - now <= KEEP_MS;
-  if (fresh && !me) return null;
-  const held = remembered(storage);
-  const credential = held?.account === me?.account ? held.credential : null;
+  const fresh = freshAt(kept, now);
+  const credential = rememberedCredential(storage, me.account);
   const identity = fresh && credential ? await keptIdentity(kept).catch(() => null) : null;
   if (identity && nonExtractable(identity) && (await sameKey(identity, me))) return { state: "unlocked", me, identity, credential, until: kept.until };
-  await forgetUnlock(store);
+  await forgetUnlock(store, me.account);
   return null;
 }
 
@@ -173,9 +214,10 @@ export function lockWhenDue(relock, { store = deviceStore, page = globalThis.doc
   const until = () => watched?.until ?? 0;
   const expire = () => {
     clearTimeout(timer);
+    const ended = watched?.me?.account ?? null;
     watched = null;
     relock();
-    return forgetUnlock(store);
+    return forgetUnlock(store, ended);
   };
   const check = () => (watched && clock() >= until() ? expire() : undefined);
   const arm = () => {
@@ -225,11 +267,11 @@ export function unlockOnShow(prompt, locked, { page = globalThis.document, win =
   };
 }
 
-export async function signedInAccount(account, store = deviceStore) {
+export async function signedInAccount(account, store = deviceStore, id = account.id) {
   try {
     return await account.me();
   } catch (error) {
-    if (error instanceof HubError && error.status === 401) await forgetUnlock(store);
+    if (error instanceof HubError && error.status === 401) for (const one of id ? [id] : (await heldAccounts(store)).map((held) => held.account)) await forgetUnlock(store, one);
     return null;
   }
 }
@@ -237,7 +279,7 @@ export async function signedInAccount(account, store = deviceStore) {
 export async function unlockAfter(hub, ceremony, storage = localStore(), store = deviceStore, clock = Date.now) {
   const { sealed, ...settled } = await settleUnlock(hub, ceremony, storage);
   if (settled.state !== "unlocked") {
-    await forgetUnlock(store);
+    await forgetUnlock(store, settled.me?.account);
     return settled;
   }
   const session = { ...settled, until: clock() + KEEP_MS };
@@ -250,8 +292,7 @@ async function settleUnlock(hub, ceremony, storage) {
   if (!prf) ({ signedIn, prf, salt } = await prfCeremony(hub, signedIn.unlock.credential));
   const { unlock } = signedIn;
   const me = withoutUnlock(signedIn);
-  const held = remembered(storage);
-  const seen = held?.account === me.account ? held.signing : null;
+  const seen = remembered(storage, me.account)?.signing ?? null;
   if (me.key && me.key.account !== me.account) return { state: "key-changed", me, credential: unlock.credential };
   if (me.key && seen && (await signingPrint(me.key)) !== seen) return { state: "key-changed", me, credential: unlock.credential };
   if (!me.key && seen) return { state: "key-missing", me, credential: unlock.credential };
