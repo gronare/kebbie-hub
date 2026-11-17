@@ -705,6 +705,10 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         .route("/v1/m/worker", put(peers::set_worker).delete(peers::clear_worker))
         .route("/v1/m/machines", get(peers::machines))
         .route(
+            "/v1/m/addresses",
+            get(peers::addresses).put(peers::put_addresses).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
+        )
+        .route(
             "/v1/m/messages",
             post(peers::post_message).layer(DefaultBodyLimit::max(COMMAND_BODY_LIMIT)),
         )

@@ -201,7 +201,8 @@ mod tests {
 
     #[test]
     fn a_machine_message_goes_from_one_machine_to_another_without_a_certificate_and_lives_a_day_at_most() {
-        assert_eq!(Kind::ALL.iter().filter(|kind| kind.is_machine_message()).copied().collect::<Vec<_>>(), [Kind::Job, Kind::JobReport]);
+        assert_eq!(Kind::ALL.iter().filter(|kind| kind.is_machine_message()).copied().collect::<Vec<_>>(), [Kind::Job, Kind::JobReport, Kind::Addresses]);
+        assert_eq!((Kind::Addresses.default_ttl(), Kind::Addresses.max_ttl()), (86_400, 86_400), "a machine announces its addresses for a day at a time");
         for kind in [Kind::Job, Kind::JobReport] {
             assert_eq!((kind.is_command(), kind.id_prefix(), kind.default_ttl(), kind.max_ttl()), (false, Prefix::Command, 3_600, 86_400), "{}", kind.name());
             assert_eq!(header(kind, machine(1), machine(2)).check_shape(), Ok(()));

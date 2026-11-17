@@ -7,7 +7,7 @@ use kebbie_hub_api::{
     CONNECT_SLOW_DOWN, ConnectPoll, ConnectStart, ConnectStarted, Connected, Inbox,
     JoinRequest, Joined, MachineName, PairingFailure,
     PairingRefusal, PairingReply, PairingState, PairingView, ResultStored, ResultUpload,
-    NoticePosted, NoticeUpload, NotifiedDevices, AccountMachines, MessageQueued, MessageUpload, WorkerOs,
+    NoticePosted, NoticeUpload, NotifiedDevices, AccountMachines, AnnouncedAddresses, MessageQueued, MessageUpload, WorkerOs,
 };
 use kebbie_hub_protocol::{
     AccountFingerprints, AccountKey, AppliedCommands, BACKLOG_BODY_MEDIA_TYPE, BacklogBody, BacklogRow, BacklogState, Board, CommandResult, Group, Home, HomeKind, Item, ItemKey, Priority, ConnectSecret, Dropped, Envelope, Header, Id,
@@ -1447,7 +1447,7 @@ impl MachineState {
                 format!("turn away mode {}", if away.on { "on" } else { "off" }),
                 done(self.switch_away(command, device, *away)),
             ),
-            Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) | Payload::Job(_) | Payload::JobReport(_) => (
+            Payload::Board(_) | Payload::Notice(_) | Payload::Result(_) | Payload::Job(_) | Payload::JobReport(_) | Payload::Addresses(_) => (
                 "nothing: not a command".to_string(),
                 refusal(command, device, Reason::BadRequest),
             ),
@@ -1558,6 +1558,14 @@ impl MachineState {
 
     pub async fn post_message(&self, envelope: &Envelope) -> Result<MessageQueued, Error> {
         Ok(self.client().post("/v1/m/messages", &MessageUpload { envelope: envelope.clone() }).await?)
+    }
+
+    pub async fn put_addresses(&self, envelope: &Envelope) -> Result<(), Error> {
+        Ok(self.client().put_empty("/v1/m/addresses", &MessageUpload { envelope: envelope.clone() }).await?)
+    }
+
+    pub async fn announced_addresses(&self) -> Result<AnnouncedAddresses, Error> {
+        Ok(self.client().get("/v1/m/addresses", &[] as &[(&str, String)]).await?)
     }
 
     pub async fn send(&self, to: &Id, payload: Payload) -> Result<(Envelope, MessageQueued), Error> {

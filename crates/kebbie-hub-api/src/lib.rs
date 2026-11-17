@@ -505,6 +505,12 @@ pub struct AccountMachines {
     pub machines: Vec<AccountMachine>,
 }
 
+// The latest addresses each other machine of the account sealed to this one; the reader opens each and keeps only those signed by a key on the account's list.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AnnouncedAddresses {
+    pub envelopes: Vec<Envelope>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MessageUpload {
     pub envelope: Envelope,

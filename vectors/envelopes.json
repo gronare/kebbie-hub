@@ -3979,6 +3979,56 @@
     {
       "envelope": {
         "at": 1761069600,
+        "ct": "HQSCPRhsCT_Wu7WYjSuAZLSFYGEy4S1uJ_gMVV2xmAIom1LYoreCxnJiotl1i4dTL3W8Ak56lbDQJU1o0kJd9JAhz0J--up1pW_W73EUAgZnZbtq52qYbdsQ6CyKw0nn4xnOqX04N-a1KCw2k-Sz2v36rG6ipwkKlzfIvkoVjClKZQ7-1lrYd2OfaSYBsDaZNGMaxlEOSe4wglmELij8flYy",
+        "exp": 1761156000,
+        "from": "mch_01K83YV3806W105VXP4AF1F8RM",
+        "id": "cmd_019a07ed-8d00-723b-88fa-0710c31b1cd5",
+        "kc": "fbB0mnh1r6rydabgS273Xuh4YdYSfHyRspC0FSC2Ffw",
+        "keys": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "4Ym3AQmQxuBrVgL5xSh3NcfQ8csrVq1KlNqT6_sDIxMOrhoNtaHG0gx4lcWEtN1PnIY3Q34LzD0zpMCyte1oembFOZPiOEsDq2UnhTfxb9k",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "lliFLGUyvkZ3kE9PmREFtItueaZxJpggDgwUTMDUyyuBg9ju_yKRU8p-WksNXAjgwYtjWiIVxgwwEzwOLT4HSX8zCtbsdFLHytJGkwO3qvQ",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "Ew2FcGr6hFcAxVUcm2XlhWcK5C9XRL47X15DHzFPKCAaWOkCgjb56wBS9kCSRTcCoofluOeRlcbcJe4YghNSZrNyMnpzJQ-54dZ2msAT_RA"
+        },
+        "kind": "addresses",
+        "machine": "mch_01K83YV380DYJHQAD9KTY48MZ4",
+        "schema": 1,
+        "sig": "Dup4-BqCJZ1ManZ1vtV3PebJCPnefRNhoOvrrjhwzNigDOoY1sywyiPCtPM5L665rKEddWhZatXVsI2RsoMKAw",
+        "v": 1
+      },
+      "expect": {
+        "payload": {
+          "addresses": [
+            {
+              "ip": "100.101.102.103",
+              "network": "tailscale"
+            },
+            {
+              "ip": "10.8.0.2",
+              "network": "wireguard"
+            }
+          ],
+          "port": 47011,
+          "type": "addresses"
+        }
+      },
+      "header_bytes": "a2ViYmllLWh1YiBlbnZlbG9wZQAAAQAoY21kXzAxOWEwN2VkLThkMDAtNzIzYi04OGZhLTA3MTBjMzFiMWNkNQAJYWRkcmVzc2VzAB5tY2hfMDFLODNZVjM4MDZXMTA1VlhQNEFGMUY4Uk0AHm1jaF8wMUs4M1lWMzgwRFlKSFFBRDlLVFk0OE1aNAAAAABo98ogAAAAAGj5G6AAAQArZmJCMG1uaDFyNnJ5ZGFiZ1MyNzNYdWg0WWRZU2ZIeVJzcEMwRlNDMkZmdwAAAA",
+      "name": "addresses-opened-by-the-peer",
+      "recipient": "machine",
+      "seal": {
+        "content_key": "C1lXCOYGLz09AUFvqoRGVlRrsVcadHj3iTIWczA8AYc",
+        "ephemeral": {
+          "acc_z-BiJIkbeoXcLA526_0PrQ": "Of3w7_pcovk0PGyhLhE-GixQOBaRBAQ09e7aiycB20A",
+          "mch_01K83YV3806W105VXP4AF1F8RM": "rNdzsz1nNl-nTg0PTyKZGEUt19CgD29YiygDcoLXX8A",
+          "mch_01K83YV380DYJHQAD9KTY48MZ4": "msToQj-xb5wB4wjq3gFNEGU622vCtZDGCkWVzL57Hxo"
+        },
+        "nonce": "HQSCPRhsCT_Wu7WY",
+        "plaintext": "eyJ0eXBlIjoiYWRkcmVzc2VzIiwicG9ydCI6NDcwMTEsImFkZHJlc3NlcyI6W3sibmV0d29yayI6InRhaWxzY2FsZSIsImlwIjoiMTAwLjEwMS4xMDIuMTAzIn0seyJuZXR3b3JrIjoid2lyZWd1YXJkIiwiaXAiOiIxMC44LjAuMiJ9XX0"
+      },
+      "sender": "other-machine"
+    },
+    {
+      "envelope": {
+        "at": 1761069600,
         "cert": {
           "account": "acc_z-BiJIkbeoXcLA526_0PrQ",
           "created_at": 1760983200,
@@ -5139,6 +5189,7 @@
   "max_ttl": {
     "accept-step": 3600,
     "accept-subtask": 3600,
+    "addresses": 86400,
     "answer": 604800,
     "away": 604800,
     "board": 86400,

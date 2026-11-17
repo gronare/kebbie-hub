@@ -10,7 +10,7 @@ use kebbie_hub_fakes::Error;
 use kebbie_hub_fakes::browser::Browser;
 use kebbie_hub_fakes::machine::{Handling, MachineState};
 use kebbie_hub_protocol::{
-    Header, Id, Job, JobEnd, JobReport, Kind, OpenError, Payload, Prefix, RunRoutine, SecretKeys, open_blob, seal, seal_blob,
+    Addresses, Envelope, Header, Id, Job, JobEnd, JobReport, Kind, LinkAddress, Network, OpenError, Payload, Prefix, RunRoutine, SecretKeys, open_blob, seal, seal_blob,
 };
 
 const COMMIT: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -255,4 +255,37 @@ async fn the_inbox_serves_a_devices_command_as_before_beside_a_job() {
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].opened, Ok(Payload::Job(job(Vec::new()))));
     assert!(worker.receive(0).await.unwrap().is_empty());
+}
+
+fn addresses(ip: &str) -> Payload {
+    Payload::Addresses(Addresses { port: 47_011, addresses: vec![LinkAddress { network: Network::Tailscale, ip: ip.into() }] })
+}
+
+#[tokio::test]
+async fn a_machine_keeps_its_latest_addresses_for_each_machine_of_its_account_outside_the_inbox() {
+    let test = start_hub(|config| config.connect_interval = 0).await;
+    let (_person, master, worker) = two_machines(&test).await;
+    let first = worker.seal_message(&master.machine, &master.public(), &addresses("100.64.0.1"), kebbie_hub::now()).unwrap();
+    worker.put_addresses(&first).await.unwrap();
+    let second = worker.seal_message(&master.machine, &master.public(), &addresses("100.64.0.2"), kebbie_hub::now()).unwrap();
+    worker.put_addresses(&second).await.unwrap();
+    let listed = master.machines().await.unwrap();
+    let announced = master.announced_addresses().await.unwrap().envelopes;
+    assert_eq!(announced, [second.for_recipient(&master.machine).unwrap()], "the latest replaces the one before");
+    assert_eq!(master.open_message(&announced[0], &listed, kebbie_hub::now()), Ok(addresses("100.64.0.2")));
+    assert!(worker.announced_addresses().await.unwrap().envelopes.is_empty(), "addresses go only to the machine they were sealed to");
+
+    let inbox: Inbox = master.client().get("/v1/m/inbox", &[("after", "0".to_string())]).await.unwrap();
+    assert!(inbox.messages.is_empty(), "a kebbie that predates addresses never meets one in its inbox");
+    assert_eq!(refused(worker.post_message(&second).await), (400, "not-a-machine-message".to_string()));
+    let job_envelope = worker.seal_message(&master.machine, &master.public(), &Payload::Job(job(Vec::new())), kebbie_hub::now()).unwrap();
+    assert_eq!(refused(worker.put_addresses(&job_envelope).await), (400, "not-addresses".to_string()));
+    let forged = Envelope { header: second.header.clone(), ..worker.seal_message(&master.machine, &master.public(), &addresses("100.64.0.3"), kebbie_hub::now()).unwrap() };
+    assert_eq!(refused(worker.put_addresses(&forged).await).0, 400, "a header signed for other ciphertext does not verify");
+
+    let mut stranger = member(&test).await;
+    let theirs = connected(&test, &mut stranger).await;
+    let across = master.seal_message(&theirs.machine, &theirs.public(), &addresses("100.64.0.4"), kebbie_hub::now()).unwrap();
+    assert_eq!(refused(master.put_addresses(&across).await), (404, "unknown-machine".to_string()));
+    assert!(theirs.announced_addresses().await.unwrap().envelopes.is_empty());
 }

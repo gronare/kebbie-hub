@@ -1038,6 +1038,20 @@ test("a question's title, body, links and plan note, a task's links and a write-
   assert.deepEqual((await openCommand(envelope, await identity("machine"), devices.key, envelopes.now)).payload, vector.expect.payload);
 });
 
+test("a machine's addresses go from one machine to another of the account for a day, as plain ips on a port", () => {
+  assert.deepEqual([KINDS.addresses.command, KINDS.addresses.ttl, KINDS.addresses.maxTtl, envelopes.max_ttl.addresses], [false, 86400, 86400, 86400]);
+  const vector = envelopes.cases.find((candidate) => candidate.name === "addresses-opened-by-the-peer");
+  checkShape(vector.envelope);
+  checkPayload(vector.expect.payload);
+  checkPayload({ type: "addresses", port: 0, addresses: [] });
+  checkPayload({ type: "addresses", port: 1, addresses: [{ network: "wireguard", ip: "fd7a:115c:a1e0::1" }] });
+  const refuses = (payload) => assert.throws(() => checkPayload(payload), (error) => error.code === "malformed", JSON.stringify(payload));
+  const one = (ip) => ({ type: "addresses", port: 47011, addresses: [{ network: "tailscale", ip }] });
+  for (const ip of ["0.0.0.0", "::", "224.0.0.1", "100.064.0.1", "mac.ts.net", "FD7A::1", "100.64.0.1:22"]) refuses(one(ip));
+  refuses({ ...one("100.64.0.1"), port: 0 });
+  refuses({ type: "addresses", port: 1, addresses: [{ network: "zerotier", ip: "10.0.0.1" }] });
+});
+
 test("a job and its report go from one machine to another of the account with no certificate, as Rust's shape rule says", () => {
   for (const kind of ["job", "job-report"]) assert.deepEqual([KINDS[kind].command, KINDS[kind].ttl, KINDS[kind].maxTtl], [false, COMMAND_TTL, envelopes.max_ttl[kind]], kind);
   const job = envelopes.cases.find((vector) => vector.name === "job-opened-by-the-worker");

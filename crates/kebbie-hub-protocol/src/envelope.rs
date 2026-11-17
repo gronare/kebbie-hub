@@ -45,10 +45,11 @@ pub enum Kind {
     ItemWrite,
     Job,
     JobReport,
+    Addresses,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 29] = [
+    pub const ALL: [Kind; 30] = [
         Kind::Board,
         Kind::Notice,
         Kind::Result,
@@ -78,6 +79,7 @@ impl Kind {
         Kind::ItemWrite,
         Kind::Job,
         Kind::JobReport,
+        Kind::Addresses,
     ];
 
     pub fn name(self) -> &'static str {
@@ -111,6 +113,7 @@ impl Kind {
             Kind::ItemWrite => "item-write",
             Kind::Job => "job",
             Kind::JobReport => "job-report",
+            Kind::Addresses => "addresses",
         }
     }
 
@@ -145,7 +148,7 @@ impl Kind {
     }
 
     pub fn is_machine_message(self) -> bool {
-        matches!(self, Kind::Job | Kind::JobReport)
+        matches!(self, Kind::Job | Kind::JobReport | Kind::Addresses)
     }
 
     pub fn id_prefix(self) -> Prefix {
@@ -165,6 +168,7 @@ impl Kind {
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,
             Kind::Job | Kind::JobReport => 3_600,
+            Kind::Addresses => 86_400,
             Kind::Start | Kind::Routine | Kind::PromptAnswer => 600,
             Kind::StartItem | Kind::FoundStart => 86_400,
             Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
@@ -178,7 +182,7 @@ impl Kind {
             Kind::Result => 7 * 86_400,
             Kind::Answer | Kind::LeadMessage | Kind::Away => KEPT_ANSWER_TTL,
             Kind::Push | Kind::Start | Kind::Routine | Kind::StartItem | Kind::FoundStart => 86_400,
-            Kind::Job | Kind::JobReport => 86_400,
+            Kind::Job | Kind::JobReport | Kind::Addresses => 86_400,
             Kind::Idea | Kind::ItemAnswer | Kind::ItemAnswers | Kind::ItemEdit | Kind::ItemWrite | Kind::DeviceDecision => 3_600,
             Kind::ReviewOpen | Kind::ReviewComments | Kind::ReviewRead | Kind::AcceptStep | Kind::AcceptSubtask => 3_600,
             Kind::FoundAdd | Kind::FoundDismiss | Kind::FoundKeep | Kind::ReviewSend => 3_600,

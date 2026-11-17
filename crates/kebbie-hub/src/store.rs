@@ -212,14 +212,21 @@ CREATE TABLE IF NOT EXISTS machine_jobs (
     until INTEGER NOT NULL,
     PRIMARY KEY (worker_id, master_id)
 );
+CREATE TABLE IF NOT EXISTS link_addresses (
+    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    from_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    envelope TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    PRIMARY KEY (machine_id, from_id)
+);
 ";
 
-const SCHEMA_VERSION: i64 = 19;
-// Schemas 17 and 18 open as 19 in place: devices lose name and kind and gain removed_at, push subscriptions gain offered, machines gain worker_os.
-const MIGRATED_IN_PLACE: [i64; 2] = [17, 18];
-// Schemas 13 and 14 open as 19: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
+const SCHEMA_VERSION: i64 = 20;
+// Schemas 17 to 19 open as 20 in place: devices lose name and kind and gain removed_at, push subscriptions gain offered, machines gain worker_os, and link_addresses is added.
+const MIGRATED_IN_PLACE: [i64; 3] = [17, 18, 19];
+// Schemas 13 and 14 open as 20: their device, pairing, command, result, device-list, notice and event tables are dropped and the rest is kept.
 const COMPATIBLE_VERSIONS: [i64; 2] = [13, 14];
-// Schemas 15 and 16 open as 19 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
+// Schemas 15 and 16 open as 20 with their devices, whose certificates hold no encryption key, and those devices' commands and results dropped.
 const DEVICE_KEYS_FROM: [i64; 2] = [15, 16];
 const DROPPED_FOR_DEVICE_KEYS: &str = "
 DROP TABLE IF EXISTS results;
@@ -761,6 +768,27 @@ impl Store {
             params![worker.as_str(), master.as_str(), until],
         )?;
         Ok(())
+    }
+
+    pub fn put_addresses(&self, machine: &Id, from: &Id, envelope: &str, expires_at: u64) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO link_addresses (machine_id, from_id, envelope, expires_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (machine_id, from_id) DO UPDATE SET envelope = excluded.envelope, expires_at = excluded.expires_at",
+            params![machine.as_str(), from.as_str(), envelope, expires_at],
+        )?;
+        Ok(())
+    }
+
+    // Only from machines still on the reader's account, as a machine that moved to another account keeps its rows until it is removed.
+    pub fn addresses_for(&self, machine: &Id, now: u64) -> Result<Vec<String>> {
+        let mut statement = self.connection.prepare(
+            "SELECT link_addresses.envelope FROM link_addresses
+             JOIN machines sender ON sender.id = link_addresses.from_id
+             JOIN machines reader ON reader.id = link_addresses.machine_id
+             WHERE link_addresses.machine_id = ?1 AND link_addresses.expires_at > ?2 AND sender.account_id = reader.account_id
+             ORDER BY link_addresses.from_id",
+        )?;
+        statement.query_map(params![machine.as_str(), now], |row| row.get(0))?.collect()
     }
 
     pub fn reports_allowed(&self, worker: &Id, master: &Id, now: u64) -> Result<bool> {
@@ -2226,6 +2254,8 @@ impl Store {
             .execute("DELETE FROM queue WHERE expires_at <= ?1", [now])?;
         self.connection
             .execute("DELETE FROM machine_jobs WHERE until <= ?1", [now])?;
+        self.connection
+            .execute("DELETE FROM link_addresses WHERE expires_at <= ?1", [now])?;
         self.connection.execute(
             "DELETE FROM commands WHERE queued_at + ?2 <= ?1",
             params![now, COMMAND_KEEP_SECONDS],

@@ -111,6 +111,7 @@ export const KINDS = {
   away: { ...command, maxTtl: KEPT_ANSWER_TTL, ttl: KEPT_ANSWER_TTL },
   job: machineMessage,
   "job-report": machineMessage,
+  addresses: { ...machineMessage, ttl: DAY },
 };
 
 const ID = /^(?:(mch|dev|ntc|brd|alr)_[0-7][0-9A-HJKMNP-TV-Z]{25}|(cmd)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(blb)_[0-9a-f]{64}|(acc)_[A-Za-z0-9_-]{22})$/;
@@ -720,6 +721,17 @@ const JOB_ENDS = {
 };
 const jobEnd = (value) => isPlainObject(value) && string(value.outcome) && Object.hasOwn(JOB_ENDS, value.outcome) && JOB_ENDS[value.outcome](value);
 const fitsMachineMessage = ({ type, ...value }) => text.encode(JSON.stringify(value)).length <= MAX_MACHINE_MESSAGE_BYTES;
+export const MAX_LINK_ADDRESSES = 16;
+const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+const plainV6 = (value) => {
+  try {
+    return /^[0-9a-f:.]+$/.test(value) && value.includes(":") && new URL(`http://[${value}]/`).hostname === `[${value}]`;
+  } catch {
+    return false;
+  }
+};
+const isListeningIp = (value) => typeof value === "string" && (IPV4.test(value) ? value !== "0.0.0.0" && Number(value.split(".")[0]) < 224 : plainV6(value) && value !== "::" && !value.startsWith("ff"));
+const linkAddress = shape({ network: oneOf("tailscale", "wireguard"), ip: isListeningIp });
 const isToken = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
 const isFoundKey = (value) => isItemKey(value) && homeOf(value) === "found";
 const PAYLOADS = {
@@ -773,6 +785,8 @@ const PAYLOADS = {
   job: (value) =>
     typed({ repo: isToken, name: isToken, command: isJobCommand, task: isToken, commit: isCommit, base: optionalField(isCommit), bundle: optionalField(blobsUpTo(MAX_JOB_BUNDLE_PARTS)), on: optionalField(isToken) })(value) &&
     fitsMachineMessage(value),
+  addresses: (value) =>
+    typed({ port: uint(0xffff), addresses: (addresses) => Array.isArray(addresses) && addresses.length <= MAX_LINK_ADDRESSES && addresses.every(linkAddress) })(value) && (value.port !== 0 || value.addresses.length === 0),
   "job-report": (value) =>
     typed({ job: (one) => prefixOf(one) === "cmd", seq: u32v, log: (log) => string(log) && text.encode(log).length <= MAX_JOB_LOG_BYTES, end: optionalField(jobEnd) })(value) && fitsMachineMessage(value),
 };

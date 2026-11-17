@@ -5,6 +5,7 @@ use crate::board::{BlobRef, Board};
 use crate::envelope::{Kind, MAX_COLLAPSE_CHARS};
 use crate::ids::{Id, Prefix};
 use crate::job::{Job, JobReport};
+use crate::link::Addresses;
 use crate::lead::{Away, LeadMessage};
 use crate::review::{AcceptStep, AcceptSubtask, ReviewComments, ReviewOpen, ReviewRead, ReviewSend};
 
@@ -56,6 +57,7 @@ pub enum Payload {
     ItemWrite(ItemWrite),
     Job(Job),
     JobReport(JobReport),
+    Addresses(Addresses),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -569,6 +571,7 @@ impl Payload {
             Payload::Away(_) => Kind::Away,
             Payload::Job(_) => Kind::Job,
             Payload::JobReport(_) => Kind::JobReport,
+            Payload::Addresses(_) => Kind::Addresses,
         }
     }
 
@@ -660,6 +663,7 @@ impl Payload {
             Payload::Board(board) => board.check(),
             Payload::Job(job) => job.check(),
             Payload::JobReport(report) => report.check(),
+            Payload::Addresses(addresses) => addresses.check(),
             Payload::StartItem(_) | Payload::Result(_) | Payload::Away(_) => Ok(()),
         }
     }

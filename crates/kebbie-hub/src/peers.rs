@@ -4,10 +4,10 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use kebbie_hub_api::{
-    AccountMachine, AccountMachines, Bytes64, MessageQueued, MessageUpload, NO_ACCOUNT, NO_JOB, NOT_A_WORKER,
+    AccountMachine, AccountMachines, AnnouncedAddresses, Bytes64, MessageQueued, MessageUpload, NO_ACCOUNT, NO_JOB, NOT_A_WORKER,
     SignedMachineList, WorkerOs, is_worker_os,
 };
-use kebbie_hub_protocol::{Id, Kind, OpenError, Prefix, verify};
+use kebbie_hub_protocol::{Envelope, Id, Kind, OpenError, Prefix, verify};
 
 use crate::auth::MachineAuth;
 use crate::error::ApiError;
@@ -72,12 +72,8 @@ pub async fn machines(
     Ok(Json(AccountMachines { list, machines }))
 }
 
-pub async fn post_message(
-    State(hub): State<Arc<Hub>>,
-    MachineAuth(machine): MachineAuth,
-    Json(upload): Json<MessageUpload>,
-) -> Result<(StatusCode, Json<MessageQueued>), ApiError> {
-    let envelope = &upload.envelope;
+// A machine message the hub may pass on: from this machine, sealed to exactly another machine of its account, this machine and the account, and signed by this machine.
+fn checked(store: &Store, machine: &Id, envelope: &Envelope, at: u64) -> Result<String, ApiError> {
     let header = &envelope.header;
     header
         .check_shape()
@@ -85,25 +81,17 @@ pub async fn post_message(
     if !header.kind.is_machine_message() {
         return Err(ApiError::bad_request("not-a-machine-message"));
     }
-    if header.from != machine {
+    if &header.from != machine {
         return Err(ApiError::bad_request(OpenError::WrongSender.key()));
     }
     let target = &header.machine;
-    let at = now();
-    let mut store = hub.store();
-    let account = account_of(&store, &machine)?;
+    let account = account_of(store, machine)?;
     if store.machine_owner(target)?.as_deref() != Some(account.as_str()) {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "unknown-machine"));
     }
-    if header.kind == Kind::Job && store.worker_os(target)?.is_none() {
-        return Err(ApiError::conflict(NOT_A_WORKER));
-    }
-    if header.kind == Kind::JobReport && !store.reports_allowed(&machine, target, at)? {
-        return Err(ApiError::conflict(NO_JOB));
-    }
     let addressed = envelope.keys.len() == 3
         && envelope.keys.contains_key(target)
-        && envelope.keys.contains_key(&machine)
+        && envelope.keys.contains_key(machine)
         && envelope.keys.keys().any(|recipient| recipient.prefix() == Prefix::Account && recipient.as_str() == account);
     if !addressed {
         return Err(ApiError::bad_request("bad-recipients"));
@@ -112,9 +100,32 @@ pub async fn post_message(
         return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "too-large"));
     }
     let keys = store
-        .machine_keys(&machine)?
+        .machine_keys(machine)?
         .ok_or_else(ApiError::unauthorized)?;
-    verify(envelope, &machine, &keys, at).map_err(|error| ApiError::bad_request(error.key()))?;
+    verify(envelope, machine, &keys, at).map_err(|error| ApiError::bad_request(error.key()))?;
+    Ok(account)
+}
+
+pub async fn post_message(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+    Json(upload): Json<MessageUpload>,
+) -> Result<(StatusCode, Json<MessageQueued>), ApiError> {
+    let envelope = &upload.envelope;
+    let header = &envelope.header;
+    if header.kind == Kind::Addresses {
+        return Err(ApiError::bad_request("not-a-machine-message"));
+    }
+    let target = &header.machine;
+    let at = now();
+    let mut store = hub.store();
+    checked(&store, &machine, envelope, at)?;
+    if header.kind == Kind::Job && store.worker_os(target)?.is_none() {
+        return Err(ApiError::conflict(NOT_A_WORKER));
+    }
+    if header.kind == Kind::JobReport && !store.reports_allowed(&machine, target, at)? {
+        return Err(ApiError::conflict(NO_JOB));
+    }
     if header.kind == Kind::Job {
         hub.check_command_gate(&store, target, header.kind)?;
     }
@@ -144,4 +155,40 @@ pub async fn post_message(
             seq,
         }),
     ))
+}
+
+// A machine's addresses never enter an inbox, where a kebbie that predates them would stop on a kind it cannot read; the hub keeps the latest one from each machine to each other machine instead, read by those that ask.
+pub async fn put_addresses(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+    Json(upload): Json<MessageUpload>,
+) -> Result<StatusCode, ApiError> {
+    let envelope = &upload.envelope;
+    let header = &envelope.header;
+    if header.kind != Kind::Addresses {
+        return Err(ApiError::bad_request("not-addresses"));
+    }
+    let at = now();
+    let store = hub.store();
+    checked(&store, &machine, envelope, at)?;
+    let kept = envelope
+        .for_recipient(&header.machine)
+        .ok_or_else(ApiError::internal)?
+        .to_json();
+    store.put_addresses(&header.machine, &machine, &kept, header.exp)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn addresses(
+    State(hub): State<Arc<Hub>>,
+    MachineAuth(machine): MachineAuth,
+) -> Result<Json<AnnouncedAddresses>, ApiError> {
+    let store = hub.store();
+    account_of(&store, &machine)?;
+    let envelopes = store
+        .addresses_for(&machine, now())?
+        .iter()
+        .map(|text| Envelope::from_json(text).map_err(|_| ApiError::internal()))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Json(AnnouncedAddresses { envelopes }))
 }

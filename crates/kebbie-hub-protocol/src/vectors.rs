@@ -39,6 +39,7 @@ use crate::device::{
 use crate::envelope::{Envelope, Header, KEPT_ANSWER_TTL, Kind, Urgency};
 use crate::ids::{Id, Prefix};
 use crate::job::{JOB_BUNDLE_MEDIA_TYPE, Job, JobEnd, JobReport};
+use crate::link::{Addresses, LinkAddress, Network};
 use crate::lead::{Away, Delivery, LEAD_THREAD_MEDIA_TYPE, LeadMessage, LeadRef, LeadThread, MAX_LEAD_MESSAGE_CHARS, MAX_LEAD_PAGE_TURNS, MAX_LEAD_TURN_CHARS, Turn};
 use crate::review::{
     AcceptStep, AcceptSubtask, DiffLine, FileStatus, GuideNote, Hunk, LineKind, MAX_REVIEW_COMMENT_CHARS, MAX_REVIEW_COMMENTS,
@@ -1177,6 +1178,16 @@ fn job_report() -> Payload {
     })
 }
 
+fn addresses() -> Payload {
+    Payload::Addresses(Addresses {
+        port: 47_011,
+        addresses: vec![
+            LinkAddress { network: Network::Tailscale, ip: "100.101.102.103".into() },
+            LinkAddress { network: Network::Wireguard, ip: "10.8.0.2".into() },
+        ],
+    })
+}
+
 fn stale(mut header: Header) -> Header {
     header.at = NOW - 7_200;
     header.exp = NOW - 3_600;
@@ -1572,6 +1583,8 @@ fn envelope_cases(parties: &Parties) -> Vec<EnvelopeCase<'_>> {
     cases.push(opens("job-opened-by-the-account", &job_sealed, account, machine, job()));
     let report_sealed = seal_case("job-report", job_header("job-report", Kind::JobReport, other_machine, machine), &job_report(), other_machine, &[machine, other_machine, account]);
     cases.push(opens("job-report-opened-by-the-machine-that-sent-the-job", &report_sealed, machine, other_machine, job_report()));
+    let addresses_sealed = seal_case("addresses", job_header("addresses", Kind::Addresses, other_machine, machine), &addresses(), other_machine, &[machine, other_machine, account]);
+    cases.push(opens("addresses-opened-by-the-peer", &addresses_sealed, machine, other_machine, addresses()));
     let job_bytes = serde_json::to_vec(&job()).unwrap();
     let mut certified_job = job_header("certified-job", Kind::Job, phone, other_machine);
     certified_job.cert = Some(phone_cert.clone());
