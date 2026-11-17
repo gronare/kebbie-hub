@@ -24,10 +24,10 @@ globalThis.indexedDB = {
 const CODE = "K7QF-M2XD";
 const VIEW = { code: CODE, name: "work-mac", state: "pending", expires_at: 1_900_000_000 };
 
-function hostedHub({ sessions, ended = [] }) {
+function hostedHub({ sessions, ended = [], keyed = false }) {
   const calls = [];
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-  const me = (account) => ({ account, handle: "k0123456789ab", key_access: false, key: null });
+  const me = (account) => ({ account, handle: "k0123456789ab", key_access: keyed, key: keyed ? { account, version: 1 } : null });
   globalThis.fetch = async (url, options = {}) => {
     const named = options.headers?.["Kebbie-Account"] ?? null;
     const path = String(url);
@@ -109,4 +109,22 @@ test("a session that ends on the connect page reads as signed out, not as a used
   assert.match(root.innerHTML, /You were signed out\. Sign in again\./);
   assert.doesNotMatch(root.innerHTML, /used or expired/);
   page.leave();
+});
+
+test("the connect page offers only the accounts with a live session, and marks the one whose session is gone as signed out", async () => {
+  kept.clear();
+  kept.set("accounts", [{ account: "acc_gone", colour: "blue" }, { account: "acc_home", colour: "peach" }]);
+  hostedHub({ sessions: ["acc_home"], keyed: true });
+  const { root, page } = connectPage();
+  await page.started;
+  assert.doesNotMatch(root.innerHTML, /Connect it to/, "one live account means no picker");
+  assert.deepEqual(kept.get("accounts").map((one) => [one.account, one.signedOut === true]), [["acc_gone", true], ["acc_home", false]]);
+  page.leave();
+
+  kept.set("accounts", [{ account: "acc_gone", colour: "blue" }, { account: "acc_home", colour: "peach" }]);
+  hostedHub({ sessions: ["acc_gone", "acc_home"], keyed: true });
+  const both = connectPage();
+  await both.page.started;
+  assert.equal((both.root.innerHTML.match(/class="pill" href="\/connect/g) ?? []).length, 2, "two live accounts give a picker of two");
+  both.page.leave();
 });

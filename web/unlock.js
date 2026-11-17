@@ -3,7 +3,7 @@ import { HubError } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { openEncryption, sealKey } from "./store.js";
 import { browserPush } from "./notify.js";
-import { forgetNotifyRecord, heldAccounts, keepAccount, listingKey, notifyRecord, othersNotified, unlockKey } from "./accounts.js";
+import { forgetNotifyRecord, heldAccounts, keepAccount, listingKey, markSignedOut, notifyRecord, othersNotified, unlockKey } from "./accounts.js";
 import { assertionJSON, creationOptions, passkeyName, prfOutput, registrationJSON, requestOptions } from "./passkey.js";
 
 const REMEMBERED = "kebbie-credential";
@@ -141,7 +141,7 @@ export async function keepUnlock(session, sealed, store = deviceStore) {
   const { encryption, ...identity } = session.identity;
   try {
     await store.put(unlockKey(identity.id), { identity, encryption: sealed, until: session.until });
-    await keepAccount(store, identity.id);
+    await keepAccount(store, identity.id, { signedOut: false });
   } catch {}
 }
 
@@ -269,9 +269,12 @@ export function unlockOnShow(prompt, locked, { page = globalThis.document, win =
 
 export async function signedInAccount(account, store = deviceStore, id = account.id) {
   try {
-    return await account.me();
+    const me = await account.me();
+    if (id) await markSignedOut(store, id, false).catch(() => undefined);
+    return me;
   } catch (error) {
     if (error instanceof HubError && error.status === 401) for (const one of id ? [id] : (await heldAccounts(store)).map((held) => held.account)) await forgetUnlock(store, one);
+    if (id && error instanceof HubError && error.status === 401) await markSignedOut(store, id, true).catch(() => undefined);
     return null;
   }
 }

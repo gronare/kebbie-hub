@@ -311,5 +311,7 @@ test("with two accounts on the phone a notice's title starts with its account's 
   await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
   kv.set("accounts", [{ account: owner, name: "Home", named: true, colour: "blue" }, { account: "acc_work", colour: "peach", email: "carl@work.example" }]);
   await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
-  assert.deepEqual(titles, [notice.title, `Home · ${notice.title}`]);
+  kv.set("accounts", [{ account: owner, name: "Home", named: true, colour: "blue" }, { account: "acc_work", colour: "peach", signedOut: true }]);
+  await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
+  assert.deepEqual(titles, [notice.title, `Home · ${notice.title}`, notice.title]);
 });

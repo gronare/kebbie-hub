@@ -14,7 +14,7 @@ import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosabl
 import { del, forgetDeviceKeys, get, put } from "./store.js";
 import { freshSlot, holderOf, merged, unlockedOf } from "./slots.js";
 import { accountChips, accountHeading, accountPicker, accountSummary, lockedAccounts } from "./screens.js";
-import { heldAccounts, keepAccount, labelsOf, listingKey, marksKey, migrate, nameOf } from "./accounts.js";
+import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
@@ -55,7 +55,8 @@ function mergeSlots() {
   Object.assign(state, merged(unlockedSlots()));
 }
 
-const heldOf = (id) => state.held.find((one) => one.account === id) ?? null;
+const liveHeld = () => liveAccounts(state.held);
+const heldOf = (id) => liveHeld().find((one) => one.account === id) ?? null;
 const tagOf = (machine) => (multi() ? heldOf(slotOfMachine(machine)?.id) : null);
 
 function arranged(now) {
@@ -63,13 +64,13 @@ function arranged(now) {
   return multi() ? { ...view, next: view.next.map((list) => ({ ...list, tag: tagOf(list.machine) })) } : view;
 }
 
-const lockedHeld = () => (multi() ? state.held.filter((one) => one.account !== state.me?.account && slots.get(one.account)?.session?.state === "locked") : []);
+const lockedHeld = () => (multi() ? liveHeld().filter((one) => one.account !== state.me?.account && slots.get(one.account)?.session?.state === "locked") : []);
 
 const accountName = (id) => {
   const one = state.held.find((held) => held.account === id);
   return one ? nameOf(one) : "Another account";
 };
-const multi = () => state.held.length > 1;
+const multi = () => liveHeld().length > 1;
 
 const planOf = (machine) => {
   const slot = machine ? slotOfMachine(machine) : null;
@@ -833,7 +834,7 @@ function openComposer() {
 
 function ideaRoute() {
   const account = ideaAccount();
-  const picker = account ? accountPicker(state.held, account) : "";
+  const picker = account ? accountPicker(liveHeld(), account) : "";
   const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()), picker, account: account ? nameOf(heldOf(account)) : null });
   if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
   return shell("backlog", backButton("#/backlog") + top("New idea") + form);
@@ -1122,8 +1123,8 @@ function machinesScreen() {
   const message = state.notice ? `<div class="center warn" role="alert">${esc(state.notice)}</div>` : "";
   const head = `<div class="narrow">${top("Machines", esc(`${state.opened.length} connected`))}${storeWarning()}${message}`;
   if (!multi()) return `${head}${awakeFirst(state.opened, now).map(rowOf).join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
-  const filter = state.held.some((one) => one.account === state.machinesFilter) ? state.machinesFilter : "all";
-  const groups = state.held
+  const filter = liveHeld().some((one) => one.account === state.machinesFilter) ? state.machinesFilter : "all";
+  const groups = liveHeld()
     .filter((one) => filter === "all" || one.account === filter)
     .map((one) => {
       const own = state.opened.filter((opened) => opened.account === one.account);
@@ -1131,7 +1132,7 @@ function machinesScreen() {
       const summary = { ...one, plan: slot ? (meOf(slot)?.plan ?? null) : null, machines: own.length };
       return accountHeading(summary) + awakeFirst(own, now).map(rowOf).join("");
     });
-  return `${head}${accountChips(state.held, filter)}${lockedAccounts(lockedHeld())}${groups.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
+  return `${head}${accountChips(liveHeld(), filter)}${lockedAccounts(lockedHeld())}${groups.join("")}<a class="btn phone-only" href="/account">Account</a></div>`;
 }
 
 function lockedScreen() {
@@ -1333,6 +1334,7 @@ async function refreshSlot(slot) {
 function sessionEnded(slot) {
   if (isPrimary(slot)) return signedOut("Your session ended. Sign in again.");
   dropSlot(slot);
+  markSignedOut(deviceStore, slot.id, true).then((list) => ((state.held = list), render())).catch(() => undefined);
   state.notice = `${accountName(slot.id)}'s session ended. Sign in to it again from Account.`;
 }
 
@@ -2573,7 +2575,7 @@ async function signedInHeld(list) {
 
 async function remember(me) {
   const address = state.info?.email ? await scoped(me.account).account.email().catch(() => null) : null;
-  state.held = await keepAccount(deviceStore, me.account, labelsOf(me, address)).catch(() => state.held);
+  state.held = await keepAccount(deviceStore, me.account, { ...labelsOf(me, address), signedOut: false }).catch(() => state.held);
   return address;
 }
 
@@ -2624,6 +2626,7 @@ async function start() {
   const kept = await keptUnlock(state.me);
   state.session = kept ?? (state.me ? { state: "locked", me: state.me } : null);
   if (state.me) await resumeOthers();
+  state.held = await heldAccounts(deviceStore).catch(() => state.held);
   state.unlocking = Boolean(kept);
   render();
   if (!state.me) return startAutofill();

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { accountOfDevice, dropAccount, heldAccounts, keepAccount, keepNotifyRecord, labelsOf, migrate, nameOf, withAccount } from "./accounts.js";
+import { accountOfDevice, dropAccount, heldAccounts, keepAccount, keepNotifyRecord, labelsOf, liveAccounts, markSignedOut, migrate, nameOf, titled, withAccount } from "./accounts.js";
 
 function memory(entries = []) {
   const values = new Map(entries);
@@ -73,4 +73,29 @@ test("an account is called by its email until the person names it, and the Home 
   const old = memory([["accounts", [{ account: "acc_a", name: "Home", colour: "blue", email: "carl@work.example" }, { account: "acc_b", name: "Work", colour: "peach" }, { account: "acc_c", name: "Kebbie", colour: "teal" }]]]);
   assert.deepEqual((await heldAccounts(old)).map(nameOf), ["carl@work.example", "Account", "Kebbie"]);
   assert.equal(nameOf({ account: "acc_d", handle: "k0123456789ab" }), "k0123456789ab", "a hub without email names it by its handle");
+});
+
+test("the same account is never held twice, and running the migration again after a sign-in adds no second entry", async () => {
+  const doubled = memory([["accounts", [{ account: "acc_home", colour: "blue" }, { account: "acc_home", colour: "peach" }]]]);
+  assert.deepEqual(await heldAccounts(doubled), [{ account: "acc_home", colour: "blue" }]);
+  const store = memory(before());
+  await migrate(store);
+  await migrate(store, "acc_home");
+  await migrate(store);
+  await keepAccount(store, "acc_home", { signedOut: false });
+  assert.deepEqual((await heldAccounts(store)).map((one) => one.account), ["acc_home"]);
+});
+
+test("only accounts with a live session count: a signed-out one leaves the list of live ones and the notice title, and comes back on sign-in", async () => {
+  const store = memory();
+  await keepAccount(store, "acc_home", { email: "carl@home.example" });
+  await keepAccount(store, "acc_work", { email: "carl@work.example" });
+  assert.equal(await titled(store, "acc_home", "Ready"), "carl@home.example · Ready");
+  await markSignedOut(store, "acc_work", true);
+  assert.deepEqual(liveAccounts(await heldAccounts(store)).map((one) => one.account), ["acc_home"]);
+  assert.equal(await titled(store, "acc_home", "Ready"), "Ready", "with one live account the title is the notice's own");
+  await markSignedOut(store, "acc_gone", true);
+  assert.equal((await heldAccounts(store)).length, 2, "marking an account this browser doesn't hold adds nothing");
+  await markSignedOut(store, "acc_work", false);
+  assert.equal(liveAccounts(await heldAccounts(store)).length, 2);
 });

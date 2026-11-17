@@ -20,13 +20,16 @@ export async function heldAccounts(store) {
   try {
     const list = await store.get(ACCOUNTS);
     if (!Array.isArray(list)) return [];
-    return list.filter((one) => typeof one?.account === "string").map(chosenName);
+    const valid = list.filter((one) => typeof one?.account === "string");
+    return valid.filter((one, at) => valid.findIndex((other) => other.account === one.account) === at).map(chosenName);
   } catch {
     return [];
   }
 }
 
 export const nameOf = (one) => one?.name || one?.email || one?.github || one?.handle || "Account";
+
+export const liveAccounts = (list) => list.filter((one) => one.signedOut !== true);
 
 export const labelsOf = (me, address = null) => ({ ...(address?.email ? { email: address.email } : {}), ...(me?.github ? { github: me.github } : {}), ...(me?.handle ? { handle: me.handle } : {}) });
 
@@ -35,6 +38,15 @@ export function withAccount(list, account, change = {}) {
   if (at >= 0) return list.map((one, index) => (index === at ? { ...one, ...change } : one));
   const used = new Set(list.map((one) => one.colour));
   return [...list, { account, colour: COLOURS.find((colour) => !used.has(colour)) ?? COLOURS[list.length % COLOURS.length], ...change }];
+}
+
+export async function markSignedOut(store, account, signedOut) {
+  const list = await heldAccounts(store);
+  const one = list.find((held) => held.account === account);
+  if (!one || (one.signedOut === true) === signedOut) return list;
+  const next = withAccount(list, account, { signedOut });
+  await store.put(ACCOUNTS, next);
+  return next;
 }
 
 export async function keepAccount(store, account, change = {}) {
@@ -101,7 +113,7 @@ export async function othersNotified(store, account) {
 }
 
 export async function titled(store, account, title) {
-  const list = await heldAccounts(store);
-  const name = list.length > 1 && list.some((one) => one.account === account) ? nameOf(list.find((one) => one.account === account)) : null;
+  const live = liveAccounts(await heldAccounts(store));
+  const name = live.length > 1 && live.some((one) => one.account === account) ? nameOf(live.find((one) => one.account === account)) : null;
   return name ? `${name} · ${title}` : title;
 }

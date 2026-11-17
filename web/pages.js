@@ -8,7 +8,7 @@ import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevi
 import { fromB64, toB64 } from "../js/protocol.js";
 import { COMMAND_TEXT, decisionBlock, standingOn } from "./decide.js";
 import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, notifyPhase, notifyText, withCategory } from "./notify.js";
-import { dropAccount, failureKey, forgetNotifyRecord, keepAccount, keepNotifyRecord as recordNotify, labelsOf, marksKey as marksOf, migrate, nameOf, notifyRecord, othersNotified } from "./accounts.js";
+import { dropAccount, failureKey, forgetNotifyRecord, heldAccounts, keepAccount, keepNotifyRecord as recordNotify, labelsOf, liveAccounts, marksKey as marksOf, migrate, nameOf, notifyRecord, othersNotified } from "./accounts.js";
 import { addFirstPasskey, forgetCredential, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
 import { accountScreen, authScreen, connectAccountPicker, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
@@ -126,6 +126,21 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     state.notice = null;
   }
 
+  async function signedInFirst() {
+    let first = null;
+    for (const id of wanted ? [wanted] : state.held.map((held) => held.account)) {
+      retarget(id);
+      const me = await signedInAccount(account);
+      first ??= me;
+    }
+    if (!first && !wanted) {
+      retarget(null);
+      first = await signedInAccount(account);
+    }
+    state.held = await heldAccounts({ get }).catch(() => state.held);
+    return first;
+  }
+
   async function signUp(ticket) {
     state.session = await unlockAfter(hub, await signUpWith(hub, ticket, deviceName()));
     signedInto(state.session.me);
@@ -177,7 +192,8 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       if (!state.me) return connectEmailScreen({ name, code: state.view.code || code, github: Boolean(state.info?.github), email: state.typed, ...shown });
       if (state.me.key_access === false && !state.me.key) return createPasskeyScreen({ who: signedInAs(state.me, state.address), ...shown });
     }
-    const picker = state.held.length > 1 && state.me && state.phase === "start" && state.view ? connectAccountPicker(state.held, state.me.account, code || state.view.code) : "";
+    const live = liveAccounts(state.held);
+    const picker = live.length > 1 && state.me && state.phase === "start" && state.view ? connectAccountPicker(live, state.me.account, code || state.view.code) : "";
     return picker + connectScreen({ supported: passkeysSupported(), phase: state.phase, view: state.view, me: state.me, session: state.session, fragment, signupOpen: state.info?.signup === "open", github: Boolean(state.info?.github), email: keepsEmail(), machines: state.machines, notice: state.notice, busy: state.busy, code });
   }
 
@@ -582,7 +598,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       await keepCounter(machine.counter);
       state.left = true;
       unlockEnds.watch(null);
-      if (state.held.length > 1) return location.assign("/#/board");
+      if (liveAccounts(state.held).length > 1) return location.assign("/#/board");
       showBoard(state.session, approved.name);
     } catch (error) {
       const said = unlocking ? unlockFailedText(error, state.view?.name ?? "this machine") : null;
@@ -775,7 +791,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
 
   async function remember(me) {
     const address = keepsEmail() ? await account.email().catch(() => null) : null;
-    const kept = await keepAccount({ get, put }, me.account, labelsOf(me, address)).catch(() => null);
+    const kept = await keepAccount({ get, put }, me.account, { ...labelsOf(me, address), signedOut: false }).catch(() => null);
     if (kept) state.held = kept.map((one) => ({ ...(state.held.find((held) => held.account === one.account) ?? {}), ...one }));
   }
 
@@ -926,11 +942,7 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
       render(top("kebbie hub"));
       state.info = await account.hub().catch(() => null);
       state.held = await migrate({ get, put, del }).catch(() => []);
-      for (const one of wanted ? [wanted] : [...state.held.map((held) => held.account), null]) {
-        retarget(one);
-        state.me = await signedInAccount(account);
-        if (state.me) break;
-      }
+      state.me = await signedInFirst();
       signedInto(state.me);
       const onward = state.me ? signedInDestination(path, params) : null;
       if (onward) return location.assign(onward);
