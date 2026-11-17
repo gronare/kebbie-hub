@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { HubError } from "./hub.js";
-import { autofillAvailable, NoPasskeyOffered, signInText, signInWith, signUpText } from "./signin.js";
+import { autofillAvailable, expectAccount, NoPasskeyOffered, signInText, signInWith, signUpText, WrongAccount } from "./signin.js";
+import { keepAccount, returningTo, signInAgainHref } from "./accounts.js";
+import { emailSignInScreen, passkeySignInScreen, signedOutStep } from "./email.js";
+import { rememberCredential, rememberedCredential } from "./unlock.js";
 
 const HUB_SALT = JSON.parse(readFileSync(new URL("../vectors/accounts.json", import.meta.url), "utf8")).hub_prf_salt.salt;
 const fromB64 = (value) => Uint8Array.fromBase64(value, { alphabet: "base64url" });
@@ -122,6 +125,71 @@ test("a sign-in names the passkey after the account's email when the hub keeps o
   const noEmail = { ...account, email: async () => { throw new Error("404"); } };
   await signInWith({ account: noEmail, credentials, platform, store: memoryStore() }).withPasskey();
   assert.equal(signalled.at(-1), "octocat", "a hub without email falls back to the GitHub login");
+});
+
+const SIGNED_OUT = [
+  { account: "acc_home", colour: "blue", email: "carl@home.example" },
+  { account: "acc_gone", name: "Work", named: true, colour: "peach", email: "carl@work.example", signedOut: true },
+];
+
+function returningHub(account) {
+  const begun = [];
+  const asked = [];
+  const hub = {
+    loginBegin: async (request) => {
+      begun.push(request);
+      return { ceremony: "c1", options: { publicKey: { challenge: "AAAA", rpId: "localhost", allowCredentials: request.credential ? [{ type: "public-key", id: request.credential }] : [] } }, prf_salt: HUB_SALT };
+    },
+    loginFinish: async () => ({ account, github: account === "acc_gone" ? "carl-work" : "bob" }),
+  };
+  const credentials = { get: async (options) => (asked.push(options), assertion) };
+  return { begun, asked, signingIn: signInWith({ account: hub, credentials, platform: {}, store: memoryStore() }) };
+}
+
+test("Sign in on a signed-out account offers that account's own passkey, and the account comes back with its name and colour as one entry", async () => {
+  const local = memoryStore();
+  rememberCredential("Cg", "acc_home", null, local);
+  rememberCredential("Dw", "acc_gone", null, local);
+  assert.equal(signInAgainHref(SIGNED_OUT[1]), "/?add=acc_gone");
+  const returning = returningTo(SIGNED_OUT, "acc_gone", { credentialOf: (id) => rememberedCredential(local, id), emailSignin: true });
+  assert.deepEqual(returning, { account: "acc_gone", name: "Work", credential: "Dw", email: "carl@work.example" });
+  assert.equal(signedOutStep({ info: { email_signin: true }, remembered: returning.credential }), "passkey");
+  assert.match(passkeySignInScreen({ returning: returning.name }), /Sign in to Work.*data-action="sign-in"/s);
+  const { begun, asked, signingIn } = returningHub("acc_gone");
+  const { signedIn } = await signingIn.withPasskey(returning.credential);
+  assert.deepEqual(begun, [{ credential: "Dw" }]);
+  assert.deepEqual(asked[0].publicKey.allowCredentials.map((one) => [...one.id]), [[...fromB64("Dw")]]);
+  assert.doesNotThrow(() => expectAccount(returning, signedIn));
+  const kv = new Map([["accounts", SIGNED_OUT]]);
+  const list = await keepAccount({ get: async (key) => kv.get(key), put: async (key, value) => void kv.set(key, value) }, signedIn.account, { signedOut: false });
+  assert.deepEqual(list.filter((one) => one.account === "acc_gone"), [{ ...SIGNED_OUT[1], signedOut: false }]);
+});
+
+test("Sign in on a signed-out account with no passkey here starts email sign-in with its email filled in", () => {
+  const returning = returningTo(SIGNED_OUT, "acc_gone", { credentialOf: () => null, emailSignin: true });
+  assert.deepEqual(returning, { account: "acc_gone", name: "Work", credential: null, email: "carl@work.example" });
+  assert.equal(signedOutStep({ info: { email_signin: true }, remembered: returning.credential }), "email");
+  assert.match(emailSignInScreen({ email: returning.email, returning: returning.name }), /Sign in to Work.*id="email"[^>]*value="carl@work\.example"/s);
+});
+
+test("an old signed-out account with no stored email and no passkey here falls back to adding an account", () => {
+  const old = [{ account: "acc_old", colour: "teal", signedOut: true }];
+  assert.equal(returningTo(old, "acc_old", { credentialOf: () => null, emailSignin: true }), null);
+  assert.equal(returningTo(SIGNED_OUT, "acc_gone", { credentialOf: () => null, emailSignin: false }), null, "a hub without email sign-in has nothing to fill in");
+  assert.equal(returningTo(SIGNED_OUT, "1", { emailSignin: true }), null, "+ Add an account names no account");
+  assert.equal(returningTo(SIGNED_OUT, "acc_home", { credentialOf: () => "Cg", emailSignin: true }), null, "a live account is not signed in again");
+});
+
+test("signing in as another account than the signed-out one is refused and says which account it was", async () => {
+  const returning = returningTo(SIGNED_OUT, "acc_gone", { credentialOf: () => "Dw", emailSignin: true });
+  const { signingIn } = returningHub("acc_bob");
+  const { signedIn } = await signingIn.withPasskey(returning.credential);
+  const prf = new Uint8Array(32).fill(7);
+  assert.throws(() => expectAccount(returning, signedIn, { prf }), (error) => error instanceof WrongAccount && error.message === "You signed in as bob, not Work. Nothing changed on this phone.");
+  assert.deepEqual([...new Set(prf)], [0], "the other account's PRF output is wiped");
+  assert.throws(() => expectAccount(returning, { account: "acc_bob" }, { typed: "bob@example.com" }), /You signed in as bob@example\.com, not Work\./);
+  assert.equal(signInText(new WrongAccount(returning, "bob")), "You signed in as bob, not Work. Nothing changed on this phone.");
+  assert.doesNotThrow(() => expectAccount(null, signedIn), "the generic add flow takes any account");
 });
 
 function memoryStore() {

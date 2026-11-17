@@ -4,7 +4,7 @@ import { answerableQuestions, answers, answerSents, answersToSend, answersWithLe
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
-import { autofillAvailable, signInText, signInWith } from "./signin.js";
+import { autofillAvailable, expectAccount, signInText, signInWith } from "./signin.js";
 import { account, HubError, scoped } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
@@ -14,7 +14,7 @@ import { answerBlock, answerReady, APPROVAL_STATES, kebbieAnswerStatus, choosabl
 import { del, forgetDeviceKeys, get, put } from "./store.js";
 import { freshSlot, holderOf, merged, unlockedOf } from "./slots.js";
 import { accountChips, accountHeading, accountPicker, accountSummary, lockedAccounts } from "./screens.js";
-import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf } from "./accounts.js";
+import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf, returningTo } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
@@ -35,6 +35,7 @@ const root = document.getElementById("app");
 let pageMode = PAGES.includes(location.pathname);
 const adding = !pageMode && new URLSearchParams(location.search).has("add");
 const onward = adding ? "/" : safeNext(new URLSearchParams(location.search).get("next"));
+let returning = null;
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const PLAN_INACTIVE = "plan-inactive";
 const state = { info: null, me: null, session: null, held: [], machinesFilter: "all", cameFrom: null, opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
@@ -1150,16 +1151,16 @@ const liftKeyboard = keyboardLift();
 
 function signedOutScreen() {
   const shown = { notice: state.notice, busy: state.busy };
-  const step = signedOutStep({ info: state.info, remembered: adding ? null : rememberedCredential(), ...state.signin });
+  const step = signedOutStep({ info: state.info, remembered: adding ? (returning?.credential ?? null) : rememberedCredential(), ...state.signin });
   if (adding) return signInStep(step, shown) + `<a class="btn back-link" href="/">Back to your boards</a>`;
   return signInStep(step, shown);
 }
 
 function signInStep(step, shown) {
   if (step === "code") return codeScreen({ purpose: "sign-in", email: state.signin.email, code: state.draft.code, ...shown });
-  if (step === "passkey") return passkeySignInScreen(shown);
+  if (step === "passkey") return passkeySignInScreen({ returning: returning?.name, ...shown });
   const github = Boolean(state.info?.github) && !adding;
-  if (step === "email") return emailSignInScreen({ github, email: state.draft.email ?? state.signin.email, next: onward, ...shown });
+  if (step === "email") return emailSignInScreen({ github, email: state.draft.email ?? state.signin.email, next: onward, returning: returning?.name, ...shown });
   return signInScreen({ github, notice: state.notice, next: onward });
 }
 
@@ -2046,9 +2047,22 @@ async function startAutofill() {
   }
 }
 
+async function landedOn(signedIn, options) {
+  try {
+    expectAccount(returning, signedIn, options);
+  } catch (error) {
+    if (!liveHeld().some((one) => one.account === signedIn.account)) await scoped(signedIn.account).account.logout().catch(() => undefined);
+    state.signin = { ...freshSignIn(), chosen: state.signin.chosen };
+    state.draft = { email: null, code: "" };
+    throw error;
+  }
+}
+
 async function signInWithPasskey(remembered) {
   try {
-    await unlocked(await signingIn.withPasskey(remembered));
+    const ceremony = await signingIn.withPasskey(remembered);
+    await landedOn(ceremony.signedIn, { prf: ceremony.prf });
+    await unlocked(ceremony);
   } catch (error) {
     state.unlocking = false;
     state.notice = signInText(error);
@@ -2087,7 +2101,7 @@ async function emailStep(act) {
 }
 
 const typedEmail = () => root.querySelector("#email")?.value.trim() ?? "";
-const freshSignIn = () => ({ step: "email", email: "", chosen: true });
+const freshSignIn = () => ({ step: "email", email: returning?.email ?? "", chosen: true });
 
 // The code field is shown and focused inside the tap, since iOS opens the keyboard only for a focus the tap itself makes.
 function focusCode() {
@@ -2120,6 +2134,7 @@ function enterCode() {
   }
   return emailStep(async () => {
     const signed = await primary().enterCode(state.signin.email, code);
+    await landedOn(signed.account, { typed: state.signin.email });
     if (onward && !adding) return location.assign(onward);
     state.me = signed.account;
     state.session = { state: "locked", me: state.me };
@@ -2365,7 +2380,7 @@ root.addEventListener("click", (event) => {
   else if (action === "confirm-email") confirmEmail();
   else if (action === "sign-in") {
     unlockPrompt.disarm();
-    signInWithPasskey(adding ? null : ownCredential());
+    signInWithPasskey(adding ? (returning?.credential ?? null) : ownCredential());
   }
   else if (action === "other-passkey") signInWithPasskey(null);
   else if (action === "add-passkey") addPasskey();
@@ -2616,7 +2631,11 @@ async function start() {
   state.info = await account.hub().catch(() => null);
   const held = await migrate({ get, put, del }).catch(() => []);
   state.held = held;
-  if (adding) return render();
+  if (adding) {
+    returning = returningTo(held, new URLSearchParams(location.search).get("add"), { credentialOf: (id) => rememberedCredential(undefined, id), emailSignin: emailSignIn() });
+    state.signin = { ...state.signin, email: returning?.email ?? "" };
+    return render();
+  }
   state.me = await signedInHeld(held);
   if (state.me && onward) return location.assign(onward);
   if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => held);

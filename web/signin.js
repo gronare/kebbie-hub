@@ -7,6 +7,22 @@ export class NoPasskeyOffered extends Error {
   }
 }
 
+export class WrongAccount extends Error {
+  constructor(wanted, got) {
+    super(`You signed in as ${got}, not ${wanted.name}. Nothing changed on this phone.`);
+    this.code = "wrong-account";
+  }
+}
+
+const labelOf = (me, typed) => typed || me?.github || me?.handle || "another account";
+
+// Refused before anything here keeps the other account, so it never takes the signed-out one's place.
+export function expectAccount(returning, signedIn, { prf = null, typed = null } = {}) {
+  if (!returning || signedIn?.account === returning.account) return;
+  prf?.fill(0);
+  throw new WrongAccount(returning, labelOf(signedIn, typed));
+}
+
 // A conditional request left pending blocks the next get(), so a new sign-in aborts the one before it.
 export function signInWith({ account, credentials, platform = globalThis.PublicKeyCredential, store = globalThis.localStorage }) {
   let pending = null;

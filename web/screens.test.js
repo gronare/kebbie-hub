@@ -860,7 +860,7 @@ test("an account whose session is gone shows under Account as signed out, with S
   ];
   const html = accountScreen({ me: { ...me, account: "acc_work" }, github: false, accounts });
   assert.match(text(html), /^kebbie hub Account Accounts on this phone carl@work\.example Signed out Sign in Remove from this phone carl@work\.example Trial · 1 machine This one carl@work\.example Name and colour/);
-  assert.match(html, /<a class="btn small" href="\/\?add=1">Sign in<\/a><button type="button" class="btn small" data-action="forget-account" data-account="acc_gone">/);
+  assert.match(html, /<a class="btn small" href="\/\?add=acc_gone">Sign in<\/a><button type="button" class="btn small" data-action="forget-account" data-account="acc_gone">/);
   assert.doesNotMatch(html, /href="\/account\?account=acc_gone"/);
   assert.match(html, /id="account-name" type="text" maxlength="24" value="" placeholder="carl@work\.example"/, "an unnamed account shows its email as the name to replace");
 });

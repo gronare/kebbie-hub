@@ -2,7 +2,7 @@ import { acceptMatters, asksYou } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
 import { planGroup } from "./pro.js";
-import { nameOf } from "./accounts.js";
+import { nameOf, signInAgainHref } from "./accounts.js";
 
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
@@ -793,7 +793,7 @@ export function accountsGroup(accounts, current) {
   return `<h2 class="group g-muted">Accounts on this phone</h2>${rows.join("")}`;
 }
 
-const signedOutRow = (one) => `<div class="task acct-out"><div class="acct-row">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))}</span><span class="meta">Signed out</span></span></div><div class="row2"><a class="btn small" href="/?add=1">Sign in</a><button type="button" class="btn small" data-action="forget-account" data-account="${esc(one.account)}">Remove from this phone</button></div></div>`;
+const signedOutRow = (one) => `<div class="task acct-out"><div class="acct-row">${accountDot(one.colour)}<span class="about"><span class="name">${esc(nameOf(one))}</span><span class="meta">Signed out</span></span></div><div class="row2"><a class="btn small" href="${esc(signInAgainHref(one))}">Sign in</a><button type="button" class="btn small" data-action="forget-account" data-account="${esc(one.account)}">Remove from this phone</button></div></div>`;
 
 export const addAccountRow = `<a class="task row-link" href="/?add=1" data-action="add-account"><span class="name">+ Add an account<span class="meta under">Sign in to another account on this hub</span></span>${CHEV_RIGHT}</a>`;
 

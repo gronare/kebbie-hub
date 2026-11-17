@@ -31,6 +31,17 @@ export const nameOf = (one) => one?.name || one?.email || one?.github || one?.ha
 
 export const liveAccounts = (list) => list.filter((one) => one.signedOut !== true);
 
+export const signInAgainHref = (one) => `/?add=${encodeURIComponent(one.account)}`;
+
+// A signed-out account signs in again by its own passkey, else by its email; null leaves the generic add flow.
+export function returningTo(list, target, { credentialOf = () => null, emailSignin = false } = {}) {
+  const one = target ? list.find((held) => held.account === target && held.signedOut === true) : null;
+  if (!one) return null;
+  const credential = credentialOf(one.account) ?? null;
+  const email = emailSignin && typeof one.email === "string" && one.email ? one.email : null;
+  return credential || email ? { account: one.account, name: nameOf(one), credential, email } : null;
+}
+
 export const labelsOf = (me, address = null) => ({ ...(address?.email ? { email: address.email } : {}), ...(me?.github ? { github: me.github } : {}), ...(me?.handle ? { handle: me.handle } : {}) });
 
 export function withAccount(list, account, change = {}) {

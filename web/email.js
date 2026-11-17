@@ -17,9 +17,11 @@ const githubLink = (href) => `<a class="btn" href="${esc(href)}">Continue with G
 const codeLinks = (busy) => `<p class="foot">Nothing arrived? <button type="button" class="link inline" data-action="resend-code"${disabled(busy)}>Send a new code</button></p><div class="links"><button type="button" class="link" data-action="other-email"${disabled(busy)}>Use another email</button></div>`;
 const newHere = `<p class="foot">New to kebbie? Start in your terminal: <code>kebbie setup</code></p>`;
 
-export function emailSignInScreen({ github = false, email = "", next = null, notice = null, busy = false }) {
+const titleFor = (returning) => (returning ? `Sign in to ${returning}` : "See your boards");
+
+export function emailSignInScreen({ github = false, email = "", next = null, returning = null, notice = null, busy = false }) {
   return authScreen({
-    intro: heading("See your boards", `Your machines' boards, end-to-end encrypted. Sign in with your email${github ? " or GitHub" : ""}.`),
+    intro: heading(titleFor(returning), `Your machines' boards, end-to-end encrypted. Sign in with your email${github ? " or GitHub" : ""}.`),
     fields: emailInput(email),
     actions: primary("send-code", "Send code", busy),
     alt: (github ? or + githubLink(githubHref({ next })) : "") + newHere,
@@ -27,9 +29,9 @@ export function emailSignInScreen({ github = false, email = "", next = null, not
   });
 }
 
-export function passkeySignInScreen({ notice = null, busy = false }) {
+export function passkeySignInScreen({ returning = null, notice = null, busy = false }) {
   return authScreen({
-    intro: heading("See your boards", "Your machines' boards, end-to-end encrypted."),
+    intro: heading(titleFor(returning), "Your machines' boards, end-to-end encrypted."),
     actions: primary("sign-in", "Sign in with your passkey", busy) + `<p class="foot">Can't use your passkey? <button type="button" class="link inline" data-action="email-instead">Sign in with email instead</button></p>`,
     notice,
   });
