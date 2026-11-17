@@ -906,7 +906,7 @@ function said(entry) {
 function subject(entry) {
   const { payload } = entry;
   if (payload.type === "routine") return payload.id;
-  if (payload.type === "start") return `${payload.name}@${payload.repo}`;
+  if (payload.type === "start") return payload.name ? `${payload.name}@${payload.repo}` : `${clip(payload.prompt, 40)} in ${payload.repo}`;
   if (payload.type === "idea") return `${entry.machineName}: ${clip(payload.text)}`;
   if (["item-answer", "item-answers", "start-item", "item-edit", "item-write", "found-start", "found-add", "found-dismiss", "found-keep"].includes(payload.type)) return itemName(entry);
   if (payload.type === "device-decision") return entry.targetName ?? payload.device.slice(-6);

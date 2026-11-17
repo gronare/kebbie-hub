@@ -643,6 +643,8 @@ test("a device's history names what it sent to the backlog: the idea and its mac
   const refused = historyEntry(entry({ type: "start-item", item: "vault:Projects/session.md", anyway: false }, { label: "Session drops on reload", result: { outcome: "refused", reason: "questions-open", blocking: 2, text: "Not started: 2 questions wait on you." } }), now);
   assert.deepEqual([refused.what, refused.said], ["Start of Session drops on reload refused", "Not started: 2 questions wait on you."]);
   assert.equal(historyEntry(entry({ type: "idea", text: "x".repeat(80), repo: null }, { result: null }), now).what, `Idea for MacBook: ${"x".repeat(59)}… waiting`);
+  assert.equal(historyEntry(entry({ type: "start", repo: "shop", name: "", prompt: "Fix the rounding in invoices" }), now).what, "Started Fix the rounding in invoices in shop", "a start the machine names reads by its words");
+  assert.equal(historyEntry(entry({ type: "start", repo: "shop", name: "invoice-rounding", prompt: "Fix it" }), now).what, "Started invoice-rounding@shop");
 });
 
 test("Account shows one Notifications row under This device, and its own page holds the switch, where notices come from, the last failure and the categories", () => {

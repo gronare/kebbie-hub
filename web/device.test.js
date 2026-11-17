@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceFingerprint, fromB64, importIdentity, newDeviceKey, openCommand, sealEnvelope, verifyDeviceCert } from "../js/protocol.js";
+import { startCommand } from "./backlog.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, heldDevice, keepAllowsChanges, keepSent, loadDevice, loadSent, openHistory, pushFollows, sendCommand, verifiedDevices } from "./device.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
@@ -125,6 +126,20 @@ test("a device that registers anew while notifications are on takes the browser'
   await store.del(`device-key:${identity.id}`);
   await ensureDevice({ store, calls, identity, name: "iPhone", now: AT + 120, subscription: async () => held });
   assert.equal(subscribed.length, 1, "with notifications off nothing is subscribed");
+});
+
+test("New's Start now seals a start with the repo, the prompt and an empty name for the machine to fill", async () => {
+  const identity = await account();
+  const machine = await importIdentity(parties.machine);
+  const posted = [];
+  const calls = { addDevice: async () => undefined, command: async (envelope) => (posted.push(envelope), { command: envelope.id, seq: 1 }) };
+  const device = await certified(identity, calls);
+  const { payload, meta } = startCommand({ text: "Fix the rounding in invoices", repo: "shop" });
+  const sent = await sendCommand({ calls, identity, device, allowed: true, machine: { id: machine.id, keys: parties.machine.public }, payload, at: AT, meta });
+  assert.deepEqual([sent.kind, sent.repo, sent.text], ["start", "shop", "Fix the rounding in invoices"]);
+  const opened = await openCommand(posted[0], machine, accounts.key, AT);
+  assert.equal(posted[0].kind, "start");
+  assert.deepEqual(opened.payload, { type: "start", repo: "shop", name: "", prompt: "Fix the rounding in invoices" });
 });
 
 test("an answer is signed by this device, sealed to the machine and the account, and its result names the device", async () => {

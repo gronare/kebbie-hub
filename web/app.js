@@ -1,6 +1,6 @@
 import { blobReader, blobSlot, failedLine, kb, keptBytes, loadingLine, planHref } from "./blobs.js";
 import { markdown } from "./markdown.js";
-import { answerableQuestions, answers, answerSents, answersToSend, answersWithLead, keepDrafts, keepMain, keyAt, bodyShown, readDrafts, readMain, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, ideaMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startedEntry, startsAnyway } from "./backlog.js";
+import { answerableQuestions, answers, answerSents, answersToSend, answersWithLead, keepDrafts, keepMain, keyAt, bodyShown, readDrafts, readMain, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, ideaMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startCommand, startedEntry, startRepo, newStartStatus, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
@@ -801,11 +801,13 @@ function findEntry(id, machine = null) {
   return { entries, entry: started ? startedEntry(id, started) : null };
 }
 
+const boardRepos = (board) => [...new Set([...(board.checkouts ?? []).map((checkout) => checkout.repo), ...(board.items ?? []).map((item) => item.address.slice(item.address.indexOf("@") + 1))])];
+
 const ideaAccount = () => (multi() ? (heldOf(state.idea.account)?.account ?? heldOf(state.cameFrom)?.account ?? state.me?.account ?? null) : null);
 
 function ideaCandidates(account = ideaAccount()) {
   const now = nowSeconds();
-  return state.opened.filter((opened) => opened.board && takes(opened.board.accepts, "idea") && (!account || opened.account === account)).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: (opened.board.checkouts ?? []).map((checkout) => checkout.repo), ideas: opened.board.idea_machine === true }));
+  return state.opened.filter((opened) => opened.board && (takes(opened.board.accepts, "idea") || takes(opened.board.accepts, "start")) && (!account || opened.account === account)).map((opened) => ({ machine: opened.machine, name: opened.name, accepts: opened.board.accepts, asleep: isAsleep({ lastSeen: opened.lastSeen }, now), repos: boardRepos(opened.board), ideas: opened.board.idea_machine === true, starts: takes(opened.board.accepts, "start") }));
 }
 
 const ideaChoice = () => chooseMachine(ideaCandidates(), { lastUsed: state.lastMachine, chosen: state.idea.machine, main: mainMachine(), ideas: ideaMachine(ideaCandidates()) });
@@ -842,12 +844,21 @@ function openComposer() {
   document.getElementById("idea")?.focus({ preventScroll: true });
 }
 
+function startedHtml() {
+  const sent = state.kept.sent.find((one) => one.id === state.idea.started);
+  if (!sent) return "";
+  const shown = shownOf(sent);
+  return `<div class="decide">${newStartStatus(sent, shown.state, { standing: shown.standing, now: nowSeconds() })}</div>`;
+}
+
 function ideaRoute() {
   const account = ideaAccount();
   const picker = account ? accountPicker(liveHeld(), account) : "";
-  const form = ideaForm({ ...state.idea, candidates: ideaCandidates(), chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(ideaCandidates()), picker, account: account ? nameOf(heldOf(account)) : null });
-  if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>New idea</h2>${form}`);
-  return shell("backlog", backButton("#/backlog") + top("New idea") + form);
+  const candidates = ideaCandidates();
+  const form = ideaForm({ ...state.idea, candidates, chosen: ideaChoice(), main: mainMachine(), ideas: ideaMachine(candidates), picker, account: account ? nameOf(heldOf(account)) : null, started: startedHtml() });
+  const title = candidates.some((one) => one.starts) ? "New" : "New idea";
+  if (twoColumns()) return shell("backlog", backlogListHtml(backlogEntries(), null, true), `<h2>${title}</h2>${form}`);
+  return shell("backlog", backButton("#/backlog") + top(title) + form);
 }
 
 function reviewUiOf(machine, address, subtask) {
@@ -1752,6 +1763,23 @@ async function addIdea() {
   go(twoColumns() ? entryHref(`idea:${sent.id}`) : "#/backlog");
 }
 
+async function startNow() {
+  const chosen = ideaChoice();
+  const repo = startRepo(chosen, state.idea.repo);
+  const text = state.idea.text.trim();
+  if (!chosen?.starts || !repo || !text || state.idea.busy) return;
+  const sent = await sendBacklog({ machine: chosen, ...startCommand({ text, repo }), ui: state.idea });
+  if (!sent) return;
+  Object.assign(state.idea, { text: "", choosing: false, started: sent.id });
+  render();
+}
+
+function startAgain() {
+  const sent = state.kept.sent.find((one) => one.id === state.idea.started);
+  Object.assign(state.idea, { text: sent?.text ?? state.idea.text, repo: sent?.repo ?? state.idea.repo, machine: sent?.machine ?? state.idea.machine, started: null });
+  render();
+}
+
 async function sendItemAnswers(entry, key = null) {
   const ui = backlogUi(entry.id);
   const { body } = bodyOf(entry);
@@ -1850,7 +1878,7 @@ function openEditor(entry, section) {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
-const BACKLOG_ACTIONS = new Set(["add-idea", "backlog-choose", "backlog-machine", "pick-question", "send-item-answers", "drop-answer", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
+const BACKLOG_ACTIONS = new Set(["add-idea", "start-now", "start-again", "backlog-choose", "backlog-machine", "pick-question", "send-item-answers", "drop-answer", "start-item", "write-item", "item-edit", "item-edit-cancel", "item-edit-save", ...FOUND_KINDS]);
 
 function backlogAction(action, target) {
   const id = target.closest("[data-item]")?.dataset.item ?? null;
@@ -1862,6 +1890,8 @@ function backlogAction(action, target) {
   if (action === "item-edit-save" && entry) return sendItemEdit(entry);
   if (action === "item-edit-cancel") ui.editing = null;
   if (action === "add-idea") return addIdea();
+  if (action === "start-now") return startNow();
+  if (action === "start-again") return startAgain();
   if (action === "send-item-answers" && entry) return sendItemAnswers(entry, target.dataset.key ?? null);
   if (action === "drop-answer" && entry) return dropAnswer(entry, target.dataset.key);
   if (action === "pick-question" && entry) return pickQuestion(entry, Number(target.dataset.index));
@@ -2491,8 +2521,11 @@ root.addEventListener("input", (event) => {
   const draft = event.target.dataset?.draft;
   if (draft === "idea") {
     state.idea.text = event.target.value;
-    const button = root.querySelector('[data-action="add-idea"]');
-    if (button) button.disabled = state.idea.busy || state.idea.text.trim() === "";
+    for (const button of root.querySelectorAll('[data-action="add-idea"], [data-action="start-now"]')) button.disabled = state.idea.busy || state.idea.text.trim() === "";
+    return;
+  }
+  if (draft === "start-repo") {
+    state.idea.repo = event.target.value;
     return;
   }
   if (draft === "item-answer") {

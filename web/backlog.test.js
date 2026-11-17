@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { answerableQuestions, answerCommand, answers, answerSents, answersToSend, answersWithLead, backlogList, bodyShown, keepDrafts, keepMain, readDrafts, readMain, sendAllLabel, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, chooseMachine, ideaMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
+import { answerableQuestions, answerCommand, answers, answerSents, answersToSend, answersWithLead, backlogList, bodyShown, keepDrafts, keepMain, readDrafts, readMain, sendAllLabel, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, chooseMachine, ideaMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, newStartStatus, startCommand, startRepo, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -549,6 +549,35 @@ test("the same vault note in two accounts stays two rows, and each row's machine
     ["acc_work|vault:Projects/round.md", "acc_work", ["mch_work"]],
   ]);
   assert.equal(entries[1].key, "vault:Projects/round.md", "the command still names the note itself");
+});
+
+test("New offers Start now on the chosen machine and Add to the backlog, starts in its first repo unless another is picked, and sends a start the machine names", () => {
+  const mac = { machine: "mch_mac", name: "MacBook", accepts: ["idea", "start"], asleep: false, repos: ["shop", "kebbie"], starts: true };
+  const both = ideaForm({ text: "Fix the rounding in invoices", candidates: [mac], chosen: chooseMachine([mac], {}) });
+  assert.match(text(both), /What do you want done\? Start it now, or add it to the backlog .* Goes to MacBook .* Starts in shop kebbie Start now on MacBook Add to the backlog$/);
+  assert.match(both, /data-action="start-now">Start now on MacBook</);
+  assert.match(both, /<option value="shop" selected>/);
+  assert.match(ideaForm({ text: "", candidates: [mac], chosen: mac }), /data-action="start-now" disabled/);
+  assert.equal(startRepo(mac, "kebbie"), "kebbie");
+  assert.equal(startRepo(mac, "gone"), "shop", "a repo the machine lacks falls back to its first, as n does");
+  assert.equal(startRepo({ ...mac, repos: [] }, null), null);
+  const ideasOnly = { ...mac, accepts: ["idea"], starts: false };
+  assert.doesNotMatch(ideaForm({ text: "x", candidates: [ideasOnly], chosen: ideasOnly }), /start-now/, "an older kebbie that takes no starts offers only the backlog");
+  const startsOnly = { ...mac, accepts: ["start"] };
+  assert.doesNotMatch(ideaForm({ text: "x", candidates: [startsOnly], chosen: startsOnly }), /add-idea/);
+  assert.doesNotMatch(ideaForm({ text: "x", candidates: [{ ...mac, repos: [] }], chosen: { ...mac, repos: [] } }), /start-now/, "with no repo on its board there is nowhere to start");
+  assert.deepEqual(startCommand({ text: "  Fix the rounding in invoices \n", repo: "shop" }).payload, { type: "start", repo: "shop", name: "", prompt: "Fix the rounding in invoices" });
+});
+
+test("a start from New says it is on its way, then the machine's result: started as its name, or the refusal with the words to try again", () => {
+  const sent = { id: "cmd_s", kind: "start", machine: "mch_mac", machineName: "MacBook", repo: "shop", text: "Fix it", at: NOW - 5, exp: NOW + 3_000, deviceName: "iPhone 16" };
+  assert.match(text(newStartStatus(sent, "sending", { now: NOW })), /Sent to MacBook The task starts in shop\./);
+  const done = { ...sent, result: { outcome: "done", text: "Started as fix-it@shop. It shows under Work in a moment.", at: NOW } };
+  assert.match(text(newStartStatus(done, "done", { now: NOW })), /✓ Started on MacBook Started as fix-it@shop\./);
+  const refused = { ...sent, result: { outcome: "refused", reason: "not-allowed", text: "Not done: MacBook takes no start from the hub", at: NOW } };
+  const said = newStartStatus(refused, "refused", { now: NOW });
+  assert.match(text(said), /MacBook takes no start from the hub/);
+  assert.match(said, /data-action="start-again"/);
 });
 
 test("with two accounts New names the account in its question and its button, with one it reads as before", () => {

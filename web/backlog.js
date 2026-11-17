@@ -213,12 +213,41 @@ export function machinePicker(candidates, chosen, { label, choosing, main = null
   return `<section class="task"><div class="row"><div><div class="meta">${esc(label)}</div><div class="name">${esc(chosen.name)}</div><div class="meta">${esc(chosen.why)}</div></div>${change}</div></section>${list}`;
 }
 
-export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null, ideas = null, picker = "", account = null }) {
-  const field = `<div class="note-field"><label for="idea">${account ? "What do you want done? " : ""}Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats.</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
-  if (!chosen) return picker + field + `<div class="pro">No machine${account ? ` on ${esc(account)}` : ""} takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
-  const ready = text.trim() !== "" && !busy;
+export const startCommand = ({ text, repo }) => ({ payload: { type: "start", repo, name: "", prompt: text.trim() }, meta: { address: null, repo, text: text.trim(), label: text.trim() } });
+
+export const startRepo = (chosen, repo) => (chosen?.repos.includes(repo) ? repo : (chosen?.repos[0] ?? null));
+
+const START_GOES = "The task starts";
+
+export function newStartStatus(sent, state, { standing = null, now }) {
+  const machine = esc(sent.machineName);
+  if (APPROVAL_STATES.includes(state)) return approvalStatus(sent, state, { standing, now, what: { goes: START_GOES, again: "start it again" } });
+  if (state === "done") return block("done", `✓ Started on ${machine}`, esc(sent.result.text), from(sent));
+  const again = `<button type="button" class="btn small" data-action="start-again">Edit and try again</button>`;
+  if (state === "refused") return block("refused", ...refusal("Not started", sent.result.text), from(sent)) + again;
+  if (state === "expired") return block("refused", `Not delivered: ${machine} stayed asleep`, `Start it again when ${machine} is awake.`, `Sent ${from(sent)} · expired ${esc(clock(sent.exp))}`) + again;
+  if (state === "waiting") return block("wait", `Waiting for ${machine}`, `${START_GOES} when ${machine} wakes up.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+  return block("wait", `Sent to ${machine}`, `${START_GOES} in ${esc(sent.repo)}.`, `Sent ${from(sent)} · expires ${esc(clock(sent.exp))}`);
+}
+
+function repoPicker(repos, repo) {
+  if (repos.length < 2) return `<div class="meta pad">Starts in ${esc(repo)}</div>`;
+  return `<div class="note-field"><label for="start-repo">Starts in</label><select id="start-repo" data-draft="start-repo">${repos.map((one) => `<option value="${esc(one)}"${one === repo ? " selected" : ""}>${esc(one)}</option>`).join("")}</select></div>`;
+}
+
+export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null, ideas = null, picker = "", account = null, repo = null, started = "" }) {
+  const starts = candidates.some((one) => one.starts);
+  const ask = account || starts ? "What do you want done? " : "";
+  const field = `<div class="note-field"><label for="idea">${ask}${starts ? "Start it now, or add it to the backlog for the lead to write out." : "Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats."}</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
+  if (!chosen) return picker + started + field + `<div class="pro">No machine${account ? ` on ${esc(account)}` : ""} takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
+  const off = text.trim() === "" || busy ? " disabled" : "";
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
-  return picker + field + machinePicker(candidates, chosen, { label: "Goes to the lead on", choosing, main, ideas }) + failed + `<div class="thumb-end idea-add"><button type="button" class="btn primary" data-action="add-idea"${ready ? "" : " disabled"}>${account ? `Add to ${esc(account)}'s backlog` : "Add to the backlog"}</button></div>`;
+  const where = startRepo(chosen, repo);
+  const canStart = chosen.starts && where !== null;
+  const start = canStart ? `<button type="button" class="btn primary" data-action="start-now"${off}>Start now on ${esc(chosen.name)}</button>` : "";
+  const add = takes(chosen.accepts, "idea") || !chosen.starts ? `<button type="button" class="btn${canStart ? "" : " primary"}" data-action="add-idea"${off}>${account ? `Add to ${esc(account)}'s backlog` : "Add to the backlog"}</button>` : "";
+  const label = starts ? "Goes to" : "Goes to the lead on";
+  return picker + started + field + machinePicker(candidates, chosen, { label, choosing, main, ideas }) + (canStart ? repoPicker(chosen.repos, where) : "") + failed + `<div class="thumb-end idea-add">${start}${add}</div>`;
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
