@@ -40,6 +40,7 @@ impl Plans for Shared {
             Gated::Command(kind) => matches!(kind, Kind::Answer | Kind::PromptAnswer | Kind::ItemAnswer | Kind::ItemAnswers | Kind::ReviewOpen | Kind::ReviewRead | Kind::DeviceDecision),
             Gated::Machine => machines(store, account) == 0,
             Gated::Device | Gated::Notifications => true,
+            Gated::Relay => false,
         };
         if free || self.0.pro.load(Ordering::SeqCst) {
             Ok(())

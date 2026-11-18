@@ -14,7 +14,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::auth::{MachineAuth, random};
 use crate::error::ApiError;
-use crate::{Hub, now};
+use crate::{Gated, Hub, now};
 
 // A frame of a link's TLS stream with room for the WebSocket's own header.
 pub const MAX_LINK_MESSAGE: usize = 1024 * 1024 + 1024;
@@ -98,6 +98,9 @@ pub struct LinkQuery {
 pub async fn link(State(hub): State<Arc<Hub>>, MachineAuth(machine): MachineAuth, Query(query): Query<LinkQuery>, upgrade: WebSocketUpgrade) -> Result<Response, ApiError> {
     let upgrade = upgrade.max_message_size(MAX_LINK_MESSAGE).max_frame_size(MAX_LINK_MESSAGE);
     let account = hub.store().machine_owner(&machine)?.ok_or(ApiError::conflict(NO_ACCOUNT))?;
+    if query.accept.is_none() {
+        hub.check_gate(&hub.store(), &account, Gated::Relay)?;
+    }
     match (query.listen, query.to, query.accept) {
         (true, None, None) => {
             if hub.store().worker_os(&machine)?.is_none() {

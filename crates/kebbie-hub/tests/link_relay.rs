@@ -1,9 +1,14 @@
 #[allow(dead_code)]
 mod common;
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use axum::Router;
 use common::*;
+use kebbie_hub::store::Store;
+use kebbie_hub::{Gated, Refusal};
 use futures_util::{SinkExt, StreamExt};
 use kebbie_hub_fakes::machine::MachineState;
 use tokio::net::TcpStream;
@@ -141,4 +146,49 @@ async fn a_link_ends_at_its_byte_limit_and_an_unanswered_ring_is_refused() {
     asker.send(Message::Binary(vec![1u8; 100].into())).await.unwrap();
     assert_eq!(binary(&mut answered).await, None, "past its byte limit the hub closes the link");
     assert_eq!(open(&test, &devbox, &format!("to={}", studio.machine)).await.err(), Some(409), "a worker that does not answer within the wait is no link");
+}
+
+async fn refused_with(test: &TestHub, machine: &MachineState, query: &str) -> (u16, String) {
+    let mut request = format!("{}/v1/m/link?{query}", test.url.replace("http://", "ws://")).into_client_request().unwrap();
+    request.headers_mut().insert("authorization", format!("Bearer {}", machine.token()).parse().unwrap());
+    match tokio_tungstenite::connect_async(request).await {
+        Err(WsError::Http(response)) => {
+            let body: serde_json::Value = serde_json::from_slice(response.body().as_deref().unwrap_or_default()).unwrap_or_default();
+            (response.status().as_u16(), body["error"].as_str().unwrap_or_default().to_string())
+        }
+        other => panic!("the hub opened the link: {:?}", other.map(|_| ())),
+    }
+}
+
+#[tokio::test]
+async fn the_relay_passes_the_plans_gate_and_with_no_plans_it_is_open() {
+    let refusing = Arc::new(AtomicBool::new(true));
+    let gate = refusing.clone();
+    let refuse_relay = move |_: &Store, _: &str, gated: Gated| match gated {
+        Gated::Relay if gate.load(Ordering::SeqCst) => Err(Refusal { url: Some("https://example.com/pro".into()), pro: true }),
+        _ => Ok(()),
+    };
+    let test = start_hub_with(|config| config.connect_interval = 0, Some(Box::new(refuse_relay)), Router::new()).await;
+    let mut person = member(&test).await;
+    let devbox = connected_with_board(&test, &mut person).await;
+    let studio = connected_with_board(&test, &mut person).await;
+    studio.set_worker("macos").await.unwrap();
+    assert_eq!(refused_with(&test, &studio, "listen=true").await, (402, kebbie_hub_api::PRO_REQUIRED.to_string()), "a plan without the relay refuses the wait");
+    assert_eq!(refused_with(&test, &devbox, &format!("to={}", studio.machine)).await, (402, kebbie_hub_api::PRO_REQUIRED.to_string()), "and the ask");
+    refusing.store(false, Ordering::SeqCst);
+    let mut listening = open(&test, &studio, "listen=true").await.unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let (mut asker, mut answered) = linked(&test, &devbox, &studio, &mut listening).await;
+    asker.send(Message::Binary(b"hello".to_vec().into())).await.unwrap();
+    assert_eq!(binary(&mut answered).await.as_deref(), Some(b"hello".as_slice()));
+
+    let open_hub = start_hub(|config| config.connect_interval = 0).await;
+    assert!(!open_hub.hub.has_plans());
+    let mut person = member(&open_hub).await;
+    let devbox = connected_with_board(&open_hub, &mut person).await;
+    let studio = connected_with_board(&open_hub, &mut person).await;
+    studio.set_worker("linux").await.unwrap();
+    let mut listening = open(&open_hub, &studio, "listen=true").await.unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    linked(&open_hub, &devbox, &studio, &mut listening).await;
 }

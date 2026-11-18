@@ -79,6 +79,8 @@ pub enum Gated {
     Machine,
     Device,
     Notifications,
+    // A machine waiting for or asking for a link the hub relays between two machines of the account.
+    Relay,
 }
 
 // Called with the store locked, so a policy reads through the Store it is given and never calls Hub::store.
