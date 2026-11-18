@@ -1,6 +1,7 @@
 import { fromB64, verifyMachineList } from "../js/protocol.js";
-import { keepAccount, labelsOf, nameOf } from "./accounts.js";
+import { heldAccounts, keepAccount, labelsOf, liveAccounts, nameOf } from "./accounts.js";
 import { NoPasskeyOffered, signInWith } from "./signin.js";
+import * as deviceStore from "./store.js";
 import { keptUnlock, unlockAfter } from "./unlock.js";
 
 export const noPasskeyText = (name) => `This phone has no passkey for ${name}. Unlock ${name} here with a passkey that belongs to it, such as one saved in your password manager.`;
@@ -33,7 +34,7 @@ export async function keepAdded(store, calls, me, { emails = true } = {}) {
 // A session signed in without a passkey cannot read the boards, so an unlock kept from before stays unused.
 export const heldSession = async (me, store, now, storage) => (me.key_access === false ? null : await keptUnlock(me, store, now, storage)) ?? { state: "locked", me };
 
-async function passkeyIds(calls) {
+export async function passkeyIds(calls) {
   const listed = await calls.passkeys();
   return (listed?.passkeys ?? []).map((one) => one.passkey).filter((id) => typeof id === "string" && id);
 }
@@ -44,7 +45,16 @@ export async function addedStep(calls, held) {
   return { account: held.account, name: nameOf(held), offered };
 }
 
-export async function unlockHeld(hub, held, { remembered = null, storage, store, clock } = {}) {
+// The hub signed the other account in at the passkey, so its session ends here unless the phone holds that account.
+export async function refuseOther(calls, ceremony, wanted, name, held) {
+  const other = ceremony.signedIn?.account;
+  if (other === wanted) return;
+  ceremony.prf?.fill(0);
+  if (other && !liveAccounts(held).some((one) => one.account === other)) await calls.as?.(other).logout().catch(() => undefined);
+  throw new OtherAccount(name);
+}
+
+export async function unlockHeld(hub, held, { remembered = null, storage, store = deviceStore, clock } = {}) {
   const name = nameOf(held);
   const allow = await passkeyIds(hub.account);
   if (!remembered && !allow.length) throw new NoPasskeyHere(name);
@@ -54,10 +64,7 @@ export async function unlockHeld(hub, held, { remembered = null, storage, store,
   } catch (error) {
     throw error instanceof NoPasskeyOffered ? new NoPasskeyHere(name) : error;
   }
-  if (ceremony.signedIn.account !== held.account) {
-    ceremony.prf?.fill(0);
-    throw new OtherAccount(name);
-  }
+  await refuseOther(hub.account, ceremony, held.account, name, await heldAccounts(store));
   return unlockAfter(hub, ceremony, storage, store, clock);
 }
 

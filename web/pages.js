@@ -11,6 +11,7 @@ import { categoriesKey, deviceWord, failureLine, keptCategories, namesSendHere, 
 import { dropAccount, failureKey, forgetNotifyRecord, heldAccounts, keepAccount, keepNotifyRecord as recordNotify, labelsOf, liveAccounts, marksKey as marksOf, migrate, nameOf, notifyRecord, othersNotified } from "./accounts.js";
 import { addFirstPasskey, forgetCredential, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, stopNotifications, unlockAfter } from "./unlock.js";
 import { supported as passkeysSupported } from "./passkey.js";
+import { passkeyIds, refuseOther } from "./locked.js";
 import { accountScreen, authScreen, connectAccountPicker, connectScreen, deviceScreen, esc, githubErrorText, heading, nav, notificationsScreen, setupScreen, signupScreen } from "./screens.js";
 import { currentPlan, machineNeedsPro, placeSheet, proCard } from "./pro.js";
 import { address, codeScreen, connectEmailScreen, createPasskeyScreen, emailText, isAuthScreen, keyboardLift, signedInAs, typedCode } from "./email.js";
@@ -564,7 +565,14 @@ export function startPage(root, { showBoard = () => location.assign("/#/board"),
     state.busy = true;
     state.notice = null;
     draw();
-    const unlock = async () => settle(await signingIn.withPasskey(rememberedCredential(undefined, account.id ?? undefined), { connect: code }));
+    const chosen = state.me?.account ?? null;
+    const calls = account;
+    const unlock = async () => {
+      const allow = chosen ? await passkeyIds(calls).catch(() => null) : null;
+      const ceremony = await signingIn.withPasskey(rememberedCredential(undefined, chosen ?? account.id ?? undefined), { connect: code }, allow);
+      if (chosen) await refuseOther(calls, ceremony, chosen, nameOf(state.held.find((one) => one.account === chosen) ?? state.me), state.held);
+      return settle(ceremony);
+    };
     let unlocking = true;
     try {
       const result = await approveFromLink({

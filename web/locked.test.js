@@ -8,7 +8,7 @@ import { heldAccounts, unlockKey } from "./accounts.js";
 import { rememberCredential } from "./unlock.js";
 import { lockedAccounts } from "./screens.js";
 import { addedScreen } from "./email.js";
-import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, noPasskeyText, unlockHeld } from "./locked.js";
+import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, noPasskeyText, OtherAccount, unlockHeld } from "./locked.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -222,4 +222,18 @@ test("an added account with no passkey skips the step and says so", async () => 
   assert.equal(text(html), `kebbie hub ${step.name} is added. It has no passkey yet. Back to your boards`);
   assert.deepEqual(actions(html), [], "no prompt is offered that cannot succeed");
   await stillLocked(account, store);
+});
+
+test("a passkey of another account is refused before anything is kept, and that account's session ends unless the phone holds it", async () => {
+  const STRAY = "acc_0123456789abcdefghijzz";
+  for (const [held, ended] of [[[WORK], [STRAY]], [[WORK, { account: STRAY, colour: "teal" }], []]]) {
+    const ends = [];
+    const account = { ...workHub(), loginFinish: async () => ({ account: STRAY, handle: "other", key_access: true, key: null }), as: (id) => ({ logout: async () => void ends.push(id) }) };
+    const store = memoryStore();
+    await store.put("accounts", held);
+    await assert.rejects(unlockHeld({ account, credentials: authenticator() }, WORK, { storage: storage(), store }), (error) => error instanceof OtherAccount && error.message === "That passkey belongs to another account than Work. Nothing changed.");
+    assert.deepEqual(ends, ended);
+    assert.equal(await store.get(unlockKey(STRAY)), undefined);
+    assert.deepEqual((await heldAccounts(store)).map((one) => one.account), held.map((one) => one.account), "the other account is not adopted");
+  }
 });
