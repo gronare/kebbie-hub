@@ -99,3 +99,15 @@ export function signUpText(error) {
   if (error?.name === "InvalidStateError") return "This device already holds a passkey for this hub. Sign in instead.";
   return null;
 }
+
+// GitHub's callback is a cross-site navigation that carries no SameSite=Strict session, so the hub keeps the other accounts' sessions only when this same-origin call finishes the sign-in.
+export async function finishGitHub(account, where = globalThis.location, past = globalThis.history) {
+  const params = new URLSearchParams(where.search);
+  if (params.get("github") !== "signed-in") return null;
+  params.delete("github");
+  const finished = await account.finishGitHub().catch(() => null);
+  if (!finished?.account) params.set("github_error", "expired");
+  else if (where.pathname !== "/") params.set("account", finished.account);
+  past.replaceState(null, "", `${where.pathname}?${params}${where.hash}`.replace(/\?(?=#|$)/, ""));
+  return finished?.account ?? null;
+}

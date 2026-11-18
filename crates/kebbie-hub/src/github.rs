@@ -18,7 +18,7 @@ use webauthn_rs::prelude::{Url, Uuid};
 use crate::account::{
     ACCOUNT_PREFIX, checked_ticket, connect_ticket, generated_handle, new_id, session_set_cookie_beside,
 };
-use crate::auth::{Anonymous, SESSION_TOKEN_PREFIX, digest, new_token, random, selected_session, wanted_account};
+use crate::auth::{Anonymous, SESSION_TOKEN_PREFIX, SameOrigin, digest, new_token, random, selected_session, wanted_account};
 use crate::error::ApiError;
 use crate::store::{Access, Ceremony, KeylessSignUp, Purpose, SignUpOutcome, Ticket};
 use crate::{Hub, clean_name, now};
@@ -32,6 +32,7 @@ const EMAIL_SCOPE: &str = "read:user user:email";
 const MAX_NEXT_LEN: usize = 512;
 const GITHUB_TIMEOUT: Duration = Duration::from_secs(10);
 const PURPOSES: [Purpose; 3] = [Purpose::GitHub, Purpose::GitHubConnect, Purpose::GitHubLink];
+const FINISH_TTL: u64 = 60;
 
 #[derive(Clone)]
 pub struct Secret(String);
@@ -245,9 +246,13 @@ pub fn safe_next(next: Option<&str>) -> String {
     .to_string()
 }
 
-fn with_error(next: &str, code: &str) -> String {
+fn with_param(next: &str, name: &str, value: &str) -> String {
     let joiner = if next.contains('?') { '&' } else { '?' };
-    format!("{next}{joiner}github_error={code}")
+    format!("{next}{joiner}{name}={value}")
+}
+
+fn with_error(next: &str, code: &str) -> String {
+    with_param(next, "github_error", code)
 }
 
 fn state_cookie_name(hub: &Hub) -> &'static str {
@@ -395,11 +400,9 @@ pub async fn callback(
         return Ok(redirect(&with_error("/", "expired"), &[cleared]));
     };
     let pending: Pending = serde_json::from_str(&ceremony.state).map_err(|_| ApiError::internal())?;
-    let same_browser = state_cookie(&hub, &headers)
-        .is_some_and(|cookie| URL_SAFE_NO_PAD.encode(digest(cookie)) == pending.browser);
-    if !same_browser {
+    let Some(browser) = state_cookie(&hub, &headers).filter(|cookie| URL_SAFE_NO_PAD.encode(digest(cookie)) == pending.browser) else {
         return Ok(redirect(&with_error(&pending.next, "expired"), &[cleared]));
-    }
+    };
     if let Some(error) = &callback.error {
         let code = if error == "access_denied" { "denied" } else { "failed" };
         return Ok(redirect(&with_error(&pending.next, code), &[cleared]));
@@ -424,8 +427,19 @@ pub async fn callback(
                 hub.verified_email(&account, email);
             }
             hub.store().log(now(), "account.logged-in", None, Some(&format!("{account} via=github")))?;
-            let cookie = session_set_cookie_beside(&hub, &headers, &account, &session)?;
-            redirect(&pending.next, &[cleared, cookie])
+            hub.store().save_ceremony(&Ceremony {
+                id_hash: digest(browser),
+                purpose: Purpose::GitHubFinish,
+                account: Some(account),
+                handle: None,
+                user_handle: None,
+                invite_hash: None,
+                state: session,
+                expires_at: now() + FINISH_TTL,
+                prf_salt: None,
+            })?;
+            let kept = state_set_cookie(&hub, browser, FINISH_TTL);
+            redirect(&with_param(&pending.next, "github", "signed-in"), &[kept])
         }
         Outcome::Linked(account) => {
             if let Some(email) = &user.email {
@@ -436,6 +450,32 @@ pub async fn callback(
         }
         Outcome::Refused(code) => redirect(&with_error(&pending.next, code), &[cleared]),
     })
+}
+
+// The callback is a cross-site navigation that carries no SameSite=Strict session, so the app finishes the sign-in by a same-origin call that does, keeping the sessions held beside it.
+pub async fn finish(
+    State(hub): State<Arc<Hub>>,
+    _: SameOrigin,
+    client: Anonymous,
+    headers: HeaderMap,
+) -> Result<Response, ApiError> {
+    hub.limit_anonymous(&client.address)?;
+    let ceremony = match state_cookie(&hub, &headers) {
+        Some(browser) => hub.store().take_ceremony(&digest(browser), &[Purpose::GitHubFinish], now())?,
+        None => None,
+    };
+    let Some(Ceremony { account: Some(account), state: session, .. }) = ceremony else {
+        return Err(ApiError::unauthorized());
+    };
+    let cookie = session_set_cookie_beside(&hub, &headers, &account, &session)?;
+    let mut response = Response::new(Body::from(serde_json::json!({ "account": account }).to_string()));
+    let answer = response.headers_mut();
+    answer.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    answer.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    for set in [state_set_cookie(&hub, "", 0), cookie] {
+        answer.append(SET_COOKIE, HeaderValue::from_str(&set).map_err(|_| ApiError::internal())?);
+    }
+    Ok(response)
 }
 
 fn link(hub: &Hub, account: Option<&str>, user: &GitHubUser) -> Result<Outcome, ApiError> {

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { HubError } from "./hub.js";
-import { autofillAvailable, expectAccount, NoPasskeyOffered, signInText, signInWith, signUpText, WrongAccount } from "./signin.js";
+import { autofillAvailable, expectAccount, finishGitHub, NoPasskeyOffered, signInText, signInWith, signUpText, WrongAccount } from "./signin.js";
 import { keepAccount, returningTo, signInAgainHref } from "./accounts.js";
 import { emailSignInScreen, passkeySignInScreen, signedOutStep } from "./email.js";
 import { rememberCredential, rememberedCredential } from "./unlock.js";
@@ -196,3 +196,27 @@ function memoryStore() {
   const map = new Map();
   return { getItem: (key) => map.get(key) ?? null, setItem: (key, value) => map.set(key, String(value)) };
 }
+
+test("a GitHub sign-in finishes by one same-origin call, which takes the marker off the address and names the account on a page", async () => {
+  const finishing = (answer) => {
+    const calls = [];
+    return { calls, finishGitHub: async () => (calls.push("finish"), answer instanceof Error ? Promise.reject(answer) : answer) };
+  };
+  const replaced = [];
+  const past = { replaceState: (_, __, url) => replaced.push(url) };
+  const where = (url) => new URL(`http://hub.test${url}`);
+
+  const home = finishing({ account: "acc_work" });
+  assert.equal(await finishGitHub(home, where("/?github=signed-in"), past), "acc_work");
+  assert.deepEqual(home.calls, ["finish"]);
+  const page = finishing({ account: "acc_work" });
+  assert.equal(await finishGitHub(page, where("/connect?code=K7QF-M2XD&github=signed-in"), past), "acc_work");
+  const spent = finishing(new HubError(401, "unauthorized"));
+  assert.equal(await finishGitHub(spent, where("/?github=signed-in"), past), null);
+  assert.deepEqual(replaced, ["/", "/connect?code=K7QF-M2XD&account=acc_work", "/?github_error=expired"]);
+
+  const plain = finishing({ account: "acc_work" });
+  assert.equal(await finishGitHub(plain, where("/?next=%2Faccount"), past), null);
+  assert.deepEqual(plain.calls, [], "an address without the marker calls nothing");
+  assert.equal(replaced.length, 3);
+});

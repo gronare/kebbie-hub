@@ -2498,6 +2498,7 @@ pub enum Purpose {
     GitHub,
     GitHubConnect,
     GitHubLink,
+    GitHubFinish,
 }
 
 impl Purpose {
@@ -2510,6 +2511,7 @@ impl Purpose {
             Purpose::GitHub => "github",
             Purpose::GitHubConnect => "github-connect",
             Purpose::GitHubLink => "github-link",
+            Purpose::GitHubFinish => "github-finish",
         }
     }
 
@@ -2522,6 +2524,7 @@ impl Purpose {
             Purpose::GitHub,
             Purpose::GitHubConnect,
             Purpose::GitHubLink,
+            Purpose::GitHubFinish,
         ]
             .into_iter()
             .find(|purpose| purpose.name() == name)

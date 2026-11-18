@@ -52,6 +52,7 @@ function accountCalls(id) {
     boards: () => on("GET", "/v1/a/boards"),
     blob: (blob) => bytes(`/v1/a/blobs/${query(blob)}`, id),
     removeGitHub: () => on("DELETE", "/v1/a/github"),
+    finishGitHub: () => call("POST", "/v1/a/github/finish", { body: {} }),
     email: () => on("GET", "/v1/a/email"),
     setEmail: (email) => on("PUT", "/v1/a/email", { email }),
     removeEmail: () => on("DELETE", "/v1/a/email"),

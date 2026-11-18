@@ -4,7 +4,7 @@ import { answerableQuestions, answers, answerSents, answersToSend, answersWithLe
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
 import { connectText, listWithout, onwardTo, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
-import { autofillAvailable, expectAccount, signInText, signInWith } from "./signin.js";
+import { autofillAvailable, expectAccount, finishGitHub, signInText, signInWith } from "./signin.js";
 import { account, HubError, scoped } from "./hub.js";
 import * as deviceStore from "./store.js";
 import { allowsChanges, collectResults, CommandProblem, ensureDevice, forgetDevice, keepSent, loadDevice, loadSent, sendCommand } from "./device.js";
@@ -2697,6 +2697,8 @@ function watchSlot(slot) {
 }
 
 async function start() {
+  const finished = await finishGitHub(account);
+  if (finished) await keepAccount(deviceStore, finished, { signedOut: false }).catch(() => undefined);
   if (pageMode) return startPage(root, { showBoard });
   if (!cryptoReady()) return render();
   showHint();

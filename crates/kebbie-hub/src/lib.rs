@@ -714,6 +714,7 @@ pub fn router_with(hub: Arc<Hub>, extra: Router<Arc<Hub>>) -> Router {
         .route("/v1/hub", get(account::hub_info))
         .route("/auth/github", get(github::start))
         .route("/auth/github/callback", get(github::callback))
+        .route("/v1/a/github/finish", post(github::finish))
         .route("/v1/a/github", delete(account::remove_github))
         .route("/v1/m/join", post(machine::join))
         .route("/v1/m/connect", post(connect::start))

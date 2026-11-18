@@ -75,7 +75,7 @@ test("every call under /v1/a/ names the account it was scoped to, and the sign-i
   };
   try {
     const work = scoped("acc_work");
-    const skip = new Set(["id", "hub", "registerBegin", "registerFinish", "loginBegin", "loginFinish", "askCode", "enterCode", "peek"]);
+    const skip = new Set(["id", "hub", "registerBegin", "registerFinish", "loginBegin", "loginFinish", "finishGitHub", "askCode", "enterCode", "peek"]);
     for (const calls of [work.account, work.connectCalls]) {
       for (const [name, method] of Object.entries(calls)) {
         if (name === "id" || name === "as") continue;

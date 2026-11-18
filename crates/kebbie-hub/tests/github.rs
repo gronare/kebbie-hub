@@ -170,6 +170,7 @@ struct Hop {
     location: String,
     cookies: Vec<String>,
     seen: String,
+    finished: Option<Box<Hop>>,
 }
 
 fn cookie_pair(cookies: &[String], name: &str) -> Option<String> {
@@ -209,12 +210,24 @@ impl GitHubBrowser {
         }
     }
 
+    // The callback arrives from github.com, a cross-site navigation, so the SameSite=Strict session cookie stays behind as in a real browser.
     async fn visit(&mut self, path: &str) -> Hop {
-        let cookies: Vec<String> = [self.state.clone(), self.session.clone()]
-            .into_iter()
-            .flatten()
-            .collect();
-        let mut request = self.http.get(format!("{}{path}", self.hub));
+        let session = if path.starts_with("/auth/github/callback") { None } else { self.session.clone() };
+        let request = self.http.get(format!("{}{path}", self.hub));
+        self.send(request, session).await
+    }
+
+    async fn finish(&mut self) -> Hop {
+        let request = self
+            .http
+            .post(format!("{}/v1/a/github/finish", self.hub))
+            .header("origin", "http://localhost:8470");
+        let session = self.session.clone();
+        self.send(request, session).await
+    }
+
+    async fn send(&mut self, mut request: reqwest::RequestBuilder, session: Option<String>) -> Hop {
+        let cookies: Vec<String> = [self.state.clone(), session].into_iter().flatten().collect();
         if !cookies.is_empty() {
             request = request.header("cookie", cookies.join("; "));
         }
@@ -246,6 +259,7 @@ impl GitHubBrowser {
             location,
             cookies: set,
             seen,
+            finished: None,
         }
     }
 
@@ -256,10 +270,13 @@ impl GitHubBrowser {
     }
 
     async fn come_back(&mut self, code: &str, state: &str) -> Hop {
-        let hop = self
+        let mut hop = self
             .visit(&format!("/auth/github/callback?code={code}&state={state}"))
             .await;
         assert_eq!(hop.status, 303, "{}", hop.seen);
+        if hop.location.contains("github=signed-in") {
+            hop.finished = Some(Box::new(self.finish().await));
+        }
         hop
     }
 
@@ -301,8 +318,11 @@ async fn a_github_account_signs_in_by_its_id_with_the_session_cookie_rules() {
     assert!(state_cookie.contains("Max-Age=300"), "{state_cookie}");
     let (code, state) = github.approve(&started.location, 4242, "octocat-renamed");
     let back = elsewhere.come_back(&code, &state).await;
-    assert_eq!(back.location, "/");
-    let session = back
+    assert_eq!(back.location, "/?github=signed-in");
+    assert_eq!(cookie_pair(&back.cookies, "kebbie_session"), None, "the session waits for the app's same-origin call");
+    let finished = back.finished.as_ref().expect("the app finishes the sign-in");
+    assert_eq!(finished.status, 200, "{}", finished.seen);
+    let session = finished
         .cookies
         .iter()
         .find(|cookie| cookie.starts_with("kebbie_session="))
@@ -312,9 +332,10 @@ async fn a_github_account_signs_in_by_its_id_with_the_session_cookie_rules() {
         "{session}"
     );
     assert!(
-        back.cookies.iter().any(|cookie| cookie.starts_with("kebbie_github=;") && cookie.contains("Max-Age=0")),
+        finished.cookies.iter().any(|cookie| cookie.starts_with("kebbie_github=;") && cookie.contains("Max-Age=0")),
         "the state cookie is cleared"
     );
+    assert_eq!(elsewhere.finish().await.status, 401, "the finish is spent once");
     let signed_in: AccountView = elsewhere.browser(&test).account().await.unwrap();
     assert_eq!(signed_in.account, view.account);
     assert_eq!(signed_in.github.as_deref(), Some("octocat-renamed"));
@@ -331,7 +352,7 @@ async fn github_signs_up_from_a_pending_connect_and_a_passkey_then_makes_the_key
     let back = arriving
         .through_github(&github, &format!("?connect={code}&next={}", urlencode(&next)), 77, "newcomer")
         .await;
-    assert_eq!(back.location, next);
+    assert_eq!(back.location, format!("{next}&github=signed-in"));
     let mut person = arriving.browser(&test);
     let created = person.account().await.unwrap();
     assert!(!created.owner);
@@ -439,7 +460,7 @@ async fn an_invite_hub_makes_no_github_account_without_a_ticket() {
     let welcomed = invited
         .through_github(&github, &format!("?invite={invite}"), 901, "invited")
         .await;
-    assert_eq!(welcomed.location, "/");
+    assert_eq!(welcomed.location, "/?github=signed-in");
     let made = invited.browser(&test).account().await.unwrap();
     assert!(!made.owner);
     assert_eq!(created_via(&test, &made.account).as_deref(), Some("invite"));
@@ -507,7 +528,7 @@ async fn a_github_state_is_spent_once_and_only_by_the_browser_it_was_given_to() 
     let started = person.start("").await;
     let (code, state) = github.approve(&started.location, 5, "five");
     let back = person.come_back(&code, &state).await;
-    assert_eq!(back.location, "/");
+    assert_eq!(back.location, "/?github=signed-in");
     assert!(person.session.is_some());
     person.session = None;
     person.state = cookie_pair(&started.cookies, "kebbie_github");
@@ -643,7 +664,7 @@ async fn a_hub_with_default_flags_never_asks_for_email_nor_stores_one() {
         .through_github(&github, "?link=1&next=/account", 31, "linker")
         .await;
     let back = GitHubBrowser::new(&test).through_github(&github, "", 31, "linker").await;
-    assert_eq!(back.location, "/");
+    assert_eq!(back.location, "/?github=signed-in");
     assert_eq!(github.email_reads(), 0, "the hub never read /user/emails");
     let refused = browser(&test).get::<Value>("/v1/a/email").await.unwrap_err();
     assert_eq!(refused.status(), Some(404));
@@ -707,7 +728,7 @@ async fn an_embedder_that_keeps_email_gets_the_verified_primary_address_from_git
 
     github.set_emails(vec![json!({"email": "unconfirmed@example.com", "primary": true, "verified": false, "visibility": null})]);
     let back = GitHubBrowser::new(&test).through_github(&github, "", 51, "ada").await;
-    assert_eq!(back.location, "/", "an unverified address still signs in");
+    assert_eq!(back.location, "/?github=signed-in", "an unverified address still signs in");
     assert_eq!(kept.lock().unwrap().len(), 2, "an unverified address is not handed over");
     assert_eq!(github.email_reads(), 3);
 }
@@ -730,4 +751,27 @@ async fn linking_github_from_a_browser_with_two_accounts_links_only_the_account_
     assert_eq!(named.location, "/account");
     assert_eq!(work.account().await.unwrap().github.as_deref(), Some("at-work"));
     assert_eq!(home.account().await.unwrap().github, None);
+}
+
+#[tokio::test]
+async fn a_github_sign_in_keeps_the_other_accounts_signed_in_in_a_browser_that_sends_no_session_on_the_callback() {
+    let github = fake_github().await;
+    let test = github_hub(&github, |_| {}).await;
+    let mut home = member(&test).await;
+    let home_id = home.account().await.unwrap().account;
+    let invite = test.hub.mint_invite().unwrap();
+    let mut made = GitHubBrowser::new(&test);
+    made.through_github(&github, &format!("?invite={invite}"), 610, "worker").await;
+    let work_id = made.browser(&test).account().await.unwrap().account;
+
+    let mut both = GitHubBrowser::signed_in_as(&test, &home);
+    let back = both.through_github(&github, "", 610, "worker").await;
+    assert_eq!(back.location, "/?github=signed-in");
+    assert_eq!(back.finished.as_ref().unwrap().status, 200);
+    let mut person = both.browser(&test);
+    person.account_header = Some(home_id.clone());
+    assert_eq!(person.account().await.unwrap().account, home_id, "the passkey account stays signed in");
+    person.account_header = Some(work_id.clone());
+    assert_eq!(person.account().await.unwrap().account, work_id, "the GitHub account is signed in beside it");
+    assert_eq!(home.account().await.unwrap().account, home_id);
 }
