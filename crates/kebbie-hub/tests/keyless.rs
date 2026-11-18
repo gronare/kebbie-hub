@@ -179,3 +179,26 @@ async fn a_first_passkey_lifts_the_session_of_the_account_it_was_added_to_when_t
     arriving.add_passkey().await.unwrap();
     assert!(arriving.account().await.unwrap().key_access);
 }
+
+#[tokio::test]
+async fn an_email_sign_in_to_an_account_held_with_its_key_keeps_the_key_session_and_ends_the_other() {
+    let test = embedding_hub(true).await;
+    let mut person = member(&test).await;
+    let me = person.account().await.unwrap().account;
+    let token = |cookie: &Option<String>| cookie.clone().unwrap().split_once('=').unwrap().1.to_string();
+    let held = token(&person.cookie);
+    let sessions = rows(&test, "sessions");
+    person.post::<_, AccountView>("/test/proven-beside", &json!({ "account": me })).await.unwrap();
+    assert_eq!(token(&person.cookie), held, "the passkey session stays in the cookie");
+    assert!(person.account().await.unwrap().key_access);
+    assert_eq!(rows(&test, "sessions"), sessions, "the keyless session it would have replaced it with is ended");
+
+    let mut keyless = keyless_session(&test, &me).await;
+    let replaced = token(&keyless.cookie);
+    keyless.post::<_, AccountView>("/test/proven-beside", &json!({ "account": me })).await.unwrap();
+    assert_ne!(token(&keyless.cookie), replaced);
+    assert_eq!(token(&keyless.cookie).split('.').count(), 1);
+    assert_eq!(rows(&test, "sessions"), sessions + 1, "the replaced keyless token is ended");
+    keyless.cookie = Some(format!("kebbie_session={replaced}"));
+    assert_eq!(status_of(keyless.account().await), 401);
+}

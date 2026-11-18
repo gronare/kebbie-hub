@@ -93,8 +93,21 @@ pub(crate) fn session_set_cookie(hub: &Hub, token: &str, max_age: u64) -> String
     format!("{name}={token}; Path=/; Max-Age={max_age}; HttpOnly;{secure} SameSite=Strict")
 }
 
+// One session per account in the cookie: a keyless sign-in to an account the browser holds with its key keeps the held session, and whichever token loses is ended.
 pub fn session_set_cookie_beside(hub: &Hub, headers: &HeaderMap, account: &str, token: &str) -> Result<String, ApiError> {
     let held = held_sessions(hub, headers)?;
+    let store = hub.store();
+    let fresh = store.session(&digest(token), now())?;
+    let keyed = held.iter().find(|one| one.session.account == account && one.session.access == Access::Key);
+    let kept = match (keyed, fresh) {
+        (Some(keyed), Some(fresh)) if fresh.access == Access::AccountOnly => keyed.token,
+        _ => token,
+    };
+    let same: Vec<&str> = held.iter().filter(|one| one.session.account == account).map(|one| one.token).chain([token]).collect();
+    for ended in same.into_iter().filter(|one| *one != kept) {
+        store.end_session(&digest(ended))?;
+    }
+    drop(store);
     let mut tokens: Vec<&str> = Vec::new();
     let mut accounts: Vec<&str> = vec![account];
     for one in &held {
@@ -103,7 +116,7 @@ pub fn session_set_cookie_beside(hub: &Hub, headers: &HeaderMap, account: &str, 
             tokens.push(one.token);
         }
     }
-    tokens.push(token);
+    tokens.push(kept);
     Ok(session_set_cookie(hub, &joined_tokens(&tokens), hub.config().session_ttl))
 }
 
