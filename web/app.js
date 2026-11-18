@@ -3,7 +3,7 @@ import { markdown } from "./markdown.js";
 import { answerableQuestions, answers, answerSents, answersToSend, answersWithLead, keepDrafts, keepMain, keyAt, bodyShown, readDrafts, readMain, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, backlogList, draftOf, filledAnswers, sendAllLabel, backlogView, foundStatus, chip, chooseMachine, ideaMachine, isFound, cleanEdit, editProblem, editReady, entryHref, ideaEntries, ideaForm, itemBody, listAction, mergeBacklog, mergedInto, needsYouCount, startCommand, startedEntry, startRepo, newStartStatus, startsAnyway } from "./backlog.js";
 import { cleared, keepFind, loadFind, pacer, textsOf, toggled } from "./find.js";
 import { arrange, asksYou, emptyMarks, findTask, isAsleep, mergeMarks, openBoards, readMarks, shownQuestion } from "./board.js";
-import { connectText, listWithout, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
+import { connectText, listWithout, onwardTo, PairingFailed, publishList, safeNext, withReauth } from "./connect.js";
 import { autofillAvailable, expectAccount, signInText, signInWith } from "./signin.js";
 import { account, HubError, scoped } from "./hub.js";
 import * as deviceStore from "./store.js";
@@ -2721,7 +2721,7 @@ async function start() {
     return render();
   }
   state.me = await signedInHeld(held);
-  if (state.me && onward) return location.assign(onward);
+  if (state.me && onward) return location.assign(await onwardTo(onward, async (id) => id === state.me.account || Boolean(await signedInAccount(scoped(id).account, deviceStore, id))));
   if (state.me) state.held = await migrate({ get, put, del }, state.me.account).catch(() => held);
   if (state.me) slotFor(state.me.account);
   const address = state.me ? await remember(state.me) : null;

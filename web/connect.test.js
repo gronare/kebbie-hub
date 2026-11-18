@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, fromB64, machineListTrusts, verifyMachineList } from "../js/protocol.js";
-import { approveFromLink, connectBlock, connectCommitment, finishConnect, forgetFragment, keptFragment, PairingFailed, parseConnectFragment, safeNext, signedInDestination, unlockFailedText, withReauth } from "./connect.js";
+import { approveFromLink, connectBlock, connectCommitment, finishConnect, forgetFragment, keptFragment, onwardTo, PairingFailed, parseConnectFragment, safeNext, signedInDestination, unlockFailedText, withReauth } from "./connect.js";
 import { HubError } from "./hub.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
@@ -186,4 +186,12 @@ test("a signed-in visitor of the sign-up page goes on to where they came from, k
   assert.equal(signedInDestination("/signup", at("")), "/", "no next goes to the board");
   assert.equal(signedInDestination("/signup", at("next=//evil.example")), "/", "never off the hub");
   for (const path of ["/connect", "/account", "/setup"]) assert.equal(signedInDestination(path, at("code=ABCD-EFGH")), null, `${path} stays where it is`);
+});
+
+test("a billing link that names an account this browser is not signed in to goes to that account's sign-in instead of looping", async () => {
+  const signedIn = (ids) => async (id) => ids.includes(id);
+  const checkout = "/v1/a/billing/checkout?account=acc_work";
+  assert.equal(await onwardTo(checkout, signedIn(["acc_home", "acc_work"])), checkout);
+  assert.equal(await onwardTo(checkout, signedIn(["acc_home"])), "/?add=acc_work");
+  assert.equal(await onwardTo("/v1/a/billing/checkout", signedIn([])), "/v1/a/billing/checkout", "a link naming no account goes on");
 });

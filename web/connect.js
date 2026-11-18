@@ -32,6 +32,12 @@ export function safeNext(value) {
   return typeof value === "string" && /^\/(?![/\\])/.test(value) ? value : null;
 }
 
+// A next path that names an account this browser is not signed in to goes to that account's sign-in instead: the hub would only send it back here again.
+export async function onwardTo(next, isSignedIn) {
+  const named = new URL(next, "https://hub.invalid").searchParams.get("account");
+  return !named || (await isSignedIn(named)) ? next : `/?add=${encodeURIComponent(named)}`;
+}
+
 export function signedInDestination(path, params) {
   return path === "/signup" ? (safeNext(params.get("next")) ?? "/") : null;
 }
