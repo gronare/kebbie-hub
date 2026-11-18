@@ -171,6 +171,12 @@ pub struct Config {
     pub relay_max_bytes: u64,
     pub relay_idle: Duration,
     pub relay_answer_wait: Duration,
+    // Relay WebSockets across the hub, outside max_connections once upgraded.
+    pub relay_max_sockets: usize,
+    pub relay_send_wait: Duration,
+    pub relay_ping: Duration,
+    // How often an open link or wait checks that its machines are still on the account.
+    pub relay_check: Duration,
 }
 
 impl Config {
@@ -242,6 +248,10 @@ impl Config {
             relay_max_bytes: 4 * 1024 * 1024 * 1024,
             relay_idle: Duration::from_secs(3_600),
             relay_answer_wait: Duration::from_secs(10),
+            relay_max_sockets: 1024,
+            relay_send_wait: Duration::from_secs(30),
+            relay_ping: Duration::from_secs(30),
+            relay_check: Duration::from_secs(60),
         }
     }
 
@@ -447,7 +457,7 @@ impl Hub {
             github,
             origin,
             feeds: Mutex::new(HashMap::new()),
-            relay: link::Relay::default(),
+            relay: link::Relay::new(config.relay_max_sockets),
             plans: hooks.plans,
             account_email: hooks.account_email,
             email_sign_in: hooks.email_sign_in,
@@ -470,6 +480,14 @@ impl Hub {
 
     pub fn open_links(&self, account: &str) -> usize {
         self.relay.open_links(account)
+    }
+
+    pub fn relay_sockets(&self) -> usize {
+        self.relay.open_sockets(self.config.relay_max_sockets)
+    }
+
+    pub fn relay_rings_waiting(&self) -> usize {
+        self.relay.waiting_count()
     }
 
     pub fn open_feeds(&self, account: &str) -> usize {

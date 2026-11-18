@@ -192,3 +192,132 @@ async fn the_relay_passes_the_plans_gate_and_with_no_plans_it_is_open() {
     tokio::time::sleep(Duration::from_millis(50)).await;
     linked(&open_hub, &devbox, &studio, &mut listening).await;
 }
+
+fn ended(test: &TestHub) -> Vec<String> {
+    test.hub.store().events().unwrap().into_iter().filter(|(kind, _)| kind == "link.relayed").filter_map(|(_, detail)| detail?.split("ended=").nth(1).map(str::to_string)).collect()
+}
+
+async fn until(what: &str, mut done: impl FnMut() -> bool) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !done() {
+        assert!(std::time::Instant::now() < deadline, "{what}");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+async fn pair(test: &TestHub) -> (MachineState, MachineState, Socket) {
+    let mut person = member(test).await;
+    let devbox = connected_with_board(test, &mut person).await;
+    let studio = connected_with_board(test, &mut person).await;
+    studio.set_worker("macos").await.unwrap();
+    let listening = open(test, &studio, "listen=true").await.unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    (devbox, studio, listening)
+}
+
+#[tokio::test]
+async fn a_peer_that_stops_reading_ends_its_link_and_frees_its_place() {
+    let test = start_hub(|config| {
+        config.connect_interval = 0;
+        config.relay_send_wait = Duration::from_millis(200);
+    })
+    .await;
+    let (devbox, studio, mut listening) = pair(&test).await;
+    let (mut asker, _stalled) = linked(&test, &devbox, &studio, &mut listening).await;
+    let account = devbox_account(&test, &devbox);
+    let flooding = tokio::spawn(async move {
+        for _ in 0..256 {
+            if asker.send(Message::Binary(vec![0u8; 1024 * 1024].into())).await.is_err() {
+                break;
+            }
+        }
+    });
+    until("a worker that reads nothing stalls the link until the hub ends it", || ended(&test).contains(&"stalled".to_string())).await;
+    assert_eq!(test.hub.open_links(&account), 0);
+    flooding.abort();
+}
+
+#[tokio::test]
+async fn only_relayed_bytes_keep_a_link_open_and_a_text_message_ends_it() {
+    let test = start_hub(|config| {
+        config.connect_interval = 0;
+        config.relay_idle = Duration::from_millis(300);
+    })
+    .await;
+    let (devbox, studio, mut listening) = pair(&test).await;
+    let (mut asker, _answered) = linked(&test, &devbox, &studio, &mut listening).await;
+    for _ in 0..8 {
+        let _ = asker.send(Message::Ping(Vec::new().into())).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_eq!(ended(&test), ["idle"], "pings are not traffic");
+    let (mut asker, mut answered) = linked(&test, &devbox, &studio, &mut listening).await;
+    asker.send(Message::Text("hello".into())).await.unwrap();
+    assert_eq!(binary(&mut answered).await, None);
+    until("a text message ends the link", || ended(&test).len() == 2).await;
+    assert_eq!(ended(&test)[1], "text");
+}
+
+#[tokio::test]
+async fn an_asker_that_leaves_during_the_ring_leaves_no_waiting_session() {
+    let test = start_hub(|config| {
+        config.connect_interval = 0;
+        config.relay_answer_wait = Duration::from_secs(5);
+    })
+    .await;
+    let (devbox, studio, mut listening) = pair(&test).await;
+    let query = format!("to={}", studio.machine);
+    let (url, token) = (test.url.clone(), devbox.token().to_string());
+    let asking = tokio::spawn(async move {
+        let mut request = format!("{}/v1/m/link?{query}", url.replace("http://", "ws://")).into_client_request().unwrap();
+        request.headers_mut().insert("authorization", format!("Bearer {token}").parse().unwrap());
+        tokio_tungstenite::connect_async(request).await.map(|(socket, _)| socket)
+    });
+    let (session, _) = ring(&mut listening).await;
+    assert_eq!(test.hub.relay_rings_waiting(), 1);
+    asking.abort();
+    until("the hub forgets the ring of an asker that is gone", || test.hub.relay_rings_waiting() == 0).await;
+    assert_eq!(open(&test, &studio, &format!("accept={session}")).await.err(), Some(404));
+}
+
+#[tokio::test]
+async fn removing_a_machine_ends_its_link_and_its_wait() {
+    let test = start_hub(|config| {
+        config.connect_interval = 0;
+        config.relay_check = Duration::from_millis(100);
+    })
+    .await;
+    let (devbox, studio, mut listening) = pair(&test).await;
+    let (_asker, mut answered) = linked(&test, &devbox, &studio, &mut listening).await;
+    assert!(test.hub.store().remove_machine(&devbox.machine).unwrap());
+    assert_eq!(binary(&mut answered).await, None, "the link of a removed asker ends");
+    until("the link is logged as removed", || ended(&test) == ["removed"]).await;
+    assert!(test.hub.store().remove_machine(&studio.machine).unwrap());
+    assert_eq!(binary(&mut listening).await, None, "and a removed worker's wait ends");
+}
+
+#[tokio::test]
+async fn a_waiting_worker_that_answers_no_pings_is_let_go() {
+    let test = start_hub(|config| {
+        config.connect_interval = 0;
+        config.relay_ping = Duration::from_millis(100);
+    })
+    .await;
+    let (devbox, studio, _silent) = pair(&test).await;
+    assert_eq!(test.hub.relay_sockets(), 1);
+    until("a wait that misses two pings ends", || test.hub.relay_sockets() == 0).await;
+    assert_eq!(open(&test, &devbox, &format!("to={}", studio.machine)).await.err(), Some(409));
+}
+
+#[tokio::test]
+async fn the_relay_holds_at_most_its_sockets_across_the_hub() {
+    let test = start_hub(|config| {
+        config.connect_interval = 0;
+        config.relay_max_sockets = 1;
+    })
+    .await;
+    let (devbox, studio, _listening) = pair(&test).await;
+    devbox.set_worker("linux").await.unwrap();
+    assert_eq!(open(&test, &devbox, "listen=true").await.err(), Some(503));
+    assert_eq!(open(&test, &devbox, &format!("to={}", studio.machine)).await.err(), Some(503));
+}
