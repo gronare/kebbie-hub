@@ -22,9 +22,19 @@ test("each machine resolves to the account that holds it, so its commands go out
 test("the merged view tags every machine with its account and keeps each account's sent commands", () => {
   const view = merged(unlockedOf(two(), (slot) => slot.session));
   assert.deepEqual(view.opened.map((one) => [one.account, one.machine]), [["acc_home", "mch_devbox"], ["acc_work", "mch_laptop"]]);
-  assert.deepEqual([...view.keys.keys()], ["mch_devbox", "mch_laptop"]);
+  assert.equal(Object.hasOwn(view, "keys"), false, "keys stay with their account, never merged where one list could shadow another");
   assert.deepEqual(view.kept.sent.map((one) => one.id), ["cmd_1", "cmd_2"]);
   assert.equal(view.allowed, true);
   assert.equal(view.fetchedAt, 90);
-  assert.deepEqual(merged([]), { opened: [], keys: new Map(), kept: { cursor: 0, sent: [] }, offline: false, fetchedAt: null, allowed: false });
+  assert.deepEqual(merged([]), { opened: [], kept: { cursor: 0, sent: [] }, offline: false, fetchedAt: null, allowed: false });
+});
+
+test("a machine another account's list also names stays with the account whose boards hold it, whichever slot comes first", () => {
+  const slots = two();
+  const work = slots.get("acc_work");
+  work.keys = new Map([...work.keys, ["mch_devbox", "work's keys for the same id"]]);
+  const open = [work, slots.get("acc_home")];
+  assert.equal(holderOf(open, "mch_devbox").id, "acc_home");
+  assert.equal(holderOf(open, "mch_devbox").keys.get("mch_devbox"), "home keys");
+  assert.equal(holderOf([work], "mch_devbox").id, "acc_work", "a machine only a signed list names still belongs to that account");
 });

@@ -39,7 +39,7 @@ const onward = adding ? "/" : safeNext(new URLSearchParams(location.search).get(
 let returning = null;
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const PLAN_INACTIVE = "plan-inactive";
-const state = { info: null, me: null, session: null, held: [], machinesFilter: "all", cameFrom: null, opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), keys: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
+const state = { info: null, me: null, session: null, held: [], machinesFilter: "all", cameFrom: null, opened: [], storeFailed: false, offline: false, fetchedAt: null, notice: null, hint: false, unlocking: false, connected: null, from: "board", taskView: null, sheet: false, allowed: false, device: null, keptFor: null, kept: { cursor: 0, sent: [] }, ui: new Map(), refused: null, backlogUi: new Map(), idea: { text: "", machine: null, account: null, choosing: false, busy: false, error: null }, lastMachine: null, reviewUi: new Map(), pro: null, trialLine: null, signin: { step: "email", email: "", chosen: false }, lead: { machine: null, draft: "", picking: false, busy: false, error: null, depth: new Map(), names: null, fresh: false, shown: new Map() }, address: null, emailStep: null, busy: false, draft: { email: null, code: "" }, updated: false };
 const slots = new Map();
 function slotFor(id) {
   if (!slots.has(id)) slots.set(id, freshSlot(id, scoped(id)));
@@ -1466,15 +1466,13 @@ async function loadCommands(slot) {
   collect(slot);
 }
 
-const keysOf = (machine) => state.keys.get(machine) ?? null;
-
 function collect(slot = null) {
   if (!slot) return Promise.all(unlockedSlots().map((one) => collect(one)));
   const identity = sessionOf(slot)?.identity;
   if (!identity || !state.info?.commands || slot.collecting || slot.kept.sent.every((one) => one.result)) return slot.collecting;
   slot.collecting = (async () => {
     try {
-      const kept = await collectResults({ calls: slot.calls.account, identity, kept: slot.kept, keysOf, now: nowSeconds() });
+      const kept = await collectResults({ calls: slot.calls.account, identity, kept: slot.kept, keysOf: (machine) => slot.keys.get(machine) ?? null, now: nowSeconds() });
       if (sessionOf(slot)?.identity !== identity) return;
       slot.kept = kept;
       await keepSent(deviceStore, slot.id, kept);
@@ -1490,8 +1488,8 @@ function collect(slot = null) {
 
 // A command goes out through the account that holds its machine, signed by that account's device, and never through another.
 async function sendThrough(slot, machine, payload, meta, ttl = undefined) {
-  const keys = keysOf(machine);
-  if (!keys || !slot) throw new Error("Your account doesn't list this machine's keys.");
+  const keys = slot?.keys.get(machine);
+  if (!keys) throw new Error("Your account doesn't list this machine's keys.");
   const identity = sessionOf(slot).identity;
   if (slot.allowed !== true) throw new CommandProblem("view-only");
   slot.device = await ensureDevice({ store: deviceStore, calls: slot.calls.account, identity, name: proposedName(navigator.userAgent), now: nowSeconds(), kept: slot.device });
