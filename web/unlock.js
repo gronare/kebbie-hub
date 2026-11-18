@@ -279,6 +279,15 @@ export async function signedInAccount(account, store = deviceStore, id = account
   }
 }
 
+// An account signed in on this hub but not yet on the phone's list is found by the unscoped call, which names the only session there is.
+export async function signedInListed(ids, accountOf, store = deviceStore) {
+  for (const id of ids) {
+    const me = await signedInAccount(accountOf(id), store, id);
+    if (me) return me;
+  }
+  return signedInAccount(accountOf(null), store, null);
+}
+
 export async function unlockAfter(hub, ceremony, storage = localStore(), store = deviceStore, clock = Date.now) {
   const { sealed, ...settled } = await settleUnlock(hub, ceremony, storage);
   if (settled.state !== "unlocked") {

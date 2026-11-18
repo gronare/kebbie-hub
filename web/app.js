@@ -15,7 +15,7 @@ import { del, forgetDeviceKeys, get, put } from "./store.js";
 import { freshSlot, holderOf, merged, unlockedOf } from "./slots.js";
 import { accountChips, accountHeading, accountPicker, accountSummary, lockedAccounts } from "./screens.js";
 import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf, returningTo } from "./accounts.js";
-import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
+import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signedInListed, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
 import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, refuseOther, unlockHeld } from "./locked.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
@@ -2223,6 +2223,7 @@ function enterCode() {
     if (onward) return location.assign(onward);
     state.me = signed.account;
     state.session = { state: "locked", me: state.me };
+    await remember(state.me);
     slotFor(state.me.account);
     state.address = await primary().email().catch(() => null);
     state.signin = freshSignIn();
@@ -2670,13 +2671,7 @@ async function resumeBoards() {
   startFeed();
 }
 
-async function signedInHeld(list) {
-  for (const held of list) {
-    const me = await signedInAccount(scoped(held.account).account, deviceStore, held.account);
-    if (me) return me;
-  }
-  return list.length ? null : signedInAccount(account);
-}
+const signedInHeld = (list) => signedInListed(list.map((held) => held.account), (id) => (id ? scoped(id).account : account), deviceStore);
 
 async function remember(me) {
   const address = state.info?.email ? await scoped(me.account).account.email().catch(() => null) : null;

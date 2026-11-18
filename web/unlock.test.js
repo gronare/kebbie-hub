@@ -7,7 +7,7 @@ import { HubError } from "./hub.js";
 import { signUpWith, signInWith } from "./signin.js";
 import { passkeySignInScreen, signedOutStep } from "./email.js";
 import { listingKey, notifyKey, unlockKey } from "./accounts.js";
-import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signOut, unlockAfter, unlockOnShow } from "./unlock.js";
+import { addFirstPasskey, addUnlockingPasskey, forgetUnlock, KEEP_MS, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, signedInListed, signOut, unlockAfter, unlockOnShow } from "./unlock.js";
 
 const load = (name) => JSON.parse(readFileSync(new URL(`../vectors/${name}`, import.meta.url), "utf8"));
 const { parties } = load("keys.json");
@@ -614,4 +614,22 @@ test("signing one account out keeps the browser's subscription while another acc
   await signOut({ id: me.account, unsubscribePush: async (device) => void ended.push(`hub forgot ${device}`), logout: async () => void ended.push("logout") }, store, async () => subscription);
   assert.deepEqual(ended, ["hub forgot dev_home", "logout"]);
   assert.ok(await store.get(notifyKey("acc_work")));
+});
+
+test("an account signed in on the hub but missing from the phone's list still signs in after a reload", async () => {
+  const sessions = { acc_new: { account: "acc_new" } };
+  const asked = [];
+  const accountOf = (id) => ({ id, me: async () => (asked.push(id), id ? (sessions[id] ?? Promise.reject(new HubError(401, "unauthorized"))) : Object.values(sessions)[0]) });
+  assert.deepEqual(await signedInListed(["acc_home", "acc_work"], accountOf, deviceStore()), { account: "acc_new" });
+  assert.deepEqual(asked, ["acc_home", "acc_work", null], "the listed accounts are asked first, then the hub's own session");
+  sessions.acc_work = { account: "acc_work" };
+  asked.length = 0;
+  assert.deepEqual(await signedInListed(["acc_home", "acc_work"], accountOf, deviceStore()), { account: "acc_work" });
+  assert.deepEqual(asked, ["acc_home", "acc_work"]);
+});
+
+test("a code sign-in from the sign-in screen keeps the account on the phone's list", () => {
+  const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  const body = app.slice(app.indexOf("function enterCode("), app.indexOf("\n}\n", app.indexOf("function enterCode(")));
+  assert.match(body, /state\.me = signed\.account;\n    state\.session = \{ state: "locked", me: state\.me \};\n    await remember\(state\.me\);/);
 });
