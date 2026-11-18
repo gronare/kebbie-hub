@@ -17,7 +17,7 @@ import { accountChips, accountHeading, accountPicker, accountSummary, lockedAcco
 import { heldAccounts, keepAccount, labelsOf, listingKey, liveAccounts, markSignedOut, marksKey, migrate, nameOf, returningTo } from "./accounts.js";
 import { addFirstPasskey, forgetUnlock, keptUnlock, lockWhenDue, rememberedCredential, signedInAccount, STATE_TEXT, stopNotifications, unlockAfter, unlockOnShow } from "./unlock.js";
 import { proposedName } from "./device-name.js";
-import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, unlockHeld } from "./locked.js";
+import { addedStep, heldSession, keepAdded, lockedMachines, NoPasskeyHere, refuseOther, unlockHeld } from "./locked.js";
 import { PAGES, startPage, SUBMIT } from "./pages.js";
 import { closeSettled, PUSHED } from "./notify.js";
 import { besideLevel, cleanComment, commentProblem, commentsProblem, commitPage, diffHref, fileAt, foldCommitsOn, freshReviewUi, hangLines, openFileAt, openOf, readKey, keptTaskView, readOf, readShaOf, reviewEntry, rowOf, reviewPage, sendControl, settleReview, shaOf, subtaskHref, subtaskPage, taskHref, taskViewOf, wholePage } from "./review.js";
@@ -1427,8 +1427,9 @@ async function nameLockedMachines(slot) {
 
 async function reauthenticate(slot) {
   const hubFor = { account: slot.calls.account, credentials: hub.credentials };
-  const session = await unlockAfter(hubFor, await signInWith(hubFor).withPasskey(rememberedCredential(undefined, slot.id)));
-  if (session.me.account !== slot.id) throw new Error(`That passkey belongs to another account than ${accountName(slot.id)}.`);
+  const ceremony = await signInWith(hubFor).withPasskey(rememberedCredential(undefined, slot.id));
+  await refuseOther(hubFor.account, ceremony, slot.id, accountName(slot.id), state.held);
+  const session = await unlockAfter(hubFor, ceremony);
   if (isPrimary(slot)) {
     state.session = session;
     state.me = session.me;
