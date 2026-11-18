@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { accountOfDevice, dropAccount, heldAccounts, keepAccount, keepNotifyRecord, labelsOf, liveAccounts, markSignedOut, migrate, nameOf, titled, withAccount } from "./accounts.js";
+import { accountOfDevice, droppedDevice, dropAccount, heldAccounts, keepAccount, keepNotifyRecord, labelsOf, liveAccounts, markSignedOut, migrate, nameOf, titled, withAccount } from "./accounts.js";
 
 function memory(entries = []) {
   const values = new Map(entries);
@@ -59,7 +59,11 @@ test("accounts get an unused colour, keep what they were given, and drop everyth
   assert.equal(await accountOfDevice(store, "dev_unknown"), null, "with two accounts an unknown device belongs to neither");
   await dropAccount(store, "acc_work");
   assert.equal(store.values.has("notify:acc_work"), false);
-  assert.equal(await accountOfDevice(store, "dev_b"), "acc_home", "with one account left an unknown device is that account's");
+  assert.equal(await accountOfDevice(store, "dev_b"), null, "a removed account's device never passes for the account left");
+  assert.equal(await droppedDevice(store, "dev_b"), true);
+  assert.equal(await accountOfDevice(store, "dev_unknown"), "acc_home", "with one account left a device never recorded is that account's");
+  await keepNotifyRecord(store, "acc_work", { device: "dev_b" });
+  assert.equal(await droppedDevice(store, "dev_b"), false, "an account added back takes its device back");
   assert.deepEqual(withAccount([], "acc_x", { colour: "teal" }), [{ account: "acc_x", colour: "teal" }]);
 });
 

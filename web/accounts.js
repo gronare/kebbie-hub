@@ -1,5 +1,6 @@
 export const ACCOUNTS = "accounts";
 export const NOTIFY_DEVICES = "notify-devices";
+export const DROPPED_DEVICES = "notify-dropped";
 export const UNKNOWN = "*";
 export const unlockKey = (account) => `unlock:${account}`;
 export const listingKey = (account) => `listing:${account}`;
@@ -70,15 +71,29 @@ export async function dropAccount(store, account) {
   const list = (await heldAccounts(store)).filter((one) => one.account !== account);
   await store.put(ACCOUNTS, list);
   const index = (await store.get(NOTIFY_DEVICES).catch(() => null)) ?? {};
+  const record = await notifyRecord(store, account);
+  const gone = [...Object.keys(index).filter((device) => index[device] === account), ...(record?.device ? [record.device] : [])];
+  await store.put(DROPPED_DEVICES, [...new Set([...(await droppedDevices(store)), ...gone])].slice(-DROPPED_KEPT));
   await store.put(NOTIFY_DEVICES, Object.fromEntries(Object.entries(index).filter(([, owner]) => owner !== account)));
   for (const key of [unlockKey(account), listingKey(account), notifyKey(account), failureKey(account)]) await store.del(key).catch(() => undefined);
   return list;
 }
 
+const DROPPED_KEPT = 64;
+
+const droppedDevices = async (store) => {
+  const list = await store.get(DROPPED_DEVICES).catch(() => null);
+  return Array.isArray(list) ? list.filter((one) => typeof one === "string") : [];
+};
+
+// The hub may still push to a removed account's device, whose session this phone no longer has to unsubscribe it.
+export const droppedDevice = async (store, device) => (await droppedDevices(store)).includes(device);
+
 // A notice sealed to a device this browser never recorded belongs to the only account here, when there is one, so it can still say why it didn't open.
 export async function accountOfDevice(store, device) {
   const index = (await store.get(NOTIFY_DEVICES).catch(() => null)) ?? {};
   if (Object.hasOwn(index, device)) return index[device];
+  if (await droppedDevice(store, device)) return null;
   const owners = new Set(Object.values(index));
   return owners.size === 1 ? [...owners][0] : null;
 }
@@ -87,6 +102,8 @@ export async function keepNotifyRecord(store, account, record) {
   await store.put(notifyKey(account), record);
   const index = (await store.get(NOTIFY_DEVICES).catch(() => null)) ?? {};
   await store.put(NOTIFY_DEVICES, { ...index, [record.device]: account });
+  const dropped = await droppedDevices(store);
+  if (dropped.includes(record.device)) await store.put(DROPPED_DEVICES, dropped.filter((one) => one !== record.device));
 }
 
 export const notifyRecord = (store, account) => store.get(notifyKey(account)).catch(() => null);

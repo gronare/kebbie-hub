@@ -1,6 +1,6 @@
 import { DEFAULT_NOTICE_CATEGORIES, fromB64, NOTICE_CATEGORIES, noticeCategoryOf, openNotice, ProtocolError, verifyMachineList } from "../js/protocol.js";
 import { openEncryption } from "./store.js";
-import { accountOfDevice, failureKey, listingKey, marksKey, notifyKey, titled } from "./accounts.js";
+import { accountOfDevice, droppedDevice, failureKey, listingKey, marksKey, notifyKey, titled } from "./accounts.js";
 
 export const categoriesKey = (device) => `notify-categories:${device}`;
 export const GENERIC = { title: "kebbie", body: "Open kebbie to see what changed." };
@@ -155,6 +155,8 @@ function unopened(envelope, tag, failure, named) {
   return { title: name ?? GENERIC.title, body: CATEGORY_TEXT[category] ?? GENERIC.body, tag, data: { url: "/#/board" }, retract: [], failure: { ...failure, name } };
 }
 
+const DROPPED_TAG = "kebbie-dropped";
+
 export async function pushedNotice(envelope, { get, now, put = null, boards = null }) {
   const tag = typeof envelope?.collapse === "string" ? envelope.collapse : "kebbie";
   const recipient = Object.keys(envelope?.keys ?? {})[0] ?? null;
@@ -164,6 +166,7 @@ export async function pushedNotice(envelope, { get, now, put = null, boards = nu
   const failed = (reason, detail = null) => ({ ...unopened(envelope, tag, { ...failure, reason, detail }, named), account: owner });
   try {
     if (!envelope) return failed("no-envelope");
+    if (recipient && (await droppedDevice({ get }, recipient))) return { title: GENERIC.title, body: GENERIC.body, tag: DROPPED_TAG, data: { url: "/#/board" }, retract: [], failure: null, account: null, dropped: true };
     owner = recipient ? await accountOfDevice({ get }, recipient) : null;
     if (!owner) return failed("no-record");
     named = (await get(listingKey(owner)).catch(() => null))?.listing ?? null;
@@ -230,6 +233,11 @@ export async function watching(clients) {
 // WebKit counts a push as shown once showNotification is called inside its event, so a quiet notice can be closed at once without the subscription being revoked.
 export async function showPushed(registration, envelope, { get, now, put = null, del = null, boards = null, clients = null }) {
   const shown = await pushedNotice(envelope, { get, now, put, boards });
+  if (shown.dropped) {
+    await registration.showNotification(shown.title, { body: shown.body, tag: shown.tag, data: shown.data, icon: "/icon-192.png", silent: true });
+    for (const notification of await registration.getNotifications({ tag: shown.tag })) if (notification.tag === shown.tag) notification.close();
+    return { ...shown, quiet: true };
+  }
   const open = await watching(clients);
   if (shown.failure && put) await put(failureKey(shown.account), shown.failure).catch(() => undefined);
   if (!shown.failure && del) await del(failureKey(shown.account)).catch(() => undefined);

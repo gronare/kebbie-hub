@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { accountIdentity, deviceId, emptyMachineList, importIdentity, machineListWith, newAccountSecrets, newDeviceKey, sealEnvelope, signMachineList } from "../js/protocol.js";
-import { failureKey, listingKey, migrate, notifyKey, NOTIFY_DEVICES } from "./accounts.js";
+import { dropAccount, failureKey, listingKey, migrate, notifyKey, NOTIFY_DEVICES } from "./accounts.js";
 import { CATEGORY_GROUPS, closeSettled, deviceWord, failureLine, GENERIC, isSettled, keptCategories, notifyPhase, notifyText, pushedNotice, PUSHED, routeOf, showPushed, switchable, withCategory } from "./notify.js";
 
 const { parties } = JSON.parse(readFileSync(new URL("../vectors/keys.json", import.meta.url), "utf8"));
@@ -314,4 +314,17 @@ test("with two accounts on the phone a notice's title starts with its account's 
   kv.set("accounts", [{ account: owner, name: "Home", named: true, colour: "blue" }, { account: "acc_work", colour: "peach", signedOut: true }]);
   await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
   assert.deepEqual(titles, [notice.title, `Home · ${notice.title}`, notice.title]);
+});
+
+test("a push to the device of an account removed from the phone is closed at once, under neither account's name, and leaves no failure", async () => {
+  const { kv, get, put, del, seal, owner } = await world();
+  kv.set("accounts", [{ account: owner, name: "Gone", colour: "blue" }, { account: "acc_left", name: "Left", colour: "peach" }]);
+  kv.set(NOTIFY_DEVICES, { ...kv.get(NOTIFY_DEVICES), dev_left: "acc_left" });
+  await dropAccount({ get, put, del }, owner);
+  const { registration, shown, closed } = tray();
+  const result = await showPushed(registration, await seal(notice), { get, put, del, now: NOW });
+  assert.equal(result.dropped, true);
+  assert.deepEqual(shown.map((one) => [one.title, one.silent]), [["kebbie", true]]);
+  assert.deepEqual(closed, ["kebbie-dropped"]);
+  assert.equal([...kv.keys()].some((key) => key.startsWith("notice-failure")), false);
 });
