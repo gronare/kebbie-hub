@@ -7,15 +7,14 @@ use crate::message::check;
 pub const MAX_LINK_ADDRESSES: usize = 16;
 
 // Where a machine takes direct links from the account's other machines: its addresses on the private networks it is on, and the port it listens on there.
+// Unknown fields and networks are tolerated, so a machine that announces more than this version knows never stops an older one reading the rest.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Addresses {
     pub port: u16,
     pub addresses: Vec<LinkAddress>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct LinkAddress {
     pub network: Network,
     pub ip: String,
@@ -26,6 +25,9 @@ pub struct LinkAddress {
 pub enum Network {
     Tailscale,
     Wireguard,
+    // A network a newer kebbie announces; a reader skips the address.
+    #[serde(other)]
+    Other,
 }
 
 impl Addresses {
@@ -74,8 +76,11 @@ mod tests {
         }
         let json = serde_json::to_value(Payload::Addresses(addresses())).unwrap();
         assert_eq!(json, serde_json::json!({ "type": "addresses", "port": 47_011, "addresses": [{ "network": "tailscale", "ip": "100.101.102.103" }, { "network": "wireguard", "ip": "fd7a:115c:a1e0::1" }] }));
-        let mut extra = json;
-        extra["addresses"][0]["name"] = serde_json::json!("mac");
-        assert!(serde_json::from_value::<Payload>(extra).is_err());
+        let mut newer = json;
+        newer["addresses"][0]["name"] = serde_json::json!("mac");
+        newer["addresses"][1]["network"] = serde_json::json!("zerotier");
+        newer["relay"] = serde_json::json!(true);
+        let Payload::Addresses(read) = serde_json::from_value::<Payload>(newer).unwrap() else { panic!("not addresses") };
+        assert_eq!((read.addresses[0].clone(), read.addresses[1].network), (addresses().addresses[0].clone(), Network::Other), "a field or network this version does not know is passed over");
     }
 }

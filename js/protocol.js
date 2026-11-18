@@ -731,7 +731,9 @@ const plainV6 = (value) => {
   }
 };
 const isListeningIp = (value) => typeof value === "string" && (IPV4.test(value) ? value !== "0.0.0.0" && Number(value.split(".")[0]) < 224 : plainV6(value) && value !== "::" && !value.startsWith("ff"));
-const linkAddress = shape({ network: oneOf("tailscale", "wireguard"), ip: isListeningIp });
+// As Rust reads them: fields and networks this version does not know are passed over, so a newer machine's announcement still reads.
+const withFields = (fields) => (value) => isPlainObject(value) && Object.entries(fields).every(([key, check]) => (Object.hasOwn(value, key) ? check(value[key]) : check.optional === true));
+const linkAddress = withFields({ network: string, ip: isListeningIp });
 const isToken = (value) => typeof value === "string" && /^[A-Za-z0-9][a-z0-9._-]{0,63}$/.test(value);
 const isFoundKey = (value) => isItemKey(value) && homeOf(value) === "found";
 const PAYLOADS = {
@@ -786,7 +788,7 @@ const PAYLOADS = {
     typed({ repo: isToken, name: isToken, command: isJobCommand, task: isToken, commit: isCommit, base: optionalField(isCommit), bundle: optionalField(blobsUpTo(MAX_JOB_BUNDLE_PARTS)), on: optionalField(isToken) })(value) &&
     fitsMachineMessage(value),
   addresses: (value) =>
-    typed({ port: uint(0xffff), addresses: (addresses) => Array.isArray(addresses) && addresses.length <= MAX_LINK_ADDRESSES && addresses.every(linkAddress) })(value) && (value.port !== 0 || value.addresses.length === 0),
+    withFields({ type: string, port: uint(0xffff), addresses: (addresses) => Array.isArray(addresses) && addresses.length <= MAX_LINK_ADDRESSES && addresses.every(linkAddress) })(value) && (value.port !== 0 || value.addresses.length === 0),
   "job-report": (value) =>
     typed({ job: (one) => prefixOf(one) === "cmd", seq: u32v, log: (log) => string(log) && text.encode(log).length <= MAX_JOB_LOG_BYTES, end: optionalField(jobEnd) })(value) && fitsMachineMessage(value),
 };

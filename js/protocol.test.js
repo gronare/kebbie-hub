@@ -1049,7 +1049,8 @@ test("a machine's addresses go from one machine to another of the account for a 
   const one = (ip) => ({ type: "addresses", port: 47011, addresses: [{ network: "tailscale", ip }] });
   for (const ip of ["0.0.0.0", "::", "224.0.0.1", "100.064.0.1", "mac.ts.net", "FD7A::1", "100.64.0.1:22"]) refuses(one(ip));
   refuses({ ...one("100.64.0.1"), port: 0 });
-  refuses({ type: "addresses", port: 1, addresses: [{ network: "zerotier", ip: "10.0.0.1" }] });
+  checkPayload({ type: "addresses", port: 1, relay: true, addresses: [{ network: "zerotier", ip: "10.0.0.1", name: "mac" }] });
+  refuses({ type: "addresses", port: 1, addresses: [{ network: 7, ip: "10.0.0.1" }] });
 });
 
 test("a job and its report go from one machine to another of the account with no certificate, as Rust's shape rule says", () => {
