@@ -346,7 +346,6 @@ export function pushSection(item, { open = orderOpens(item), push = "", foot = "
   return `<h3 class="sec">Push order · ${esc(order.length)}</h3>${body}${push}<div class="steps go order-toggle">${toggle}</div>${foot}`;
 }
 
-const OBSTACLE_WORDS = { investigating: "obstacle: being investigated", asked: "obstacle: the investigator asks you", "with-lead": "obstacle: with the lead" };
 const DECIDED_BY = { investigator: "Investigator", lead: "The lead", you: "You" };
 const DECISION = { subtask: "add a preparatory subtask first", workaround: "work around it", task: "a separate task takes it", ask: "asks you" };
 
@@ -428,7 +427,6 @@ export function stepSummary(item) {
   if (total && !ready && !building && pushedCount(item)) parts.push(`↑ ${esc(plural(pushedCount(item), "commit", "commits"))} pushed`);
   const stage = stageLine(item);
   if (stage) parts.push(stage);
-  if (OBSTACLE_WORDS[item.obstacle?.state]) parts.push(`<span class="warn">${OBSTACLE_WORDS[item.obstacle.state]}</span>`);
   return parts.length ? `<div class="step-line">${parts.join(" · ")}</div>` : "";
 }
 
@@ -447,7 +445,7 @@ export const taskKey = (machine, address) => `${machine}|${address}`;
 export function taskRow(row, selected = null) {
   const href = `#/task/${encodeURIComponent(row.machine)}/${encodeURIComponent(row.item.address)}`;
   const on = selected === taskKey(row.machine, row.item.address);
-  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(assessmentText(row.item.assessment)), esc(row.item.summary)].filter(Boolean).join(" · ");
+  const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(row.item.summary)].filter(Boolean).join(" · ");
   const wanted = row.item.next_for_you ?? stepsWanted(row.item, row.name);
   const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
   return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepSummary(row.item)}${you}</a>`;
