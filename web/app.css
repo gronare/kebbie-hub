@@ -144,6 +144,7 @@ a.task:active { background: var(--sel); }
 .task .meta, .meta { color: var(--muted); font-size: 13.5px; }
 .you { font-size: 14px; color: var(--peach); }
 .you b { font-weight: 600; }
+.task-row > :is(.meta, .step-line, .you) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .machine { display: inline-block; flex: none; font: 500 11.5px/1.5 var(--mono); color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .asleep { opacity: 0.6; }
 .steps { display: grid; gap: 2px; font-size: 14px; margin-top: 2px; }

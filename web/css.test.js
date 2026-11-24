@@ -38,3 +38,8 @@ test("a page with a Back row shows Back in every pose, and only a pending strip 
   assert.ok(index(".back-btn") < shown, "the default that hides a lone Back comes first");
   assert.ok(shown < index(".strip-pending :is(.back-btn, .switch-btn)"), "a strip that has not settled still hides it");
 });
+
+test("a task row keeps its meta, step and you lines to one line each, cut with an ellipsis", () => {
+  const body = rules.find((one) => one.selector === ".task-row > :is(.meta, .step-line, .you)")?.body ?? "";
+  for (const want of [/white-space:\s*nowrap/, /overflow:\s*hidden/, /text-overflow:\s*ellipsis/]) assert.match(body, want);
+});

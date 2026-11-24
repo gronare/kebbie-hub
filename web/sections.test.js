@@ -35,7 +35,7 @@ test("a section lists its tasks, each opening its card, with the selected one ma
   const html = sectionView(view, "needs-you", NOW, { selected: taskKey("mch_a", "hub@kebbie") });
   assert.match(text(html), /^Needs you 2 tasks Refunds through the new gateway studio/);
   assert.deepEqual(hrefs(html), ["#/task/mch_a/refunds%40shop", "#/task/mch_a/hub%40kebbie"]);
-  assert.match(html, /<a class="task sel" href="#\/task\/mch_a\/hub%40kebbie" aria-current="true">/);
+  assert.match(html, /<a class="task task-row sel" href="#\/task\/mch_a\/hub%40kebbie" aria-current="true">/);
   assert.equal(sectionView(view, "nowhere", NOW), "");
 });
 

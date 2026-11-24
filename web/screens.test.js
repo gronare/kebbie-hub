@@ -322,6 +322,7 @@ test("the push order opens by itself on a moved commit, a group, a failed test, 
 test("a board row says in one line how far the subtasks have come and what is yours to do, never the whole list", () => {
   const html = taskRow(rowOf(required));
   assert.equal(text(html), "payments devbox api · 2 commits ◆ 1 of 3 subtasks to review · 1 in progress you: review Charge through a PaymentGateway on devbox");
+  assert.match(html, /^<a class="task task-row" /, "the row carries the class that keeps each line to one line");
   assert.match(html, /<div class="step-line"><span class="accept">◆ 1 of 3 subtasks to review<\/span> · <span class="prog">1 in progress<\/span><\/div>/);
   assert.doesNotMatch(html, /class="step |<payment>|to accept/, "the board row lists no subtasks");
   assert.equal(text(stepSummary(mindin)), "✓ 3 of 6 subtasks accepted · ◆ 1 to review · 1 in progress");
@@ -428,8 +429,8 @@ test("the nav names the tabs with the backlog between board and questions, count
 
 test("the selected task is outlined on the board, and only that one", () => {
   const selected = taskKey("mch_a", "payments@api");
-  assert.match(taskRow(rowOf(payments), selected), /^<a class="task sel" href="#\/task\/mch_a\/payments%40api" aria-current="true">/);
-  assert.match(taskRow(rowOf(payments), taskKey("mch_b", "payments@api")), /^<a class="task" href=/);
+  assert.match(taskRow(rowOf(payments), selected), /^<a class="task task-row sel" href="#\/task\/mch_a\/payments%40api" aria-current="true">/);
+  assert.match(taskRow(rowOf(payments), taskKey("mch_b", "payments@api")), /^<a class="task task-row" href=/);
 });
 
 test("a machine reads awake or asleep beside its dot, and the board's header lists every machine", () => {

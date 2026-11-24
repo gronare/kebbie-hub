@@ -448,7 +448,7 @@ export function taskRow(row, selected = null) {
   const meta = [row.repo && esc(row.repo), agentChip(row.item.agent, true), esc(recipeText(row.item)), esc(row.item.summary)].filter(Boolean).join(" · ");
   const wanted = row.item.next_for_you ?? stepsWanted(row.item, row.name);
   const you = wanted ? `<div class="you"><b>you:</b> ${esc(wanted)}</div>` : "";
-  return `<a class="task${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepSummary(row.item)}${you}</a>`;
+  return `<a class="task task-row${on ? " sel" : ""}" href="${href}"${on ? ' aria-current="true"' : ""}><div class="head"><span class="name">${esc(taskName(row.item, row.task))}</span> <span class="machine">${esc(row.name)}</span></div><div class="meta">${meta}</div>${stepSummary(row.item)}${you}</a>`;
 }
 
 export const ICONS = {
