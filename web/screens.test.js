@@ -464,10 +464,10 @@ test("an empty Next says nothing needs you once, machines with something get a l
   assert.deepEqual([waited(30), waited(42 * 60), waited(3600), waited(3 * 86_400)], ["now", "42 min", "1 h", "3 d"]);
 });
 
-test("a row shows the task's title, its agent and model and its recipe, and leaves the review assessment to the lead", () => {
+test("a row shows the task's title and its agent and model, and leaves the recipe and the review assessment to the lead", () => {
   const item = { ...payments, subtasks: undefined, title: "Round VAT per invoice", agent: { status: "working", kind: "claude", model: "opus" }, recipe: "small fix", assessment: "review suggested: touches money" };
-  assert.equal(text(taskRow(rowOf(item))), "Round VAT per invoice devbox api · claude · opus · recipe: small fix · 2 commits");
-  assert.equal(text(taskRow(rowOf({ ...item, assessment: { word: "recommended", reason: "touches money" } }))), "Round VAT per invoice devbox api · claude · opus · recipe: small fix · 2 commits");
+  assert.equal(text(taskRow(rowOf(item))), "Round VAT per invoice devbox api · claude · opus · 2 commits");
+  assert.equal(text(taskRow(rowOf({ ...item, assessment: { word: "recommended", reason: "touches money" } }))), "Round VAT per invoice devbox api · claude · opus · 2 commits");
   assert.equal(text(taskRow(rowOf({ ...payments, subtasks: undefined }))), "payments devbox api · 2 commits", "a board from an older kebbie names the task as before");
   assert.equal(agentChip({ status: "idle" }), "", "an agent without its kind shows no chip");
 });
