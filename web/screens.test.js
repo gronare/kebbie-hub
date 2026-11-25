@@ -437,6 +437,7 @@ test("a machine reads awake or asleep beside its dot, and the board's header lis
   assert.equal(text(machineRow({ machine: "mch_a", name: "mac", awake: true, facts: ["kebbie 0.24.0"] })), "mac awake · kebbie 0.24.0 Remove");
   assert.match(machineRow({ machine: "mch_a", name: "studio", awake: false, facts: [] }), /class="mrow asleep"><span class="dot"/);
   assert.doesNotMatch(machineRow({ machine: "mch_b", name: "studio", awake: true, facts: [] }), /main-machine/);
+  assert.equal(text(machineRow({ machine: "mch_c", name: "devbox", awake: false, facts: ["kebbie 0.24.0"], ideas: true })), "devbox asleep · ideas machine · kebbie 0.24.0 Remove");
   assert.equal(text(machineDots([{ name: "mac", awake: true, lastSeen: "12:00" }, { name: "studio", awake: false, lastSeen: "Fri 17:40" }])), "mac studio · last seen Fri 17:40");
 });
 

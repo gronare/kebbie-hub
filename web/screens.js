@@ -610,9 +610,9 @@ export function promptBlock({ item, repo }, answer = promptCards(item.prompt) + 
   return `<p class="q">${esc(question)}</p>${context ? `<div class="meta pad">${context}</div>` : ""}${detail}${cmd}${answer}`;
 }
 
-export function machineRow({ machine, name, awake, facts }) {
+export function machineRow({ machine, name, awake, facts, ideas = false }) {
   const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(machine)}" data-name="${esc(name)}">Remove</button>`;
-  const said = [awake ? "awake" : "asleep", ...facts];
+  const said = [awake ? "awake" : "asleep", ...(ideas ? ["ideas machine"] : []), ...facts];
   return `<div class="mrow${awake ? "" : " asleep"}"><span class="dot${awake ? " awake" : ""}" aria-hidden="true"></span><div class="about"><b>${esc(name)}</b><small>${esc(said.join(" · "))}</small></div>${remove}</div>`;
 }
 
