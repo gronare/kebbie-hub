@@ -30,7 +30,7 @@ export function mergeBacklog(opened, now) {
       const vault = row.home.kind === "vault";
       const prefix = vaultPrefix(opened, machine.account);
       const id = vault ? `${prefix}${row.item}` : `${machine.machine}|${row.item}`;
-      const seen = { machine: machine.machine, name: machine.name, accepts: machine.board.accepts ?? null, asleep: isAsleep({ lastSeen: machine.lastSeen }, now), repos: (machine.board.checkouts ?? []).map((checkout) => checkout.repo), row };
+      const seen = { machine: machine.machine, name: machine.name, accepts: machine.board.accepts ?? null, asleep: isAsleep({ lastSeen: machine.lastSeen }, now), repos: (machine.board.checkouts ?? []).map((checkout) => checkout.repo), ideas: machine.board.idea_machine === true, row };
       const held = entries.get(id);
       if (!held) entries.set(id, { id, key: row.item, vault, prefix, account: machine.account ?? null, row, machines: [seen] });
       else {
@@ -184,38 +184,33 @@ export function backlogList({ entries, selected = null, now, top, action = "", f
 
 export const ideaMachine = (candidates) => (candidates.find((one) => one.ideas && !one.asleep) ?? candidates.find((one) => one.ideas))?.machine ?? null;
 
-export function chooseMachine(candidates, { repo = null, lastUsed = null, chosen = null, main = null, ideas = null } = {}) {
-  if (candidates.length === 0) return null;
-  const picked = candidates.find((one) => one.machine === chosen);
-  if (picked) return { ...picked, why: "you chose it" };
-  const home = candidates.find((one) => one.machine === ideas);
-  if (home && !home.asleep) return { ...home, why: "ideas machine" };
-  if (home) {
-    const other = chooseMachine(candidates.filter((one) => one !== home && !one.asleep), { repo, lastUsed, main });
-    return other ? { ...other, why: `ideas machine is asleep, sent to ${other.name}` } : { ...home, why: "ideas machine, asleep now" };
-  }
-  const head = candidates.find((one) => one.machine === main);
-  if (head && !head.asleep) return { ...head, why: "main machine" };
-  const others = head ? candidates.filter((one) => one !== head && !one.asleep) : candidates;
-  if (head && others.length === 0) return { ...head, why: "main machine, asleep now" };
-  const fallback = (one, why) => ({ ...one, why: head ? `main machine is offline, sent to ${one.name}` : why });
-  const withRepo = repo ? others.find((one) => one.repos.includes(repo)) : null;
-  if (withRepo) return fallback(withRepo, `it has ${repo}`);
-  const last = others.find((one) => one.machine === lastUsed);
-  if (last) return fallback(last, "you used it last");
-  const awake = others.find((one) => !one.asleep) ?? others[0];
-  return fallback(awake, awake.asleep ? "asleep now" : "awake now");
+export function routeMachine(candidates, { repo = null, needsRepo = false } = {}) {
+  const holders = repo ? candidates.filter((one) => one.repos.includes(repo)) : [];
+  const pool = needsRepo && holders.length ? holders : candidates;
+  if (pool.length === 0) return null;
+  const awake = (but = null) => pool.filter((one) => one !== but && !one.asleep).sort((a, b) => Number(b.ideas === true) - Number(a.ideas === true))[0] ?? null;
+  const goes = (target, why) => {
+    if (!target.asleep) return { ...target, why };
+    const other = awake(target);
+    return other ? { ...other, why: `${target.name} is asleep, sent to ${other.name}` } : { ...target, why: `${why}, asleep now` };
+  };
+  if (holders.length === 1) return goes(holders[0], `only ${holders[0].name} has ${repo}`);
+  const ideas = pool.find((one) => one.ideas);
+  if (ideas) return goes(ideas, "ideas machine");
+  const first = awake();
+  return first ? { ...first, why: "awake now" } : { ...pool[0], why: "asleep now" };
 }
 
-export function machinePicker(candidates, chosen, { label, choosing, main = null, ideas = null }) {
-  const change = candidates.length > 1 ? `<button type="button" class="btn small" data-action="backlog-choose">${choosing ? "Done" : "Change"}</button>` : "";
-  const list = choosing ? `<div class="options">${candidates.map((one) => `<div class="opt pick${one.machine === chosen.machine ? " picked" : ""}" role="button" tabindex="0" data-action="backlog-machine" data-machine="${esc(one.machine)}" aria-pressed="${one.machine === chosen.machine}"><b>${esc(one.name)}</b><small>${one.asleep ? "asleep" : "awake"}${one.machine === ideas ? " · ideas machine" : one.machine === main ? " · main machine" : ""}</small></div>`).join("")}</div>` : "";
-  return `<section class="task"><div class="row"><div><div class="meta">${esc(label)}</div><div class="name">${esc(chosen.name)}</div><div class="meta">${esc(chosen.why)}</div></div>${change}</div></section>${list}`;
+export function newTargets(candidates, repo = null) {
+  const starters = candidates.filter((one) => one.starts).sort((a, b) => Number(b.ideas === true) - Number(a.ideas === true));
+  const repos = [...new Set(starters.flatMap((one) => one.repos))];
+  const where = repos.includes(repo) ? repo : (repos[0] ?? null);
+  return { adds: routeMachine(candidates.filter((one) => takes(one.accepts, "idea"))), starter: where ? routeMachine(starters, { repo: where, needsRepo: true }) : null, repos, repo: where };
 }
+
+export const machineLine = (label, chosen) => `<section class="task"><div class="row"><div><div class="meta">${esc(label)}</div><div class="name">${esc(chosen.name)}</div><div class="meta">${esc(chosen.why)}</div></div></div></section>`;
 
 export const startCommand = ({ text, repo }) => ({ payload: { type: "start", repo, name: "", prompt: text.trim() }, meta: { address: null, repo, text: text.trim(), label: text.trim() } });
-
-export const startRepo = (chosen, repo) => (chosen?.repos.includes(repo) ? repo : (chosen?.repos[0] ?? null));
 
 const START_GOES = "The task starts";
 
@@ -235,19 +230,18 @@ function repoPicker(repos, repo) {
   return `<div class="note-field"><label for="start-repo">Starts in</label><select id="start-repo" data-draft="start-repo">${repos.map((one) => `<option value="${esc(one)}"${one === repo ? " selected" : ""}>${esc(one)}</option>`).join("")}</select></div>`;
 }
 
-export function ideaForm({ text = "", candidates, chosen, choosing = false, busy = false, error = null, main = null, ideas = null, picker = "", account = null, repo = null, started = "" }) {
+export function ideaForm({ text = "", candidates, adds = null, starter = null, repos = [], repo = null, busy = false, error = null, picker = "", account = null, started = "" }) {
   const starts = candidates.some((one) => one.starts);
   const ask = account || starts ? "What do you want done? " : "";
   const field = `<div class="note-field"><label for="idea">${ask}${starts ? "Start it now, or add it to the backlog for the lead to write out." : "Describe what you want. The lead gives it a title and writes it out from the code, the notes and your chats."}</label><textarea id="idea" data-draft="idea" rows="5" maxlength="2000">${esc(text)}</textarea></div>`;
-  if (!chosen) return picker + started + field + `<div class="pro">No machine${account ? ` on ${esc(account)}` : ""} takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
+  if (!adds && !starter) return picker + started + field + `<div class="pro">No machine${account ? ` on ${esc(account)}` : ""} takes ideas from the hub. Allow them in kebbie's settings on a machine.</div>`;
   const off = text.trim() === "" || busy ? " disabled" : "";
   const failed = error ? `<div class="center warn" role="alert">${esc(error)}</div>` : "";
-  const where = startRepo(chosen, repo);
-  const canStart = chosen.starts && where !== null;
-  const start = canStart ? `<button type="button" class="btn primary" data-action="start-now"${off}>Start now on ${esc(chosen.name)}</button>` : "";
-  const add = takes(chosen.accepts, "idea") || !chosen.starts ? `<button type="button" class="btn${canStart ? "" : " primary"}" data-action="add-idea"${off}>${account ? `Add to ${esc(account)}'s backlog` : "Add to the backlog"}</button>` : "";
-  const label = starts ? "Goes to" : "Goes to the lead on";
-  return picker + started + field + machinePicker(candidates, chosen, { label, choosing, main, ideas }) + (canStart ? repoPicker(chosen.repos, where) : "") + failed + `<div class="thumb-end idea-add">${start}${add}</div>`;
+  const start = starter ? `<button type="button" class="btn primary" data-action="start-now"${off}>Start now on ${esc(starter.name)}</button>` : "";
+  const add = adds ? `<button type="button" class="btn${starter ? "" : " primary"}" data-action="add-idea"${off}>${account ? `Add to ${esc(account)}'s backlog` : "Add to the backlog"}</button>` : "";
+  const goes = adds ? machineLine("Goes to the lead on", adds) : "";
+  const startsOn = starter ? repoPicker(repos, repo) + machineLine("Starts on", starter) : "";
+  return picker + started + field + goes + startsOn + failed + `<div class="thumb-end idea-add">${start}${add}</div>`;
 }
 
 const dayOf = (seconds, now) => (new Date(seconds * 1000).toDateString() === new Date(now * 1000).toDateString() ? "today" : new Date(seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
@@ -469,23 +463,6 @@ export function strayDrafts(ui, body, sentOf) {
 }
 
 const draftsKey = (id) => `kebbie-answers:${id}`;
-const mainKey = (account) => `kebbie-main-machine:${account}`;
-
-export function readMain(storage, account) {
-  try {
-    return storage?.getItem(mainKey(account)) || null;
-  } catch {
-    return null;
-  }
-}
-
-export function keepMain(storage, account, machine) {
-  try {
-    if (machine) storage?.setItem(mainKey(account), machine);
-    else storage?.removeItem(mainKey(account));
-  } catch {}
-}
-
 export function readDrafts(storage, id) {
   try {
     const raw = JSON.parse(storage?.getItem(draftsKey(id)) ?? "null");
@@ -567,7 +544,7 @@ export function startStatus(sent, state, { title, standing = null, now, taskHref
   return block("wait", `Sent to ${machine}`, `The lead on ${machine} picks the recipe and queues ${esc(title)}.`, `Sent ${from(sent)} · expires in ${hours(sent.exp - now)}`);
 }
 
-function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref, main }) {
+function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref }) {
   if (entry.row.state === "to-write") return "";
   if (access === "off") return "";
   if (access === "refused") return proLine("Starting it from this device comes with Hub Pro.", refusedUrl);
@@ -576,7 +553,7 @@ function startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, n
   const status = start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : "";
   if (start && !settled(start.state)) return status;
   const failed = ui.error ? `<div class="center warn" role="alert">${esc(ui.error)}</div>` : "";
-  const picker = candidates.length > 1 ? machinePicker(candidates, chosen, { label: "Starts on", choosing: ui.choosing, main }) : "";
+  const picker = candidates.length > 1 ? machineLine("Starts on", chosen) : "";
   return `${status}${picker}<div class="pair-answer"><a class="btn" href="#/backlog">Save to backlog</a><button type="button" class="btn primary" data-action="start-item"${ui.busy ? " disabled" : ""}>Start</button></div><div class="meta pad">The lead on ${esc(chosen.name)} picks the recipe and queues it.</div>${failed}`;
 }
 
@@ -644,7 +621,7 @@ function foundBody(entry, facts, options) {
   return facts + sources + `<div class="decide found-area thumb-end" data-item="${esc(entry.id)}">${foundArea(entry, options)}</div>`;
 }
 
-export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null, write = null, main = null, strays = [] }) {
+export function itemBody(entry, { body = null, bodyState = null, access = "off", refusedUrl = null, ui, sentFor = () => null, start = null, candidates = [], chosen = null, now, taskHref = "#/board", edits = null, found = null, write = null, strays = [] }) {
   if (entry.idea) return ideaCard(entry, now);
   if (entry.gone) return `<div class="decide start-area">${start ? startStatus(start.sent, start.state, { title: entry.row.title, standing: start.standing, now, taskHref }) : ""}</div><div class="meta pad">It left the backlog when it started.</div>`;
   const counts = body ? questionsLeft(body, sentFor) : { left: entry.row.blocking, withLead: 0 };
@@ -652,7 +629,7 @@ export function itemBody(entry, { body = null, bodyState = null, access = "off",
   const facts = itemFacts(entry, counts, now, entry.key && !isFound(entry) ? titleArea(entry, edit) : "");
   if (isFound(entry) && found) return foundBody(entry, facts, { access, refusedUrl, found, ui, now });
   const writing = writeArea(entry, { access, write, ui, now });
-  const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${writing}${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref, main })}</div>`;
+  const area = `<div class="decide start-area" data-item="${esc(entry.id)}">${writing}${startArea(entry, { access, refusedUrl, candidates, chosen, ui, start, now, taskHref })}</div>`;
   if (!entry.row.body && entry.row.state === "ready") return facts + (entry.row.goal ? section("Goal", entry.row.goal) : "") + area;
   if (!entry.row.body) {
     const said = entry.row.state === "drafting" ? "The lead is writing it out from the code, the notes and your chat. Its sections show here when it is saved." : `The lead on ${entry.machines[0].name} writes it out from the code, the notes and your chats. Its sections show here when it is saved.`;

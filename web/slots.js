@@ -1,6 +1,6 @@
 import { emptyMarks } from "./board.js";
 
-export const freshSlot = (id, calls) => ({ id, calls, me: null, session: null, opened: [], marks: emptyMarks(), keys: new Map(), kept: { cursor: 0, sent: [] }, keptFor: null, allowed: false, device: null, lastMachine: null, fetchedAt: null, offline: false, following: null, collecting: null, retrying: null, ends: null });
+export const freshSlot = (id, calls) => ({ id, calls, me: null, session: null, opened: [], marks: emptyMarks(), keys: new Map(), kept: { cursor: 0, sent: [] }, keptFor: null, allowed: false, device: null, fetchedAt: null, offline: false, following: null, collecting: null, retrying: null, ends: null });
 
 export const unlockedOf = (slots, sessionOf) => [...slots.values()].filter((slot) => sessionOf(slot)?.state === "unlocked");
 

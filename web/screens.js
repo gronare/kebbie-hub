@@ -610,11 +610,10 @@ export function promptBlock({ item, repo }, answer = promptCards(item.prompt) + 
   return `<p class="q">${esc(question)}</p>${context ? `<div class="meta pad">${context}</div>` : ""}${detail}${cmd}${answer}`;
 }
 
-export function machineRow({ machine, name, awake, facts, main = null }) {
+export function machineRow({ machine, name, awake, facts }) {
   const remove = `<button type="button" class="btn small" data-action="remove-machine" data-id="${esc(machine)}" data-name="${esc(name)}">Remove</button>`;
-  const head = main === null ? "" : `<button type="button" class="btn small${main ? " primary" : ""}" data-action="main-machine" data-id="${esc(machine)}" aria-pressed="${main}">${main ? "Main machine" : "Make main"}</button>`;
-  const said = [awake ? "awake" : "asleep", ...(main ? ["gets ideas, answers and starts first"] : []), ...facts];
-  return `<div class="mrow${awake ? "" : " asleep"}"><span class="dot${awake ? " awake" : ""}" aria-hidden="true"></span><div class="about"><b>${esc(name)}</b><small>${esc(said.join(" · "))}</small></div>${head}${remove}</div>`;
+  const said = [awake ? "awake" : "asleep", ...facts];
+  return `<div class="mrow${awake ? "" : " asleep"}"><span class="dot${awake ? " awake" : ""}" aria-hidden="true"></span><div class="about"><b>${esc(name)}</b><small>${esc(said.join(" · "))}</small></div>${remove}</div>`;
 }
 
 export function machineDots(machines) {

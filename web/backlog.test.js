@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MAX_ITEM_TITLE_CHARS, MAX_SECTION_CHARS } from "../js/protocol.js";
-import { answerableQuestions, answerCommand, answers, answerSents, answersToSend, answersWithLead, backlogList, bodyShown, keepDrafts, keepMain, readDrafts, readMain, sendAllLabel, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, chooseMachine, ideaMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, newStartStatus, startCommand, startRepo, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
+import { answerableQuestions, answerCommand, answers, answerSents, answersToSend, answersWithLead, backlogList, bodyShown, keepDrafts, readDrafts, sendAllLabel, sendAnswers, sentKey, settleDrafts, startAnswering, strayDrafts, takesBatch, routeMachine, newTargets, ideaMachine, needsYouCount, cleanEdit, editProblem, editReady, ideaEntries, ideaForm, itemBody, newStartStatus, startCommand, listAction, mergeBacklog, mergedInto, startsAnyway, writeArea, backlogRow } from "./backlog.js";
 
 const text = (html) => html.replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/\s+/g, " ").trim();
 const top = (title, aside) => `<h1>${title}</h1><span>${aside}</span>`;
@@ -36,7 +36,7 @@ const opened = [
   machine("mch_work", "work-mac", [session, row("vault:Projects/round.md", { title: "Round invoices", priority: "high", repo: "billing" })], { repos: ["webapp", "billing"] }),
 ];
 const [Q0, Q1, Q2] = body.questions.map((question) => question.text);
-const ui = (fields = {}) => ({ answers: new Map(), open: new Set(), answering: { busy: false, error: null }, busy: false, error: null, choosing: false, machine: null, visit: NOW - 60, ...fields });
+const ui = (fields = {}) => ({ answers: new Map(), open: new Set(), answering: { busy: false, error: null }, busy: false, error: null, visit: NOW - 60, ...fields });
 const sentAt = (fields) => ({ id: "cmd_1", machine: "mch_work", machineName: "work-mac", device: "dev_1", deviceName: "iPhone 16", at: NOW - 120, exp: NOW - 120 + 3600, result: null, ...fields });
 
 test("a vault note seen on two machines is one row with the vault chip, and the list groups by priority with its questions counted", () => {
@@ -51,18 +51,17 @@ test("a vault note seen on two machines is one row with the vault chip, and the 
   assert.ok(said.indexOf("High ·") < said.indexOf("Medium ·"));
 });
 
-test("a start goes to the machine that has the repo, else the one used last, and can be changed", () => {
+test("a start goes to the one machine that has the item's repo and names it, with no chooser", () => {
   const shared = mergeBacklog(opened, NOW).find((entry) => entry.vault && entry.row.repo === "webapp");
-  assert.equal(chooseMachine(shared.machines, { repo: "webapp" }).name, "work-mac");
-  assert.equal(chooseMachine(shared.machines, { repo: "nowhere", lastUsed: "mch_mac" }).why, "you used it last");
-  assert.equal(chooseMachine(shared.machines, { repo: "webapp", chosen: "mch_mac" }).name, "MacBook");
-  const html = itemBody(shared, { body, access: "ready", ui: ui({ choosing: true }), candidates: shared.machines, chosen: chooseMachine(shared.machines, { repo: "webapp" }), now: NOW });
-  assert.match(text(html), /Starts on work-mac it has webapp Done MacBook awake work-mac awake Save to backlog Start The lead on work-mac picks the recipe and queues it\./);
+  const chosen = routeMachine(shared.machines, { repo: "webapp", needsRepo: true });
+  assert.deepEqual([chosen.name, chosen.why], ["work-mac", "only work-mac has webapp"]);
+  const html = itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW });
+  assert.match(text(html), /Starts on work-mac only work-mac has webapp Save to backlog Start The lead on work-mac picks the recipe and queues it\./);
+  assert.doesNotMatch(html, /backlog-choose|backlog-machine/);
 });
-
 test("the card shows its facts, its sections and its questions, blocking ones marked, and which machines see it", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const said = text(itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW }));
   assert.match(said, /priority high repo webapp state drafting: 2 questions wait on you filed \d+ Nov note Projects\/session\.md · seen on MacBook and work-mac/);
   assert.match(said, /Background Users are signed out on reload\. Goal You stay signed in\. What we know - The cookie lasts ten minutes\. Open questions 2 wait on you before it starts/);
@@ -74,7 +73,7 @@ test("the card shows its facts, its sections and its questions, blocking ones ma
 
 test("an answer sent shows with the lead, and once the body carries it the question stops counting", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const picked = itemBody(shared, { body, access: "ready", ui: ui({ open: new Set([Q0]), answers: new Map([[Q0, "Renew on every request"]]) }), candidates: shared.machines, chosen, now: NOW });
   assert.match(text(picked), /Your answer Renew on every request Does a password .* Send 1 answer/);
   const done = { sent: sentAt({ kind: "item-answer", index: 0, text: "Renew on every request", result: { outcome: "done", reason: null, text: "ok", at: NOW - 60 } }), state: "done", standing: null, live: true };
@@ -90,7 +89,7 @@ test("an answer sent shows with the lead, and once the body carries it the quest
 
 test("each open question keeps its own draft across a re-render, and every filled answer goes out with one Send button", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const drafts = ui({ open: new Set([Q0, Q1, Q2]), answers: new Map([[Q0, "Renew on every request"], [Q1, "Yes, every device"]]) });
   const card = () => itemBody(shared, { body, access: "ready", ui: drafts, candidates: shared.machines, chosen, now: NOW });
   const values = (html) => [...html.matchAll(/<textarea id="answer-(\d)"[^>]*>([^<]*)<\/textarea>/g)].map(([, index, value]) => `${index}:${value}`);
@@ -119,7 +118,7 @@ test("the Send button counts what it sends, and says how many while it sends", (
 
 test("a sent answer keeps its draft: hidden while it is on its way, back in its field with one plain line and Send again when it is refused", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const drafts = ui({ open: new Set([Q0]), answers: new Map([[Q0, "Renew on every request"]]) });
   const sent = (state, result = null) => (index) => (index === 0 ? { sent: sentAt({ kind: "item-answer", index: 0, question: Q0, text: "Renew on every request", result }), state, standing: null, live: state === "sent" } : null);
   const going = itemBody(shared, { body, access: "ready", ui: drafts, sentFor: sent("sent"), candidates: shared.machines, chosen, now: NOW });
@@ -144,7 +143,7 @@ test("a refused answer whose draft is gone gets its text back, and one whose que
   const strays = strayDrafts(changed, body, () => null);
   assert.deepEqual(strays, [{ key: "Renew the session on reload?", question: "Renew the session on reload?", text: "Every request" }]);
   const shared = mergeBacklog(opened, NOW)[0];
-  const said = text(itemBody(shared, { body, access: "ready", ui: changed, strays, candidates: shared.machines, chosen: chooseMachine(shared.machines, { repo: "webapp" }), now: NOW }));
+  const said = text(itemBody(shared, { body, access: "ready", ui: changed, strays, candidates: shared.machines, chosen: routeMachine(shared.machines, { repo: "webapp" }), now: NOW }));
   assert.match(said, /Renew the session on reload\? no longer on the item Not delivered: the item changed while you answered\. Your answer is still here\. Copy it into the question as it reads now\. Every request Remove/);
   const delivered = { ...refused, sent: { ...refused.sent, result: { outcome: "done", reason: null, text: "ok", at: NOW } }, state: "done", live: true };
   const sentOnce = ui({ answers: new Map([[Q0, "Renew on every request"]]) });
@@ -169,7 +168,7 @@ test("answer drafts are kept per item and question across a reload, and a storag
 
 test("a click while answers are sending is never dropped unseen: the button says Sending and a press with no machine says why", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const drafts = ui({ open: new Set([Q0, Q1]), answers: new Map([[Q0, "Renew on every request"], [Q1, "Every device"]]) });
   const going = answersToSend(body, drafts, [0, 1]);
   assert.deepEqual(startAnswering(drafts, { chosen, answers: going }), { total: 2, keys: [Q0, Q1] });
@@ -215,62 +214,63 @@ test("one item-answers command shows With the lead on each question it answered"
     const one = each.find((sent) => answers(sent, questions, index));
     return one ? { sent: one, state: "done", standing: null, live: true } : null;
   };
-  const said = text(itemBody(shared, { body, access: "ready", ui: ui(), sentFor, candidates: shared.machines, chosen: chooseMachine(shared.machines, { repo: "webapp" }), now: NOW }));
+  const said = text(itemBody(shared, { body, access: "ready", ui: ui(), sentFor, candidates: shared.machines, chosen: routeMachine(shared.machines, { repo: "webapp" }), now: NOW }));
   assert.match(said, /Should a reload renew the session\? With the lead: "Renew on every request".*Does a password change sign out every device\? With the lead: "Every device"/);
   assert.equal(answersWithLead({ ...shared, row: { ...shared.row, blocking: 2 } }, [batch], { shown: () => ({ state: "done", live: true }), storedAt: () => 0, body }), 2);
 });
 
-test("the main machine gets the work while it is awake, and while it is asleep an awake machine does and says so", () => {
+test("the rule sends work to the one machine with the repo, else the ideas machine, and an asleep one's work to an awake machine", () => {
   const candidates = [
-    { machine: "mch_mac", name: "MacBook", asleep: false, repos: ["kebbie"] },
-    { machine: "mch_work", name: "work-mac", asleep: false, repos: ["webapp"] },
-    { machine: "mch_box", name: "devbox", asleep: false, repos: [] },
+    { machine: "mch_mac", name: "MacBook", asleep: false, repos: ["kebbie", "shop"] },
+    { machine: "mch_work", name: "work-mac", asleep: false, repos: ["webapp", "shop"] },
+    { machine: "mch_box", name: "devbox", asleep: false, repos: ["kebbie", "shop"], ideas: true },
   ];
-  const main = chooseMachine(candidates, { repo: "webapp", lastUsed: "mch_work", main: "mch_box" });
-  assert.deepEqual([main.name, main.why], ["devbox", "main machine"], "the main machine wins over the repo and the last used");
-  assert.equal(chooseMachine(candidates, { repo: "webapp", chosen: "mch_mac", main: "mch_box" }).name, "MacBook", "a machine picked for this action wins over the main one");
-  const asleep = candidates.map((one) => (one.machine === "mch_box" ? { ...one, asleep: true, repos: ["webapp"] } : one));
-  const fallback = chooseMachine(asleep, { repo: "webapp", main: "mch_box" });
-  assert.deepEqual([fallback.name, fallback.why], ["work-mac", "main machine is offline, sent to work-mac"]);
-  const mostlyAsleep = asleep.map((one) => (one.machine === "mch_work" ? { ...one, asleep: true } : one));
-  assert.equal(chooseMachine(mostlyAsleep, { repo: "webapp", lastUsed: "mch_work", main: "mch_box" }).name, "MacBook", "never an asleep machine while another is awake");
-  const allAsleep = candidates.map((one) => ({ ...one, asleep: true }));
-  assert.deepEqual(Object.values((({ name, why }) => ({ name, why }))(chooseMachine(allAsleep, { main: "mch_box" }))), ["devbox", "main machine, asleep now"]);
-  assert.equal(chooseMachine(candidates, { repo: "webapp", main: "mch_gone" }).why, "it has webapp", "a main machine that does not take this action changes nothing");
+  const said = (one) => [one.name, one.why];
+  assert.deepEqual(said(routeMachine(candidates, { repo: "webapp" })), ["work-mac", "only work-mac has webapp"], "a repo on one machine wins over the ideas machine");
+  assert.deepEqual(said(routeMachine(candidates, { repo: "shop" })), ["devbox", "ideas machine"], "a repo on several machines goes to the ideas machine");
+  assert.deepEqual(said(routeMachine(candidates)), ["devbox", "ideas machine"], "no repo goes to the ideas machine");
+  assert.deepEqual(said(routeMachine(candidates, { repo: "nowhere" })), ["devbox", "ideas machine"]);
+  const boxAsleep = candidates.map((one) => (one.ideas ? { ...one, asleep: true } : one));
+  assert.deepEqual(said(routeMachine(boxAsleep)), ["MacBook", "devbox is asleep, sent to MacBook"]);
+  const workAsleep = candidates.map((one) => (one.machine === "mch_work" ? { ...one, asleep: true } : one));
+  assert.deepEqual(said(routeMachine(workAsleep, { repo: "webapp" })), ["devbox", "work-mac is asleep, sent to devbox"], "an awake ideas machine takes the asleep machine's work first");
+  assert.deepEqual(said(routeMachine(workAsleep, { repo: "webapp", needsRepo: true })), ["work-mac", "only work-mac has webapp, asleep now"], "a start waits for the only machine with its repo");
+  assert.deepEqual(said(routeMachine(candidates.map((one) => ({ ...one, asleep: true })))), ["devbox", "ideas machine, asleep now"]);
+  const plain = candidates.map(({ ideas, ...one }) => one);
+  assert.deepEqual(said(routeMachine(plain, { repo: "shop" })), ["MacBook", "awake now"], "with no ideas machine an awake machine takes it");
+  assert.deepEqual(said(routeMachine([{ ...plain[1], asleep: true }, plain[0]], { repo: "kebbie", needsRepo: true })), ["MacBook", "only MacBook has kebbie"]);
+  assert.deepEqual(said(routeMachine(plain, { repo: "gone", needsRepo: true })), ["MacBook", "awake now"], "a start whose repo no machine has goes out for the machine to refuse");
+  assert.equal(routeMachine([]), null);
+  assert.equal(ideaMachine(candidates), "mch_box");
+  assert.equal(ideaMachine(plain), null, "a kebbie without ideas.machine names none");
 });
 
-test("a new idea goes to the ideas machine while it is awake, and while it is asleep to an awake machine, with the line saying so", () => {
-  const candidates = [
-    { machine: "mch_mac", name: "MacBook", asleep: false, repos: ["kebbie"] },
-    { machine: "mch_box", name: "devbox", asleep: false, repos: [], ideas: true },
-  ];
-  const ideas = ideaMachine(candidates);
-  assert.equal(ideas, "mch_box");
-  assert.deepEqual(Object.values((({ name, why }) => ({ name, why }))(chooseMachine(candidates, { lastUsed: "mch_mac", main: "mch_mac", ideas }))), ["devbox", "ideas machine"], "the ideas machine wins over the main and the last used");
-  assert.equal(chooseMachine(candidates, { chosen: "mch_mac", ideas }).why, "you chose it", "your pick wins over the ideas machine");
-  const asleep = candidates.map((one) => (one.ideas ? { ...one, asleep: true } : one));
-  assert.equal(ideaMachine(asleep), "mch_box", "an asleep ideas machine is still the one named");
-  assert.deepEqual(Object.values((({ name, why }) => ({ name, why }))(chooseMachine(asleep, { ideas: "mch_box" }))), ["MacBook", "ideas machine is asleep, sent to MacBook"]);
-  assert.equal(chooseMachine(asleep.map((one) => ({ ...one, asleep: true })), { ideas: "mch_box" }).why, "ideas machine, asleep now");
-  assert.equal(ideaMachine([{ machine: "mch_old", name: "old", asleep: false, repos: [] }]), null, "a kebbie without ideas.machine names none");
-  const form = ideaForm({ text: "x", candidates, chosen: chooseMachine(candidates, { ideas }), choosing: true, ideas });
-  assert.match(text(form), /Goes to the lead on devbox ideas machine Done .*devbox awake · ideas machine/);
+test("an item's write-out and answers go to the ideas machine its board names, not to another machine that also has the repo", () => {
+  const box = machine("mch_box", "devbox", [session], { repos: ["kebbie", "webapp"] });
+  box.board.idea_machine = true;
+  const shared = mergeBacklog([...opened, box], NOW).find((entry) => entry.key === session.item);
+  assert.deepEqual(shared.machines.map((one) => [one.name, one.ideas]), [["MacBook", false], ["work-mac", false], ["devbox", true]]);
+  const chosen = routeMachine(shared.machines, { repo: shared.row.repo });
+  assert.deepEqual([chosen.name, chosen.why], ["devbox", "ideas machine"]);
 });
 
-test("the main machine is kept on the phone per account, and a storage that throws keeps none", () => {
-  const held = new Map();
-  const storage = { getItem: (key) => held.get(key) ?? null, setItem: (key, value) => held.set(key, value), removeItem: (key) => held.delete(key) };
-  keepMain(storage, "acc_1", "mch_box");
-  assert.equal(readMain(storage, "acc_1"), "mch_box");
-  assert.equal(readMain(storage, "acc_2"), null);
-  keepMain(storage, "acc_1", null);
-  assert.equal(readMain(storage, "acc_1"), null);
-  assert.equal(readMain({ getItem: () => { throw new Error("blocked"); } }, "acc_1"), null);
+test("New sends an idea to the ideas machine and a start to the machine the rule picks for its repo, each named without a chooser", () => {
+  const mac = { machine: "mch_mac", name: "MacBook", accepts: ["idea", "start"], asleep: false, repos: ["shop", "kebbie"], starts: true };
+  const box = { machine: "mch_box", name: "devbox", accepts: ["idea", "start"], asleep: false, repos: ["kebbie"], starts: true, ideas: true };
+  const targets = newTargets([mac, box], null);
+  assert.deepEqual([targets.adds.name, targets.starter.name, targets.repo, targets.repos], ["devbox", "devbox", "kebbie", ["kebbie", "shop"]], "the ideas machine's repos come first");
+  const shop = newTargets([mac, box], "shop");
+  assert.deepEqual([shop.adds.name, shop.starter.name, shop.starter.why], ["devbox", "MacBook", "only MacBook has shop"]);
+  const form = ideaForm({ text: "x", candidates: [mac, box], ...shop });
+  assert.match(text(form), /Goes to the lead on devbox ideas machine Starts in kebbie shop Starts on MacBook only MacBook has shop Start now on MacBook Add to the backlog$/);
+  assert.doesNotMatch(form, /backlog-choose|backlog-machine/);
+  assert.equal(newTargets([mac, box], "gone").repo, "kebbie", "a repo no machine has falls back to the first");
+  assert.notEqual(newTargets([mac, box], "kebbie").starter.name, newTargets([mac, box], "shop").starter.name, "picking another repo can move the start to another machine");
 });
 
 test("when the lead folds one answer in and its question leaves, every other draft and sent answer stays on its own question", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const drafts = ui({ open: new Set([Q0, Q1, Q2]), answers: new Map([[Q0, "Renew on every request"], [Q1, "Every device"], [Q2, "Yes"]]) });
   const [first, second] = answersToSend(body, drafts, [0, 1]).map((one) => answerCommand(shared, one).meta);
   const kept = [sentAt({ kind: "item-answer", ...first, result: { outcome: "done", reason: null, text: "ok", at: NOW - 60 } }), sentAt({ kind: "item-answer", ...second, id: "cmd_2" })];
@@ -298,7 +298,7 @@ test("a body that changes keeps the one shown until the new one is read, so the 
 
 test("a start refused for open questions says how many, and a second Start in the same visit goes anyway", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const start = { sent: sentAt({ kind: "start-item", at: NOW - 30, exp: NOW - 30 + DAY, result: { outcome: "refused", reason: "questions-open", blocking: 2, text: "Not started: 2 questions wait on you.", at: NOW - 20 } }), state: "refused", standing: null, live: false };
   const said = text(itemBody(shared, { body, access: "ready", ui: ui(), start, candidates: shared.machines, chosen, now: NOW }));
   assert.match(said, /Not started: 2 questions wait on you\. Answer them on its card, or press Start again to start anyway\. .* Save to backlog Start/);
@@ -309,7 +309,7 @@ test("a start refused for open questions says how many, and a second Start in th
 
 test("a start waiting for an asleep machine, one waiting for this device's approval and one started each say so", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: "webapp" });
+  const chosen = routeMachine(shared.machines, { repo: "webapp" });
   const card = (state, fields = {}, standing = null) => text(itemBody(shared, { body, access: "ready", ui: ui(), start: { sent: sentAt({ kind: "start-item", exp: NOW - 120 + DAY, ...fields }), state, standing, live: state !== "refused" }, candidates: shared.machines, chosen, now: NOW, taskHref: "#/task/mch_work/session@webapp" }));
   assert.match(card("waiting"), /Waiting for work-mac The lead starts Session drops on reload when work-mac wakes up\. Sent from iPhone 16 at \d\d:\d\d · goes out when it wakes · expires in 23 h$/);
   assert.match(card("approval", {}, { state: "waiting", fingerprint: "AB", until: NOW + 23 * 3600 }), /Waiting for work-mac to approve this iPhone 16 Approve it in kebbie, or it is approved automatically in 23 h\. Your start goes out if work-mac approves before/);
@@ -350,15 +350,14 @@ test("a new idea shows at once under New until its machine posts a board after f
   assert.match(text(itemBody(entry, { now: NOW })), /state to write: the lead on MacBook writes it out filed today, from iPhone 16/);
 });
 
-test("the idea composer goes to a chosen machine and adds only a written idea", () => {
-  const candidates = [{ machine: "mch_mac", name: "MacBook", asleep: false, repos: [] }, { machine: "mch_work", name: "work-mac", asleep: false, repos: [] }];
-  const chosen = chooseMachine(candidates, { lastUsed: "mch_mac" });
-  assert.match(text(ideaForm({ text: "", candidates, chosen })), /Goes to the lead on MacBook you used it last Change Add to the backlog/);
-  assert.match(ideaForm({ text: "", candidates, chosen }), /data-action="add-idea" disabled/);
-  assert.doesNotMatch(ideaForm({ text: "retry", candidates, chosen }), /data-action="add-idea" disabled/);
-  assert.match(text(ideaForm({ text: "x", candidates: [], chosen: null })), /No machine takes ideas from the hub/);
+test("the idea composer names where the idea goes and adds only a written idea", () => {
+  const candidates = [{ machine: "mch_mac", name: "MacBook", accepts: ["idea"], asleep: false, repos: [] }, { machine: "mch_work", name: "work-mac", accepts: ["idea"], asleep: false, repos: [], ideas: true }];
+  const targets = newTargets(candidates);
+  assert.match(text(ideaForm({ text: "", candidates, ...targets })), /Goes to the lead on work-mac ideas machine Add to the backlog/);
+  assert.match(ideaForm({ text: "", candidates, ...targets }), /data-action="add-idea" disabled/);
+  assert.doesNotMatch(ideaForm({ text: "retry", candidates, ...targets }), /data-action="add-idea" disabled/);
+  assert.match(text(ideaForm({ text: "x", candidates: [], ...newTargets([]) })), /No machine takes ideas from the hub/);
 });
-
 test("a vault note's row shows the furthest state and the fewest blocking questions any machine has, and a ready item without a body shows its goal", () => {
   const answered = { ...session, blocking: 1 };
   const [shared] = mergeBacklog([machine("mch_mac", "MacBook", [session]), machine("mch_work", "work-mac", [answered])], NOW);
@@ -371,7 +370,7 @@ test("a vault note's row shows the furthest state and the fewest blocking questi
 
 test("the card shows whatever template the item uses, in its order, with the open questions under the section the template names", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const chosen = routeMachine(shared.machines, { repo: shared.row.repo });
   const other = { sections: [section("problem", "Problem", "Reloads sign you out.", true), section("risks", "Risks", "")], questions: body.questions, questions_key: null };
   const said = text(itemBody(shared, { body: other, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW }));
   assert.match(said, /Problem Reloads sign you out\. Risks Empty\. Open questions 2 wait on you before it starts/);
@@ -382,7 +381,7 @@ test("the card shows whatever template the item uses, in its order, with the ope
 
 test("each section and the title get an Edit where a machine takes edits, and Save waits for a change a required section can hold", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const chosen = routeMachine(shared.machines, { repo: shared.row.repo });
   const card = (fields) => itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: () => null, ...fields } });
   assert.equal((card({}).match(/data-action="item-edit"/g) ?? []).length, body.sections.length + 1);
   assert.doesNotMatch(card({ machine: null }), /data-action="item-edit"/);
@@ -400,7 +399,7 @@ test("each section and the title get an Edit where a machine takes edits, and Sa
 
 test("a saved edit shows Saving with its text until the board carries it, and an edit made on an older text says the machine has a newer one", () => {
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const chosen = routeMachine(shared.machines, { repo: shared.row.repo });
   const edit = (shown) => (key) => (key === "goal" ? shown : null);
   const card = (shown) => text(itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: edit(shown) } }));
   const sent = sentAt({ kind: "item-edit", section: "goal", text: "You stay signed in across a reload." });
@@ -421,7 +420,7 @@ test("an edit loses control characters the machine refuses, says what is too lon
   assert.equal(editProblem(payload(null, "x".repeat(MAX_ITEM_TITLE_CHARS + 1))), "This title is 201 characters; a title holds at most 200.");
   assert.equal(editProblem(payload("goal", "😀".repeat(MAX_SECTION_CHARS))), "This section comes to 32 kB, and an edit holds at most 24 kB. Shorten it before saving.");
   const shared = mergeBacklog(opened, NOW)[0];
-  const chosen = chooseMachine(shared.machines, { repo: shared.row.repo });
+  const chosen = routeMachine(shared.machines, { repo: shared.row.repo });
   const { text: _, ...kept } = sentAt({ kind: "item-edit", section: "goal", result: { outcome: "done", at: NOW } });
   const card = (key) => text(itemBody(shared, { body, access: "ready", ui: ui(), candidates: shared.machines, chosen, now: NOW, edits: { machine: chosen, editing: null, sentFor: (one) => (one === key ? { sent: kept, state: "done", standing: null, live: true, saving: true, recent: true } : null) } }));
   assert.match(card("goal"), /Goal Saving…/);
@@ -551,24 +550,22 @@ test("the same vault note in two accounts stays two rows, and each row's machine
   assert.equal(entries[1].key, "vault:Projects/round.md", "the command still names the note itself");
 });
 
-test("New offers Start now on the chosen machine and Add to the backlog, starts in its first repo unless another is picked, and sends a start the machine names", () => {
+test("New offers Start now on the rule's machine and Add to the backlog, starts in the first repo unless another is picked, and sends a start the machine names", () => {
   const mac = { machine: "mch_mac", name: "MacBook", accepts: ["idea", "start"], asleep: false, repos: ["shop", "kebbie"], starts: true };
-  const both = ideaForm({ text: "Fix the rounding in invoices", candidates: [mac], chosen: chooseMachine([mac], {}) });
-  assert.match(text(both), /What do you want done\? Start it now, or add it to the backlog .* Goes to MacBook .* Starts in shop kebbie Start now on MacBook Add to the backlog$/);
+  const both = ideaForm({ text: "Fix the rounding in invoices", candidates: [mac], ...newTargets([mac]) });
+  assert.match(text(both), /What do you want done\? Start it now, or add it to the backlog .* Goes to the lead on MacBook .* Starts in shop kebbie Starts on MacBook .* Start now on MacBook Add to the backlog$/);
   assert.match(both, /data-action="start-now">Start now on MacBook</);
   assert.match(both, /<option value="shop" selected>/);
-  assert.match(ideaForm({ text: "", candidates: [mac], chosen: mac }), /data-action="start-now" disabled/);
-  assert.equal(startRepo(mac, "kebbie"), "kebbie");
-  assert.equal(startRepo(mac, "gone"), "shop", "a repo the machine lacks falls back to its first, as n does");
-  assert.equal(startRepo({ ...mac, repos: [] }, null), null);
+  assert.match(ideaForm({ text: "", candidates: [mac], ...newTargets([mac]) }), /data-action="start-now" disabled/);
+  assert.equal(newTargets([mac], "kebbie").repo, "kebbie");
+  assert.equal(newTargets([{ ...mac, repos: [] }]).starter, null);
   const ideasOnly = { ...mac, accepts: ["idea"], starts: false };
-  assert.doesNotMatch(ideaForm({ text: "x", candidates: [ideasOnly], chosen: ideasOnly }), /start-now/, "an older kebbie that takes no starts offers only the backlog");
+  assert.doesNotMatch(ideaForm({ text: "x", candidates: [ideasOnly], ...newTargets([ideasOnly]) }), /start-now/, "an older kebbie that takes no starts offers only the backlog");
   const startsOnly = { ...mac, accepts: ["start"] };
-  assert.doesNotMatch(ideaForm({ text: "x", candidates: [startsOnly], chosen: startsOnly }), /add-idea/);
-  assert.doesNotMatch(ideaForm({ text: "x", candidates: [{ ...mac, repos: [] }], chosen: { ...mac, repos: [] } }), /start-now/, "with no repo on its board there is nowhere to start");
+  assert.doesNotMatch(ideaForm({ text: "x", candidates: [startsOnly], ...newTargets([startsOnly]) }), /add-idea/);
+  assert.doesNotMatch(ideaForm({ text: "x", candidates: [{ ...mac, repos: [] }], ...newTargets([{ ...mac, repos: [] }]) }), /start-now/, "with no repo on its board there is nowhere to start");
   assert.deepEqual(startCommand({ text: "  Fix the rounding in invoices \n", repo: "shop" }).payload, { type: "start", repo: "shop", name: "", prompt: "Fix the rounding in invoices" });
 });
-
 test("a start from New says it is on its way, then the machine's result: started as its name, or the refusal with the words to try again", () => {
   const sent = { id: "cmd_s", kind: "start", machine: "mch_mac", machineName: "MacBook", repo: "shop", text: "Fix it", at: NOW - 5, exp: NOW + 3_000, deviceName: "iPhone 16" };
   assert.match(text(newStartStatus(sent, "sending", { now: NOW })), /Sent to MacBook The task starts in shop\./);
@@ -582,9 +579,9 @@ test("a start from New says it is on its way, then the machine's result: started
 
 test("with two accounts New names the account in its question and its button, with one it reads as before", () => {
   const candidates = [{ machine: "mch_devbox", name: "devbox", accepts: ["idea"], asleep: false, repos: [], ideas: true }];
-  const chosen = chooseMachine(candidates, {});
-  const plain = ideaForm({ text: "Mail a summary", candidates, chosen });
+  const targets = newTargets(candidates);
+  const plain = ideaForm({ text: "Mail a summary", candidates, ...targets });
   assert.match(text(plain), /Add to the backlog$/);
-  const work = ideaForm({ text: "Mail a summary", candidates, chosen, picker: "<div>PICKER</div>", account: "Work" });
+  const work = ideaForm({ text: "Mail a summary", candidates, ...targets, picker: "<div>PICKER</div>", account: "Work" });
   assert.match(text(work), /^PICKER What do you want done\? .* Add to Work's backlog$/);
 });
