@@ -1,4 +1,4 @@
-import { acceptMatters, asksYou } from "./board.js";
+import { acceptMatters, acceptRequired, asksYou, leadPushes } from "./board.js";
 import { connectBlock, connectBlockText } from "./connect.js";
 import { CATEGORY_GROUPS, switchable } from "./notify.js";
 import { planGroup } from "./pro.js";
@@ -415,6 +415,8 @@ export function stageLine(item) {
   return `${esc(name)} pushed`;
 }
 
+const youReview = (item) => !leadPushes(item) || acceptRequired(item);
+
 export function stepSummary(item) {
   const subtasks = item.subtasks ?? [];
   const of = (...states) => subtasks.filter((one) => states.includes(one.state)).length;
@@ -422,7 +424,8 @@ export function stepSummary(item) {
   const total = subtasks.length;
   const parts = [];
   if (accepted) parts.push(`<span class="ok">✓ ${esc(accepted)} of ${esc(total)} subtasks accepted</span>`);
-  if (ready) parts.push(`<span class="accept">◆ ${accepted ? `${esc(ready)} to review` : `${esc(ready)} of ${esc(total)} subtasks to review`}</span>`);
+  if (ready && youReview(item)) parts.push(`<span class="accept">◆ ${accepted ? `${esc(ready)} to review` : `${esc(ready)} of ${esc(total)} subtasks to review`}</span>`);
+  else if (ready) parts.push(`${esc(ready)} of ${esc(total)} subtasks ready`);
   if (building) parts.push(`<span class="prog">${esc(building)} in progress</span>`);
   if (total && !ready && !building && pushedCount(item)) parts.push(`↑ ${esc(plural(pushedCount(item), "commit", "commits"))} pushed`);
   const stage = stageLine(item);
@@ -434,7 +437,7 @@ export function stepsWanted(item, machineName) {
   const ready = (item.subtasks ?? []).find((one) => one.state === "ready");
   const kebbie = item.kebbie_questions?.[0];
   const verify = kebbie?.stage ? `verify ${stageName(item, item.stages[stageAt(item, kebbie.stage)])}` : kebbie?.kind === "verify" ? "verify a check" : kebbie ? "close the task" : "";
-  const asks = [verify, runCount(item) ? `push ${plural(runCount(item), "commit", "commits")}` : "", ready ? `review ${ready.title}` : ""].filter(Boolean);
+  const asks = [verify, runCount(item) && !leadPushes(item) ? `push ${plural(runCount(item), "commit", "commits")}` : "", ready && youReview(item) ? `review ${ready.title}` : ""].filter(Boolean);
   return asks.length ? `${asks.join(" or ")} on ${machineName}` : null;
 }
 

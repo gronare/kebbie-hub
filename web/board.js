@@ -84,15 +84,16 @@ export async function openBoards(listing, identity, now, marks = emptyMarks()) {
 export const isAsleep = (machine, now) => machine.lastSeen === null || now - machine.lastSeen > SLEEP_AFTER;
 
 export const acceptRequired = (item) => item.require_accept === true;
+export const leadPushes = (item) => Boolean(item?.push_permission);
 export const asksYou = (item) => Boolean(item?.question || item?.prompt || item?.kebbie_questions?.length);
 export const shownQuestion = (item) => item.question ?? (item.prompt ? null : (item.kebbie_questions?.[0] ?? null));
 
-// Accepting a ready subtask means something when the board requires it before a push, or when the task is still building a later subtask so the push can take this one ahead; a task in review or reported ready is pushed whole.
+// Accepting a ready subtask means something when the board requires it before a push, or when the task is still building a later subtask so the push can take this one ahead; a task in review or reported ready is pushed whole, and so is one the lead may push.
 const PUSHED_WHOLE = ["READY TO PUSH", "TO REVIEW"];
 export const acceptMatters = (item, subtask) => {
   const subtasks = item?.subtasks ?? [];
   const at = subtasks.findIndex((one) => one.id === subtask?.id);
-  return acceptRequired(item) || (!PUSHED_WHOLE.includes(item?.group) && at >= 0 && subtasks.slice(at + 1).some((later) => later.state === "planned" || later.state === "in-progress"));
+  return acceptRequired(item) || (!leadPushes(item) && !PUSHED_WHOLE.includes(item?.group) && at >= 0 && subtasks.slice(at + 1).some((later) => later.state === "planned" || later.state === "in-progress"));
 };
 
 export const toAccept = (item) => (item.subtasks ?? []).filter((subtask) => subtask.state === "ready" && acceptMatters(item, subtask)).length;

@@ -334,6 +334,22 @@ test("a board row says in one line how far the subtasks have come and what is yo
   for (const state of ["investigating", "asked", "with-lead", "decided"]) assert.equal(text(stepSummary({ ...asks, obstacle: { ...asks.obstacle, state } })), "◆ 1 of 3 subtasks to review · 1 in progress", `an obstacle ${state} stays off the row`);
 });
 
+test("a row in a repo the lead may push shows nothing yellow and asks you nothing, unless the board requires your accept", () => {
+  const lead = { ...payments, push_permission: "repo" };
+  const html = taskRow(rowOf(lead));
+  assert.equal(text(html), "payments devbox api · 2 commits 1 of 3 subtasks ready · 1 in progress");
+  assert.doesNotMatch(html, /class="(accept|warn)"|you:/);
+  assert.doesNotMatch(text(taskRow(rowOf({ ...mindin, require_accept: false, push_permission: "task" }))), /you:|to review/, "the lead pushes the run and reviews the ready subtask");
+  assert.match(text(taskRow(rowOf({ ...mindin, push_permission: "task" }))), /you: review Lint from the index on devbox$/, "with require_accept the push is the lead's but the accept stays yours");
+  const going = { ...lead, summary: "pushing for the lead · 2nd in line" };
+  assert.equal(text(taskRow(rowOf(going))), "payments devbox api · pushing for the lead · 2nd in line 1 of 3 subtasks ready · 1 in progress", "a task on its way out says its place in line, without yellow");
+  const yours = taskRow(rowOf({ ...lead, require_accept: true }));
+  assert.match(yours, /<span class="accept">◆ 1 of 3 subtasks to review<\/span>/, "require_accept keeps the accept yours");
+  assert.match(text(yours), /you: review Charge through a PaymentGateway on devbox$/);
+  const verify = { ...lead, kebbie_questions: [{ kind: "verify", text: "Check it" }] };
+  assert.match(text(taskRow(rowOf(verify))), /you: verify a check on devbox$/, "a check only you can make stays yours");
+});
+
 test("what kebbie asks of you comes before a subtask to review", () => {
   assert.equal(text(taskRow(rowOf({ ...required, next_for_you: "answer: Keep it?" }))).endsWith("you: answer: Keep it?"), true);
   assert.doesNotMatch(text(taskRow(rowOf({ ...payments, subtasks: payments.subtasks.map((one) => ({ ...one, state: one.state === "ready" ? "in-progress" : one.state })) }))), /you:/);
@@ -393,6 +409,8 @@ test("a task without subtasks shows its row as before, and the board's count onl
   assert.match(text(subtaskList({ ...payments, group: "TO REVIEW" })), /accepting each subtask is optional: push takes what is committed$/);
   assert.match(text(subtaskList({ ...payments, subtasks: payments.subtasks.map((one) => ({ ...one, state: "ready" })) })), /accepting each subtask is optional: push takes what is committed$/);
   assert.doesNotMatch(text(subtaskList(required)), /optional/);
+  assert.match(text(subtaskList({ ...payments, push_permission: "task" })), /accepting each subtask is optional: push takes what is committed$/, "the lead may push the task, so nothing waits on your accept");
+  assert.doesNotMatch(text(subtaskList({ ...required, push_permission: "repo" })), /optional/, "require_accept keeps the accept yours");
 });
 
 test("after the two nearest planned subtasks the rest fold into one line that opens them", () => {

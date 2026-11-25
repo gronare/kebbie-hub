@@ -150,6 +150,10 @@ test("a fully read step offers Accept in the thumb zone, and a comment waiting o
   const optional = subtaskEnd(allRead({ item: allReady }));
   assert.equal(text(optional), "Optional: the push takes it as committed. Accept “Charge through a PaymentGateway”", "nothing waits on it: a plain button, said to be optional");
   assert.match(optional, /<button type="button" class="btn" data-action="rv-accept">/);
+  const lead = subtaskEnd(allRead({ item: { ...item, push_permission: "repo" } }));
+  assert.equal(text(lead), "Optional: the push takes it as committed. Accept “Charge through a PaymentGateway”", "the lead may push the task, so its push takes the subtask as committed");
+  assert.match(lead, /<button type="button" class="btn" data-action="rv-accept">/);
+  assert.match(subtaskEnd(allRead({ item: { ...item, push_permission: "repo", require_accept: true } })), /class="btn primary" data-action="rv-accept"/, "require_accept keeps the accept yours");
   assert.equal(text(subtaskEnd(allRead({ sentComments: [{ path: "src/orders.rs", state: "done" }] }))), "Waiting for Claude's changes");
   assert.equal(text(subtaskEnd(allRead({ sentComments: [{ path: "src/orders.rs", state: "refused" }] }))), "Accept “Charge through a PaymentGateway”", "a comment that never arrived waits on nothing");
   assert.match(text(subtaskEnd(allRead({ accepts: ["review-open"] }))), /MacBook takes accepts only at the machine\. Accept Charge through a PaymentGateway in kebbie there\./);

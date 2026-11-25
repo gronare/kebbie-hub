@@ -83,8 +83,10 @@ test("a board with subtasks opens with them, and the board counts the subtasks w
   assert.equal(toAccept({ subtasks: task.subtasks.map((one) => (one.state === "in-progress" || one.state === "planned" ? { ...one, state: "ready" } : one)) }), 0, "every subtask ready: the push takes them all, so nothing counts");
   assert.equal(toAccept({ ...task, group: "READY TO PUSH" }), 0, "a task reported ready is pushed whole");
   assert.equal(toAccept({ ...task, group: "TO REVIEW" }), 0, "a task in review is pushed whole");
+  for (const permit of ["task", "repo"]) assert.equal(toAccept({ ...task, push_permission: permit }), 0, `with the lead's ${permit} push permission the lead accepts, so nothing counts for you`);
   task.require_accept = true;
   assert.equal(toAccept(task), 1);
+  assert.equal(toAccept({ ...task, push_permission: "repo" }), 1, "require_accept keeps the accept yours: kebbie takes it only from you");
   const two = { require_accept: true, subtasks: [...task.subtasks.map((one) => (one.id === "new-gateway" ? { ...one, state: "ready", commits: ["3".repeat(40)] } : one))] };
   const view = arrange([
     machineWith("mch_a", "devbox", now - 10, [task, item("other@web", "WORKING", 0, two), item("search@web", "WORKING")]),
