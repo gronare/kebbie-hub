@@ -40,7 +40,7 @@ pub fn view(pairing: &Pairing, side: Side, now: u64) -> PairingView {
         reason: pairing.reason,
         expires_at: pairing.expires_at,
         machine: pairing.machine.clone(),
-        commitment: Some(pairing.commitment).filter(|_| shows_reveal).map(Bytes32),
+        commitment: shows_reveal.then_some(pairing.commitment).map(Bytes32),
         machine_keys: pairing.machine_keys.filter(|_| shows_reply),
         machine_nonce: pairing.machine_nonce.filter(|_| shows_reply).map(Bytes32),
         machine_name: None,
