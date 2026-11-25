@@ -73,6 +73,17 @@ test("tasks from awake machines group in the terminal's order, most urgent first
   assert.deepEqual(view.sleeping, []);
 });
 
+test("Ready to push holds only what you push: a task on its way out for the lead sits under Working with its place in line", () => {
+  const view = arrange([machineWith("mch_a", "devbox", now - 10, [
+    item("mine@web", "READY TO PUSH"),
+    item("queued@web", "WORKING", 0, { push_permission: "repo", summary: "pushing for the lead · 2nd in line" }),
+    item("waiting@web", "WORKING", 0, { push_permission: "task", summary: "the lead pushes it" }),
+  ])], now);
+  const shown = Object.fromEntries(view.groups.map((group) => [group.title, group.rows.map((row) => row.item.address)]));
+  assert.deepEqual(shown["Ready to push"], ["mine@web"]);
+  assert.deepEqual(shown.Working, ["queued@web", "waiting@web"]);
+});
+
 test("a board with subtasks opens with them, and the board counts the subtasks waiting to be accepted on awake machines", async () => {
   const planned = envelopes.cases.find((candidate) => candidate.name === "board-with-subtasks-opened-by-the-account");
   const [opened] = await open([entry({ rev: planned.expect.payload.rev, envelope: planned.envelope })]);
